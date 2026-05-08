@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proto Trading | World-Class Portal Concept</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #101828; background: #f4f6f8; }
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      .shell { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+      .topbar { height: 72px; display: flex; align-items: center; gap: 18px; padding: 0 24px; background: #111827; color: #fff; }
+      .brand { display: flex; align-items: center; gap: 9px; min-width: 210px; font-weight: 900; }
+      .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: #dc2626; display: grid; place-items: center; }
+      .brand span:last-child { color: #ef4444; }
+      .search { flex: 1; max-width: 760px; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 15px; border-radius: 8px; background: #fff; color: #667085; }
+      .search input { width: 100%; border: 0; outline: 0; font-size: 15px; }
+      .cart-summary { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-left: 18px; border-left: 1px solid #344054; white-space: nowrap; }
+      .cart-badge { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #dc2626; font-size: 11px; font-weight: 800; }
+      .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; }
+      .sidebar, .drawer { background: #fff; border-color: #e4e7ec; }
+      .sidebar { border-right: 1px solid #e4e7ec; overflow: auto; padding: 14px; }
+      .sidebar-label, .eyebrow { color: #98a2b3; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+      .category { width: 100%; min-height: 44px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 11px; border: 0; border-radius: 8px; background: transparent; color: #344054; text-align: left; font-weight: 700; }
+      .category small { color: #98a2b3; font-weight: 800; }
+      .category.active { background: #fff1f2; color: #be123c; box-shadow: inset 3px 0 0 #dc2626; }
+      .trust { margin-top: 18px; padding: 16px; border: 1px solid #e4e7ec; border-radius: 8px; background: #f9fafb; display: grid; gap: 7px; font-size: 13px; line-height: 1.45; color: #667085; }
+      .trust strong { color: #101828; font-size: 14px; }
+      .content { overflow: auto; padding: 26px 30px 38px; }
+      .hero { min-height: 250px; display: grid; grid-template-columns: minmax(0, 1fr) 42%; align-items: center; gap: 24px; padding: 30px; border-radius: 10px; background: #111827; color: #fff; overflow: hidden; }
+      .hero h1 { max-width: 760px; margin: 10px 0 12px; font-size: 42px; line-height: 1.02; letter-spacing: 0; }
+      .hero p { max-width: 630px; color: #cbd5e1; line-height: 1.55; }
+      .hero img { width: 100%; height: 210px; object-fit: cover; border-radius: 8px; }
+      .metrics { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+      .metrics b { padding: 8px 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; background: rgba(255,255,255,.05); font-size: 13px; }
+      .shortcuts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+      .shortcut { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px; border: 1px solid #e4e7ec; border-radius: 8px; background: #fff; color: #344054; font-weight: 800; text-align: left; }
+      .shortcut b { color: #dc2626; font-size: 18px; }
+      .results-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 12px 0 16px; border-bottom: 1px solid #e4e7ec; }
+      .results-head h2 { margin: 3px 0; font-size: 30px; }
+      .results-head p { margin: 0; color: #667085; font-size: 14px; }
+      .results-head select { height: 40px; border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; padding: 0 12px; font-weight: 700; }
+      .grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 18px; padding-top: 18px; }
+      .card { display: flex; flex-direction: column; min-height: 420px; border: 1px solid #e4e7ec; border-radius: 8px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+      .image { position: relative; height: 190px; display: grid; place-items: center; background: #f8fafc; border-bottom: 1px solid #edf0f3; }
+      .tags { position: absolute; top: 10px; left: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+      .tags span { padding: 4px 7px; border-radius: 4px; background: #111827; color: #fff; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+      .image img { width: 78%; height: 78%; object-fit: contain; }
+      .body { display: flex; flex: 1; flex-direction: column; padding: 16px; }
+      .meta { display: flex; justify-content: space-between; gap: 10px; color: #98a2b3; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+      .meta b { color: #16a34a; }
+      .card h3 { margin: 8px 0; min-height: 44px; font-size: 15px; line-height: 1.45; }
+      .card p { margin: 0; color: #667085; font-size: 12px; line-height: 1.45; }
+      .price { margin-top: auto; padding-top: 13px; border-top: 1px solid #edf0f3; display: flex; align-items: baseline; gap: 7px; }
+      .price strong { color: #dc2626; font-size: 25px; }
+      .price span { color: #98a2b3; font-size: 11px; }
+      .buy { display: flex; gap: 8px; margin-top: 13px; }
+      .qty { height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; overflow: hidden; background: #f9fafb; display: flex; align-items: center; }
+      .qty button { width: 34px; height: 100%; border: 0; background: transparent; font-weight: 900; }
+      .qty span { width: 32px; text-align: center; font-weight: 900; }
+      .add, .drawer button.send { flex: 1; height: 40px; border: 0; border-radius: 7px; background: #dc2626; color: #fff; display: inline-flex; justify-content: center; align-items: center; gap: 7px; font-weight: 900; }
+      .drawer { border-left: 1px solid #e4e7ec; display: flex; flex-direction: column; overflow: hidden; }
+      .drawer-head, .drawer-foot { padding: 20px; border-bottom: 1px solid #e4e7ec; }
+      .drawer-head h2 { margin: 3px 0; }
+      .drawer-head p { color: #667085; font-size: 13px; margin: 0; }
+      .cart-lines { flex: 1; overflow: auto; padding: 0 20px; }
+      .line { display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: center; padding: 15px 0; border-bottom: 1px solid #edf0f3; }
+      .line img { width: 58px; height: 58px; border: 1px solid #e4e7ec; border-radius: 7px; object-fit: contain; background: #f8fafc; }
+      .line strong { display: block; font-size: 13px; line-height: 1.35; }
+      .line span { color: #98a2b3; font-size: 11px; font-weight: 900; }
+      .line b { display: block; margin-top: 4px; color: #dc2626; }
+      .drawer-foot { border-top: 1px solid #e4e7ec; border-bottom: 0; background: #f9fafb; }
+      .total { display: flex; justify-content: space-between; align-items: baseline; }
+      .total span { color: #667085; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+      .total strong { font-size: 27px; }
+      .drawer-foot p { color: #667085; font-size: 13px; }
+      .drawer small { margin-top: 12px; display: block; text-align: center; color: #98a2b3; }
+      .sticky { height: 56px; display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding: 0 24px; background: #111827; color: #fff; border-top: 1px solid #253044; }
+      .sticky span { color: #98a2b3; }
+      .sticky strong { font-size: 20px; }
+      .sticky b { color: #22c55e; font-size: 13px; }
+      @media (max-width: 1180px) { .layout { grid-template-columns: 240px minmax(0, 1fr); } .drawer { display: none; } .grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+      @media (max-width: 760px) { .topbar { padding: 0 14px; } .brand { min-width: auto; } .brand span:not(.brand-mark), .cart-summary strong { display: none; } .layout { grid-template-columns: 1fr; } .sidebar { display: none; } .content { padding: 16px; } .hero { grid-template-columns: 1fr; padding: 22px; } .hero h1 { font-size: 32px; } .hero img { height: 150px; } .shortcuts { grid-template-columns: 1fr 1fr; } .results-head { align-items: flex-start; flex-direction: column; } .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">P</span><span>PROTO</span><span>TRADING</span></div>
+        <label class="search">Search <input id="search" placeholder="Search products, SKU codes or trade lines" /></label>
+        <div class="cart-summary"><span class="cart-badge" id="units">18</span><strong id="topTotal">R443.46</strong></div>
+      </header>
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-label">Categories</div>
+          <div id="categories"></div>
+          <div class="trust"><strong>Trade customers only</strong><span>Wholesale pricing, stock and delivery are confirmed by the sales team after request submission.</span></div>
+        </aside>
+        <main class="content">
+          <section class="hero">
+            <div><span class="eyebrow">Logged-in wholesale portal</span><h1>Build a quote-ready order from fast-moving trade stock.</h1><p>Search, browse categories, add quantities, and send a clean wholesale request to Proto Trading.</p><div class="metrics"><b>5,000+ lines</b><b>R1,000 minimum</b><b>SA-wide support</b></div></div>
+            <img src="/hero-cluster.png" alt="Proto Trading wholesale products" />
+          </section>
+          <section class="shortcuts">
+            <button class="shortcut" data-query="hot"><b>*</b><span>Hot sellers</span><span>></span></button>
+            <button class="shortcut" data-query="under r50"><b>%</b><span>Under R50</span><span>></span></button>
+            <button class="shortcut" data-query="new"><b>+</b><span>New stock</span><span>></span></button>
+            <button class="shortcut" data-query=""><b>#</b><span>Quick order</span><span>></span></button>
+          </section>
+          <section class="results-head"><div><span>Catalogue</span><h2 id="heading">All Products</h2><p id="count">6 products shown</p></div><select id="sort"><option value="featured">Featured</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="code">SKU code</option></select></section>
+          <section class="grid" id="grid"></section>
+        </main>
+        <aside class="drawer">
+          <div class="drawer-head"><span class="eyebrow">Wholesale order</span><h2>My Order</h2><p id="lineCount">2 line items</p></div>
+          <div class="cart-lines" id="cartLines"></div>
+          <div class="drawer-foot"><div class="total"><span>Subtotal excl. VAT</span><strong id="drawerTotal">R443.46</strong></div><p id="minimum">Add R556.54 more to reach the minimum.</p><button class="send">Send quote request</button><small>Stock, VAT and delivery confirmed by reply.</small></div>
+        </aside>
+      </div>
+      <footer class="sticky"><span id="stickyUnits">18 units</span><strong id="stickyTotal">R443.46</strong><b id="stickyStatus">Minimum order not reached</b></footer>
+    </div>
+    <script>
+      const products = [
+        {id:1, code:'0001-BLK', name:'Ladies Structured Crossbody Bag | Black | Strap Included', category:'Bags, Wallets & Accessories', price:216.52, image:'/bag_black.png', tags:['Hot seller','Fast reseller'], pack:'12 per carton', status:'In stock'},
+        {id:2, code:'0001-CRM', name:'Ladies Structured Crossbody Bag | Cream | Strap Included', category:'Bags, Wallets & Accessories', price:216.52, image:'/bag_cream.png', tags:['New stock','Trade favourite'], pack:'12 per carton', status:'In stock'},
+        {id:3, code:'03890-BL', name:'Glass Czech Beads Loose | White and Red | Size 8/0', category:'Beads, Jewellery & Accessories', price:13.04, image:'/beads_redwhite.png', tags:['Under R50','Bulk buy'], pack:'1/4kg packs', status:'In stock'},
+        {id:4, code:'8616-RED', name:'Wood Painted Beads | 6mm Red | Retail Craft Pack', category:'Beads, Jewellery & Accessories', price:47.83, image:'/beads_woodred.png', tags:['Hot seller','Bulk buy'], pack:'Assorted inner packs', status:'In stock'},
+        {id:5, code:'7721-BLU', name:'School Backpack | Royal Blue | Reinforced Daily Use', category:'Bags, Wallets & Accessories', price:185, image:'/school_bag.png', tags:['Seasonal volume'], pack:'6 per carton', status:'Confirm stock'},
+        {id:6, code:'PK-992', name:'Kraft Paper Bags | Medium | 50 Piece Wholesale Bundle', category:'Packaging', price:120, image:'/kraft_bags.png', tags:['Eco range','Bulk buy'], pack:'50 pieces', status:'In stock'}
+      ];
+      const categories = ['All Products', ...Array.from(new Set(products.map(p => p.category)))];
+      let activeCategory = 'All Products';
+      let cart = [{ product: products[2], qty: 12 }, { product: products[3], qty: 6 }];
+      const money = value => `R${value.toFixed(2)}`;
+      function renderCategories() {
+        document.getElementById('categories').innerHTML = categories.map(cat => {
+          const count = cat === 'All Products' ? products.length : products.filter(p => p.category === cat).length;
+          return `<button class="category ${cat === activeCategory ? 'active' : ''}" data-cat="${cat}"><span>${cat}</span><small>${count}</small></button>`;
+        }).join('');
+        document.querySelectorAll('.category').forEach(btn => btn.onclick = () => { activeCategory = btn.dataset.cat; render(); });
+      }
+      function filtered() {
+        const q = document.getElementById('search').value.trim().toLowerCase();
+        const sort = document.getElementById('sort').value;
+        const list = products.filter(p => (activeCategory === 'All Products' || p.category === activeCategory) && (!q || `${p.code} ${p.name} ${p.category} ${p.tags.join(' ')}`.toLowerCase().includes(q)));
+        if (sort === 'price-low') list.sort((a,b) => a.price - b.price);
+        if (sort === 'price-high') list.sort((a,b) => b.price - a.price);
+        if (sort === 'code') list.sort((a,b) => a.code.localeCompare(b.code));
+        if (sort === 'featured') list.sort((a,b) => Number(b.tags.includes('Hot seller')) - Number(a.tags.includes('Hot seller')));
+        return list;
+      }
+      function addToCart(id) {
+        const product = products.find(p => p.id === id);
+        const existing = cart.find(i => i.product.id === id);
+        if (existing) existing.qty += 1; else cart.push({ product, qty: 1 });
+        renderCart();
+      }
+      function renderProducts() {
+        const list = filtered();
+        document.getElementById('heading').textContent = activeCategory;
+        document.getElementById('count').textContent = `${list.length} products shown`;
+        document.getElementById('grid').innerHTML = list.map(p => `<article class="card"><div class="image"><div class="tags">${p.tags.map(t => `<span>${t}</span>`).join('')}</div><img src="${p.image}" alt="${p.name}"></div><div class="body"><div class="meta"><span>${p.code}</span><b>${p.status}</b></div><h3>${p.name}</h3><p>${p.category} | ${p.pack}</p><div class="price"><strong>${money(p.price)}</strong><span>excl. VAT</span></div><div class="buy"><div class="qty"><button>-</button><span>1</span><button>+</button></div><button class="add" data-id="${p.id}">Add to order</button></div></div></article>`).join('');
+        document.querySelectorAll('.add').forEach(btn => btn.onclick = () => addToCart(Number(btn.dataset.id)));
+      }
+      function renderCart() {
+        const total = cart.reduce((sum, item) => sum + item.product.price * item.qty, 0);
+        const units = cart.reduce((sum, item) => sum + item.qty, 0);
+        document.getElementById('cartLines').innerHTML = cart.map(item => `<div class="line"><img src="${item.product.image}" alt=""><div><strong>${item.product.name}</strong><span>${item.product.code}</span><b>${money(item.product.price * item.qty)}</b></div><strong>x${item.qty}</strong></div>`).join('');
+        document.getElementById('lineCount').textContent = `${cart.length} line items`;
+        document.getElementById('drawerTotal').textContent = money(total);
+        document.getElementById('topTotal').textContent = money(total);
+        document.getElementById('stickyTotal').textContent = money(total);
+        document.getElementById('units').textContent = units;
+        document.getElementById('stickyUnits').textContent = `${units} units`;
+        document.getElementById('minimum').textContent = total >= 1000 ? 'Minimum reached. Ready to submit.' : `Add ${money(1000 - total)} more to reach the minimum.`;
+        document.getElementById('stickyStatus').textContent = total >= 1000 ? 'Ready to submit' : 'Minimum order not reached';
+      }
+      function render() { renderCategories(); renderProducts(); renderCart(); }
+      document.getElementById('search').oninput = renderProducts;
+      document.getElementById('sort').onchange = renderProducts;
+      document.querySelectorAll('.shortcut').forEach(btn => btn.onclick = () => { document.getElementById('search').value = btn.dataset.query; renderProducts(); });
+      render();
+    </script>
+  </body>
+</html>
