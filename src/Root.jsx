@@ -43,8 +43,7 @@ export default function Root() {
     const profile = await getCustomerProfile(userId);
     setCustomer(profile);
     if (profile) {
-      if (profile.role === 'admin') setView('admin');
-      else if (profile.is_approved) setView('portal');
+      if (profile.is_approved || profile.role === 'admin') setView('portal');
       else setView('pending');
     }
   }
@@ -93,7 +92,7 @@ export default function Root() {
 
   // Admin panel
   if (session && customer?.role === 'admin' && view === 'admin') {
-    return <AdminPage customer={customer} onLogout={handleLogout} />;
+    return <AdminPage customer={customer} onLogout={handleLogout} onViewPortal={() => setView('portal')} />;
   }
 
   // Profile page

@@ -713,7 +713,7 @@ const TABS = [
   { id: 'orders',     label: 'Orders',    icon: Download },
 ];
 
-export default function AdminPage({ customer, onLogout }) {
+export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [activeTab, setActiveTab] = useState('products');
 
   return (
@@ -728,8 +728,11 @@ export default function AdminPage({ customer, onLogout }) {
             </div>
             <span style={{ background: '#7f1d1d', color: '#fca5a5', padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: '700' }}>Admin Panel</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '13px', color: '#64748b' }}>{customer?.email}</span>
+            <button onClick={onViewPortal} style={BTN('ghost')}>
+              ← View Catalogue
+            </button>
             <button onClick={onLogout} style={BTN('ghost')}><LogOut size={14} /> Logout</button>
           </div>
         </div>
