@@ -298,7 +298,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Header
         cartItemCount={totalItemCount}
         cartTotal={cartTotal}

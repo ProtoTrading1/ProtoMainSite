@@ -196,6 +196,8 @@ input, select, textarea { font-family: inherit; outline: none; }
 @media (max-width: 900px) {
   .sidebar-rail { display: none; }
   .desktop-only { display: none; }
+  .main-layout { overflow-y: auto; }
+  .content-area { overflow-y: unset; }
 }
 
 /* ── Common Animations ── */
@@ -972,6 +974,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   place-items: center;
   padding: 34px;
   background: #ffffff;
+  border-right: 2px solid #000000;
 }
 .product-zoom-image img {
   max-width: 94%;
@@ -1478,32 +1481,130 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 @media (max-width: 1200px) {
-  .product-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+  .product-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
 }
 
+/* ── Tablet / Mobile (≤ 900px) ── */
 @media (max-width: 900px) {
+  /* Header */
   .app-header { padding: 0 14px; gap: 10px; }
   .brand-block { min-width: auto; }
   .brand-copy, .trade-pill, .header-action { display: none; }
-  .header-search { height: 42px; }
-  .content-area { padding: 18px; }
-  .trade-hero { grid-template-columns: 1fr; padding: 22px; }
-  .trade-hero-copy h1 { font-size: 30px; }
-  .trade-hero-image img { height: 150px; }
-  .trade-search-hero { padding: 22px; }
-  .trade-search-hero.with-image { grid-template-columns: 1fr; }
-  .trade-search-copy h1 { font-size: 30px; }
-  .hero-search-bar { min-height: 58px; }
-  .trade-specs { grid-template-columns: 1fr; }
-  .shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .shortcut-card { min-height: 80px; padding: 14px; }
-  .results-control, .section-heading { align-items: stretch; flex-direction: column; }
-  .product-grid { grid-template-columns: 1fr; }
-  .recommendation-grid { grid-template-columns: 1fr; }
-  .product-zoom-modal { grid-template-columns: 1fr; overflow: auto; }
-  .product-zoom-image { min-height: 320px; }
-  .product-zoom-details { padding: 28px 22px; }
-  .sticky-order-bar { padding: 0 14px; }
+
+  /* Layout: become a normal scrolling page */
+  .app-root { height: auto !important; overflow: visible !important; min-height: 100vh; }
+  .main-layout { flex-direction: column; height: auto !important; overflow: visible; }
+  .content-area { padding: 14px; overflow-y: visible; height: auto; }
+
+  /* Hero */
+  .trade-hero { grid-template-columns: 1fr; padding: 28px 20px 24px; gap: 0; }
+  .trade-hero-copy h1 { font-size: 26px; line-height: 1.25; }
+  .trade-hero-image { display: none; }
+  .hero-metrics { gap: 20px; }
+  .hero-metrics div strong { font-size: 22px; }
+
+  /* Section heading */
+  .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .view-toggle { display: none; }
+
+  /* Shortcut grid: 3 across on tablet */
+  .shortcut-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .shortcut-card { min-height: 72px; padding: 10px 12px; gap: 8px; font-size: 13px; }
+  .shortcut-card svg { flex-shrink: 0; }
+  .shortcut-card span { overflow: hidden; }
+  .shortcut-card small { display: none; }
+
+  /* Sort control */
+  .results-control { align-items: stretch; flex-direction: column; }
+
+  /* Product grid: 2 columns */
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .recommendation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+  /* Product card touch targets */
+  .add-button { min-height: 44px; font-size: 13px; }
+  .qty-stepper button { min-width: 36px; min-height: 36px; }
+  .cart-in-control button { min-width: 36px; min-height: 36px; }
+
+  /* Zoom modal: stack vertically */
+  .product-zoom-backdrop { align-items: flex-end; padding: 0; }
+  .product-zoom-modal {
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    overflow-y: auto;
+  }
+  .product-zoom-image {
+    min-height: 240px;
+    max-height: 280px;
+    border-right: none;
+    border-bottom: 2px solid #000000;
+  }
+  .product-zoom-image img { max-height: 220px; object-fit: contain; }
+  .product-zoom-details { padding: 20px 18px 28px; }
+  .product-zoom-close { top: 12px; right: 12px; }
+  .product-zoom-buy-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .product-zoom-line-total { justify-content: space-between; }
+  .zoom-add-to-cart { min-height: 48px; font-size: 15px; }
+
+  /* Trade specs */
+  .trade-specs { grid-template-columns: 1fr; gap: 6px; }
+
+  /* Order confirm modal */
   .modal-lines div { grid-template-columns: 1fr; }
-  .product-zoom-buy-row { flex-direction: column; align-items: stretch; }
+
+  /* Buyer note */
+  .buyer-note { flex-direction: column; gap: 8px; }
+}
+
+/* ── Small phones (≤ 600px) ── */
+@media (max-width: 600px) {
+  /* Header */
+  .app-header { padding: 0 12px; }
+  .brand-logo { font-size: 17px; }
+
+  /* Content */
+  .content-area { padding: 10px; }
+
+  /* Hero */
+  .trade-hero { padding: 20px 16px; }
+  .trade-hero-copy h1 { font-size: 22px; }
+  .hero-proof { flex-direction: column; gap: 6px; }
+  .hero-metrics { flex-direction: column; gap: 12px; align-items: flex-start; }
+
+  /* Shortcut grid: 2 columns on small phones */
+  .shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shortcut-card { min-height: 60px; padding: 10px; font-size: 12px; }
+
+  /* Product grid: 2 columns still, tighter */
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .recommendation-grid { grid-template-columns: 1fr; }
+
+  /* Product card */
+  .product-card { min-height: unset; }
+  .product-body { padding: 10px; }
+  .product-image { height: 140px; }
+  .product-image img, .product-image img.catalogue-photo, .product-image img.trimmed-catalogue-photo {
+    max-height: 110px;
+  }
+  .price-row strong { font-size: 16px; }
+  .buy-row { flex-direction: column; gap: 8px; }
+  .qty-stepper { width: 100%; }
+  .add-button { width: 100%; justify-content: center; min-height: 42px; }
+  /* Hide verbose fields on small cards */
+  .product-detail-row, .product-trade-note, .view-product-link, .product-colour-row, .product-badges { display: none; }
+
+  /* Zoom modal */
+  .product-zoom-image { min-height: 200px; max-height: 220px; }
+  .product-zoom-details { padding: 16px 14px 24px; }
+  .product-zoom-details h2 { font-size: 18px; }
+
+  /* Catalog page */
+  .catalog-toolbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .section-heading h2 { font-size: 20px; }
+
+  /* Sort */
+  .sort-control select { font-size: 14px; }
 }
