@@ -4,7 +4,6 @@ import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import Drawer from './components/Drawer';
-import StickyBar from './components/StickyBar';
 import OrderConfirmModal from './components/OrderConfirmModal';
 import MobileNav from './components/MobileNav';
 import ReorderModal from './components/ReorderModal';
@@ -15,7 +14,6 @@ import categories from './data/categories.json';
 import './index.css';
 
 const HEADER_H = 72;
-const STICKY_H = 56;
 const CATALOG_PAGE_SIZE = 60;
 
 function getProductImageUrl(product, siteOrigin = '') {
@@ -296,7 +294,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setReorderModal(false);
   };
 
-  const bodyH = `calc(100vh - ${HEADER_H}px - ${STICKY_H}px)`;
+  const bodyH = `calc(100vh - ${HEADER_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
@@ -364,8 +362,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </aside>
       </div>
-
-      <StickyBar cartItems={cartItems} cartTotal={cartTotal} sendOrderEmail={sendOrderEmail} />
 
       <OrderConfirmModal
         isOpen={modalOpen}

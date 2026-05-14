@@ -2,10 +2,10 @@
 
 :root {
   /* Colors */
-  --proto-red: #8B1A1A;
-  --proto-red-hover: #7A1515;
-  --proto-red-dark: #7A1515;
-  --proto-red-light: rgba(139, 26, 26, 0.1);
+  --proto-red: #000000;
+  --proto-red-hover: #1a1a1a;
+  --proto-red-dark: #111111;
+  --proto-red-light: rgba(0, 0, 0, 0.07);
   
   --bg-deep: #050505;
   --bg-surface: #0F1117;
@@ -131,6 +131,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: flex;
   overflow: hidden;
   max-width: 100vw;
+  position: relative;
 }
 
 .sidebar-rail {
@@ -148,14 +149,17 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cart-drawer {
-  position: relative;
-  width: 28px;
-  border-left: 1px solid var(--border-light);
+  position: absolute;
+  right: 0;
+  top: 0;
   height: 100%;
-  flex-shrink: 0;
+  width: var(--drawer-width);
+  border-left: 1px solid var(--border-light);
   overflow: hidden;
   background-color: #ffffff;
-  transition: width 0.22s ease, box-shadow 0.22s ease;
+  transform: translateX(calc(100% - 28px));
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+  z-index: 10;
 }
 
 .cart-drawer::before {
@@ -171,22 +175,16 @@ input, select, textarea { font-family: inherit; outline: none; }
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.72;
+  transition: opacity 0.18s ease;
 }
 
-.cart-drawer:hover {
-  width: var(--drawer-width);
-  box-shadow: -20px 0 36px rgba(0, 0, 0, 0.35);
-}
-
-.cart-drawer:hover::before {
-  opacity: 0;
-}
-
+.cart-drawer:hover,
 .cart-drawer.peek {
-  width: var(--drawer-width);
+  transform: translateX(0);
   box-shadow: -20px 0 36px rgba(0, 0, 0, 0.35);
 }
 
+.cart-drawer:hover::before,
 .cart-drawer.peek::before {
   opacity: 0;
 }
@@ -360,7 +358,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
   padding: 30px;
   border-radius: 10px;
-  background: #111827;
+  background: #000000;
   color: #fff;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.08);
@@ -404,7 +402,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   font-size: 42px;
   line-height: 1.03;
   letter-spacing: 0;
-  color: #111827;
+  color: #000000;
 }
 .trade-search-copy p {
   max-width: 720px;
@@ -430,7 +428,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   background: transparent;
   font-size: 19px;
   font-weight: 600;
-  color: #111827;
+  color: #000000;
 }
 .trade-search-image {
   display: flex;
@@ -462,8 +460,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 6px;
   padding: 8px 11px;
   border-radius: 999px;
-  background: #fff1f2;
-  color: #881337;
+  background: #f3f4f6;
+  color: #111111;
   font-size: 12px;
   font-weight: 750;
 }
@@ -509,7 +507,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .trade-story-card h3 {
   margin: 8px 0;
   font-size: 28px;
-  color: #111827;
+  color: #000000;
 }
 .trade-story-card p {
   color: #1f2937;
@@ -523,7 +521,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .recommendation-heading h3 {
   margin-top: 6px;
   font-size: 28px;
-  color: #111827;
+  color: #000000;
 }
 .recommendation-grid {
   display: grid;
@@ -536,7 +534,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 2px;
 }
 .results-copy strong {
-  color: #111827;
+  color: #000000;
   font-size: 14px;
 }
 .results-copy span {
@@ -564,7 +562,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .section-heading h2 {
   margin: 3px 0;
   font-size: 30px;
-  color: #111827;
+  color: #000000;
 }
 .section-heading p { color: #1f2937; font-size: 14px; }
 .build-stamp {
@@ -600,16 +598,23 @@ input, select, textarea { font-family: inherit; outline: none; }
   border-radius: 14px;
   background: #fff;
   text-align: left;
-  color: #111827;
+  color: #000000;
 }
-.shortcut-card.active {
+.shortcut-card:hover {
   border-color: #8B1A1A;
   background: #8B1A1A;
   color: #fff;
 }
+.shortcut-card:hover svg:first-child { color: #fff; }
+.shortcut-card:hover small { color: rgba(255,255,255,0.8); }
+.shortcut-card.active {
+  border-color: #000000;
+  background: #000000;
+  color: #fff;
+}
 .shortcut-card.active svg:first-child { color: #fff; }
 .shortcut-card.active small { color: rgba(255,255,255,0.8); }
-.shortcut-card svg:first-child { color: var(--proto-red); }
+.shortcut-card svg:first-child { color: #111111; }
 .shortcut-card strong,
 .shortcut-card small { display: block; }
 .shortcut-card strong { font-size: 13px; text-transform: uppercase; }
@@ -630,7 +635,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .sort-control select {
   border: 1px solid var(--border-light);
-  color: #111827;
+  color: #000000;
   font-weight: 800;
   background: #fff;
   border-radius: 10px;
@@ -722,7 +727,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .tag-row span {
   padding: 4px 7px;
   border-radius: 4px;
-  background: #111827;
+  background: #000000;
   color: #fff;
   font-size: 10px;
   font-weight: 900;
@@ -751,7 +756,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .product-card h3 {
   min-height: 64px;
   margin: 8px 0;
-  color: #111827;
+  color: #000000;
   font-size: 15px;
   line-height: 1.45;
   display: -webkit-box;
@@ -873,7 +878,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   border-left: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
   background: #fff;
-  color: #111827;
+  color: #000000;
   text-align: center;
   font-weight: 900;
   font-size: 13px;
@@ -1056,7 +1061,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-align: center;
 }
 .empty-state svg { color: #94a3b8; }
-.empty-state h3 { margin: 12px 0 6px; color: #111827; }
+.empty-state h3 { margin: 12px 0 6px; color: #000000; }
 .empty-state p { color: #1f2937; }
 .empty-state button {
   margin-top: 18px;
@@ -1077,7 +1082,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .buyer-note svg { color: var(--proto-red); }
 .buyer-note strong,
 .buyer-note span { display: block; }
-.buyer-note strong { color: #111827; }
+.buyer-note strong { color: #000000; }
 
 .order-drawer {
   height: 100%;
@@ -1091,7 +1096,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   background: #fff;
 }
 
-.cart-drawer:hover .order-drawer {
+.cart-drawer:hover .order-drawer,
+.cart-drawer.peek .order-drawer {
   opacity: 1;
   transform: translateX(0);
 }
@@ -1106,7 +1112,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 14px;
   background: #ffffff;
 }
-.drawer-header h2 { margin: 3px 0; color: #111827; }
+.drawer-header h2 { margin: 3px 0; color: #000000; }
 .drawer-header p { color: #1f2937; font-size: 13px; }
 .ready-pill {
   align-self: flex-start;
@@ -1156,7 +1162,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .drawer-line-body { flex: 1; min-width: 0; }
 .drawer-line-body h3 {
-  color: #111827;
+  color: #000000;
   font-size: 13px;
   line-height: 1.35;
 }
@@ -1214,7 +1220,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   font-weight: 750;
 }
 .drawer-totals strong {
-  color: #111827;
+  color: #000000;
   font-size: 13px;
 }
 .minimum-card {
