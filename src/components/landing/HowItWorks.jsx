@@ -1,4 +1,3 @@
-import React from 'react';
 import { UserPlus, ShieldCheck, LayoutGrid } from 'lucide-react';
 
 const steps = [

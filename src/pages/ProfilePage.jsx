@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Loader2, Package, ShieldCheck, Star } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
 import { fetchOrderHistory } from '../lib/orders';
@@ -36,6 +36,8 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const isPremium = customer?.tier === 'premium';
+  const latestOrder = orders[0] || null;
+  const latestItem = latestOrder?.items?.[0] || null;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
@@ -97,6 +99,20 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             ))}
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px', marginTop: '18px' }}>
+            {[
+              ['Email', customer?.email || '—'],
+              ['Delivery Address', form.delivery_address || 'Not saved yet'],
+              ['Last Order', latestOrder ? new Date(latestOrder.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No order yet'],
+              ['Last Item Ordered', latestItem ? `${latestItem.code} ×${latestItem.qty}` : 'No item yet'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>{label}</div>
+                <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', lineHeight: 1.4 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
           <div style={{ marginTop: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
               Delivery Address
@@ -151,6 +167,11 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
                       </div>
                     ))}
                   </div>
+                  {i === 0 && order.items?.[0] && (
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: '#e11d48', fontWeight: '700' }}>
+                      Last ordered item: {order.items[0].name} ({order.items[0].code})
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

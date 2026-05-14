@@ -1,31 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import CategoryNav from './CategoryNav';
 import MegaMenu from './MegaMenu';
 
-export default function Sidebar({ categories, path, navigate, refinements, setRefinement, counts }) {
-  const [hoveredL1Id, setHoveredL1Id] = useState(null);
-  const closeTimer = useRef(null);
+export default function Sidebar({ categories, path, navigate, counts }) {
+  const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
 
-  const hoveredL1Node = hoveredL1Id ? categories.find(c => c.id === hoveredL1Id) : null;
-  const menuOpen = !!hoveredL1Node && !!(hoveredL1Node.children?.length);
+  const activeRoot = path?.[0] || null;
 
-  const openMenu = useCallback((id) => {
-    clearTimeout(closeTimer.current);
-    setHoveredL1Id(id);
-  }, []);
+  const menuNode = useMemo(() => {
+    const targetId = openCategoryId || activeRoot;
+    return targetId ? categories.find((category) => category.id === targetId) : null;
+  }, [activeRoot, categories, openCategoryId]);
 
-  const scheduleClose = useCallback(() => {
-    closeTimer.current = setTimeout(() => setHoveredL1Id(null), 160);
-  }, []);
-
-  const cancelClose = useCallback(() => {
-    clearTimeout(closeTimer.current);
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    clearTimeout(closeTimer.current);
-    setHoveredL1Id(null);
-  }, []);
+  const menuOpen = Boolean(menuNode?.children?.length && openCategoryId);
 
   return (
     <div
@@ -36,7 +23,6 @@ export default function Sidebar({ categories, path, navigate, refinements, setRe
         backgroundColor: '#fff',
         zIndex: 100,
       }}
-      onMouseLeave={scheduleClose}
     >
       <div
         style={{
@@ -59,48 +45,19 @@ export default function Sidebar({ categories, path, navigate, refinements, setRe
             path={path}
             navigate={navigate}
             counts={counts}
-            onHoverL1={openMenu}
-            hoveredL1Id={hoveredL1Id}
+            openCategoryId={openCategoryId}
+            onToggleL1={setOpenCategoryId}
           />
         </div>
       </div>
 
-      {menuOpen && (
-        <div
-          onMouseEnter={cancelClose}
-          style={{
-            position: 'absolute',
-            left: '100%',
-            top: 0,
-            bottom: 0,
-            zIndex: 300,
-            pointerEvents: 'auto',
-          }}
-        >
-          <MegaMenu
-            key={hoveredL1Node.id}
-            l1Node={hoveredL1Node}
-            navigate={navigate}
-            setRefinement={setRefinement}
-            counts={counts}
-            onClose={closeMenu}
-            sidebarW={0}
-            headerH={0}
-            stickyH={0}
-          />
-        </div>
-      )}
-
-      {menuOpen && (
-        <div
-          onClick={closeMenu}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            cursor: 'default',
-            backgroundColor: 'rgba(0,0,0,0.02)',
-          }}
+      {menuOpen && menuNode && (
+        <MegaMenu
+          key={menuNode.id}
+          l1Node={menuNode}
+          navigate={navigate}
+          counts={counts}
+          onClose={() => setOpenCategoryId(null)}
         />
       )}
     </div>

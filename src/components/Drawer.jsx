@@ -1,14 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FileText, Lock, PackageCheck, ShieldCheck, Trash2 } from 'lucide-react';
 
 const MIN_ORDER = 1000;
 
 function QuantityInput({ item, updateQty }) {
-  const [draftQty, setDraftQty] = useState(String(item.qty));
-
-  useEffect(() => {
-    setDraftQty(String(item.qty));
-  }, [item.qty]);
+  const [draftQty, setDraftQty] = useState(() => String(item.qty));
 
   const commitQty = () => {
     const nextQty = Math.max(1, Math.min(9999, Number(draftQty) || 1));
@@ -72,7 +68,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <div className="mini-stepper">
                   <button onClick={() => updateQty(item.product.id, item.qty - 1)} type="button">-</button>
-                  <QuantityInput item={item} updateQty={updateQty} />
+                  <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} />
                   <button onClick={() => updateQty(item.product.id, item.qty + 1)} type="button">+</button>
                 </div>
                 <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label="Remove item">

@@ -12,7 +12,7 @@
   --bg-card: #ffffff;
   --bg-main: #FFFFFF;
   
-  --header-dark: #111827;
+  --header-dark: #000000;
   --text-primary: #0F172A;
   --text-secondary: #1f2937;
   --text-tertiary: #374151;
@@ -179,6 +179,15 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cart-drawer:hover::before {
+  opacity: 0;
+}
+
+.cart-drawer.peek {
+  width: var(--drawer-width);
+  box-shadow: -20px 0 36px rgba(0, 0, 0, 0.35);
+}
+
+.cart-drawer.peek::before {
   opacity: 0;
 }
 

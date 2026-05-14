@@ -1,4 +1,3 @@
-import React from 'react';
 import { ShieldCheck, Mail, Truck, Store, MessageSquare } from 'lucide-react';
 
 const items = [

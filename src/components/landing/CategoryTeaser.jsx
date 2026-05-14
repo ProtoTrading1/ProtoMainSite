@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Briefcase, Scissors, ToyBrick, Package, Home, Wrench, 
   PenTool, Smile, Shirt, Cookie, Wind, Utensils, Lock 

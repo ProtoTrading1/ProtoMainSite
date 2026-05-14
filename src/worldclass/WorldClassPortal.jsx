@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   BadgePercent,
@@ -8,7 +8,6 @@ import {
   Mail,
   Menu,
   Minus,
-  PackageCheck,
   Plus,
   Search,
   ShieldCheck,

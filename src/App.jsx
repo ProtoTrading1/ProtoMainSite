@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
+import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import Drawer from './components/Drawer';
@@ -72,6 +73,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
   const [cartItems, setCartItems] = useState([]);
+  const [flyAnim, setFlyAnim] = useState(null);
+  const [drawerPeek, setDrawerPeek] = useState(false);
+  const drawerTimerRef = useRef(null);
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -161,12 +165,18 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [customer?.name, customer?.email, customer?.phone, customer?.delivery_address]);
 
-  const addToCart = (product, qty) => {
+  const addToCart = (product, qty, buttonPos = null) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: i.qty + qty } : i));
       return [...prev, { product, qty }];
     });
+
+    if (buttonPos) setFlyAnim(buttonPos);
+
+    setDrawerPeek(true);
+    if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+    drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), 5000);
   };
 
   const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })));
@@ -343,7 +353,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </main>
 
-        <aside className="cart-drawer">
+        <aside className={`cart-drawer${drawerPeek ? ' peek' : ''}`}>
           <Drawer
             cartItems={cartItems}
             cartTotal={cartTotal}
@@ -380,6 +390,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       />
 
       {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}
+
+      {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
     </div>
   );
 }

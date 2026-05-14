@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowRight,
   Building2,
@@ -7,7 +7,6 @@ import {
   Lock,
   Mail,
   MapPin,
-  PackageCheck,
   PackageSearch,
   Phone,
   User,

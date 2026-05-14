@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import App from './App';
-import AdminPage from './pages/AdminPage';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
@@ -8,24 +7,49 @@ import WorldClassPortal from './worldclass/WorldClassPortal';
 import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+
 export default function Root() {
-  const [session, setSession] = useState(undefined); // undefined = loading
+  const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
-  const [view, setView] = useState('landing'); // 'landing' | 'login' | 'portal' | 'admin' | 'profile'
+  const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
   const [route, setRoute] = useState(window.location.hash);
 
-  // Sync hash changes
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  // Bootstrap auth state
+  const setSurface = useCallback((next) => {
+    setView(next);
+    if (['portal', 'admin', 'profile', 'login', 'landing'].includes(next)) {
+      window.sessionStorage.setItem('proto-surface', next);
+    }
+  }, []);
+
+  const loadCustomer = useCallback(async (userId) => {
+    const profile = await getCustomerProfile(userId);
+    setCustomer(profile);
+
+    if (!profile) return;
+
+    if (profile.is_approved || profile.role === 'admin') {
+      const preferred = window.sessionStorage.getItem('proto-surface');
+      if (profile.role === 'admin' && preferred === 'admin') setSurface('admin');
+      else setSurface('portal');
+      return;
+    }
+
+    setView('pending');
+  }, [setSurface]);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null);
-      if (data.session?.user) loadCustomer(data.session.user.id);
+      if (data.session?.user) {
+        void loadCustomer(data.session.user.id);
+      }
     });
 
     const { data: { subscription } } = onAuthChange(async (sess) => {
@@ -36,17 +60,9 @@ export default function Root() {
         setCustomer(null);
       }
     });
-    return () => subscription.unsubscribe();
-  }, []);
 
-  async function loadCustomer(userId) {
-    const profile = await getCustomerProfile(userId);
-    setCustomer(profile);
-    if (profile) {
-      if (profile.is_approved || profile.role === 'admin') setView('portal');
-      else setView('pending');
-    }
-  }
+    return () => subscription.unsubscribe();
+  }, [loadCustomer]);
 
   const handleLogin = async (sess) => {
     setSession(sess);
@@ -57,15 +73,14 @@ export default function Root() {
     await signOut();
     setSession(null);
     setCustomer(null);
+    window.sessionStorage.removeItem('proto-surface');
     setView('landing');
     window.location.hash = '';
   };
 
-  // Special routes
   if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
   if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
 
-  // Loading
   if (session === undefined) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505' }}>
@@ -74,7 +89,6 @@ export default function Root() {
     );
   }
 
-  // Logged in — pending approval
   if (session && customer && !customer.is_approved && customer.role !== 'admin') {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
@@ -90,48 +104,51 @@ export default function Root() {
     );
   }
 
-  // Admin panel
   if (session && customer?.role === 'admin' && view === 'admin') {
-    return <AdminPage customer={customer} onLogout={handleLogout} onViewPortal={() => setView('portal')} />;
+    return (
+      <Suspense fallback={(
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#e2e8f0' }}>
+          Loading admin…
+        </div>
+      )}>
+        <AdminPage customer={customer} onLogout={handleLogout} onViewPortal={() => setSurface('portal')} />
+      </Suspense>
+    );
   }
 
-  // Profile page
   if (session && view === 'profile') {
     return (
       <ProfilePage
         customer={customer}
-        onBack={() => setView('portal')}
+        onBack={() => setSurface('portal')}
         onProfileUpdate={(updated) => setCustomer(updated)}
       />
     );
   }
 
-  // Portal
   if (session && (view === 'portal' || view === 'admin')) {
     return (
       <App
         customer={customer}
         onLogout={handleLogout}
-        onViewProfile={() => setView('profile')}
-        onViewAdmin={() => setView('admin')}
+        onViewProfile={() => setSurface('profile')}
+        onViewAdmin={() => setSurface('admin')}
       />
     );
   }
 
-  // Login page
   if (view === 'login') {
     return (
       <LoginPage
         onLogin={handleLogin}
-        onBack={() => setView('landing')}
+        onBack={() => setSurface('landing')}
       />
     );
   }
 
-  // Landing
   return (
     <LandingPage
-      onLogin={() => setView('login')}
+      onLogin={() => setSurface('login')}
       onApply={() => {
         const el = document.getElementById('trade-access-form');
         if (el) el.scrollIntoView({ behavior: 'smooth' });

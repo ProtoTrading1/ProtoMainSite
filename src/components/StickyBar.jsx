@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRight, FileText, ShoppingBag } from 'lucide-react';
 
 export default function StickyBar({ cartItems, cartTotal, sendOrderEmail }) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock3, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 
 function TrimmedProductImage({ src, alt }) {
@@ -127,6 +127,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange }) {
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const addButtonRef = useRef(null);
 
   const lineTotal = (product.price * qty).toFixed(2);
   const inCart = cartQty > 0;
@@ -135,7 +136,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const closePreview = () => setZoomOpen(false);
 
   const handleAdd = () => {
-    addToCart(product, qty);
+    const rect = addButtonRef.current?.getBoundingClientRect();
+    const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
+    addToCart(product, qty, pos);
   };
 
   return (
@@ -210,7 +213,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   <Plus size={14} />
                 </button>
               </div>
-              <button className="add-button" onClick={handleAdd} type="button">
+              <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
                 <ShoppingCart size={16} />
                 Add to order
               </button>

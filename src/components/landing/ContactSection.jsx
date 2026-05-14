@@ -1,4 +1,3 @@
-import React from 'react';
 import { Mail, HelpCircle, MessageCircle } from 'lucide-react';
 
 const faqs = [

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { RotateCcw, ShoppingCart, X } from 'lucide-react';
+import { useState } from 'react';
+import { ShoppingCart, X } from 'lucide-react';
 
 export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   const [selected, setSelected] = useState(() =>

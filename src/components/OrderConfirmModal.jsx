@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Check, CheckCircle, Copy, Loader2, X } from 'lucide-react';
 
 export default function OrderConfirmModal({

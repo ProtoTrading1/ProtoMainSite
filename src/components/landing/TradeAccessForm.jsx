@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Send, CheckCircle, Info, Building2, User, Mail, Phone, MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { Send, CheckCircle, Info, Building2, Phone } from 'lucide-react';
 
 export default function TradeAccessForm() {
   const [submitted, setSubmitted] = useState(false);

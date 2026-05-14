@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Protoportal Admin / Backend Feature Review</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Arial, sans-serif; color:#111827; line-height:1.45; font-size:11px; }
+  h1,h2,h3 { margin: 0 0 8px 0; line-height:1.2; }
+  h1 { font-size: 24px; }
+  h2 { font-size: 16px; margin-top: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  h3 { font-size: 13px; margin-top: 12px; }
+  p, li { margin: 4px 0; }
+  .muted { color:#6b7280; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; break-inside: avoid; }
+  .pill { display:inline-block; padding:2px 7px; border-radius:999px; background:#fee2e2; color:#991b1b; font-size:10px; font-weight:700; margin-left:6px; }
+  table { width:100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { border:1px solid #e5e7eb; padding:6px 8px; vertical-align: top; }
+  th { background:#f9fafb; text-align:left; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+  ul { padding-left: 18px; }
+  .small { font-size:10px; }
+</style>
+</head>
+<body>
+  <h1>Protoportal Main — Admin & Backend Feature Review</h1>
+  <p class="muted">Source of truth: local codebase at <code>~/Desktop/Projects💻 /protoportal-main</code>. Reviewed on 2026-05-10.</p>
+
+  <h2>Executive summary</h2>
+  <p>This project is a React + Vite wholesale portal backed by Supabase auth/database, with a lightweight admin panel embedded in the frontend for users whose <code>customers.role</code> is <code>admin</code>. The implemented admin scope is practical and fairly complete for catalogue operations: product CRUD, CSV import/export, customer approval/tiering, specials management, and order review/export. Backend logic is mostly client-to-Supabase with Row Level Security doing the protection, plus one serverless email endpoint for sending order PDFs.</p>
+
+  <h2>Admin access model</h2>
+  <div class="card">
+    <ul>
+      <li>Admin UI is only surfaced when the logged-in customer profile has <code>role === 'admin'</code> (<code>src/components/Header.jsx</code>, <code>src/Root.jsx</code>).</li>
+      <li>Normal approved customers land in the catalogue portal; unapproved customers see a pending approval screen.</li>
+      <li>Supabase migration defines <code>public.is_admin()</code> and RLS policies so admin users can read/write all products, customers, and orders.</li>
+    </ul>
+  </div>
+
+  <h2>Main admin modules</h2>
+  <table>
+    <thead>
+      <tr><th>Module</th><th>What it does</th><th>Implementation notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Products</strong></td>
+        <td>Add/edit products, archive/restore, search/filter, reorder sort positions, CSV import, CSV export, set “special” flags and visibility.</td>
+        <td>Implemented in <code>ProductsTab</code> in <code>src/pages/AdminPage.jsx</code>; data access in <code>src/lib/products.js</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Customers</strong></td>
+        <td>Review all customers, approve accounts, change tier (regular/premium), import tiers from CSV, export customer list.</td>
+        <td>Implemented in <code>CustomersTab</code>; data access in <code>src/lib/customers.js</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Specials</strong></td>
+        <td>Curate weekly specials from active products and choose visibility by customer tier.</td>
+        <td>Implemented in <code>SpecialsTab</code>; depends on product <code>is_special</code> and <code>special_visibility</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Orders</strong></td>
+        <td>View recent orders with customer details and export them to CSV.</td>
+        <td>Implemented in <code>OrdersTab</code>; admin fetch joins <code>orders</code> with customer name/email/tier.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Module details</h2>
+
+  <h3>1) Products module</h3>
+  <ul>
+    <li>Manual product form supports code, name, price ex VAT, stock, min qty, image URL, category, case pack, lead time, trade note, new-stock flag, and archive flag.</li>
+    <li>List view includes thumbnail, code, name, price, stock, category path, active/archived status, special status, special visibility, and row-level actions.</li>
+    <li>Sorting can be adjusted manually by swapping <code>sort_order</code> values up/down.</li>
+    <li>CSV import maps a simple sheet into product upserts; export emits product data back out as CSV.</li>
+    <li>Products can be marked as “special” and limited to <code>all</code>, <code>premium</code>, or <code>regular</code> customers.</li>
+  </ul>
+
+  <h3>2) Customers module</h3>
+  <ul>
+    <li>Shows all users with name, email, phone, delivery address, tier, approval state, registration date, and role label.</li>
+    <li>Admins can approve/disapprove accounts by toggling <code>is_approved</code>.</li>
+    <li>Admins can set tier manually to <code>regular</code> or <code>premium</code>.</li>
+    <li>Bulk CSV tier import expects <code>email,tier</code>.</li>
+    <li>Dashboard summary highlights pending approvals and tier counts.</li>
+  </ul>
+
+  <h3>3) Specials module</h3>
+  <ul>
+    <li>Provides a dedicated merchandising view for weekly specials.</li>
+    <li>Separates current specials from non-special active products.</li>
+    <li>Allows quick add/remove and visibility targeting by customer segment.</li>
+    <li>Frontend portal respects this visibility when users toggle specials view.</li>
+  </ul>
+
+  <h3>4) Orders module</h3>
+  <ul>
+    <li>Shows customer name, email, tier, item count, order total ex VAT, status, and date.</li>
+    <li>Supports CSV export of the order list.</li>
+    <li>Read-only in current implementation: no admin status editing, fulfillment workflow, or internal notes UI.</li>
+  </ul>
+
+  <h2>Backend / data features</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Supabase auth + profile bootstrap</h3>
+      <ul>
+        <li>Auth supports login and signup from the portal UI.</li>
+        <li>A database trigger auto-creates a <code>customers</code> row when a new auth user is created.</li>
+        <li>New users require admin approval before they can access the portal.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Products table</h3>
+      <ul>
+        <li>Stores pricing, image URL, stock, category path, tags/badges, archive state, new/special flags, segment visibility, sort order, minimum qty, and trade notes.</li>
+        <li>RLS allows approved customers to read active products and admins to do everything.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Customers table</h3>
+      <ul>
+        <li>Stores email, name, phone, delivery address, tier, role, approval status, and created date.</li>
+        <li>Users can read/update their own profile; admins can read all and update/delete broadly.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Orders table</h3>
+      <ul>
+        <li>Stores line items as JSON, total ex VAT, status, customer link, and created date.</li>
+        <li>Users can create/read their own orders; admins can read/manage all via RLS.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Operational logic beyond the admin UI</h2>
+  <ul>
+    <li><strong>Order persistence:</strong> checkout writes orders to Supabase before sending email.</li>
+    <li><strong>Auto-upgrade rule:</strong> a regular customer is auto-promoted to premium when an order total exceeds <code>R4,000</code> and at least one line quantity exceeds <code>10</code>.</li>
+    <li><strong>Email/PDF generation:</strong> <code>api/send-order.js</code> builds a branded PDF with PDFKit and emails it via Resend.</li>
+    <li><strong>Fallback catalogue:</strong> if live product fetch fails, the storefront falls back to static JSON stock data.</li>
+  </ul>
+
+  <h2>Obvious caveats / risks</h2>
+  <table>
+    <thead><tr><th>Area</th><th>Caveat</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>CSV parsing</td>
+        <td>CSV is parsed with naive <code>split(',')</code> logic in the browser.</td>
+        <td>Quoted commas, escaped values, or complex CSVs may import incorrectly.</td>
+      </tr>
+      <tr>
+        <td>Bulk tier import</td>
+        <td><code>bulkSetTiersFromCsv</code> updates customers one row at a time from the client.</td>
+        <td>Slow for large lists; partial failures are hard to detect cleanly.</td>
+      </tr>
+      <tr>
+        <td>Order admin workflow</td>
+        <td>Orders are view/export only in admin.</td>
+        <td>No shipment/status management, assignment, note-taking, or audit workflow yet.</td>
+      </tr>
+      <tr>
+        <td>Product uniqueness</td>
+        <td>Product upsert uses <code>onConflict: 'code'</code>, but the SQL migration shown does not define a unique constraint on <code>products.code</code>.</td>
+        <td>Upsert may fail or behave unexpectedly unless the live database has an extra unique index not shown here.</td>
+      </tr>
+      <tr>
+        <td>Supabase-only trust model</td>
+        <td>Most admin writes happen directly from the frontend to Supabase.</td>
+        <td>Security depends heavily on correct RLS and profile role integrity.</td>
+      </tr>
+      <tr>
+        <td>Email dependency</td>
+        <td>Order submission requires <code>RESEND_API_KEY</code> and reachable image URLs for richer PDFs.</td>
+        <td>Missing env vars or broken images degrade email/PDF output.</td>
+      </tr>
+      <tr>
+        <td>Status controls</td>
+        <td>Order status exists in schema but there is no admin UI to change it.</td>
+        <td>Operational teams may need direct DB access or a future admin enhancement.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Bottom line</h2>
+  <p>The admin/backend implementation is real and usable, not just scaffolded. It covers the core catalogue and account-management needs for a wholesale portal, with a clean role-gated admin surface. The biggest gaps are around robustness (CSV handling, batched ops), richer order operations, and making sure the database schema fully matches the client assumptions.</p>
+
+  <p class="small muted">Key files reviewed: <code>src/pages/AdminPage.jsx</code>, <code>src/Root.jsx</code>, <code>src/lib/products.js</code>, <code>src/lib/customers.js</code>, <code>src/lib/orders.js</code>, <code>api/send-order.js</code>, <code>migrations/001_initial.sql</code>, <code>src/components/Header.jsx</code>.</p>
+</body>
+</html>

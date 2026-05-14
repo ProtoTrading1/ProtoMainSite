@@ -1,4 +1,3 @@
-import React from 'react';
 import { ShieldCheck, Layers, Mail, TrendingUp } from 'lucide-react';
 
 const props = [

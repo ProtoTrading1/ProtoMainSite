@@ -1,154 +1,16 @@
 [
   {
-    "id": "bags-wallets",
-    "label": "Bags, Wallets & Accessories",
-    "icon": "Briefcase",
-    "children": [
-      {
-        "id": "handbags",
-        "label": "Handbags",
-        "children": [
-          {
-            "id": "leather-bags",
-            "label": "Leather Bags",
-            "children": [
-              { "id": "tote-bags",     "label": "Tote Bags" },
-              { "id": "shoulder-bags", "label": "Shoulder Bags" },
-              { "id": "clutch-bags",   "label": "Clutch Bags" }
-            ]
-          },
-          { "id": "canvas-bags", "label": "Canvas Bags" },
-          { "id": "fabric-bags", "label": "Fabric Bags" }
-        ]
-      },
-      { "id": "wallets-purses", "label": "Wallets & Purses" },
-      { "id": "travel-bags",    "label": "Travel Bags" },
-      { "id": "school-bags",    "label": "School Bags" },
-      { "id": "shopping-bags",  "label": "Shopping Bags" },
-      { "id": "bag-belt-components", "label": "Bag & Belt Components" }
-    ],
-    "refinements": {
-      "colour": ["Black", "Cream", "Brown", "Red", "Blue", "Multi"],
-      "style":  ["Casual", "Formal", "Sport"]
-    }
-  },
-  {
     "id": "beads-jewellery",
     "label": "Beads, Jewellery & Accessories",
     "icon": "Scissors",
     "children": [
-      {
-        "id": "glass-beads",
-        "label": "Glass Beads",
-        "children": [
-          { "id": "czech-beads",   "label": "Czech Beads" },
-          { "id": "seed-beads",    "label": "Seed Beads" },
-          { "id": "bugle-beads",   "label": "Bugle Beads" },
-          { "id": "faceted-beads", "label": "Faceted Beads" }
-        ]
-      },
-      {
-        "id": "wood-beads",
-        "label": "Wood Beads",
-        "children": [
-          { "id": "painted-wood",  "label": "Painted Wood" },
-          { "id": "natural-wood",  "label": "Natural Wood" }
-        ]
-      },
-      { "id": "plastic-beads",  "label": "Plastic Beads" },
-      { "id": "metal-findings", "label": "Metal Findings" },
-      { "id": "chains-wire",    "label": "Chains & Wire" }
-    ],
-    "refinements": {
-      "colour": ["Red", "Blue", "Green", "White", "Black", "Multi"],
-      "size":   ["2mm", "4mm", "6mm", "8mm", "10mm", "12mm"]
-    }
-  },
-  {
-    "id": "toys-games-novelty",
-    "label": "Toys, Games & Novelty",
-    "icon": "ToyBrick",
-    "children": [
-      { "id": "action-figures",    "label": "Action & Figures" },
-      { "id": "educational-toys",  "label": "Educational Toys" },
-      { "id": "outdoor-toys",      "label": "Outdoor Toys" },
-      { "id": "novelty-gag",       "label": "Novelty & Gag" },
-      { "id": "plush-soft",        "label": "Plush & Soft Toys" },
-      { "id": "toy-vehicles",      "label": "Toy Vehicles" },
-      { "id": "games-puzzles",     "label": "Games & Puzzles" }
-    ],
-    "refinements": {
-      "ageGroup": ["0-2 years", "3-5 years", "6-10 years", "10+ years"]
-    }
-  },
-  {
-    "id": "packaging",
-    "label": "Packaging",
-    "icon": "Package",
-    "children": [
-      { "id": "bags-pouches",  "label": "Bags & Pouches" },
-      { "id": "boxes-cartons", "label": "Boxes & Cartons" },
-      { "id": "tape-labels",   "label": "Tape & Labels" },
-      { "id": "protection",    "label": "Bubble Wrap & Protection" },
-      { "id": "tissue-paper",  "label": "Tissue Paper" }
-    ],
-    "refinements": {
-      "size": ["Small", "Medium", "Large", "XL"]
-    }
-  },
-  {
-    "id": "homeware-kitchen",
-    "label": "Homeware & Kitchen",
-    "icon": "Home",
-    "children": [
-      { "id": "kitchenware",    "label": "Kitchenware" },
-      { "id": "tableware",      "label": "Tableware" },
-      { "id": "storage-org",   "label": "Storage & Organisation" },
-      { "id": "cleaning",      "label": "Cleaning Products" },
-      { "id": "home-decor",    "label": "Home Décor" },
-      { "id": "bathroom",      "label": "Bathroom" }
-    ],
-    "refinements": {}
-  },
-  {
-    "id": "hardware",
-    "label": "Hardware",
-    "icon": "Wrench",
-    "children": [
-      { "id": "hand-tools",    "label": "Hand Tools" },
-      { "id": "fixings",       "label": "Fixings & Fasteners" },
-      { "id": "electrical",    "label": "Electrical Accessories" },
-      { "id": "adhesives",     "label": "Adhesives & Sealants" }
-    ],
-    "refinements": {}
-  },
-  {
-    "id": "arts-crafts-stationery",
-    "label": "Arts, Crafts & Stationery",
-    "icon": "PenTool",
-    "children": [
-      { "id": "pens-pencils",   "label": "Pens & Pencils" },
-      { "id": "notebooks-pads", "label": "Notebooks & Pads" },
-      { "id": "art-supplies",   "label": "Art Supplies" },
-      { "id": "craft-kits",      "label": "Craft Kits" },
-      { "id": "office-supplies","label": "Office Supplies" },
-      { "id": "glue-tape",      "label": "Glue & Tape" }
-    ],
-    "refinements": {
-      "colour": ["Blue", "Black", "Red", "Assorted"]
-    }
-  },
-  {
-    "id": "beauty-personal-care",
-    "label": "Beauty & Personal Care",
-    "icon": "Smile",
-    "children": [
-      { "id": "hair-accessories", "label": "Hair Accessories" },
-      { "id": "beauty-tools",     "label": "Beauty Tools" },
-      { "id": "skin-care",        "label": "Skin Care" },
-      { "id": "cosmetics-makeup", "label": "Cosmetics & Makeup" },
-      { "id": "hygiene",          "label": "Hygiene Products" },
-      { "id": "fragrances",       "label": "Fragrances" }
+      { "id": "metal-components", "label": "Metal Beads & Components" },
+      { "id": "wood-beads", "label": "Wood Beads" },
+      { "id": "findings-components", "label": "Findings & Components" },
+      { "id": "bangles-jewellery", "label": "Bangles & Jewellery Sets" },
+      { "id": "chains-wire", "label": "Chains & Wire" },
+      { "id": "stone-acrylic-beads", "label": "Stone & Acrylic Beads" },
+      { "id": "general-beads-components", "label": "General Beads & Components" }
     ],
     "refinements": {}
   },
@@ -157,32 +19,73 @@
     "label": "Fashion & Accessories",
     "icon": "Shirt",
     "children": [
-      { "id": "belts",           "label": "Belts" },
-      { "id": "scarves-shawls",  "label": "Scarves & Shawls" },
-      { "id": "hats-caps",       "label": "Hats & Caps" },
-      { "id": "fashion-jewellery","label": "Fashion Jewellery" }
+      { "id": "scarves-shawls", "label": "Scarves & Shawls" },
+      { "id": "bags-wallets", "label": "Bags & Wallets" },
+      { "id": "luggage-travel", "label": "Luggage & Travel" },
+      { "id": "hats-headwear", "label": "Hats & Headwear" },
+      { "id": "hair-accessories", "label": "Hair Accessories" },
+      { "id": "eyewear", "label": "Eyewear" },
+      { "id": "bag-straps", "label": "Bag Straps" }
     ],
     "refinements": {}
   },
   {
-    "id": "confectionery",
-    "label": "Confectionery",
-    "icon": "Cookie",
+    "id": "homeware-kitchen",
+    "label": "Homeware & Kitchen",
+    "icon": "Home",
     "children": [
-      { "id": "sweets-candy",    "label": "Sweets & Candy" },
-      { "id": "chocolates",      "label": "Chocolates" },
-      { "id": "snacks",          "label": "Snacks" }
+      { "id": "candles", "label": "Candles" },
+      { "id": "bathroom-accessories", "label": "Bathroom Accessories" },
+      { "id": "placemats-tableware", "label": "Placemats & Tableware" },
+      { "id": "kitchenware", "label": "Kitchenware" },
+      { "id": "home-decor", "label": "Home Décor" }
     ],
     "refinements": {}
   },
   {
-    "id": "textiles",
-    "label": "Textiles",
-    "icon": "Wind",
+    "id": "beauty-personal-care",
+    "label": "Beauty & Personal Care",
+    "icon": "Smile",
     "children": [
-      { "id": "fabrics-rolls",   "label": "Fabrics & Rolls" },
-      { "id": "yarn-wool",       "label": "Yarn & Wool" },
-      { "id": "haberdashery",    "label": "Haberdashery" }
+      { "id": "shampoo-conditioner", "label": "Shampoo & Conditioner" },
+      { "id": "bath-shower", "label": "Bath & Shower" },
+      { "id": "body-care", "label": "Body Care" },
+      { "id": "handwash-hygiene", "label": "Hand Wash & Hygiene" },
+      { "id": "sun-care", "label": "Sun Care" },
+      { "id": "beauty-cosmetics", "label": "Beauty & Cosmetics" }
+    ],
+    "refinements": {}
+  },
+  {
+    "id": "arts-crafts-stationery",
+    "label": "Arts, Crafts & Stationery",
+    "icon": "PenTool",
+    "children": [
+      { "id": "canvas-art-surfaces", "label": "Canvas & Art Surfaces" },
+      { "id": "paint-art-supplies", "label": "Paint & Art Supplies" },
+      { "id": "pens-writing", "label": "Pens & Writing" },
+      { "id": "books-pads", "label": "Books & Pads" }
+    ],
+    "refinements": {}
+  },
+  {
+    "id": "packaging",
+    "label": "Packaging",
+    "icon": "Package",
+    "children": [
+      { "id": "resealable-packets", "label": "Resealable Packets" },
+      { "id": "bags-gift-packaging", "label": "Bags & Gift Packaging" }
+    ],
+    "refinements": {}
+  },
+  {
+    "id": "toys-games-novelty",
+    "label": "Toys, Games & Novelty",
+    "icon": "ToyBrick",
+    "children": [
+      { "id": "fidget-toys", "label": "Fidget Toys" },
+      { "id": "die-cast-toys", "label": "Die Cast Toys" },
+      { "id": "games-novelty", "label": "Games & Novelty" }
     ],
     "refinements": {}
   },
@@ -191,10 +94,29 @@
     "label": "Events, Parties & Hospitality",
     "icon": "Utensils",
     "children": [
-      { "id": "party-supplies",  "label": "Party Supplies" },
-      { "id": "event-decor",     "label": "Event Décor" },
-      { "id": "hospitality-amenities", "label": "Hospitality Amenities" },
-      { "id": "catering-disposables",  "label": "Catering Disposables" }
+      { "id": "parasols-event-decor", "label": "Parasols & Event Décor" },
+      { "id": "party-supplies", "label": "Party Supplies" },
+      { "id": "hospitality-amenities", "label": "Hospitality Amenities" }
+    ],
+    "refinements": {}
+  },
+  {
+    "id": "hardware",
+    "label": "Hardware",
+    "icon": "Wrench",
+    "children": [
+      { "id": "hand-tools", "label": "Hand Tools" },
+      { "id": "knives-blades", "label": "Knives & Blades" },
+      { "id": "spray-paint", "label": "Spray Paint" }
+    ],
+    "refinements": {}
+  },
+  {
+    "id": "confectionery",
+    "label": "Confectionery",
+    "icon": "Cookie",
+    "children": [
+      { "id": "sweets-nougat", "label": "Sweets & Nougat" }
     ],
     "refinements": {}
   }

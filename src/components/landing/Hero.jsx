@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRight, Calendar, Package, LayoutGrid } from 'lucide-react';
 
 export default function Hero({ onLogin, onApply }) {
