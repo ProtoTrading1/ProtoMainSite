@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
+import TopNav from './components/TopNav';
 import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -14,6 +15,7 @@ import categories from './data/categories.json';
 import './index.css';
 
 const HEADER_H = 72;
+const TOPNAV_H = 40;
 const CATALOG_PAGE_SIZE = 60;
 
 function getProductImageUrl(product, siteOrigin = '') {
@@ -294,7 +296,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setReorderModal(false);
   };
 
-  const bodyH = `calc(100vh - ${HEADER_H}px)`;
+  const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
@@ -311,6 +313,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onReorder={() => setReorderModal(true)}
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
+      />
+
+      <TopNav
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSpecials={() => handleShortcut('clearance')}
       />
 
       <div className="main-layout" style={{ height: bodyH }}>
