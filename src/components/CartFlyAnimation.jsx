@@ -2,8 +2,11 @@ import { motion } from 'motion/react';
 import { ShoppingCart } from 'lucide-react';
 
 export default function CartFlyAnimation({ from, onDone }) {
-  const toX = window.innerWidth - 110;
-  const toY = 26;
+  // Find the actual cart element on screen
+  const cartEl = document.querySelector('.cart-summary');
+  const cartRect = cartEl?.getBoundingClientRect();
+  const toX = cartRect ? cartRect.left + cartRect.width / 2 - 13 : window.innerWidth - 110;
+  const toY = cartRect ? cartRect.top + cartRect.height / 2 - 13 : 26;
 
   const midX = from.x + (toX - from.x) * 0.4;
   const midY = Math.min(from.y, toY) - 180;
