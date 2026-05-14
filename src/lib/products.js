@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+const PAGE_SIZE = 1000;
+const DEFAULT_CATALOG_PAGE_SIZE = 60;
+
 function adapt(row) {
   return {
     id: row.id,
@@ -26,23 +29,168 @@ function adapt(row) {
   };
 }
 
+function applyCollectionFilter(query, collection) {
+  if (collection === 'hot') return query.contains('badges', ['Hot seller']);
+  if (collection === 'new') return query.eq('is_new', true);
+  if (collection === 'clearance') return query.eq('is_special', true);
+  if (collection === 'instock') return query.gt('stock_on_hand', 0);
+  if (collection === 'soldout') return query.eq('stock_on_hand', 0);
+  return query;
+}
+
+function applySearchFilter(query, searchQuery) {
+  const q = searchQuery?.trim();
+  if (!q) return query;
+  const safe = q.replace(/[%',()]/g, ' ').trim();
+  if (!safe) return query;
+  return query.or(`name.ilike.%${safe}%,code.ilike.%${safe}%`);
+}
+
+function applyPathFilter(query, path) {
+  if (!Array.isArray(path) || path.length === 0) return query;
+  return query.contains('category_path', path);
+}
+
+function applySort(query, sort) {
+  if (sort === 'price-low') return query.order('price_ex_vat', { ascending: true }).order('sort_order', { ascending: true });
+  if (sort === 'price-high') return query.order('price_ex_vat', { ascending: false }).order('sort_order', { ascending: true });
+  if (sort === 'newest' || sort === 'latest') return query.order('created_at', { ascending: false });
+  if (sort === 'code') return query.order('code', { ascending: true });
+  if (sort === 'stock') return query.order('stock_on_hand', { ascending: false });
+  return query.order('sort_order', { ascending: true }).order('created_at', { ascending: false });
+}
+
+async function fetchAllProductRows({ archived = null } = {}) {
+  const rows = [];
+  let from = 0;
+
+  while (true) {
+    let query = supabase
+      .from('products')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (archived !== null) query = query.eq('is_archived', archived);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
 export async function fetchProducts() {
-  const { data, error } = await supabase
+  const data = await fetchAllProductRows({ archived: false });
+  return data.map(adapt);
+}
+
+export async function fetchProductPage({
+  page = 1,
+  pageSize = DEFAULT_CATALOG_PAGE_SIZE,
+  searchQuery = '',
+  categoryPath = [],
+  collection = 'all',
+  sort = 'featured',
+} = {}) {
+  const from = Math.max(0, (page - 1) * pageSize);
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from('products')
+    .select('*', { count: 'exact' })
+    .eq('is_archived', false)
+    .range(from, to);
+
+  query = applyCollectionFilter(query, collection);
+  query = applyPathFilter(query, categoryPath);
+  query = applySearchFilter(query, searchQuery);
+  query = applySort(query, sort);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  return {
+    products: (data || []).map(adapt),
+    total: count || 0,
+    page,
+    pageSize,
+    hasMore: (count || 0) > to + 1,
+  };
+}
+
+export async function fetchCategoryCounts({ collection = 'all' } = {}) {
+  const entries = [['', []]];
+  for (const category of (await import('../data/categories.json')).default) {
+    entries.push([category.id, [category.id]]);
+    for (const child of category.children || []) {
+      entries.push([[category.id, child.id].join('/'), [category.id, child.id]]);
+    }
+  }
+
+  const results = await Promise.all(entries.map(async ([key, path]) => {
+    let query = supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_archived', false);
+    query = applyCollectionFilter(query, collection);
+    query = applyPathFilter(query, path);
+    const { count, error } = await query;
+    if (error) throw error;
+    return [key, count || 0];
+  }));
+
+  return Object.fromEntries(results);
+}
+
+export async function fetchAllProductsAdmin() {
+  const data = await fetchAllProductRows();
+  return data.map(adapt);
+}
+
+export async function fetchAdminProductsPage({
+  page = 1,
+  pageSize = 50,
+  searchQuery = '',
+  mainCategory = 'all',
+  includeArchived = false,
+} = {}) {
+  const from = Math.max(0, (page - 1) * pageSize);
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from('products')
+    .select('*', { count: 'exact' })
+    .range(from, to)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (!includeArchived) query = query.eq('is_archived', false);
+  if (mainCategory !== 'all') query = query.contains('category_path', [mainCategory]);
+  query = applySearchFilter(query, searchQuery);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { rows: (data || []).map(adapt), total: count || 0, page, pageSize };
+}
+
+export async function fetchProductsByMainCategory(mainCategory, { limit = 300 } = {}) {
+  let query = supabase
     .from('products')
     .select('*')
     .eq('is_archived', false)
     .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []).map(adapt);
-}
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
-export async function fetchAllProductsAdmin() {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false });
+  if (mainCategory && mainCategory !== 'all') query = query.contains('category_path', [mainCategory]);
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data || []).map(adapt);
 }
@@ -103,12 +251,7 @@ export async function bulkUpsertProducts(rows) {
 }
 
 export async function exportProductsCsv() {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('sort_order', { ascending: true });
-  if (error) throw error;
-  return data || [];
+  return fetchAllProductRows();
 }
 
 function toRow(f) {

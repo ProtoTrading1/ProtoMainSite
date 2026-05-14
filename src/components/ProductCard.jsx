@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Check, Clock3, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Clock3, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 
 function TrimmedProductImage({ src, alt }) {
   const isRemoteCatalogueImage = String(src || '').startsWith('http');
@@ -124,20 +124,23 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart }) {
+export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange }) {
   const [qty, setQty] = useState(product.minQty || 1);
-  const [added, setAdded] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+
+  const lineTotal = (product.price * qty).toFixed(2);
+  const inCart = cartQty > 0;
+
+  const openPreview = () => setZoomOpen(true);
+  const closePreview = () => setZoomOpen(false);
 
   const handleAdd = () => {
     addToCart(product, qty);
-    setAdded(true);
-    window.setTimeout(() => setAdded(false), 1600);
   };
 
   return (
     <article className="product-card">
-      <button className="product-image product-image-button" onClick={() => setZoomOpen(true)} type="button" aria-label={`Zoom ${product.name}`}>
+      <button className="product-image product-image-button" onClick={openPreview} type="button" aria-label={`Zoom ${product.name}`}>
         <div className="tag-row">
           {product.tags?.map((tag) => {
             const label = tag.label || tag;
@@ -152,7 +155,9 @@ export default function ProductCard({ product, addToCart }) {
           <span>{product.code}</span>
           <strong>{product.inStock ? 'In stock' : 'Confirm stock'}</strong>
         </div>
-        <h3>{product.name}</h3>
+        <button className="product-title-button" onClick={openPreview} type="button">
+          <h3>{product.name}</h3>
+        </button>
         <div className="product-badges">
           {product.badges?.map((badge) => <span key={badge}>{badge}</span>)}
         </div>
@@ -171,6 +176,9 @@ export default function ProductCard({ product, addToCart }) {
           <span>Min {product.minQty || 1}</span>
         </div>
         <p className="product-trade-note">{product.tradeNote || 'Wholesale quote item'}</p>
+        <button className="view-product-link" onClick={openPreview} type="button">
+          View details and order smoother
+        </button>
         <div className="product-colour-row">
           {product.colour && <span>{product.colour}</span>}
           {product.size && <span>{product.size}</span>}
@@ -181,25 +189,39 @@ export default function ProductCard({ product, addToCart }) {
           <span>excl. VAT</span>
         </div>
         <div className="buy-row">
-          <div className="qty-stepper" aria-label="Quantity selector">
-            <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease quantity">
-              <Minus size={14} />
-            </button>
-            <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-            <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase quantity">
-              <Plus size={14} />
-            </button>
-          </div>
-          <button className={added ? 'add-button added' : 'add-button'} onClick={handleAdd} type="button">
-            {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-            {added ? 'Added' : 'Add to order'}
-          </button>
+          {inCart ? (
+            <div className="cart-in-control">
+              <button onClick={() => onCartQtyChange(product, cartQty - 1)} type="button" aria-label="Remove one from order">
+                <Minus size={15} />
+              </button>
+              <span>{cartQty}</span>
+              <button onClick={() => onCartQtyChange(product, cartQty + 1)} type="button" aria-label="Add one more to order">
+                <Plus size={15} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="qty-stepper" aria-label="Quantity selector">
+                <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease quantity">
+                  <Minus size={14} />
+                </button>
+                <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase quantity">
+                  <Plus size={14} />
+                </button>
+              </div>
+              <button className="add-button" onClick={handleAdd} type="button">
+                <ShoppingCart size={16} />
+                Add to order
+              </button>
+            </>
+          )}
         </div>
       </div>
       {zoomOpen && (
-        <div className="product-zoom-backdrop" onClick={() => setZoomOpen(false)}>
+        <div className="product-zoom-backdrop" onClick={closePreview}>
           <section className="product-zoom-modal" onClick={(event) => event.stopPropagation()}>
-            <button className="product-zoom-close" onClick={() => setZoomOpen(false)} type="button" aria-label="Close product preview">
+            <button className="product-zoom-close" onClick={closePreview} type="button" aria-label="Close product preview">
               <X size={20} />
             </button>
             <div className="product-zoom-image">
@@ -211,14 +233,29 @@ export default function ProductCard({ product, addToCart }) {
               <div className="product-zoom-meta">
                 <span>{product.inStock ? 'In stock' : 'Confirm stock'}</span>
                 <span>{product.leadTime || 'Confirm quantity'}</span>
-                {product.stockOnHand != null && <span>{product.stockOnHand} on hand</span>}
+                <span>Trade quote item</span>
               </div>
               <div className="product-zoom-price">
                 <strong>R{product.price.toFixed(2)}</strong>
                 <span>excl. VAT</span>
               </div>
               <p>{product.tradeNote || 'Wholesale quote item'}</p>
-              <button className="primary-order-button" onClick={() => { handleAdd(); setZoomOpen(false); }} type="button">
+              <div className="product-zoom-buy-row">
+                <div className="qty-stepper" aria-label="Quantity selector in preview">
+                  <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease quantity">
+                    <Minus size={14} />
+                  </button>
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                  <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase quantity">
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <div className="product-zoom-line-total">
+                  <span>Current line</span>
+                  <strong>R{lineTotal}</strong>
+                </div>
+              </div>
+              <button className="primary-order-button" onClick={() => { handleAdd(); closePreview(); }} type="button">
                 <ShoppingCart size={17} />
                 Add {qty} to order
               </button>

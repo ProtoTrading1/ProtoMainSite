@@ -1,8 +1,7 @@
-import React from 'react';
-import { LayoutDashboard, LogOut, Menu, RotateCcw, Search, ShoppingCart, User } from 'lucide-react';
+import { LayoutDashboard, LogOut, Menu, RotateCcw, ShoppingCart, User } from 'lucide-react';
 
 export default function Header({
-  cartItemCount, cartTotal, searchQuery = '', setSearchQuery = () => {},
+  cartItemCount, cartTotal,
   onMenuClick, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
 }) {
   return (
@@ -18,15 +17,6 @@ export default function Header({
           <strong>PROTO</strong>
           <span>TRADING</span>
         </div>
-      </div>
-
-      <div className="header-search">
-        <Search size={19} />
-        <input
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search products, codes — typos OK"
-        />
       </div>
 
       <div className="header-actions">
@@ -59,7 +49,7 @@ export default function Header({
         </button>
 
         {onLogout && (
-          <button className="header-action desktop-only" type="button" onClick={onLogout} title="Log out" style={{ opacity: 0.6 }}>
+          <button className="header-action desktop-only" type="button" onClick={onLogout} title="Log out" style={{ opacity: 0.75 }}>
             <LogOut size={17} />
           </button>
         )}

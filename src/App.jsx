@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -8,12 +8,14 @@ import OrderConfirmModal from './components/OrderConfirmModal';
 import MobileNav from './components/MobileNav';
 import ReorderModal from './components/ReorderModal';
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { useProductFilter, useCategoryCounts } from './hooks/useProductFilter';
-import { fetchProducts } from './lib/products';
+import { fetchCategoryCounts, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
-import { fuzzyFilter } from './lib/fuzzySearch';
 import categories from './data/categories.json';
 import './index.css';
+
+const HEADER_H = 72;
+const STICKY_H = 56;
+const CATALOG_PAGE_SIZE = 60;
 
 function getProductImageUrl(product, siteOrigin = '') {
   const src = product.localImage || product.image || '';
@@ -21,12 +23,6 @@ function getProductImageUrl(product, siteOrigin = '') {
   if (/^https?:\/\//i.test(src)) return src;
   if (!siteOrigin) return src;
   return `${siteOrigin}${src.startsWith('/') ? src : `/${src}`}`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function buildOrderText(cartItems, cartTotal) {
@@ -39,85 +35,111 @@ function buildOrderText(cartItems, cartTotal) {
     return label + ' '.repeat(pad) + lineTotal;
   });
   return [
-    `Hi Proto Trading,`, ``,
-    `Please process the following wholesale order request:`,
-    `Date: ${date}`, ``, divider, ...lines, divider,
-    `SUBTOTAL (excl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`, ``,
-    `Please confirm availability, pricing, and delivery.`, ``,
-    `Thank you`,
+    'Hi Proto Trading,',
+    '',
+    'Please process the following wholesale order request:',
+    `Date: ${date}`,
+    '',
+    divider,
+    ...lines,
+    divider,
+    `SUBTOTAL (excl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`,
+    '',
+    'Please confirm availability, pricing, and delivery.',
+    '',
+    'Thank you',
   ].join('\n');
 }
 
-function sortProducts(products, sort) {
-  const next = [...products];
-  if (sort === 'price-low')  return next.sort((a, b) => a.price - b.price);
-  if (sort === 'price-high') return next.sort((a, b) => b.price - a.price);
-  if (sort === 'newest')     return next.sort((a, b) => Number(b.isNew) - Number(a.isNew));
-  if (sort === 'code')       return next.sort((a, b) => a.code.localeCompare(b.code));
-  return next.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+function collectionLabel(collection) {
+  if (collection === 'hot') return 'Hot Sellers';
+  if (collection === 'new') return 'New Stock';
+  if (collection === 'clearance') return 'Clearance Stock';
+  if (collection === 'instock') return 'In Stock';
+  if (collection === 'soldout') return 'Out of Stock';
+  return 'All Products';
 }
 
-const HEADER_H = 72;
-const STICKY_H = 56;
-
 export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) {
-  const { path, refinements, navigate, back, setRefinement } = useHashNav();
+  const { path, refinements, navigate, setRefinement } = useHashNav();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState('featured');
-  const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [counts, setCounts] = useState({ '': 0 });
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [page, setPage] = useState(1);
   const [cartItems, setCartItems] = useState([]);
-  const [showSpecials, setShowSpecials] = useState(false);
+  const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
 
-  // Load products from Supabase (falls back to static JSON)
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchProducts()
-      .then((products) => {
-        if (!cancelled && products.length > 0) setAllProducts(products);
-      })
-      .catch(() => {
-        // Fallback to static JSON
-        fetch('/stockProducts.json')
-          .then((r) => r.ok ? r.json() : Promise.reject())
-          .then((products) => { if (!cancelled && Array.isArray(products)) setAllProducts(products); })
-          .catch(() => {});
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+    setPage(1);
+  }, [searchQuery, sort, activeCollection, path.join('/')]);
 
-  // Load last order for reorder feature
   useEffect(() => {
     if (!customer?.id) return;
     fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
   }, [customer?.id]);
 
-  // Filter products by customer tier for specials
-  const visibleProducts = useMemo(() => {
-    if (!showSpecials) return allProducts.filter((p) => !p.isArchived);
-    const tier = customer?.tier || 'regular';
-    return allProducts.filter((p) =>
-      !p.isArchived &&
-      p.isSpecial &&
-      (p.specialVisibility === 'all' || p.specialVisibility === tier)
-    );
-  }, [allProducts, showSpecials, customer?.tier]);
+  useEffect(() => {
+    let cancelled = false;
 
-  const categoryProducts = useProductFilter(visibleProducts, path, refinements);
-  const filteredProducts = useMemo(() => {
-    const searched = searchQuery.trim()
-      ? fuzzyFilter(categoryProducts, searchQuery)
-      : categoryProducts;
-    return sortProducts(searched, sort);
-  }, [categoryProducts, searchQuery, sort]);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [pageData, nextCounts] = await Promise.all([
+          fetchProductPage({
+            page,
+            pageSize: CATALOG_PAGE_SIZE,
+            searchQuery,
+            categoryPath: path,
+            collection: activeCollection,
+            sort,
+          }),
+          fetchCategoryCounts({ collection: activeCollection }),
+        ]);
 
-  const counts = useCategoryCounts(visibleProducts);
+        if (cancelled) return;
+        setUsingFallback(false);
+        setCatalogProducts(pageData.products);
+        setCatalogTotal(pageData.total);
+        setCounts(nextCounts);
+      } catch {
+        const response = await fetch('/stockProducts.json');
+        const fallback = await response.json();
+        if (cancelled) return;
+        let rows = Array.isArray(fallback) ? fallback : [];
+        if (activeCollection === 'hot') rows = rows.filter((item) => (item.badges || []).includes('Hot seller'));
+        if (activeCollection === 'new') rows = rows.filter((item) => item.isNew);
+        if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
+        if (activeCollection === 'instock') rows = rows.filter((item) => (item.stockOnHand ?? 0) > 0);
+        if (activeCollection === 'soldout') rows = rows.filter((item) => (item.stockOnHand ?? 0) <= 0);
+        if (path.length) rows = rows.filter((item) => path.every((seg, index) => item.categoryPath?.[index] === seg));
+        if (searchQuery.trim()) {
+          const q = searchQuery.trim().toLowerCase();
+          rows = rows.filter((item) => item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q));
+        }
+        setUsingFallback(true);
+        setCatalogTotal(rows.length);
+        setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
+        setCounts({ '': rows.length });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCollection, page, path, searchQuery, sort]);
+
   const breadcrumb = buildBreadcrumb(categories, path);
+  const recommendationProducts = useMemo(() => catalogProducts.slice(0, 4), [catalogProducts]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [orderText, setOrderText] = useState('');
@@ -130,29 +152,72 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     region: customer?.delivery_address || 'To confirm',
   });
 
+  useEffect(() => {
+    setCustomerDetails({
+      name: customer?.name || 'Trade Customer',
+      email: customer?.email || '',
+      phone: customer?.phone || '+27',
+      region: customer?.delivery_address || 'To confirm',
+    });
+  }, [customer?.name, customer?.email, customer?.phone, customer?.delivery_address]);
+
   const addToCart = (product, qty) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) return prev.map((i) => i.product.id === product.id ? { ...i, qty: i.qty + qty } : i);
+      if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: i.qty + qty } : i));
       return [...prev, { product, qty }];
     });
   };
 
-  const updateQty = (id, qty) => setCartItems((prev) =>
-    prev.map((i) => i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })
-  );
-
+  const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })));
   const removeFromCart = (id) => setCartItems((prev) => prev.filter((i) => i.product.id !== id));
   const clearCart = () => setCartItems([]);
 
-  const handleShortcut = (id) => {
-    if (id === 'start')   { navigate([]); setSearchQuery(''); setShowSpecials(false); }
-    if (id === 'hot')     { setSearchQuery('hot'); setShowSpecials(false); }
-    if (id === 'new')     { setSearchQuery('new'); setShowSpecials(false); }
-    if (id === 'specials') { setShowSpecials((v) => !v); setSearchQuery(''); navigate([]); }
+  const cartQtyMap = useMemo(() => {
+    const map = {};
+    for (const item of cartItems) map[item.product.id] = item.qty;
+    return map;
+  }, [cartItems]);
+
+  const handleCartQtyChange = (product, newQty) => {
+    if (newQty <= 0) removeFromCart(product.id);
+    else updateQty(product.id, newQty);
   };
 
-  const cartTotal = cartItems.reduce((acc, i) => acc + (i.product.price * i.qty), 0);
+  const handleShortcut = (id) => {
+    if (id === 'start') {
+      setActiveCollection('all');
+      setSearchQuery('');
+      navigate([]);
+    }
+    if (id === 'hot') {
+      setActiveCollection('hot');
+      setSearchQuery('');
+      navigate([]);
+    }
+    if (id === 'new') {
+      setActiveCollection('new');
+      setSearchQuery('');
+      navigate([]);
+    }
+    if (id === 'clearance') {
+      setActiveCollection('clearance');
+      setSearchQuery('');
+      navigate([]);
+    }
+    if (id === 'instock') {
+      setActiveCollection('instock');
+      setSearchQuery('');
+      navigate([]);
+    }
+    if (id === 'soldout') {
+      setActiveCollection('soldout');
+      setSearchQuery('');
+      navigate([]);
+    }
+  };
+
+  const cartTotal = cartItems.reduce((acc, i) => acc + i.product.price * i.qty, 0);
   const totalItemCount = cartItems.reduce((acc, i) => acc + i.qty, 0);
 
   const sendOrderEmail = async () => {
@@ -165,14 +230,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setModalOpen(true);
 
     try {
-      // Save order to Supabase
       if (customer?.id) {
         await saveOrder(customer.id, cartItems, cartTotal);
-        // Refresh last order
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       }
 
-      // Send email via API
       const payload = {
         customer: customerDetails,
         totals: { subtotal: cartTotal },
@@ -204,15 +266,28 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   };
 
   const handleReorder = (items) => {
-    // Restore items from last order back into cart
-    for (const item of items) {
-      const product = allProducts.find((p) => p.id === item.productId || p.code === item.code);
-      if (product) addToCart(product, item.qty);
-    }
+    const selectedItems = items
+      .map((item) => {
+        const product = catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
+        return product ? { product, qty: item.qty } : null;
+      })
+      .filter(Boolean);
+
+    setCartItems((prev) => {
+      const next = [...prev];
+      for (const item of selectedItems) {
+        const existing = next.find((entry) => entry.product.id === item.product.id);
+        if (existing) existing.qty += item.qty;
+        else next.push(item);
+      }
+      return next;
+    });
+
     setReorderModal(false);
   };
 
   const bodyH = `calc(100vh - ${HEADER_H}px - ${STICKY_H}px)`;
+  const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -236,8 +311,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categories={categories}
             path={path}
             navigate={navigate}
-            back={back}
-            refinements={refinements}
             setRefinement={setRefinement}
             counts={counts}
           />
@@ -245,22 +318,28 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         <main className="content-area">
           <MainContent
-            products={filteredProducts}
-            allProductCount={visibleProducts.length}
-            categoryProductCount={categoryProducts.length}
+            products={catalogProducts}
+            allProductCount={counts[''] || catalogTotal}
+            categoryProductCount={catalogTotal}
             addToCart={addToCart}
+            cartQtyMap={cartQtyMap}
+            onCartQtyChange={handleCartQtyChange}
             path={path}
             navigate={navigate}
             breadcrumb={breadcrumb}
-            refinements={refinements}
-            setRefinement={setRefinement}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             sort={sort}
             setSort={setSort}
             onShortcut={handleShortcut}
-            showSpecials={showSpecials}
+            activeCollection={activeCollection}
+            collectionLabel={collectionLabel(activeCollection)}
+            recommendationProducts={recommendationProducts}
             loading={loading}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            usingFallback={usingFallback}
           />
         </main>
 
@@ -300,13 +379,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         breadcrumb={breadcrumb}
       />
 
-      {reorderModal && (
-        <ReorderModal
-          lastOrder={lastOrder}
-          onReorder={handleReorder}
-          onClose={() => setReorderModal(false)}
-        />
-      )}
+      {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}
     </div>
   );
 }

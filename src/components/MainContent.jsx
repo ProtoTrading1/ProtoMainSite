@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -7,19 +6,22 @@ import {
   List,
   Loader2,
   PackageCheck,
+  PackageX,
   Search,
   Sparkles,
-  Star,
+  Tag,
   TimerReset,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import Breadcrumb from './Breadcrumb';
 
 const shortcuts = [
-  { id: 'start',    icon: PackageCheck, title: 'All Products',        desc: 'Browse the full trade range' },
-  { id: 'hot',      icon: Flame,        title: 'Hot Sellers',         desc: 'Fast-moving lines' },
-  { id: 'new',      icon: Sparkles,     title: 'New Stock',           desc: 'Fresh arrivals' },
-  { id: 'specials', icon: Star,         title: "This Week's Specials", desc: 'Starred deals for you' },
+  { id: 'start', icon: PackageCheck, title: 'All Products', desc: 'Browse the full trade range' },
+  { id: 'instock', icon: CheckCircle2, title: 'In Stock', desc: 'Available now' },
+  { id: 'hot', icon: Flame, title: 'Hot Sellers', desc: 'Fast-moving lines' },
+  { id: 'new', icon: Sparkles, title: 'New Stock', desc: 'Fresh arrivals' },
+  { id: 'clearance', icon: Tag, title: 'Clearance Stock', desc: 'Special pricing lines' },
+  { id: 'soldout', icon: PackageX, title: 'Missed Out', desc: 'Out of stock' },
 ];
 
 export default function MainContent({
@@ -27,6 +29,8 @@ export default function MainContent({
   allProductCount,
   categoryProductCount = products.length,
   addToCart,
+  cartQtyMap = {},
+  onCartQtyChange = () => {},
   path,
   navigate,
   breadcrumb,
@@ -35,22 +39,25 @@ export default function MainContent({
   sort = 'featured',
   setSort = () => {},
   onShortcut = () => {},
-  showSpecials = false,
+  activeCollection = 'all',
+  collectionLabel = 'All Products',
+  recommendationProducts = [],
   loading = false,
+  page = 1,
+  totalPages = 1,
+  onPageChange = () => {},
+  usingFallback = false,
 }) {
-  const isFiltered = path && path.length > 0;
-  const currentLabel = showSpecials
-    ? "This Week's Specials"
-    : isFiltered ? breadcrumb[breadcrumb.length - 1]?.label : 'All Wholesale Products';
+  const isCategoryPage = path && path.length > 0;
+  const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
+  const currentLabel = isCategoryPage ? breadcrumb[breadcrumb.length - 1]?.label || 'All Wholesale Products' : isAllProductsPage ? 'All Wholesale Products' : collectionLabel;
   const resultLabel = searchQuery
-    ? `${products.length} matching ${products.length === 1 ? 'item' : 'items'}`
+    ? `${categoryProductCount} matching ${categoryProductCount === 1 ? 'item' : 'items'}`
     : `${categoryProductCount} trade ${categoryProductCount === 1 ? 'item' : 'items'}`;
-  const visibleProducts = products.slice(0, 60);
-  const hiddenCount = Math.max(0, products.length - visibleProducts.length);
 
   return (
     <div className="catalog-page">
-      {!isFiltered && !showSpecials && (
+      {isAllProductsPage && (
         <section className="trade-hero">
           <div className="trade-hero-copy">
             <span className="eyebrow">Established 1987 | Wholesale supply</span>
@@ -76,22 +83,17 @@ export default function MainContent({
         </section>
       )}
 
-      {showSpecials && (
-        <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Star size={20} color="#e11d48" fill="#e11d48" />
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', fontFamily: 'Outfit, sans-serif' }}>
-            This Week&apos;s Specials
-          </h2>
-        </div>
-      )}
-
       <div className="catalog-toolbar">
         <Breadcrumb crumbs={breadcrumb} navigate={navigate} />
-        {(isFiltered || showSpecials) && (
-          <button className="text-action" onClick={() => { navigate([]); onShortcut('start'); }} type="button">
-            Clear filter
+        {isCategoryPage ? (
+          <button className="text-action" onClick={() => navigate([])} type="button">
+            Go back to all products
           </button>
-        )}
+        ) : activeCollection !== 'all' ? (
+          <button className="text-action" onClick={() => onShortcut('start')} type="button">
+            Go back to all products
+          </button>
+        ) : null}
       </div>
 
       <section className="section-heading">
@@ -100,7 +102,7 @@ export default function MainContent({
           <h2>{currentLabel}</h2>
           <p>
             {resultLabel} from {allProductCount} live catalogue products.
-            {hiddenCount > 0 ? ` Showing first ${visibleProducts.length}; use search or categories to narrow.` : ''}
+            {usingFallback ? ' Running on fallback catalogue data.' : ''}
           </p>
         </div>
         <div className="view-toggle">
@@ -109,69 +111,108 @@ export default function MainContent({
         </div>
       </section>
 
-      {!isFiltered && !showSpecials && (
-        <div className="shortcut-grid">
-          {shortcuts.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button key={item.id} className="shortcut-card" onClick={() => onShortcut(item.id)} type="button">
-                <Icon size={22} />
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>{item.desc}</small>
-                </span>
-                <ArrowRight size={15} />
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="shortcut-grid">
+        {shortcuts.map((item) => {
+          const Icon = item.icon;
+          const isActive = (item.id === 'start' && activeCollection === 'all') || item.id === activeCollection;
+          return (
+            <button key={item.id} className={`shortcut-card ${isActive ? 'active' : ''}`} onClick={() => onShortcut(item.id)} type="button">
+              <Icon size={22} />
+              <span>
+                <strong>{item.title}</strong>
+                <small>{item.desc}</small>
+              </span>
+              <ArrowRight size={15} />
+            </button>
+          );
+        })}
+      </div>
 
       <div className="results-control">
-        <label className="within-search">
-          <Search size={17} />
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search within visible products — typos OK"
-          />
-        </label>
         <label className="sort-control">
           <span>Sort</span>
           <select value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="featured">Featured</option>
-            <option value="price-low">Price: low to high</option>
-            <option value="price-high">Price: high to low</option>
-            <option value="newest">Newest stock</option>
-            <option value="code">SKU code</option>
+            <option value="featured">Most Popular</option>
+            <option value="latest">Sort by Latest</option>
+            <option value="price-low">Low to High</option>
+            <option value="stock">Stock Status</option>
           </select>
         </label>
       </div>
 
+      {isAllProductsPage ? (
+        <section className="trade-story-card">
+          <div>
+            <span className="eyebrow">Built for retailers</span>
+            <h3>Move from browsing to quote-ready faster.</h3>
+            <p>Browse core wholesale lines, build a clean basket, and send one sharp order request to the Proto Trading team.</p>
+          </div>
+          <div className="hero-proof">
+            <span><CheckCircle2 size={15} /> Trade-only ordering</span>
+            <span><CheckCircle2 size={15} /> Quote confirmed by reply</span>
+            <span><CheckCircle2 size={15} /> Built for repeat buyers</span>
+          </div>
+        </section>
+      ) : recommendationProducts.length > 0 ? (
+        <section className="recommendation-section">
+          <div className="recommendation-heading">
+            <span className="eyebrow">Recommended next</span>
+            <h3>We think you will like these</h3>
+          </div>
+          <div className="recommendation-grid">
+            {recommendationProducts.map((product) => (
+              <ProductCard
+                key={`rec-${product.id}`}
+                product={product}
+                addToCart={addToCart}
+                cartQty={cartQtyMap[product.id] || 0}
+                onCartQtyChange={onCartQtyChange}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#94a3b8' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#64748b' }}>
           <Loader2 size={24} />
           <span>Loading catalogue…</span>
         </div>
       ) : products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />
-          <h3>{showSpecials ? 'No specials available for your tier.' : 'No matching products'}</h3>
-          <p>
-            {showSpecials
-              ? 'Check back later or browse the full catalogue.'
-              : 'Clear the search or choose another category to continue building the order.'}
-          </p>
+          <h3>No matching products</h3>
+          <p>Clear the search or choose another category to continue building the order.</p>
           <button onClick={() => { setSearchQuery(''); onShortcut('start'); }} type="button">
-            Clear filter
+            Go back to all products
           </button>
         </div>
       ) : (
-        <div className="product-grid">
-          {visibleProducts.map((product) => (
-            <ProductCard key={product.id} product={product} addToCart={addToCart} />
-          ))}
-        </div>
+        <>
+          <div className="product-grid">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                addToCart={addToCart}
+                cartQty={cartQtyMap[product.id] || 0}
+                onCartQtyChange={onCartQtyChange}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 ? (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
+              <button onClick={() => onPageChange(Math.max(1, page - 1))} type="button" disabled={page <= 1} className="text-action" style={{ opacity: page <= 1 ? 0.45 : 1 }}>
+                Previous page
+              </button>
+              <span style={{ color: '#64748b', alignSelf: 'center' }}>Page {page} of {totalPages}</span>
+              <button onClick={() => onPageChange(Math.min(totalPages, page + 1))} type="button" disabled={page >= totalPages} className="text-action" style={{ opacity: page >= totalPages ? 0.45 : 1 }}>
+                Next page
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       <section className="buyer-note">
