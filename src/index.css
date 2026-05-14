@@ -971,13 +971,12 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: grid;
   place-items: center;
   padding: 34px;
-  background: radial-gradient(circle at top, #1b202c 0%, #0f1117 85%);
+  background: #ffffff;
 }
 .product-zoom-image img {
   max-width: 94%;
   max-height: 500px;
   object-fit: contain;
-  mix-blend-mode: multiply;
 }
 .product-zoom-details {
   display: flex;
@@ -1004,6 +1003,28 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: #cbd5e1;
   font-size: 12px;
   font-weight: 800;
+}
+.zoom-stock-chip {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.zoom-stock-chip--in {
+  background: rgba(22,163,74,0.15);
+  color: #4ade80;
+  border: 1px solid rgba(22,163,74,0.3);
+}
+.zoom-stock-chip--confirm {
+  background: rgba(139,26,26,0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(139,26,26,0.35);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.zoom-stock-chip--confirm:hover {
+  background: rgba(139,26,26,0.32);
 }
 .product-zoom-price {
   display: flex;

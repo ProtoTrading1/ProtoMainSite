@@ -127,6 +127,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange }) {
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [showStock, setShowStock] = useState(false);
   const addButtonRef = useRef(null);
 
   const lineTotal = (product.price * qty).toFixed(2);
@@ -234,9 +235,17 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <span className="eyebrow">{product.code}</span>
               <h2>{product.name}</h2>
               <div className="product-zoom-meta">
-                <span>{product.inStock ? 'In stock' : 'Confirm stock'}</span>
-                <span>{product.leadTime || 'Confirm quantity'}</span>
-                <span>Trade quote item</span>
+                {product.inStock ? (
+                  <span className="zoom-stock-chip zoom-stock-chip--in">In stock</span>
+                ) : (
+                  <button
+                    className="zoom-stock-chip zoom-stock-chip--confirm"
+                    type="button"
+                    onClick={() => setShowStock((s) => !s)}
+                  >
+                    {showStock ? `Stock on hand: ${product.stockOnHand ?? 0}` : 'Confirm stock →'}
+                  </button>
+                )}
               </div>
               <div className="product-zoom-price">
                 <strong>R{product.price.toFixed(2)}</strong>
@@ -258,10 +267,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   <strong>R{lineTotal}</strong>
                 </div>
               </div>
-              <button className="primary-order-button" onClick={() => { handleAdd(); closePreview(); }} type="button">
-                <ShoppingCart size={17} />
-                Add {qty} to order
-              </button>
             </div>
           </section>
         </div>
