@@ -267,6 +267,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   <strong>R{lineTotal}</strong>
                 </div>
               </div>
+              <button className="zoom-add-to-cart" onClick={() => { handleAdd(); closePreview(); }} type="button">
+                <ShoppingCart size={17} />
+                Add {qty} to cart
+              </button>
             </div>
           </section>
         </div>

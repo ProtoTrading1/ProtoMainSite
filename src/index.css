@@ -1074,6 +1074,21 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: #111111;
   font-size: 20px;
 }
+.zoom-add-to-cart {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 10px;
+  background: #000000;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  transition: background 0.15s;
+}
+.zoom-add-to-cart:hover { background: #8B1A1A; }
 .empty-state {
   padding: 64px 20px;
   border: 1px solid var(--border-light);
