@@ -116,7 +116,7 @@ export default function MainContent({
           const Icon = item.icon;
           const isActive = (item.id === 'start' && activeCollection === 'all') || item.id === activeCollection;
           return (
-            <button key={item.id} className={`shortcut-card${item.id === 'start' ? ' clear-tab' : ''}${isActive ? ' active' : ''}`} onClick={() => onShortcut(item.id)} type="button">
+            <button key={item.id} className={`shortcut-card${isActive ? ' active' : ''}`} onClick={() => onShortcut(item.id)} type="button">
               <Icon size={22} />
               <span>
                 <strong>{item.title}</strong>

@@ -358,7 +358,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
   padding: 30px;
   border-radius: 10px;
-  background: #000000;
+  background: #8B1A1A;
   color: #fff;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.08);
@@ -370,7 +370,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   font-size: 40px;
   line-height: 1.05;
   letter-spacing: 0;
-  color: #dc2626;
+  color: #fff;
 }
 .trade-hero-copy p {
   max-width: 620px;
@@ -600,20 +600,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-align: left;
   color: #000000;
 }
-.shortcut-card.clear-tab {
-  background: transparent;
-  border: 1.5px dashed #d1d5db;
-  color: #374151;
-}
-.shortcut-card.clear-tab svg:first-child { color: #374151; }
-.shortcut-card.clear-tab small { color: #6b7280; }
-.shortcut-card.clear-tab.active {
-  background: transparent;
-  border: 1.5px solid #000000;
-  color: #000000;
-}
-.shortcut-card.clear-tab.active svg:first-child { color: #000000; }
-.shortcut-card.clear-tab.active small { color: #374151; }
 .shortcut-card:hover {
   border-color: #8B1A1A;
   background: #8B1A1A;

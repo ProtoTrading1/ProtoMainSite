@@ -49,7 +49,7 @@ export default function CartFlyAnimation({ from, onDone }) {
           opacity: [1, 1, 0],
           rotate: [0, -25, 10],
         }}
-        transition={{ duration: 1.1, ease: 'easeInOut', times: [0, 0.5, 1] }}
+        transition={{ duration: 1.6, ease: 'easeInOut', times: [0, 0.5, 1] }}
         onAnimationComplete={onDone}
       >
         <ShoppingCart size={26} />
