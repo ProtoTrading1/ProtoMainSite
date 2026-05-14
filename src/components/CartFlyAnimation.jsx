@@ -5,33 +5,55 @@ export default function CartFlyAnimation({ from, onDone }) {
   const toX = window.innerWidth - 110;
   const toY = 26;
 
-  // Arc: peak midpoint rises above both start and end
-  const midX = from.x + (toX - from.x) * 0.45;
-  const midY = Math.min(from.y, toY) - 120;
+  const midX = from.x + (toX - from.x) * 0.4;
+  const midY = Math.min(from.y, toY) - 180;
 
   return (
-    <motion.div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        zIndex: 9999,
-        pointerEvents: 'none',
-        color: '#16a34a',
-        filter: 'drop-shadow(0 4px 8px rgba(22,163,74,0.5))',
-      }}
-      initial={{ x: from.x - 14, y: from.y - 14, scale: 1, opacity: 1, rotate: 0 }}
-      animate={{
-        x: [from.x - 14, midX, toX],
-        y: [from.y - 14, midY, toY],
-        scale: [1, 1.2, 0.35],
-        opacity: [1, 1, 0],
-        rotate: [0, -20, 0],
-      }}
-      transition={{ duration: 0.65, ease: 'easeInOut', times: [0, 0.45, 1] }}
-      onAnimationComplete={onDone}
-    >
-      <ShoppingCart size={26} />
-    </motion.div>
+    <>
+      {/* Pulsing ring at origin */}
+      <motion.div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9998,
+          pointerEvents: 'none',
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          border: '2px solid #16a34a',
+          x: from.x - 24,
+          y: from.y - 24,
+        }}
+        initial={{ scale: 0.5, opacity: 0.9 }}
+        animate={{ scale: 2.5, opacity: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      />
+
+      {/* Flying cart icon */}
+      <motion.div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+          pointerEvents: 'none',
+          color: '#16a34a',
+          filter: 'drop-shadow(0 6px 12px rgba(22,163,74,0.6))',
+        }}
+        initial={{ x: from.x - 13, y: from.y - 13, scale: 1.1, opacity: 1, rotate: 0 }}
+        animate={{
+          x: [from.x - 13, midX, toX],
+          y: [from.y - 13, midY, toY],
+          scale: [1.1, 1.4, 0.3],
+          opacity: [1, 1, 0],
+          rotate: [0, -25, 10],
+        }}
+        transition={{ duration: 1.1, ease: 'easeInOut', times: [0, 0.5, 1] }}
+        onAnimationComplete={onDone}
+      >
+        <ShoppingCart size={26} />
+      </motion.div>
+    </>
   );
 }
