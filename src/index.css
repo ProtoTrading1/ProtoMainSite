@@ -319,10 +319,8 @@ input, select, textarea { font-family: inherit; outline: none; }
 .cart-summary {
   position: relative;
   gap: 10px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: #8B1A1A;
-  color: #fff;
+  padding-left: 18px;
+  border-left: 1px solid #374151;
   font-weight: 850;
 }
 .cart-summary em {
@@ -602,15 +600,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-align: left;
   color: #000000;
 }
-.shortcut-card.all-products-tab {
-  background: #000000;
-  border-color: #000000;
-  color: #fff;
-}
-.shortcut-card.all-products-tab svg:first-child { color: #fff; }
-.shortcut-card.all-products-tab small { color: rgba(255,255,255,0.7); }
-.shortcut-card:hover,
-.shortcut-card.all-products-tab:hover {
+.shortcut-card:hover {
   border-color: #8B1A1A;
   background: #8B1A1A;
   color: #fff;
@@ -618,8 +608,8 @@ input, select, textarea { font-family: inherit; outline: none; }
 .shortcut-card:hover svg:first-child { color: #fff; }
 .shortcut-card:hover small { color: rgba(255,255,255,0.8); }
 .shortcut-card.active {
-  border-color: #000000;
-  background: #000000;
+  border-color: #8B1A1A;
+  background: #8B1A1A;
   color: #fff;
 }
 .shortcut-card.active svg:first-child { color: #fff; }

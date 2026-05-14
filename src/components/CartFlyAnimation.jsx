@@ -24,7 +24,7 @@ export default function CartFlyAnimation({ from, onDone }) {
           width: 48,
           height: 48,
           borderRadius: '50%',
-          border: '2px solid #16a34a',
+          border: '2px solid #8B1A1A',
           x: from.x - 24,
           y: from.y - 24,
         }}
@@ -41,8 +41,8 @@ export default function CartFlyAnimation({ from, onDone }) {
           left: 0,
           zIndex: 9999,
           pointerEvents: 'none',
-          color: '#16a34a',
-          filter: 'drop-shadow(0 6px 12px rgba(22,163,74,0.6))',
+          color: '#8B1A1A',
+          filter: 'drop-shadow(0 6px 12px rgba(139,26,26,0.6))',
         }}
         initial={{ x: from.x - 13, y: from.y - 13, scale: 1.1, opacity: 1, rotate: 0 }}
         animate={{
