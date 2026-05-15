@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import App from './App';
 import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
+import LoginModal from './components/LoginModal';
 import ProfilePage from './pages/ProfilePage';
 import WorldClassPortal from './worldclass/WorldClassPortal';
 import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
@@ -27,6 +27,13 @@ export default function Root() {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
+
+  useEffect(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const area = document.querySelector('.content-area');
+    if (area) area.scrollTop = 0;
+  }, [view]);
 
   const loadCustomer = useCallback(async (userId) => {
     const profile = await getCustomerProfile(userId);
@@ -137,22 +144,29 @@ export default function Root() {
     );
   }
 
-  if (view === 'login') {
-    return (
-      <LoginPage
-        onLogin={handleLogin}
-        onBack={() => setSurface('landing')}
-      />
-    );
-  }
+  const scrollToApply = () => {
+    setSurface('landing');
+    setTimeout(() => {
+      document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
+    }, 80);
+  };
 
   return (
-    <LandingPage
-      onLogin={() => setSurface('login')}
-      onApply={() => {
-        const el = document.getElementById('trade-access-form');
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }}
-    />
+    <>
+      <LandingPage
+        onLogin={() => setSurface('login')}
+        onApply={() => {
+          const el = document.getElementById('lp-apply');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+      {view === 'login' && (
+        <LoginModal
+          onLogin={handleLogin}
+          onClose={() => setSurface('landing')}
+          onApply={() => { setSurface('landing'); scrollToApply(); }}
+        />
+      )}
+    </>
   );
 }

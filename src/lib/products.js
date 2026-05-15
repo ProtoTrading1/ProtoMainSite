@@ -1,292 +1,307 @@
-import { supabase } from './supabase';
+import { supabaseStock } from './supabaseStock';
+
+// Promise singletons — prevents parallel fetches when multiple components mount at once
+let _loadPromise = null;
+let _cache = null;
+let _adminLoadPromise = null;
+let _adminCache = null;
+
+// ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
+const LS_KEY = 'proto_catalog_v2';
+const LS_TTL = 15 * 60 * 1000;
+
+function saveToLocalCache(data) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
+}
+function loadFromLocalCache() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return (Date.now() - ts < LS_TTL) ? data : null;
+  } catch { return null; }
+}
 
 const PAGE_SIZE = 1000;
-const DEFAULT_CATALOG_PAGE_SIZE = 60;
 
-function adapt(row) {
-  return {
-    id: row.id,
-    code: row.code,
-    name: row.name,
-    price: Number(row.price_ex_vat),
-    image: row.image_url || '',
-    stockOnHand: row.stock_on_hand ?? 0,
-    categoryPath: row.category_path || [],
-    tags: row.tags || [],
-    badges: row.badges || [],
-    isNew: row.is_new,
-    isSpecial: row.is_special,
-    specialVisibility: row.special_visibility || 'all',
-    isArchived: row.is_archived,
-    sortOrder: row.sort_order ?? 0,
-    minQty: row.min_qty || 1,
-    casePack: row.case_pack || '',
-    marginCue: row.margin_cue || '',
-    leadTime: row.lead_time || '',
-    tradeNote: row.trade_note || '',
-    inStock: (row.stock_on_hand ?? 1) > 0,
-    createdAt: row.created_at,
-  };
-}
-
-function applyCollectionFilter(query, collection) {
-  if (collection === 'hot') return query.contains('badges', ['Hot seller']);
-  if (collection === 'new') return query.eq('is_new', true);
-  if (collection === 'clearance') return query.eq('is_special', true);
-  if (collection === 'instock') return query.gt('stock_on_hand', 0);
-  if (collection === 'soldout') return query.eq('stock_on_hand', 0);
-  return query;
-}
-
-function applySearchFilter(query, searchQuery) {
-  const q = searchQuery?.trim();
-  if (!q) return query;
-  const safe = q.replace(/[%',()]/g, ' ').trim();
-  if (!safe) return query;
-  return query.or(`name.ilike.%${safe}%,code.ilike.%${safe}%`);
-}
-
-function applyPathFilter(query, path) {
-  if (!Array.isArray(path) || path.length === 0) return query;
-  return query.contains('category_path', path);
-}
-
-function applySort(query, sort) {
-  if (sort === 'price-low') return query.order('price_ex_vat', { ascending: true }).order('sort_order', { ascending: true });
-  if (sort === 'price-high') return query.order('price_ex_vat', { ascending: false }).order('sort_order', { ascending: true });
-  if (sort === 'newest' || sort === 'latest') return query.order('created_at', { ascending: false });
-  if (sort === 'code') return query.order('code', { ascending: true });
-  if (sort === 'stock') return query.order('stock_on_hand', { ascending: false });
-  return query.order('sort_order', { ascending: true }).order('created_at', { ascending: false });
-}
-
-async function fetchAllProductRows({ archived = null } = {}) {
+async function fetchAllRows(table, selectCols = '*', extraFilter = null) {
   const rows = [];
   let from = 0;
-
   while (true) {
-    let query = supabase
-      .from('products')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (archived !== null) query = query.eq('is_archived', archived);
-
-    const { data, error } = await query;
+    let q = supabaseStock.from(table).select(selectCols).range(from, from + PAGE_SIZE - 1);
+    if (extraFilter) q = extraFilter(q);
+    const { data, error } = await q;
     if (error) throw error;
-    const batch = data || [];
-    rows.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
+    rows.push(...(data || []));
+    if ((data || []).length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
-
   return rows;
 }
 
+function adapt(wpRow, stockRow) {
+  const stockQty = stockRow?.stock_qty ?? 0;
+  return {
+    id: wpRow.website_sku,
+    code: wpRow.barcode,
+    barcode: wpRow.barcode,
+    websiteSku: wpRow.website_sku,
+    parentSku: wpRow.parent_sku,
+    name: wpRow.title,
+    price: Number(stockRow?.sell_price ?? 0),
+    image: wpRow.image_url || '',
+    stockQty,
+    stockOnHand: stockQty,
+    colour: wpRow.colour || '',
+    category: (wpRow.category || '').trim(),
+    categoryPath: wpRow.category ? [wpRow.category] : [],
+    tags: [],
+    badges: [],
+    isNew: false,
+    isSpecial: false,
+    isArchived: !wpRow.active,
+    sortOrder: 0,
+    minQty: 1,
+    casePack: '',
+    marginCue: '',
+    leadTime: '',
+    tradeNote: '',
+    inStock: stockQty > 0,
+    createdAt: wpRow.created_at,
+    yearlySales: stockRow?.yearly_sales ?? 0,
+    supplier: stockRow?.supplier || '',
+  };
+}
+
+async function loadAllFromDB({ includeInactive = false, onProgress } = {}) {
+  onProgress?.(8);
+  // Fetch both tables in parallel — no huge .in() filter, join client-side
+  const [wpRows, stockRows] = await Promise.all([
+    fetchAllRows('website_products', '*', includeInactive ? null : (q) => q.eq('active', true)).then((r) => { onProgress?.(55); return r; }),
+    fetchAllRows('products', 'sku,sell_price,stock_qty,yearly_sales,supplier').then((r) => { onProgress?.(85); return r; }),
+  ]);
+
+  const stockMap = {};
+  for (const s of stockRows) stockMap[s.sku] = s;
+
+  onProgress?.(100);
+  return wpRows.map((wp) => adapt(wp, stockMap[wp.barcode]));
+}
+
+// Admin cache — includes inactive products; cached for the session
+function getAllCachedAdmin(onProgress) {
+  if (_adminCache) {
+    onProgress?.(100);
+    return Promise.resolve(_adminCache);
+  }
+  if (!_adminLoadPromise) {
+    _adminLoadPromise = loadAllFromDB({ includeInactive: true, onProgress })
+      .then((all) => {
+        _adminCache = all;
+        return _adminCache;
+      })
+      .catch((err) => {
+        _adminLoadPromise = null;
+        throw err;
+      });
+  }
+  return _adminLoadPromise;
+}
+
+export async function fetchDistinctCategories() {
+  const all = await getAllCached();
+  return [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
+}
+
+// Returns only in-stock, categorized products for the customer catalog
+// Fetches from the edge-cached /api/products endpoint (served by Vercel CDN)
+// Falls back to direct Supabase if the API fails
+function getAllCached() {
+  if (!_loadPromise) {
+    const local = loadFromLocalCache();
+    if (local) {
+      _cache = local;
+      _loadPromise = Promise.resolve(local);
+    } else {
+      _loadPromise = fetch('/api/products')
+        .then((r) => {
+          if (!r.ok) throw new Error(`API ${r.status}`);
+          return r.json();
+        })
+        .then((products) => {
+          _cache = products;
+          saveToLocalCache(products);
+          return _cache;
+        })
+        .catch(() => loadAllFromDB()
+          .then((all) => {
+            _cache = all.filter((p) => p.stockQty > 0 && p.category);
+            saveToLocalCache(_cache);
+            return _cache;
+          }))
+        .catch((err) => {
+          _loadPromise = null;
+          throw err;
+        });
+    }
+  }
+  return _loadPromise;
+}
+
+export function invalidateProductCache() {
+  _cache = null;
+  _loadPromise = null;
+  _adminCache = null;
+  _adminLoadPromise = null;
+  try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
+// Live stock check — always a fresh single-row query
+export async function checkStock(barcode) {
+  const { data, error } = await supabaseStock
+    .from('products')
+    .select('stock_qty')
+    .eq('sku', barcode)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.stock_qty ?? 0;
+}
+
+// ─── Filtering / sorting helpers ──────────────────────────────────────────────
+
+function applyCollection(products, collection) {
+  if (collection === 'instock') return products.filter((p) => p.stockQty > 0);
+  if (collection === 'soldout') return products.filter((p) => p.stockQty <= 0);
+  if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
+  if (collection === 'new') return [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return products;
+}
+
+function applyPathFilter(products, categoryPath) {
+  if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
+  return products.filter((p) => p.category === categoryPath[0]);
+}
+
+function applySearchFilter(products, searchQuery) {
+  const q = searchQuery?.trim().toLowerCase();
+  if (!q) return products;
+  return products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.code.toLowerCase().includes(q) ||
+      (p.websiteSku || '').toLowerCase().includes(q) ||
+      (p.parentSku || '').toLowerCase().includes(q)
+  );
+}
+
+function applySort(products, sort) {
+  const arr = [...products];
+  if (sort === 'price-low') arr.sort((a, b) => a.price - b.price);
+  else if (sort === 'price-high') arr.sort((a, b) => b.price - a.price);
+  else if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  else if (sort === 'stock') arr.sort((a, b) => b.stockQty - a.stockQty);
+  return arr;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export async function fetchProducts() {
-  const data = await fetchAllProductRows({ archived: false });
-  return data.map(adapt);
+  return getAllCached();
 }
 
 export async function fetchProductPage({
   page = 1,
-  pageSize = DEFAULT_CATALOG_PAGE_SIZE,
+  pageSize = 60,
   searchQuery = '',
   categoryPath = [],
   collection = 'all',
   sort = 'featured',
 } = {}) {
-  const from = Math.max(0, (page - 1) * pageSize);
-  const to = from + pageSize - 1;
+  let products = await getAllCached();
+  products = applyCollection(products, collection);
+  products = applyPathFilter(products, categoryPath);
+  products = applySearchFilter(products, searchQuery);
+  products = applySort(products, sort);
 
-  let query = supabase
-    .from('products')
-    .select('*', { count: 'exact' })
-    .eq('is_archived', false)
-    .range(from, to);
-
-  query = applyCollectionFilter(query, collection);
-  query = applyPathFilter(query, categoryPath);
-  query = applySearchFilter(query, searchQuery);
-  query = applySort(query, sort);
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-
+  const total = products.length;
+  const from = (page - 1) * pageSize;
   return {
-    products: (data || []).map(adapt),
-    total: count || 0,
+    products: products.slice(from, from + pageSize),
+    total,
     page,
     pageSize,
-    hasMore: (count || 0) > to + 1,
+    hasMore: total > from + pageSize,
   };
 }
 
 export async function fetchCategoryCounts({ collection = 'all' } = {}) {
-  const entries = [['', []]];
-  for (const category of (await import('../data/categories.json')).default) {
-    entries.push([category.id, [category.id]]);
-    for (const child of category.children || []) {
-      entries.push([[category.id, child.id].join('/'), [category.id, child.id]]);
-    }
+  let products = await getAllCached();
+  products = applyCollection(products, collection);
+  const counts = { '': products.length };
+  for (const p of products) {
+    if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
   }
-
-  const results = await Promise.all(entries.map(async ([key, path]) => {
-    let query = supabase
-      .from('products')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_archived', false);
-    query = applyCollectionFilter(query, collection);
-    query = applyPathFilter(query, path);
-    const { count, error } = await query;
-    if (error) throw error;
-    return [key, count || 0];
-  }));
-
-  return Object.fromEntries(results);
+  return counts;
 }
 
-export async function fetchAllProductsAdmin() {
-  const data = await fetchAllProductRows();
-  return data.map(adapt);
+export async function fetchAllProductsAdmin({ onProgress } = {}) {
+  return getAllCachedAdmin(onProgress);
 }
 
 export async function fetchAdminProductsPage({
   page = 1,
   pageSize = 50,
   searchQuery = '',
-  mainCategory = 'all',
   includeArchived = false,
+  zeroStockOnly = false,
+  categoryFilter = '',
+  onProgress,
 } = {}) {
-  const from = Math.max(0, (page - 1) * pageSize);
-  const to = from + pageSize - 1;
-
-  let query = supabase
-    .from('products')
-    .select('*', { count: 'exact' })
-    .range(from, to)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false });
-
-  if (!includeArchived) query = query.eq('is_archived', false);
-  if (mainCategory !== 'all') query = query.contains('category_path', [mainCategory]);
-  query = applySearchFilter(query, searchQuery);
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data || []).map(adapt), total: count || 0, page, pageSize };
+  let rows = await fetchAllProductsAdmin({ onProgress });
+  if (!includeArchived) rows = rows.filter((p) => !p.isArchived);
+  // Product Manager shows live (in-stock) products; Archive shows zero-stock
+  if (zeroStockOnly) rows = rows.filter((p) => p.stockQty === 0);
+  else rows = rows.filter((p) => p.stockQty > 0);
+  if (categoryFilter && categoryFilter !== 'all') rows = rows.filter((p) => p.category === categoryFilter);
+  rows = applySearchFilter(rows, searchQuery);
+  rows = [...rows].sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
+  const total = rows.length;
+  const from = (page - 1) * pageSize;
+  return { rows: rows.slice(from, from + pageSize), total, page, pageSize };
 }
 
 export async function fetchProductsByMainCategory(mainCategory, { limit = 300 } = {}) {
-  let query = supabase
-    .from('products')
-    .select('*')
-    .eq('is_archived', false)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (mainCategory && mainCategory !== 'all') query = query.contains('category_path', [mainCategory]);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data || []).map(adapt);
-}
-
-export async function createProduct(fields) {
-  const { data, error } = await supabase
-    .from('products')
-    .insert([toRow(fields)])
-    .select()
-    .single();
-  if (error) throw error;
-  return adapt(data);
-}
-
-export async function updateProduct(id, fields) {
-  const { data, error } = await supabase
-    .from('products')
-    .update(toRow(fields))
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-  return adapt(data);
-}
-
-export async function archiveProduct(id, archive = true) {
-  const { error } = await supabase
-    .from('products')
-    .update({ is_archived: archive })
-    .eq('id', id);
-  if (error) throw error;
-}
-
-export async function setSpecial(id, isSpecial, visibility = 'all') {
-  const { error } = await supabase
-    .from('products')
-    .update({ is_special: isSpecial, special_visibility: visibility })
-    .eq('id', id);
-  if (error) throw error;
-}
-
-export async function updateSortOrder(id, sortOrder) {
-  const { error } = await supabase
-    .from('products')
-    .update({ sort_order: sortOrder })
-    .eq('id', id);
-  if (error) throw error;
-}
-
-export async function bulkUpsertProducts(rows) {
-  const mapped = rows.map(toRow);
-  const { data, error } = await supabase
-    .from('products')
-    .upsert(mapped, { onConflict: 'code' })
-    .select();
-  if (error) throw error;
-  return (data || []).map(adapt);
+  const all = await getAllCached();
+  const filtered = mainCategory && mainCategory !== 'all'
+    ? all.filter((p) => p.category === mainCategory)
+    : all;
+  return filtered.slice(0, limit);
 }
 
 export async function exportProductsCsv() {
-  return fetchAllProductRows();
+  return fetchAllProductsAdmin();
 }
 
-function toRow(f) {
-  const row = {};
-  if (f.code            !== undefined) row.code             = f.code;
-  if (f.name            !== undefined) row.name             = f.name;
-  if (f.price           !== undefined) row.price_ex_vat     = f.price;
-  if (f.price_ex_vat    !== undefined) row.price_ex_vat     = f.price_ex_vat;
-  if (f.image           !== undefined) row.image_url        = f.image;
-  if (f.image_url       !== undefined) row.image_url        = f.image_url;
-  if (f.stockOnHand     !== undefined) row.stock_on_hand    = f.stockOnHand;
-  if (f.stock_on_hand   !== undefined) row.stock_on_hand    = f.stock_on_hand;
-  if (f.categoryPath    !== undefined) row.category_path    = f.categoryPath;
-  if (f.category_path   !== undefined) row.category_path    = f.category_path;
-  if (f.tags            !== undefined) row.tags             = f.tags;
-  if (f.badges          !== undefined) row.badges           = f.badges;
-  if (f.isArchived      !== undefined) row.is_archived      = f.isArchived;
-  if (f.is_archived     !== undefined) row.is_archived      = f.is_archived;
-  if (f.isNew           !== undefined) row.is_new           = f.isNew;
-  if (f.is_new          !== undefined) row.is_new           = f.is_new;
-  if (f.isSpecial       !== undefined) row.is_special       = f.isSpecial;
-  if (f.is_special      !== undefined) row.is_special       = f.is_special;
-  if (f.specialVisibility !== undefined) row.special_visibility = f.specialVisibility;
-  if (f.special_visibility !== undefined) row.special_visibility = f.special_visibility;
-  if (f.sortOrder       !== undefined) row.sort_order       = f.sortOrder;
-  if (f.sort_order      !== undefined) row.sort_order       = f.sort_order;
-  if (f.minQty          !== undefined) row.min_qty          = f.minQty;
-  if (f.min_qty         !== undefined) row.min_qty          = f.min_qty;
-  if (f.casePack        !== undefined) row.case_pack        = f.casePack;
-  if (f.case_pack       !== undefined) row.case_pack        = f.case_pack;
-  if (f.marginCue       !== undefined) row.margin_cue       = f.marginCue;
-  if (f.margin_cue      !== undefined) row.margin_cue       = f.margin_cue;
-  if (f.leadTime        !== undefined) row.lead_time        = f.leadTime;
-  if (f.lead_time       !== undefined) row.lead_time        = f.lead_time;
-  if (f.tradeNote       !== undefined) row.trade_note       = f.tradeNote;
-  if (f.trade_note      !== undefined) row.trade_note       = f.trade_note;
-  return row;
+export async function createProduct() { throw new Error('Products are managed in the stock system'); }
+
+export async function updateProduct(websiteSku, payload) {
+  const patch = {};
+  if (payload.image   !== undefined) patch.image_url = payload.image;
+  if (payload.name    !== undefined) patch.title     = payload.name;
+  if (payload.categoryPath?.length)  patch.category  = payload.categoryPath[0];
+
+  if (!Object.keys(patch).length) return;
+
+  const { error } = await supabaseStock
+    .from('website_products')
+    .update(patch)
+    .eq('website_sku', websiteSku);
+
+  if (error) throw error;
+  invalidateProductCache();
 }
+
+export async function archiveProduct() { throw new Error('Products are managed in the stock system'); }
+export async function setSpecial() { throw new Error('Not supported'); }
+export async function updateSortOrder() { throw new Error('Not supported'); }
+export async function bulkUpsertProducts() { throw new Error('Not supported'); }

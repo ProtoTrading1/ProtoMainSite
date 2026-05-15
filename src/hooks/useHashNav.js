@@ -8,7 +8,8 @@ function parseHash() {
   const [pathStr = '', queryStr = ''] = raw.split('?');
   const segments = pathStr ? pathStr.split('/').filter(Boolean) : [];
   const routePrefix = ROUTE_PREFIXES.has(segments[0]) ? segments[0] : '';
-  const path = routePrefix ? segments.slice(1) : segments;
+  const decode = (s) => { try { return decodeURIComponent(s).trim(); } catch { return s.trim(); } };
+  const path = (routePrefix ? segments.slice(1) : segments).map(decode);
   const refinements = {};
   if (queryStr) {
     new URLSearchParams(queryStr).forEach((v, k) => { refinements[k] = v; });

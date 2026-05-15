@@ -46,11 +46,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
           <button
             key={cat.id}
             onClick={() => {
-              if (!hasChildren) {
-                navigate([cat.id]);
-                onToggleL1(null);
-                return;
-              }
+              navigate([cat.id]);
               onToggleL1(isOpen ? null : cat.id);
             }}
             style={{

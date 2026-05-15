@@ -1,0 +1,85 @@
+import { createClient } from '@supabase/supabase-js';
+
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
+  const rows = [];
+  let from = 0;
+  while (true) {
+    let q = supabase.from(table).select(selectCols).range(from, from + PAGE_SIZE - 1);
+    if (filter) q = filter(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    rows.push(...(data || []));
+    if ((data || []).length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return rows;
+}
+
+function adapt(wpRow, stockRow) {
+  const stockQty = stockRow?.stock_qty ?? 0;
+  return {
+    id: wpRow.website_sku,
+    code: wpRow.barcode,
+    barcode: wpRow.barcode,
+    websiteSku: wpRow.website_sku,
+    parentSku: wpRow.parent_sku,
+    name: wpRow.title,
+    price: Number(stockRow?.sell_price ?? 0),
+    image: wpRow.image_url || '',
+    stockQty,
+    stockOnHand: stockQty,
+    colour: wpRow.colour || '',
+    category: (wpRow.category || '').trim(),
+    categoryPath: wpRow.category ? [(wpRow.category || '').trim()] : [],
+    tags: [],
+    badges: [],
+    isNew: false,
+    isSpecial: false,
+    isArchived: !wpRow.active,
+    sortOrder: 0,
+    minQty: 1,
+    casePack: '',
+    marginCue: '',
+    leadTime: '',
+    tradeNote: '',
+    inStock: stockQty > 0,
+    createdAt: wpRow.created_at,
+    yearlySales: stockRow?.yearly_sales ?? 0,
+    supplier: stockRow?.supplier || '',
+  };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const supabase = createClient(
+      process.env.VITE_STOCK_SUPABASE_URL,
+      process.env.VITE_STOCK_SUPABASE_KEY,
+    );
+
+    const [wpRows, stockRows] = await Promise.all([
+      fetchAllRows(supabase, 'website_products', '*', (q) => q.eq('active', true)),
+      fetchAllRows(supabase, 'products', 'sku,sell_price,stock_qty,yearly_sales,supplier'),
+    ]);
+
+    const stockMap = {};
+    for (const s of stockRows) stockMap[s.sku] = s;
+
+    const products = wpRows
+      .map((wp) => adapt(wp, stockMap[wp.barcode]))
+      .filter((p) => p.stockQty > 0 && p.category);
+
+    // Vercel edge cache: serve instantly for 60s, then revalidate in background for up to 1hr
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=3600');
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).json(products);
+  } catch (err) {
+    console.error('products api error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to fetch products' });
+  }
+}

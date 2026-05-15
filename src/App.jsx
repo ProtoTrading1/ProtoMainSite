@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Header from './components/Header';
-import TopNav from './components/TopNav';
 import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -9,13 +8,13 @@ import OrderConfirmModal from './components/OrderConfirmModal';
 import MobileNav from './components/MobileNav';
 import ReorderModal from './components/ReorderModal';
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchProductPage } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import categories from './data/categories.json';
 import './index.css';
 
 const HEADER_H = 72;
-const TOPNAV_H = 40;
+const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
 
 function getProductImageUrl(product, siteOrigin = '') {
@@ -79,6 +78,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
+  const [browseCategories, setBrowseCategories] = useState([]);
 
   useEffect(() => {
     setPage(1);
@@ -88,6 +88,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (!customer?.id) return;
     fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
   }, [customer?.id]);
+
+  useEffect(() => {
+    fetchDistinctCategories().then(setBrowseCategories).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +146,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     };
   }, [activeCollection, page, path, searchQuery, sort]);
 
-  const breadcrumb = buildBreadcrumb(categories, path);
+  const rawBreadcrumb = buildBreadcrumb(categories, path);
+  const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
+    : path.map((seg, i) => ({ label: seg, path: path.slice(0, i + 1) }));
   const recommendationProducts = useMemo(() => catalogProducts.slice(0, 4), [catalogProducts]);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -313,11 +319,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onReorder={() => setReorderModal(true)}
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
-      />
-
-      <TopNav
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
         onSpecials={() => handleShortcut('clearance')}
       />
 
@@ -356,6 +357,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             totalPages={totalPages}
             onPageChange={setPage}
             usingFallback={usingFallback}
+            browseCategories={browseCategories}
+            categoryCounts={counts}
           />
         </main>
 
