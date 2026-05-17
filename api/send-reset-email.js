@@ -73,10 +73,12 @@ export default async function handler(req, res) {
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
-    options: { redirectTo: process.env.SITE_URL || 'https://protoportal-main.vercel.app/' },
   });
 
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    console.error('generateLink error:', error);
+    return res.status(400).json({ error: error.message });
+  }
 
   const resetLink = data.properties.action_link;
 
