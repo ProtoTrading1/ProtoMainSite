@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 export default function ResetPasswordPage({ token, onDone }) {
   const [password, setPassword] = useState('');
@@ -17,18 +16,13 @@ export default function ResetPasswordPage({ token, onDone }) {
     if (password !== confirm) { setError('Passwords do not match.'); return; }
     setLoading(true);
     try {
-      if (token) {
-        const res = await fetch('/api/do-reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Reset failed');
-      } else {
-        const { error } = await supabase.auth.updateUser({ password });
-        if (error) throw new Error(error.message);
-      }
+      const res = await fetch('/api/do-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Reset failed');
       setDone(true);
     } catch (err) {
       setError(err.message);
