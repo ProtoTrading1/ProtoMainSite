@@ -1,6 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
-import { createHmac, randomBytes } from 'crypto';
+import { createHmac } from 'crypto';
 
 function makeToken(email, secret) {
   const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + 3600000 })).toString('base64url');
@@ -73,23 +72,8 @@ export default async function handler(req, res) {
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
 
-  // Verify the email actually exists in auth
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    secret,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-  if (listError) {
-    console.error('listUsers error:', listError.message);
-    // Don't reveal whether the email exists — just continue
-  }
-  const exists = !listError && users?.some((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
-  if (!exists && !listError) {
-    // Return success anyway so we don't leak which emails are registered
-    return res.status(200).json({ ok: true });
-  }
-
+  // Generate a stateless signed token — no Supabase API calls needed here.
+  // If the email doesn't exist the do-reset-password endpoint will catch it.
   const token = makeToken(email.trim(), secret);
   const siteUrl = 'https://protoportal-main.vercel.app';
   const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
