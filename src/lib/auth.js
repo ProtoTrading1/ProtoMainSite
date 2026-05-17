@@ -40,10 +40,13 @@ export async function submitTradeApplication({ email, password, contactName, bus
 
 export async function resetPassword(email) {
   const trimmed = email.trim();
-  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-    redirectTo: `${window.location.origin}/`,
+  const res = await fetch('/api/send-reset-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: trimmed }),
   });
-  if (error) throw error;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send reset email');
 }
 
 export async function signOut() {
