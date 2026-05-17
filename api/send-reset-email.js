@@ -74,7 +74,7 @@ export default async function handler(req, res) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'api-key': process.env.VITE_BREVO_API_KEY || process.env.BREVO_API_KEY || process.env.BREVO_SMTP_PASS,
+      'api-key': process.env.BREVO_API_KEY,
     },
     body: JSON.stringify({
       sender: { name: 'Proto Trading Online', email: 'george@proto.co.za' },
