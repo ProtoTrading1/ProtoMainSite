@@ -15,6 +15,7 @@ export default function Root() {
   const [customer, setCustomer] = useState(null);
   const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
   const [route, setRoute] = useState(window.location.hash);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -60,7 +61,11 @@ export default function Root() {
       }
     });
 
-    const { data: { subscription } } = onAuthChange(async (sess) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sess) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+        return;
+      }
       setSession(sess ?? null);
       if (sess?.user) {
         await loadCustomer(sess.user.id);
@@ -88,6 +93,19 @@ export default function Root() {
 
   if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
   if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
+
+  if (passwordRecovery) {
+    return (
+      <ResetPasswordPage
+        token={null}
+        onDone={() => {
+          setPasswordRecovery(false);
+          window.location.hash = '';
+          setSurface('login');
+        }}
+      />
+    );
+  }
 
   if (route.startsWith('#/reset-password')) {
     const params = new URLSearchParams(route.replace('#/reset-password?', '').replace('#/reset-password', ''));
