@@ -36,7 +36,7 @@ import {
   invalidateProductCache,
   updateProduct,
 } from '../lib/products';
-import { approveCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
+import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
 import { fetchAllOrdersAdmin, updateOrderAdmin } from '../lib/orders';
 import categories from '../data/categories.json';
 
@@ -351,6 +351,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     finally { setSaving(''); }
   };
 
+  const removeCustomer = async (person) => {
+    if (!window.confirm(`Delete ${person.name || person.email}? This cannot be undone.`)) return;
+    setSaving(`del-${person.id}`);
+    try { await deleteCustomer(person.id); await loadCustomers(); setExpandedCustomer(null); }
+    finally { setSaving(''); }
+  };
+
   const updateOrder = async (order, patch) => {
     setSaving(order.id);
     try {
@@ -609,6 +616,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                           <button onClick={() => void approveRequest(person)} className="adm-btn-red adm-btn-sm" disabled={saving === person.id}>
                             {saving === person.id ? 'Approving…' : <><Check size={14} /> Approve</>}
                           </button>
+                          <button onClick={() => void removeCustomer(person)} className="adm-btn-ghost adm-btn-sm" disabled={saving === `del-${person.id}`} style={{ color: '#c40000' }}>
+                            {saving === `del-${person.id}` ? 'Deleting…' : <><X size={14} /> Delete</>}
+                          </button>
                         </div>
                         <div className="adm-request-date">Applied {new Date(person.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                       </div>
@@ -616,16 +626,19 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   </div>
                 ) : (
                   <div className="adm-list">
-                    <div className="adm-list-head" style={{ gridTemplateColumns: '1.3fr 1.2fr 1fr 120px 120px' }}>
-                      <span>Name</span><span>Email</span><span>Phone</span><span>Orders</span><span>Tier</span>
+                    <div className="adm-list-head" style={{ gridTemplateColumns: '1.3fr 1.2fr 1fr 80px 110px 80px' }}>
+                      <span>Name</span><span>Email</span><span>Phone</span><span>Orders</span><span>Tier</span><span></span>
                     </div>
                     {customerRows.map((person) => (
-                      <div key={person.id} className="adm-list-row" style={{ gridTemplateColumns: '1.3fr 1.2fr 1fr 120px 120px' }}>
+                      <div key={person.id} className="adm-list-row" style={{ gridTemplateColumns: '1.3fr 1.2fr 1fr 80px 110px 80px' }}>
                         <span style={{ fontWeight: 700 }}>{person.name || 'Unnamed'}</span>
                         <span>{person.email}</span>
                         <span>{person.phone || '—'}</span>
                         <span>{person.orderCount}</span>
                         <button onClick={() => void updateCustomer(person, { tier: person.tier === 'premium' ? 'regular' : 'premium' })} className="adm-tier-btn adm-tier-btn--active">{person.tier === 'premium' ? 'Premium' : 'Regular'}</button>
+                        <button onClick={() => void removeCustomer(person)} className="adm-btn-ghost adm-btn-sm" disabled={saving === `del-${person.id}`} style={{ color: '#c40000', padding: '4px 8px' }}>
+                          {saving === `del-${person.id}` ? '…' : <X size={14} />}
+                        </button>
                       </div>
                     ))}
                   </div>

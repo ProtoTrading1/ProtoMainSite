@@ -34,32 +34,12 @@ export async function fetchAllCustomers() {
 }
 
 export async function fetchCustomersPage({ page = 1, pageSize = 50, tab = 'regular', searchQuery = '' } = {}) {
-  const from = Math.max(0, (page - 1) * pageSize);
-  const to = from + pageSize - 1;
-  let query = supabase
-    .from('customers')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(from, to);
+  const params = new URLSearchParams({ tab, page: String(page), pageSize: String(pageSize), search: searchQuery });
+  const res = await fetch(`/api/admin-customers?${params}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch customers');
 
-  if (tab === 'premium') {
-    query = query.eq('tier', 'premium').eq('is_approved', true);
-  } else if (tab === 'requests') {
-    query = query.eq('is_approved', false);
-  } else {
-    query = query.neq('tier', 'premium').eq('is_approved', true);
-  }
-
-  const q = searchQuery.trim();
-  if (q) {
-    const safe = q.replace(/[%',()]/g, ' ').trim();
-    if (safe) query = query.or(`name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`);
-  }
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-
-  const rows = data || [];
+  const rows = json.rows || [];
   const ids = rows.map((row) => row.id).filter(Boolean);
   const orderCounts = {};
 
@@ -84,10 +64,20 @@ export async function fetchCustomersPage({ page = 1, pageSize = 50, tab = 'regul
 
   return {
     rows: rows.map((row) => ({ ...row, orderCount: orderCounts[row.id] || 0 })),
-    total: count || 0,
-    page,
-    pageSize,
+    total: json.total || 0,
+    page: json.page || page,
+    pageSize: json.pageSize || pageSize,
   };
+}
+
+export async function deleteCustomer(id) {
+  const res = await fetch('/api/admin-customers', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to delete customer');
 }
 
 export async function fetchCustomerOrderCounts() {
