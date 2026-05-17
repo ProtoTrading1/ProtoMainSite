@@ -12,9 +12,7 @@ export default async function handler(req, res) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: 'https://protoportal-main.vercel.app',
-  });
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ ok: true });
