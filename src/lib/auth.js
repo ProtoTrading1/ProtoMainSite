@@ -49,13 +49,19 @@ export async function getSession() {
 }
 
 export async function getCustomerProfile(userId) {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error) return null;
-  return data;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`/api/customer-profile?userId=${encodeURIComponent(userId)}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.profile ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function onAuthChange(callback) {

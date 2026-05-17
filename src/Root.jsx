@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import App from './App';
 import LandingPage from './pages/LandingPage';
 import LoginModal from './components/LoginModal';
@@ -16,6 +16,7 @@ export default function Root() {
   const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const loadingCustomerRef = useRef(false);
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -38,19 +39,25 @@ export default function Root() {
   }, [view]);
 
   const loadCustomer = useCallback(async (userId) => {
-    const profile = await getCustomerProfile(userId);
-    setCustomer(profile);
+    if (loadingCustomerRef.current) return;
+    loadingCustomerRef.current = true;
+    try {
+      const profile = await getCustomerProfile(userId);
+      setCustomer(profile);
 
-    if (!profile) return;
+      if (!profile) return;
 
-    if (profile.is_approved || profile.role === 'admin') {
-      const preferred = window.sessionStorage.getItem('proto-surface');
-      if (profile.role === 'admin' && preferred === 'admin') setSurface('admin');
-      else setSurface('portal');
-      return;
+      if (profile.is_approved || profile.role === 'admin') {
+        const preferred = window.sessionStorage.getItem('proto-surface');
+        if (profile.role === 'admin' && preferred === 'admin') setSurface('admin');
+        else setSurface('portal');
+        return;
+      }
+
+      setView('pending');
+    } finally {
+      loadingCustomerRef.current = false;
     }
-
-    setView('pending');
   }, [setSurface]);
 
   useEffect(() => {

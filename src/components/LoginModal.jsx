@@ -36,7 +36,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
         if (mode === 'login') {
           const { session } = await signIn(email, password);
-          if (session) onLogin(session);
+          if (session) await onLogin(session);
         } else {
           await signUp(email, password, name);
           setInfo('Account created. Check your email to confirm, then log in.');
