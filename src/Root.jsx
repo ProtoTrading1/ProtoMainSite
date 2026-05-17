@@ -3,6 +3,7 @@ import App from './App';
 import LandingPage from './pages/LandingPage';
 import LoginModal from './components/LoginModal';
 import ProfilePage from './pages/ProfilePage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import WorldClassPortal from './worldclass/WorldClassPortal';
 import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
@@ -87,6 +88,20 @@ export default function Root() {
 
   if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
   if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
+
+  if (route.startsWith('#/reset-password')) {
+    const params = new URLSearchParams(route.replace('#/reset-password?', '').replace('#/reset-password', ''));
+    const token = params.get('token');
+    return (
+      <ResetPasswordPage
+        token={token}
+        onDone={() => {
+          window.location.hash = '';
+          setSurface('login');
+        }}
+      />
+    );
+  }
 
   if (session === undefined) {
     return (

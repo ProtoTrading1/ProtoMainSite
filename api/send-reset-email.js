@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { createHmac, randomBytes } from 'crypto';
+
+function makeToken(email, secret) {
+  const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + 3600000 })).toString('base64url');
+  const sig = createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
 
 const RESET_HTML = (link) => `<!DOCTYPE html>
 <html lang="en">
@@ -44,7 +51,7 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
   </p>
   <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
 </td></tr>
-<tr><td style="background:#c40000;padding:34px;color:#ffffff;">
+<tr><td style="background:#c40000;padding:34px;">
   <div style="display:inline-block;background:#ffffff;padding:12px 18px;border-radius:6px;margin-bottom:24px;">
     <span style="font-size:25px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
     <span style="font-size:17px;font-weight:800;color:#222222;"> TRADING</span>
@@ -63,26 +70,30 @@ export default async function handler(req, res) {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  // Generate a real Supabase recovery link using the service role key
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
+
+  // Verify the email actually exists in auth
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    secret,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
-
-  const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'recovery',
-    email,
-  });
-
-  if (error) {
-    console.error('generateLink error:', error);
-    return res.status(400).json({ error: error.message });
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error('listUsers error:', listError.message);
+    // Don't reveal whether the email exists — just continue
+  }
+  const exists = !listError && users?.some((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
+  if (!exists && !listError) {
+    // Return success anyway so we don't leak which emails are registered
+    return res.status(200).json({ ok: true });
   }
 
-  const resetLink = data.properties.action_link;
+  const token = makeToken(email.trim(), secret);
+  const siteUrl = 'https://protoportal-main.vercel.app';
+  const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
 
-  // Send via Brevo SMTP using nodemailer
   const transporter = nodemailer.createTransport({
     host: 'smtp-relay.brevo.com',
     port: 587,
@@ -95,7 +106,7 @@ export default async function handler(req, res) {
 
   await transporter.sendMail({
     from: `"Proto Trading Online" <${process.env.BREVO_SMTP_USER}>`,
-    to: email,
+    to: email.trim(),
     subject: 'Reset your Proto Trading password',
     html: RESET_HTML(resetLink),
   });
