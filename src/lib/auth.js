@@ -17,24 +17,13 @@ export async function signUp(email, password, name) {
 }
 
 export async function submitTradeApplication({ email, password, contactName, businessName, phone, country, province, city, businessType }) {
-  // All questionnaire data goes into user metadata — a DB trigger reads it and
-  // creates the customers row server-side (no RLS conflict).
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        name: contactName || businessName,
-        phone: phone || null,
-        business_name: businessName || null,
-        country: country || null,
-        province: province || null,
-        city: city || null,
-        business_type: businessType || null,
-      },
-    },
+  const res = await fetch('/api/register-trade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, contactName, businessName, phone, country, province, city, businessType }),
   });
-  if (error) throw error;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Registration failed');
   return data;
 }
 
