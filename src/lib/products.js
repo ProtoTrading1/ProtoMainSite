@@ -7,7 +7,7 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v2';
+const LS_KEY = 'proto_catalog_v3';
 const LS_TTL = 15 * 60 * 1000;
 
 function saveToLocalCache(data) {
@@ -39,8 +39,24 @@ async function fetchAllRows(table, selectCols = '*', extraFilter = null) {
   return rows;
 }
 
+const DEPT_SLUG_MAP = {
+  'Arts, Crafts & Stationery': 'arts-crafts-stationery',
+  'Beads, Jewellery & Accessories': 'beads-jewellery',
+  'Beauty & Personal Care': 'beauty-personal-care',
+  'Events & Parties': 'events-parties',
+  'Fashion & Accessories': 'fashion-accessories',
+  'Food & Drinks': 'food-drinks',
+  'Hardware': 'hardware',
+  'Homeware & Kitchen': 'homeware-kitchen',
+  'Packaging': 'packaging',
+  'Textiles': 'textiles',
+  'Toys, Games & Kids': 'toys-games-kids',
+};
+
 function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
+  const rawCategory = (wpRow.category || '').trim();
+  const categorySlug = DEPT_SLUG_MAP[rawCategory] || rawCategory;
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -53,8 +69,8 @@ function adapt(wpRow, stockRow) {
     stockQty,
     stockOnHand: stockQty,
     colour: wpRow.colour || '',
-    category: (wpRow.category || '').trim(),
-    categoryPath: wpRow.category ? [wpRow.category] : [],
+    category: categorySlug,
+    categoryPath: categorySlug ? [categorySlug] : [],
     tags: [],
     badges: [],
     isNew: false,
