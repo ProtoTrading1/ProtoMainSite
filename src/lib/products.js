@@ -53,10 +53,16 @@ const DEPT_SLUG_MAP = {
   'Toys, Games & Kids': 'toys-games-kids',
 };
 
+function labelToSlug(label) {
+  if (!label) return '';
+  return label.toLowerCase().replace(/[,&]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
 function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
-  const rawCategory = (wpRow.category || '').trim();
-  const categorySlug = DEPT_SLUG_MAP[rawCategory] || rawCategory;
+  const rawDept = (wpRow.category || '').trim();
+  const deptSlug = DEPT_SLUG_MAP[rawDept] || labelToSlug(rawDept);
+  const categoryPath = deptSlug ? [deptSlug] : [];
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -69,8 +75,8 @@ function adapt(wpRow, stockRow) {
     stockQty,
     stockOnHand: stockQty,
     colour: wpRow.colour || '',
-    category: categorySlug,
-    categoryPath: categorySlug ? [categorySlug] : [],
+    category: deptSlug,
+    categoryPath,
     tags: [],
     badges: [],
     isNew: false,
@@ -195,7 +201,7 @@ function applyCollection(products, collection) {
 
 function applyPathFilter(products, categoryPath) {
   if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
-  return products.filter((p) => p.category === categoryPath[0]);
+  return products.filter((p) => categoryPath.every((seg, i) => p.categoryPath[i] === seg));
 }
 
 function applySearchFilter(products, searchQuery) {
@@ -255,7 +261,12 @@ export async function fetchCategoryCounts({ collection = 'all' } = {}) {
   products = applyCollection(products, collection);
   const counts = { '': products.length };
   for (const p of products) {
-    if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
+    const cp = p.categoryPath;
+    if (!cp?.length) continue;
+    for (let i = 1; i <= cp.length; i++) {
+      const key = cp.slice(0, i).join('/');
+      counts[key] = (counts[key] || 0) + 1;
+    }
   }
   return counts;
 }

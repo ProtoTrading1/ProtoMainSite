@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import SKU_SUBS from './sku-subcategories.js';
 
 const PAGE_SIZE = 1000;
 
@@ -17,8 +18,32 @@ async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
   return rows;
 }
 
+const DEPT_SLUG_MAP = {
+  'Arts, Crafts & Stationery': 'arts-crafts-stationery',
+  'Beads, Jewellery & Accessories': 'beads-jewellery',
+  'Beauty & Personal Care': 'beauty-personal-care',
+  'Events & Parties': 'events-parties',
+  'Fashion & Accessories': 'fashion-accessories',
+  'Food & Drinks': 'food-drinks',
+  'Hardware': 'hardware',
+  'Homeware & Kitchen': 'homeware-kitchen',
+  'Packaging': 'packaging',
+  'Textiles': 'textiles',
+  'Toys, Games & Kids': 'toys-games-kids',
+};
+
+function labelToSlug(label) {
+  if (!label) return '';
+  return label.toLowerCase().replace(/[,&]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
 function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
+  const rawDept = (wpRow.category || '').trim();
+  const deptSlug = DEPT_SLUG_MAP[rawDept] || labelToSlug(rawDept);
+  const subs = SKU_SUBS[wpRow.website_sku] || [];
+  const sub1Slug = subs[0] ? labelToSlug(subs[0]) : '';
+  const categoryPath = deptSlug ? (sub1Slug ? [deptSlug, sub1Slug] : [deptSlug]) : [];
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -31,8 +56,8 @@ function adapt(wpRow, stockRow) {
     stockQty,
     stockOnHand: stockQty,
     colour: wpRow.colour || '',
-    category: (wpRow.category || '').trim(),
-    categoryPath: wpRow.category ? [(wpRow.category || '').trim()] : [],
+    category: deptSlug,
+    categoryPath,
     tags: [],
     badges: [],
     isNew: false,
