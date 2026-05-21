@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Globe,
   Grip,
+  ImagePlus,
   Loader2,
   LogOut,
   Mail,
@@ -21,6 +22,7 @@ import {
   Shield,
   ShoppingBag,
   SlidersHorizontal,
+  Star,
   Store,
   User,
   Users,
@@ -38,10 +40,37 @@ import {
 } from '../lib/products';
 import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
 import { fetchAllOrdersAdmin, updateOrderAdmin } from '../lib/orders';
+import { fetchSpecials, saveSpecials } from '../lib/specials';
 import categories from '../data/categories.json';
+
+// ─── Reorder sort order — stored in localStorage, applied client-side ─────────
+const SORT_STORE_KEY = 'proto_sort_v1';
+
+function saveCategoryOrder(category, ids) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SORT_STORE_KEY) || '{}');
+    all[category] = ids;
+    localStorage.setItem(SORT_STORE_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+function loadCategoryOrder(category) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SORT_STORE_KEY) || '{}');
+    return Array.isArray(all[category]) ? all[category] : null;
+  } catch { return null; }
+}
+
+function applySavedOrder(products, category) {
+  const saved = loadCategoryOrder(category);
+  if (!saved || !saved.length) return products;
+  const orderMap = new Map(saved.map((id, i) => [id, i]));
+  return [...products].sort((a, b) => (orderMap.get(a.id) ?? 999999) - (orderMap.get(b.id) ?? 999999));
+}
 
 const sections = [
   { id: 'products', label: 'Product Manager', icon: PackagePlus },
+  { id: 'specials', label: "This Week's Specials", icon: Star },
   { id: 'archive', label: 'Archive', icon: Archive },
   { id: 'reorder', label: 'Reorder Grid', icon: Grip },
   { id: 'customers', label: 'Customer Management', icon: Users },
@@ -130,6 +159,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [productForm, setProductForm] = useState(emptyForm);
   const [expandedCustomer, setExpandedCustomer] = useState(null);
 
+  const [contentEditProduct, setContentEditProduct] = useState(null);
+  const [contentEditForm, setContentEditForm] = useState({ image: '', description: '' });
+  const [contentEditSaving, setContentEditSaving] = useState(false);
+  const [contentEditError, setContentEditError] = useState('');
+
   const [productSearch, setProductSearch] = useState('');
   const [productCategory, setProductCategory] = useState('all');
   const [productPage, setProductPage] = useState(1);
@@ -158,6 +192,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
   const [orders, setOrders] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
+
+  const [specials, setSpecials] = useState([]); // [{productId, productName, productCode, productImage, deal, discountPct, bogoX, bogoY}]
+  const [specialsSaving, setSpecialsSaving] = useState(false);
 
   const mainCategories = categories.map((item) => ({ id: item.id, label: item.label }));
 
@@ -201,7 +238,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     try {
       const rows = await fetchProductsByMainCategory(categoryId, { limit: CATEGORY_WORK_SIZE });
       if (target === 'pricing') setPricingProducts(rows);
-      if (target === 'reorder') setReorderProducts(rows);
+      if (target === 'reorder') setReorderProducts(applySavedOrder(rows, categoryId));
     } finally { setLoading(false); }
   };
 
@@ -217,6 +254,40 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   useEffect(() => { if (activeSection === 'pricing') void loadCategoryWorkingSet(pricingCategory, 'pricing'); }, [activeSection, pricingCategory]);
   useEffect(() => { if (activeSection === 'reorder') void loadCategoryWorkingSet(reorderCategory, 'reorder'); }, [activeSection, reorderCategory]);
   useEffect(() => { if (activeSection === 'orders' && orders.length === 0) void loadOrders(); }, [activeSection]);
+
+  // Load specials on mount
+  useEffect(() => {
+    fetchSpecials().then((data) => setSpecials(data?.items || [])).catch(() => {});
+  }, []);
+
+  const specialsSet = new Set(specials.map((s) => s.productId));
+
+  const toggleSpecial = async (product) => {
+    let next;
+    if (specialsSet.has(product.id)) {
+      next = specials.filter((s) => s.productId !== product.id);
+    } else {
+      if (specials.length >= 10) { alert('Maximum 10 specials allowed. Remove one first.'); return; }
+      next = [...specials, { productId: product.id, productName: product.name, productCode: product.code, productImage: product.image || '', deal: 'none', discountPct: 10, bogoX: 1, bogoY: 1 }];
+    }
+    setSpecials(next);
+    setSpecialsSaving(true);
+    try { await saveSpecials(next); } catch { /* silent */ } finally { setSpecialsSaving(false); }
+  };
+
+  const updateSpecialDeal = async (productId, patch) => {
+    const next = specials.map((s) => s.productId === productId ? { ...s, ...patch } : s);
+    setSpecials(next);
+    setSpecialsSaving(true);
+    try { await saveSpecials(next); } catch { /* silent */ } finally { setSpecialsSaving(false); }
+  };
+
+  const clearAllSpecials = async () => {
+    if (!window.confirm('Remove all specials?')) return;
+    setSpecials([]);
+    setSpecialsSaving(true);
+    try { await saveSpecials([]); } catch { /* silent */ } finally { setSpecialsSaving(false); }
+  };
 
   const stats = useMemo(() => ({
     products: productTotal,
@@ -245,6 +316,36 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   };
 
   const closeEditor = () => { setEditorOpen(false); setEditingProduct(null); };
+
+  const openContentEdit = (product) => {
+    setContentEditProduct(product);
+    setContentEditForm({ image: product.image || '', description: product.description || '' });
+    setContentEditError('');
+  };
+
+  const closeContentEdit = () => { setContentEditProduct(null); setContentEditError(''); };
+
+  const saveContentEdit = async () => {
+    if (!contentEditProduct) return;
+    setContentEditSaving(true);
+    setContentEditError('');
+    try {
+      await updateProduct(contentEditProduct.id, {
+        image: contentEditForm.image.trim(),
+        description: contentEditForm.description,
+      });
+      // Update local list so the badge reflects the change without a full reload
+      setProductRows((prev) => prev.map((p) => p.id === contentEditProduct.id
+        ? { ...p, image: contentEditForm.image.trim(), description: contentEditForm.description }
+        : p
+      ));
+      closeContentEdit();
+    } catch (err) {
+      setContentEditError(err.message || 'Save failed');
+    } finally {
+      setContentEditSaving(false);
+    }
+  };
 
   const refreshCurrentSection = async () => {
     if (activeSection === 'products' || activeSection === 'archive') invalidateProductCache();
@@ -312,16 +413,19 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally { setSaving(''); }
   };
 
-  const swapReorder = async (targetId) => {
-    if (!dragId || dragId === targetId) return;
-    const from = reorderProducts.find((item) => item.id === dragId);
-    const to = reorderProducts.find((item) => item.id === targetId);
-    if (!from || !to) return;
-    setSaving('reorder');
-    try {
-      await Promise.all([updateProduct(from.id, { sortOrder: to.sortOrder }), updateProduct(to.id, { sortOrder: from.sortOrder })]);
-      await loadCategoryWorkingSet(reorderCategory, 'reorder');
-    } finally { setSaving(''); setDragId(null); }
+  const swapReorder = (targetId) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    setReorderProducts((prev) => {
+      const fromIdx = prev.findIndex((p) => p.id === dragId);
+      const toIdx = prev.findIndex((p) => p.id === targetId);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, item);
+      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      return next;
+    });
+    setDragId(null);
   };
 
   const toggleSelectAllPricing = () => {
@@ -449,7 +553,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-list">
-                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 180px 100px' }}>
+                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 180px 148px' }}>
                     <span>Product</span><span>Stock</span><span>Actions</span>
                   </div>
                   {productRows.reduce((acc, product, i) => {
@@ -461,9 +565,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       );
                     }
                     acc.push(
-                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 180px 100px' }}>
+                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 180px 148px' }}>
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: 14 }}>{product.name}</div>
+                          <div style={{ fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {product.name}
+                            {!product.image && <span style={{ fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>No image</span>}
+                            {specialsSet.has(product.id) && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#8B1A1A', borderRadius: 4, padding: '1px 5px' }}>Special</span>}
+                          </div>
                           <div className="adm-muted" style={{ fontSize: 11 }}>
                             <span title="Barcode (customer code)">BC: {product.barcode || product.code}</span>
                             {product.websiteSku && <span title="Website SKU" style={{ marginLeft: 8 }}>WSK: {product.websiteSku}</span>}
@@ -475,7 +583,15 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                           {product.supplier && <div className="adm-muted" style={{ fontSize: 11 }}>{product.supplier}</div>}
                         </div>
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => openEditProduct(product)} className="adm-icon-btn"><Pencil size={14} /></button>
+                          <button
+                            onClick={() => void toggleSpecial(product)}
+                            className="adm-icon-btn"
+                            title={specialsSet.has(product.id) ? 'Remove from specials' : 'Add to specials'}
+                          >
+                            <Star size={14} className={specialsSet.has(product.id) ? 'star-spinning' : ''} style={{ color: specialsSet.has(product.id) ? '#f59e0b' : undefined }} />
+                          </button>
+                          <button onClick={() => openContentEdit(product)} className="adm-icon-btn" title="Edit image & description"><ImagePlus size={14} /></button>
+                          <button onClick={() => openEditProduct(product)} className="adm-icon-btn" title="Edit product details"><Pencil size={14} /></button>
                           <button onClick={() => void toggleArchive(product)} className="adm-icon-btn">{product.isArchived ? <ArchiveRestore size={14} /> : <Archive size={14} />}</button>
                         </div>
                       </div>
@@ -484,6 +600,131 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   }, [])}
                 </div>
                 <Pager page={productPage} totalPages={productPages} onChange={setProductPage} />
+              </div>
+            )}
+
+            {/* THIS WEEK'S SPECIALS */}
+            {activeSection === 'specials' && (
+              <div className="adm-panel">
+                <div className="adm-section-head">
+                  <div>
+                    <h2 className="adm-section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Star size={20} style={{ color: '#f59e0b' }} /> This Week's Specials
+                    </h2>
+                    <p className="adm-section-note">Max 10 specials. Star a product in Product Manager to add it here. Configure the deal type for each.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {specialsSaving && <span className="adm-muted" style={{ fontSize: 12 }}>Saving…</span>}
+                    {specials.length > 0 && (
+                      <button onClick={() => void clearAllSpecials()} className="adm-btn-ghost" style={{ color: '#c40000' }}>
+                        Clear all
+                      </button>
+                    )}
+                    <span className="adm-pill">{specials.length} / 10</span>
+                  </div>
+                </div>
+
+                {specials.length === 0 && (
+                  <div className="adm-empty" style={{ padding: '48px 0', textAlign: 'center', color: '#64748b' }}>
+                    <Star size={36} style={{ color: '#d1d5db', marginBottom: 12 }} />
+                    <p style={{ margin: 0 }}>No specials yet. Go to <strong>Product Manager</strong> and click the ☆ star on any product to add it here.</p>
+                  </div>
+                )}
+
+                {specials.length > 0 && (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {specials.map((item) => (
+                      <div key={item.productId} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start', padding: '16px', background: '#fafafa', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Star size={14} className="star-spinning" />
+                            {item.productName}
+                          </div>
+                          <div className="adm-muted" style={{ fontSize: 11, marginTop: 4 }}>{item.productCode}</div>
+
+                          {/* Deal selector */}
+                          <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                              <span style={{ fontWeight: 600 }}>Deal:</span>
+                              <select
+                                value={item.deal || 'none'}
+                                onChange={(e) => void updateSpecialDeal(item.productId, { deal: e.target.value })}
+                                className="adm-select"
+                                style={{ fontSize: 12, padding: '4px 8px' }}
+                              >
+                                <option value="none">No deal — just featured</option>
+                                <option value="discount">Discount %</option>
+                                <option value="bogo">Buy X Get Y Free</option>
+                              </select>
+                            </label>
+
+                            {item.deal === 'discount' && (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                                <span style={{ fontWeight: 600 }}>Discount:</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="99"
+                                  value={item.discountPct || 10}
+                                  onChange={(e) => void updateSpecialDeal(item.productId, { discountPct: Number(e.target.value) })}
+                                  className="adm-tiny-input"
+                                  style={{ width: 56 }}
+                                />
+                                <span className="adm-muted">%</span>
+                              </label>
+                            )}
+
+                            {item.deal === 'bogo' && (
+                              <>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                                  <span style={{ fontWeight: 600 }}>Buy</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="99"
+                                    value={item.bogoX || 1}
+                                    onChange={(e) => void updateSpecialDeal(item.productId, { bogoX: Number(e.target.value) })}
+                                    className="adm-tiny-input"
+                                    style={{ width: 48 }}
+                                  />
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                                  <span style={{ fontWeight: 600 }}>Get</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="99"
+                                    value={item.bogoY || 1}
+                                    onChange={(e) => void updateSpecialDeal(item.productId, { bogoY: Number(e.target.value) })}
+                                    className="adm-tiny-input"
+                                    style={{ width: 48 }}
+                                  />
+                                  <span style={{ fontWeight: 600 }}>Free</span>
+                                </label>
+                              </>
+                            )}
+
+                            {/* Preview badge */}
+                            <span style={{ marginLeft: 'auto', background: '#8B1A1A', color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                              {item.deal === 'discount' ? `${item.discountPct || 10}% OFF`
+                                : item.deal === 'bogo' ? `Buy ${item.bogoX || 1} Get ${item.bogoY || 1} Free`
+                                : "This Week's Special"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => void toggleSpecial({ id: item.productId, name: item.productName, code: item.productCode, image: item.productImage })}
+                          className="adm-icon-btn"
+                          title="Remove from specials"
+                          style={{ color: '#c40000', marginTop: 2 }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -554,13 +795,22 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                     <h2 className="adm-section-title">Reorder Grid</h2>
                     <p className="adm-section-note">Drag cards to reorder within the category. Loads one category at a time.</p>
                   </div>
-                  <select value={reorderCategory} onChange={(e) => setReorderCategory(e.target.value)} className="adm-select">
-                    {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  </select>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <select value={reorderCategory} onChange={(e) => setReorderCategory(e.target.value)} className="adm-select">
+                      {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                    </select>
+                    <button
+                      onClick={() => { saveCategoryOrder(reorderCategory, []); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
+                      className="adm-btn-ghost"
+                      title="Reset to default order"
+                    >
+                      Reset
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                   {reorderProducts.map((product) => (
-                    <div key={product.id} draggable onDragStart={() => setDragId(product.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => void swapReorder(product.id)} className="adm-reorder-card">
+                    <div key={product.id} draggable onDragStart={() => setDragId(product.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => swapReorder(product.id)} className={`adm-reorder-card${dragId === product.id ? ' adm-reorder-card--dragging' : ''}`}>
                       <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="adm-muted">No image</span>}</div>
                       <div style={{ fontWeight: 800, fontSize: 13 }}>{product.name}</div>
                       <div className="adm-muted">{product.code}</div>
@@ -739,6 +989,74 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               <button onClick={() => setExpandedCustomer(null)} className="adm-btn-ghost">Cancel</button>
               <button onClick={() => void approveRequest(expandedCustomer)} className="adm-btn-red" disabled={saving === expandedCustomer.id}>
                 {saving === expandedCustomer.id ? 'Approving…' : <><Check size={15} /> Approve trade access</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Content quick-edit modal (image URL + description) */}
+      {contentEditProduct && (
+        <div className="adm-modal-backdrop">
+          <div className="adm-modal" style={{ maxWidth: 560 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 20, fontFamily: 'Outfit, sans-serif' }}>Edit image & description</h3>
+                <p className="adm-muted" style={{ marginTop: 4, fontSize: 13 }}>{contentEditProduct.name}</p>
+              </div>
+              <button onClick={closeContentEdit} className="adm-icon-btn"><X size={16} /></button>
+            </div>
+
+            {/* Image URL + preview */}
+            <label style={{ display: 'grid', gap: 6, marginBottom: 16 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>Image URL</span>
+              <input
+                value={contentEditForm.image}
+                onChange={(e) => setContentEditForm((f) => ({ ...f, image: e.target.value }))}
+                className="adm-field-input"
+                placeholder="https://example.com/product-image.jpg"
+              />
+            </label>
+
+            {/* Live image preview */}
+            <div style={{ marginBottom: 20, borderRadius: 10, overflow: 'hidden', background: '#f8f8f8', border: '1px solid #e5e7eb', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {contentEditForm.image ? (
+                <img
+                  src={contentEditForm.image}
+                  alt="Preview"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                />
+              ) : null}
+              <div style={{ display: contentEditForm.image ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8', gap: 8 }}>
+                <ImagePlus size={32} />
+                <span style={{ fontSize: 13 }}>No image URL set</span>
+              </div>
+            </div>
+
+            {/* Description */}
+            <label style={{ display: 'grid', gap: 6, marginBottom: 20 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>Description</span>
+              <textarea
+                value={contentEditForm.description}
+                onChange={(e) => setContentEditForm((f) => ({ ...f, description: e.target.value }))}
+                className="adm-field-input"
+                rows={4}
+                placeholder="Product description shown to customers…"
+                style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+              />
+            </label>
+
+            {contentEditError && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fef2f2', borderRadius: 6, color: '#c40000', fontSize: 13 }}>
+                {contentEditError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={closeContentEdit} className="adm-btn-ghost"><ChevronLeft size={15} /> Cancel</button>
+              <button onClick={() => void saveContentEdit()} className="adm-btn-red" disabled={contentEditSaving}>
+                {contentEditSaving ? 'Saving…' : <><Check size={15} /> Save to Supabase</>}
               </button>
             </div>
           </div>

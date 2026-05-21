@@ -7,7 +7,7 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v3';
+const LS_KEY = 'proto_catalog_v4';
 const LS_TTL = 15 * 60 * 1000;
 
 function saveToLocalCache(data) {
@@ -70,6 +70,7 @@ function adapt(wpRow, stockRow) {
     websiteSku: wpRow.website_sku,
     parentSku: wpRow.parent_sku,
     name: wpRow.title,
+    description: wpRow.description || '',
     price: Number(stockRow?.sell_price ?? 0),
     image: wpRow.image_url || '',
     stockQty,
@@ -82,7 +83,7 @@ function adapt(wpRow, stockRow) {
     isNew: false,
     isSpecial: false,
     isArchived: !wpRow.active,
-    sortOrder: 0,
+    sortOrder: wpRow.sort_order || 0,
     minQty: 1,
     casePack: '',
     marginCue: '',
@@ -135,9 +136,10 @@ export async function fetchDistinctCategories() {
   return [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
 }
 
-// Returns only in-stock, categorized products for the customer catalog
-// Fetches from the edge-cached /api/products endpoint (served by Vercel CDN)
-// Falls back to direct Supabase if the API fails
+// Returns only in-stock, categorized, imaged products for the customer catalog.
+// Primary source: /products.json (static CDN file, generated at build time — instant).
+// Fallback 1: /api/products (edge-cached Vercel function — ~200ms warm).
+// Fallback 2: direct Supabase (if both above fail).
 function getAllCached() {
   if (!_loadPromise) {
     const local = loadFromLocalCache();
@@ -145,11 +147,15 @@ function getAllCached() {
       _cache = local;
       _loadPromise = Promise.resolve(local);
     } else {
-      _loadPromise = fetch('/api/products')
+      _loadPromise = fetch('/products.json')
         .then((r) => {
-          if (!r.ok) throw new Error(`API ${r.status}`);
+          if (!r.ok) throw new Error(`products.json ${r.status}`);
           return r.json();
         })
+        .catch(() => fetch('/api/products').then((r) => {
+          if (!r.ok) throw new Error(`API ${r.status}`);
+          return r.json();
+        }))
         .then((products) => {
           _cache = products;
           saveToLocalCache(products);
@@ -157,7 +163,7 @@ function getAllCached() {
         })
         .catch(() => loadAllFromDB()
           .then((all) => {
-            _cache = all.filter((p) => p.stockQty > 0 && p.category);
+            _cache = all.filter((p) => p.stockQty > 0 && p.category && p.image);
             saveToLocalCache(_cache);
             return _cache;
           }))
@@ -313,9 +319,11 @@ export async function createProduct() { throw new Error('Products are managed in
 
 export async function updateProduct(websiteSku, payload) {
   const patch = {};
-  if (payload.image   !== undefined) patch.image_url = payload.image;
-  if (payload.name    !== undefined) patch.title     = payload.name;
-  if (payload.categoryPath?.length)  patch.category  = payload.categoryPath[0];
+  if (payload.image       !== undefined) patch.image_url   = payload.image;
+  if (payload.name        !== undefined) patch.title       = payload.name;
+  if (payload.description !== undefined) patch.description = payload.description;
+  if (payload.sortOrder   !== undefined) patch.sort_order  = payload.sortOrder;
+  if (payload.categoryPath?.length)      patch.category    = payload.categoryPath[0];
 
   if (!Object.keys(patch).length) return;
 
