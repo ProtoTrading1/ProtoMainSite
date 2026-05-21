@@ -487,12 +487,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     if (!dragId || dragId === targetId) { setDragId(null); return; }
     setReorderProducts((prev) => {
       const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
+      // If dropping onto another selected card, bail — no sensible position
+      if (toMove.has(targetId)) return prev;
       const moving = prev.filter((p) => toMove.has(p.id));
       const rest = prev.filter((p) => !toMove.has(p.id));
       const insertAt = rest.findIndex((p) => p.id === targetId);
-      const next = insertAt < 0
-        ? [...rest, ...moving]
-        : [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
+      if (insertAt < 0) return prev;
+      const next = [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
       saveCategoryOrder(reorderCategory, next.map((p) => p.id));
       return next;
     });
@@ -906,7 +907,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       <div
                         key={product.id}
                         draggable
-                        onClick={(e) => { if (e.target.closest('button')) return; toggleSelectReorder(product.id); }}
                         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(product.id); }}
                         onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                         onDragEnter={(e) => { e.preventDefault(); if (product.id !== dragId) setDragOverId(product.id); }}
@@ -916,9 +916,17 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                         className={`adm-reorder-card${isDragging ? ' adm-reorder-card--dragging' : ''}${isOver ? ' adm-reorder-card--over' : ''}${isSelected ? ' adm-reorder-card--selected' : ''}`}
                       >
                         <div className="adm-reorder-handle">
+                          {/* onMouseDown stops the parent drag from starting when the checkbox is clicked */}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectReorder(product.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ width: 14, height: 14, flexShrink: 0, cursor: 'pointer', accentColor: '#8B1A1A' }}
+                          />
                           <Grip size={14} />
-                          <span className="adm-muted" style={{ fontSize: 10 }}>drag to reorder</span>
-                          {isSelected && <Check size={12} style={{ color: '#8B1A1A' }} />}
+                          <span className="adm-muted" style={{ fontSize: 10 }}>{isSelected ? 'selected' : 'drag to reorder'}</span>
                           <button
                             onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
                             className="adm-icon-btn"
