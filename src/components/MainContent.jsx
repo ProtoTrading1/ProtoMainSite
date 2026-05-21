@@ -31,6 +31,7 @@ export default function MainContent({
   addToCart,
   cartQtyMap = {},
   onCartQtyChange = () => {},
+  specialsMap = {},
   path,
   navigate,
   breadcrumb,
@@ -186,6 +187,7 @@ export default function MainContent({
                 addToCart={addToCart}
                 cartQty={cartQtyMap[product.id] || 0}
                 onCartQtyChange={onCartQtyChange}
+                special={specialsMap[product.id] || null}
               />
             ))}
           </div>

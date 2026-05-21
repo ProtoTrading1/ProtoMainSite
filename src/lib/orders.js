@@ -73,47 +73,20 @@ export async function fetchLastOrder(customerId) {
   return data;
 }
 
-export async function fetchAllOrdersAdmin(limit = 100) {
-  if (limit && limit <= PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, customers(name, email, tier)')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return data || [];
-  }
-
-  const rows = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, customers(name, email, tier)')
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    const batch = data || [];
-    rows.push(...batch);
-    if (batch.length < PAGE_SIZE || (limit && rows.length >= limit)) break;
-    from += PAGE_SIZE;
-  }
-
-  return limit ? rows.slice(0, limit) : rows;
+export async function fetchAllOrdersAdmin(limit = 150) {
+  const res = await fetch(`/api/admin-orders?limit=${limit}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch orders');
+  return json.rows || [];
 }
 
 export async function updateOrderAdmin(id, fields) {
-  const patch = { ...fields };
-  if (patch.status === 'viewed' && !patch.viewed_at) patch.viewed_at = new Date().toISOString();
-  if (patch.status === 'paid' && !patch.paid_at) patch.paid_at = new Date().toISOString();
-  if (patch.status === 'delivered' && !patch.delivered_at) patch.delivered_at = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from('orders')
-    .update(patch)
-    .eq('id', id)
-    .select('*, customers(name, email, tier)')
-    .single();
-  if (error) throw error;
-  return data;
+  const res = await fetch('/api/admin-orders', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...fields }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to update order');
+  return json.row;
 }

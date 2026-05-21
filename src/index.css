@@ -1195,6 +1195,61 @@ input, select, textarea { font-family: inherit; outline: none; }
 .product-meta strong { color: #15803d; font-weight: 700; }
 .pc-instock { color: #15803d !important; }
 .pc-confirm { color: #92400e !important; }
+
+/* ── Special ribbon (top-right corner of product image) ── */
+.pc-special-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 8;
+}
+.pc-special-ribbon {
+  position: absolute;
+  top: 22px;
+  right: -26px;
+  width: 108px;
+  background: #8B1A1A;
+  color: #fff;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  padding: 5px 0;
+  transform: rotate(45deg);
+  white-space: nowrap;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* Badge shown inside the zoom modal */
+.pz-special-badge {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  background: #8B1A1A;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 5px 12px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+/* ── Star spinning animation ── */
+@keyframes star-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.star-spinning {
+  animation: star-spin 1.4s linear infinite;
+  display: inline-flex;
+  color: #f59e0b;
+}
 .product-card h3 {
   min-height: 54px;
   margin: 6px 0 10px;
@@ -2634,6 +2689,12 @@ input, select, textarea { font-family: inherit; outline: none; }
 
 .adm-reorder-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.adm-reorder-card--dragging {
+  opacity: 0.4;
+  border: 2px dashed #8B1A1A;
+  cursor: grabbing;
 }
 
 .adm-thumb {

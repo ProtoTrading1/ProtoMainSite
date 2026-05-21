@@ -68,14 +68,22 @@ function FindUsModal({ onClose }) {
 export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
-  searchQuery, setSearchQuery, onSpecials,
+  searchQuery, setSearchQuery, onSpecials, onCartClick,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showFindUs, setShowFindUs] = useState(false);
 
   const toggleSearch = () => {
     setSearchOpen((v) => {
+      if (v) setSearchQuery('');
+      return !v;
+    });
+  };
+
+  const toggleMobileSearch = () => {
+    setMobileSearchOpen((v) => {
       if (v) setSearchQuery('');
       return !v;
     });
@@ -158,7 +166,7 @@ export default function Header({
             </button>
           )}
 
-          <div className="cart-summary">
+          <div className="cart-summary" onClick={onCartClick} style={onCartClick ? { cursor: 'pointer' } : undefined}>
             <ShoppingCart size={22} />
             <span className="cart-count">{cartItemCount}</span>
             <span>
@@ -169,7 +177,7 @@ export default function Header({
         </div>
       </header>
 
-      {/* Search bar — slides below header */}
+      {/* Desktop search bar */}
       {searchOpen && (
         <div className="header-search-drop">
           <Search size={16} />
@@ -191,6 +199,53 @@ export default function Header({
           </button>
         </div>
       )}
+
+      {/* Mobile action bar */}
+      <div className="mobile-action-bar">
+        <button type="button" className={mobileSearchOpen ? 'active' : ''} onClick={toggleMobileSearch}>
+          <Search size={14} />
+          Search
+        </button>
+        {hasLastOrder && (
+          <button type="button" onClick={onReorder}>
+            <RotateCcw size={14} />
+            Reorder
+          </button>
+        )}
+        <button type="button" className="specials-btn" onClick={onSpecials}>
+          <Star size={14} />
+          Specials
+        </button>
+        <button type="button" onClick={() => setShowAbout(true)}>
+          <Info size={14} />
+          About Us
+        </button>
+        <button type="button" onClick={() => setShowFindUs(true)}>
+          <MapPin size={14} />
+          Find Us
+        </button>
+      </div>
+
+      {/* Mobile search input */}
+      <div className={`mobile-action-search-drop${mobileSearchOpen ? ' open' : ''}`}>
+        <Search size={16} color="rgba(255,255,255,0.5)" />
+        <input
+          autoFocus={mobileSearchOpen}
+          type="search"
+          placeholder="Search products, codes…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') toggleMobileSearch(); }}
+        />
+        {searchQuery && (
+          <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear">
+            <X size={15} />
+          </button>
+        )}
+        <button type="button" onClick={toggleMobileSearch} aria-label="Close">
+          <X size={15} />
+        </button>
+      </div>
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showFindUs && <FindUsModal onClose={() => setShowFindUs(false)} />}

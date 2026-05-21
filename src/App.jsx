@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ShoppingCart, X } from 'lucide-react';
 import Header from './components/Header';
 import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
@@ -10,6 +11,7 @@ import ReorderModal from './components/ReorderModal';
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
+import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import categories from './data/categories.json';
 import './index.css';
 
@@ -63,6 +65,7 @@ function collectionLabel(collection) {
 export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) {
   const { path, refinements, navigate, setRefinement } = useHashNav();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState('featured');
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
+  const [specialsMap, setSpecialsMap] = useState({});
 
   useEffect(() => {
     setPage(1);
@@ -91,6 +95,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     fetchDistinctCategories().then(setBrowseCategories).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchSpecials().then((data) => setSpecialsMap(buildSpecialsMap(data))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -320,6 +328,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('clearance')}
+        onCartClick={() => setMobileCartOpen(true)}
       />
 
       <div className="main-layout" style={{ height: bodyH }}>
@@ -341,6 +350,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             onCartQtyChange={handleCartQtyChange}
+            specialsMap={specialsMap}
             path={path}
             navigate={navigate}
             breadcrumb={breadcrumb}
@@ -394,11 +404,59 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         navigate={navigate}
         counts={counts}
         breadcrumb={breadcrumb}
+        customer={customer}
+        onViewProfile={onViewProfile}
+        onViewAdmin={onViewAdmin}
+        onLogout={onLogout}
       />
 
       {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}
 
       {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
+
+      {/* Mobile cart FAB */}
+      <button
+        className="mobile-cart-fab"
+        onClick={() => setMobileCartOpen(true)}
+        type="button"
+        aria-label="Open cart"
+      >
+        <ShoppingCart size={18} />
+        {totalItemCount > 0 && (
+          <span className="mobile-cart-fab-badge">{totalItemCount}</span>
+        )}
+        <span>R{cartTotal.toFixed(2)}</span>
+      </button>
+
+      {/* Mobile cart bottom sheet */}
+      {mobileCartOpen && (
+        <div className="mobile-cart-backdrop" onClick={() => setMobileCartOpen(false)}>
+          <div className="mobile-cart-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-cart-sheet-handle" />
+            <div className="mobile-cart-sheet-header">
+              <span className="mobile-cart-sheet-title">Your Order</span>
+              <button
+                type="button"
+                className="mobile-cart-sheet-close"
+                onClick={() => setMobileCartOpen(false)}
+                aria-label="Close cart"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mobile-cart-sheet-body">
+              <Drawer
+                cartItems={cartItems}
+                cartTotal={cartTotal}
+                updateQty={updateQty}
+                removeFromCart={removeFromCart}
+                clearCart={clearCart}
+                sendOrderEmail={() => { setMobileCartOpen(false); sendOrderEmail(); }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

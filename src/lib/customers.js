@@ -38,32 +38,9 @@ export async function fetchCustomersPage({ page = 1, pageSize = 50, tab = 'regul
   const res = await fetch(`/api/admin-customers?${params}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to fetch customers');
-
-  const rows = json.rows || [];
-  const ids = rows.map((row) => row.id).filter(Boolean);
-  const orderCounts = {};
-
-  if (ids.length) {
-    let offset = 0;
-    while (true) {
-      const { data: orderRows, error: orderError } = await supabase
-        .from('orders')
-        .select('customer_id')
-        .in('customer_id', ids)
-        .range(offset, offset + PAGE_SIZE - 1);
-      if (orderError) throw orderError;
-      const batch = orderRows || [];
-      batch.forEach((row) => {
-        if (!row.customer_id) return;
-        orderCounts[row.customer_id] = (orderCounts[row.customer_id] || 0) + 1;
-      });
-      if (batch.length < PAGE_SIZE) break;
-      offset += PAGE_SIZE;
-    }
-  }
-
+  // orderCount is now included server-side — no second round-trip needed
   return {
-    rows: rows.map((row) => ({ ...row, orderCount: orderCounts[row.id] || 0 })),
+    rows: json.rows || [],
     total: json.total || 0,
     page: json.page || page,
     pageSize: json.pageSize || pageSize,

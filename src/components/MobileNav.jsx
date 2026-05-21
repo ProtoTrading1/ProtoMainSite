@@ -1,6 +1,6 @@
-import { X, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, LayoutGrid, User, LogOut, LayoutDashboard } from 'lucide-react';
 
-export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb }) {
+export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout }) {
   if (!isOpen) return null;
 
   let currentCategories = categories;
@@ -53,7 +53,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#111827',
+            backgroundColor: '#000000',
             color: '#fff',
           }}
         >
@@ -154,7 +154,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
 
           {currentCategories.length === 0 && (
             <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>You’re inside {currentLabel}</div>
+              <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>You&apos;re inside {currentLabel}</div>
               <button
                 onClick={onClose}
                 style={{
@@ -170,6 +170,40 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
                 Show products
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Account actions at bottom */}
+        <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 0', flexShrink: 0 }}>
+          {onViewProfile && (
+            <button
+              onClick={() => { onViewProfile(); onClose(); }}
+              style={{ width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <User size={18} color="#374151" />
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>My Profile</div>
+                {customer?.name && <div style={{ fontSize: '12px', color: '#6B7280' }}>{customer.name}</div>}
+              </div>
+            </button>
+          )}
+          {customer?.role === 'admin' && onViewAdmin && (
+            <button
+              onClick={() => { onViewAdmin(); onClose(); }}
+              style={{ width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <LayoutDashboard size={18} color="#374151" />
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Admin Dashboard</span>
+            </button>
+          )}
+          {onLogout && (
+            <button
+              onClick={() => { onLogout(); onClose(); }}
+              style={{ width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <LogOut size={18} color="#DC2626" />
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#DC2626' }}>Log Out</span>
+            </button>
           )}
         </div>
       </div>

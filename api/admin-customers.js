@@ -42,7 +42,28 @@ export default async function handler(req, res) {
     const { data, error, count } = await query;
     if (error) return res.status(400).json({ error: error.message });
 
-    return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pageSize: size });
+    const rows = data || [];
+
+    // Count orders per customer server-side — avoids a slow round-trip from the browser
+    let orderCounts = {};
+    if (rows.length > 0) {
+      const ids = rows.map((r) => r.id).filter(Boolean);
+      const { data: orderRows } = await supabase
+        .from('orders')
+        .select('customer_id')
+        .in('customer_id', ids);
+      (orderRows || []).forEach((r) => {
+        if (!r.customer_id) return;
+        orderCounts[r.customer_id] = (orderCounts[r.customer_id] || 0) + 1;
+      });
+    }
+
+    return res.status(200).json({
+      rows: rows.map((r) => ({ ...r, orderCount: orderCounts[r.id] || 0 })),
+      total: count || 0,
+      page: pageNum,
+      pageSize: size,
+    });
   }
 
   // DELETE — remove customer

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { ImageOff, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { checkStock } from '../lib/products';
 
 function TrimmedProductImage({ src, alt }) {
   const isRemoteCatalogueImage = String(src || '').startsWith('http');
   const [displaySrc, setDisplaySrc] = useState(src);
+  const [broken, setBroken] = useState(false);
 
+  // All hooks before any conditional return
   useEffect(() => {
+    setBroken(false);
     setDisplaySrc(src);
     if (!isRemoteCatalogueImage || !src) return;
 
@@ -64,14 +67,34 @@ function TrimmedProductImage({ src, alt }) {
     return () => { cancelled = true; };
   }, [src, isRemoteCatalogueImage]);
 
+  if (!src || broken) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', color: '#d1d5db' }}>
+        <ImageOff size={28} />
+      </div>
+    );
+  }
+
   return (
     <img
       className={isRemoteCatalogueImage ? 'catalogue-photo trimmed-catalogue-photo' : ''}
       src={displaySrc}
       alt={alt}
       loading="lazy"
-      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+      onError={() => setBroken(true)}
     />
+  );
+}
+
+function SpecialRibbon({ special }) {
+  if (!special) return null;
+  let text = "This Week's Special";
+  if (special.deal === 'discount' && special.discountPct) text = `${special.discountPct}% OFF`;
+  if (special.deal === 'bogo') text = `Buy ${special.bogoX || 1} Get ${special.bogoY || 1} Free`;
+  return (
+    <div className="pc-special-corner" aria-label={text}>
+      <span className="pc-special-ribbon">{text}</span>
+    </div>
   );
 }
 
@@ -98,7 +121,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange }) {
+export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special }) {
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showStock, setShowStock] = useState(false);
@@ -166,6 +189,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
           )}
           <TrimmedProductImage src={product.localImage || product.image} alt={product.name} />
+          <SpecialRibbon special={special} />
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
         </button>
 
@@ -244,6 +268,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 </div>
               )}
               <TrimmedProductImage src={product.localImage || product.image} alt={product.name} />
+              {special && (
+                <div className="pz-special-badge">
+                  {special.deal === 'discount' && special.discountPct ? `${special.discountPct}% OFF`
+                    : special.deal === 'bogo' ? `Buy ${special.bogoX || 1} Get ${special.bogoY || 1} Free`
+                    : "This Week's Special"}
+                </div>
+              )}
             </div>
 
             {/* White details panel */}

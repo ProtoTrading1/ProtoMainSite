@@ -367,11 +367,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
         image: contentEditForm.image.trim(),
         description: contentEditForm.description,
       });
-      // Update local list so the badge reflects the change without a full reload
-      setProductRows((prev) => prev.map((p) => p.id === contentEditProduct.id
-        ? { ...p, image: contentEditForm.image.trim(), description: contentEditForm.description }
-        : p
-      ));
+      // Update local lists so image/description reflects the change without a full reload
+      const patch = { image: contentEditForm.image.trim(), description: contentEditForm.description };
+      setProductRows((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
+      setReorderProducts((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
       closeContentEdit();
     } catch (err) {
       setContentEditError(err.message || 'Save failed');
@@ -586,7 +585,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-list">
-                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 180px 148px' }}>
+                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 180px 120px' }}>
                     <span>Product</span><span>Stock</span><span>Actions</span>
                   </div>
                   {productRows.reduce((acc, product, i) => {
@@ -598,7 +597,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       );
                     }
                     acc.push(
-                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 180px 148px' }}>
+                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 180px 120px' }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {product.name}
@@ -623,7 +622,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                           >
                             <Star size={14} className={specialsSet.has(product.id) ? 'star-spinning' : ''} style={{ color: specialsSet.has(product.id) ? '#f59e0b' : undefined }} />
                           </button>
-                          <button onClick={() => openContentEdit(product)} className="adm-icon-btn" title="Edit image & description"><ImagePlus size={14} /></button>
                           <button onClick={() => openEditProduct(product)} className="adm-icon-btn" title="Edit product details"><Pencil size={14} /></button>
                           <button onClick={() => void toggleArchive(product)} className="adm-icon-btn">{product.isArchived ? <ArchiveRestore size={14} /> : <Archive size={14} />}</button>
                         </div>
@@ -847,6 +845,14 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="adm-muted">No image</span>}</div>
                       <div style={{ fontWeight: 800, fontSize: 13 }}>{product.name}</div>
                       <div className="adm-muted">{product.code}</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
+                        className="adm-icon-btn"
+                        title="Edit image & description"
+                        style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                      >
+                        <ImagePlus size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
