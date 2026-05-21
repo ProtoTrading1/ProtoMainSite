@@ -28,7 +28,7 @@ async function fetchAllRows(table, selectCols = '*', extraFilter = null) {
   const rows = [];
   let from = 0;
   while (true) {
-    let q = supabaseStock.from(table).select(selectCols).range(from, from + PAGE_SIZE - 1);
+    let q = supabaseStock.from(table).select(selectCols).order('sort_order', { ascending: true }).range(from, from + PAGE_SIZE - 1);
     if (extraFilter) q = extraFilter(q);
     const { data, error } = await q;
     if (error) throw error;
