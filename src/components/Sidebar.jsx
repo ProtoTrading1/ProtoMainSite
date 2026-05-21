@@ -52,13 +52,20 @@ export default function Sidebar({ categories, path, navigate, counts }) {
       </div>
 
       {menuOpen && menuNode && (
-        <MegaMenu
-          key={menuNode.id}
-          l1Node={menuNode}
-          navigate={navigate}
-          counts={counts}
-          onClose={() => setOpenCategoryId(null)}
-        />
+        <>
+          {/* Transparent backdrop — clicking outside the mega-menu closes it */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 200 }}
+            onClick={() => setOpenCategoryId(null)}
+          />
+          <MegaMenu
+            key={menuNode.id}
+            l1Node={menuNode}
+            navigate={navigate}
+            counts={counts}
+            onClose={() => setOpenCategoryId(null)}
+          />
+        </>
       )}
     </div>
   );

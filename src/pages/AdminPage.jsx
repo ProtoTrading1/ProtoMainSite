@@ -954,7 +954,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                             <ImagePlus size={13} />
                           </button>
                         </div>
-                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ maxWidth: '90%', maxHeight: '90%', width: 'auto', height: 'auto', objectFit: 'contain' }} /> : <span className="adm-muted">No image</span>}</div>
+                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ maxWidth: '90%', maxHeight: '90%', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply' }} /> : <span className="adm-muted">No image</span>}</div>
                         <div style={{ fontWeight: 800, fontSize: 13, marginTop: 8 }}>{product.name}</div>
                         <div className="adm-muted" style={{ fontSize: 11 }}>{product.code}</div>
                       </div>
