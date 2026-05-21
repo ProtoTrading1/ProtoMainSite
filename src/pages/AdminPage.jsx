@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   ArchiveRestore,
@@ -11,6 +11,7 @@ import {
   Grip,
   ImagePlus,
   Loader2,
+  Upload,
   LogOut,
   Mail,
   MapPin,
@@ -163,6 +164,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [contentEditForm, setContentEditForm] = useState({ image: '', description: '' });
   const [contentEditSaving, setContentEditSaving] = useState(false);
   const [contentEditError, setContentEditError] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageDragOver, setImageDragOver] = useState(false);
+  const imageFileInputRef = useRef(null);
 
   const [productSearch, setProductSearch] = useState('');
   const [productCategory, setProductCategory] = useState('all');
@@ -287,6 +291,35 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     setSpecials([]);
     setSpecialsSaving(true);
     try { await saveSpecials([]); } catch { /* silent */ } finally { setSpecialsSaving(false); }
+  };
+
+  const uploadImageFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) {
+      setContentEditError('Only image files are supported.');
+      return;
+    }
+    setImageUploading(true);
+    setContentEditError('');
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch('/api/upload-product-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, base64 }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Upload failed');
+      setContentEditForm((f) => ({ ...f, image: json.url }));
+    } catch (err) {
+      setContentEditError(err.message || 'Image upload failed');
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   const stats = useMemo(() => ({
@@ -995,10 +1028,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
         </div>
       )}
 
-      {/* Content quick-edit modal (image URL + description) */}
+      {/* Content quick-edit modal (image drag-drop + description) */}
       {contentEditProduct && (
         <div className="adm-modal-backdrop">
-          <div className="adm-modal" style={{ maxWidth: 560 }}>
+          <div className="adm-modal" style={{ maxWidth: 580 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 20, fontFamily: 'Outfit, sans-serif' }}>Edit image & description</h3>
@@ -1007,32 +1040,93 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               <button onClick={closeContentEdit} className="adm-icon-btn"><X size={16} /></button>
             </div>
 
-            {/* Image URL + preview */}
-            <label style={{ display: 'grid', gap: 6, marginBottom: 16 }}>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>Image URL</span>
+            {/* Hidden file input */}
+            <input
+              ref={imageFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImageFile(f); e.target.value = ''; }}
+            />
+
+            {/* Drop zone / preview */}
+            <div
+              onClick={() => !imageUploading && imageFileInputRef.current?.click()}
+              onDragEnter={(e) => { e.preventDefault(); setImageDragOver(true); }}
+              onDragOver={(e) => { e.preventDefault(); setImageDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setImageDragOver(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setImageDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void uploadImageFile(file);
+              }}
+              style={{
+                position: 'relative',
+                marginBottom: 12,
+                borderRadius: 10,
+                border: `2px dashed ${imageDragOver ? '#8B1A1A' : contentEditForm.image ? '#d1d5db' : '#cbd5e1'}`,
+                background: imageDragOver ? '#fff5f5' : contentEditForm.image ? '#f8f8f8' : '#f8fafc',
+                height: 220,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: imageUploading ? 'wait' : 'pointer',
+                overflow: 'hidden',
+                transition: 'border-color 0.15s, background 0.15s',
+              }}
+            >
+              {imageUploading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#8B1A1A' }}>
+                  <Loader2 size={32} className="spin" />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Uploading…</span>
+                </div>
+              ) : contentEditForm.image ? (
+                <>
+                  <img
+                    src={contentEditForm.image}
+                    alt="Preview"
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  />
+                  <div style={{
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
+                    display: imageDragOver ? 'flex' : 'none',
+                    alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, color: '#fff',
+                  }}>
+                    <Upload size={28} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Drop to replace</span>
+                  </div>
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    padding: '6px 10px', background: 'rgba(0,0,0,0.5)',
+                    color: '#fff', fontSize: 11, textAlign: 'center',
+                    display: imageDragOver ? 'none' : 'block',
+                  }}>
+                    Click or drag a new image to replace
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: imageDragOver ? '#8B1A1A' : '#94a3b8', pointerEvents: 'none' }}>
+                  <Upload size={32} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>Drag & drop an image here</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>or click to browse files</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Manual URL input */}
+            <label style={{ display: 'grid', gap: 5, marginBottom: 18 }}>
+              <span style={{ fontWeight: 700, fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Or paste image URL</span>
               <input
                 value={contentEditForm.image}
                 onChange={(e) => setContentEditForm((f) => ({ ...f, image: e.target.value }))}
                 className="adm-field-input"
-                placeholder="https://example.com/product-image.jpg"
+                placeholder="https://example.com/product.jpg"
+                style={{ fontSize: 12 }}
               />
             </label>
-
-            {/* Live image preview */}
-            <div style={{ marginBottom: 20, borderRadius: 10, overflow: 'hidden', background: '#f8f8f8', border: '1px solid #e5e7eb', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {contentEditForm.image ? (
-                <img
-                  src={contentEditForm.image}
-                  alt="Preview"
-                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                />
-              ) : null}
-              <div style={{ display: contentEditForm.image ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8', gap: 8 }}>
-                <ImagePlus size={32} />
-                <span style={{ fontSize: 13 }}>No image URL set</span>
-              </div>
-            </div>
 
             {/* Description */}
             <label style={{ display: 'grid', gap: 6, marginBottom: 20 }}>
@@ -1055,7 +1149,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button onClick={closeContentEdit} className="adm-btn-ghost"><ChevronLeft size={15} /> Cancel</button>
-              <button onClick={() => void saveContentEdit()} className="adm-btn-red" disabled={contentEditSaving}>
+              <button onClick={() => void saveContentEdit()} className="adm-btn-red" disabled={contentEditSaving || imageUploading}>
                 {contentEditSaving ? 'Saving…' : <><Check size={15} /> Save to Supabase</>}
               </button>
             </div>
