@@ -147,13 +147,13 @@ function getAllCached() {
       _cache = local;
       _loadPromise = Promise.resolve(local);
     } else {
-      _loadPromise = fetch('/products.json')
+      _loadPromise = fetch('/api/products')
         .then((r) => {
-          if (!r.ok) throw new Error(`products.json ${r.status}`);
+          if (!r.ok) throw new Error(`API ${r.status}`);
           return r.json();
         })
-        .catch(() => fetch('/api/products').then((r) => {
-          if (!r.ok) throw new Error(`API ${r.status}`);
+        .catch(() => fetch('/products.json').then((r) => {
+          if (!r.ok) throw new Error(`products.json ${r.status}`);
           return r.json();
         }))
         .then((products) => {
@@ -318,21 +318,35 @@ export async function exportProductsCsv() {
 export async function createProduct() { throw new Error('Products are managed in the stock system'); }
 
 export async function updateProduct(websiteSku, payload) {
+  // Image and description go through the server-side endpoint (service-role key, no RLS)
+  const contentFields = {};
+  if (payload.image       !== undefined) contentFields.image       = payload.image;
+  if (payload.description !== undefined) contentFields.description = payload.description;
+
+  if (Object.keys(contentFields).length) {
+    const res = await fetch('/api/update-product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ websiteSku, ...contentFields }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Update failed');
+  }
+
+  // Other fields (name, sortOrder, categoryPath) still go through the client
   const patch = {};
-  if (payload.image       !== undefined) patch.image_url   = payload.image;
-  if (payload.name        !== undefined) patch.title       = payload.name;
-  if (payload.description !== undefined) patch.description = payload.description;
-  if (payload.sortOrder   !== undefined) patch.sort_order  = payload.sortOrder;
-  if (payload.categoryPath?.length)      patch.category    = payload.categoryPath[0];
+  if (payload.name        !== undefined) patch.title      = payload.name;
+  if (payload.sortOrder   !== undefined) patch.sort_order = payload.sortOrder;
+  if (payload.categoryPath?.length)      patch.category   = payload.categoryPath[0];
 
-  if (!Object.keys(patch).length) return;
+  if (Object.keys(patch).length) {
+    const { error } = await supabaseStock
+      .from('website_products')
+      .update(patch)
+      .eq('website_sku', websiteSku);
+    if (error) throw error;
+  }
 
-  const { error } = await supabaseStock
-    .from('website_products')
-    .update(patch)
-    .eq('website_sku', websiteSku);
-
-  if (error) throw error;
   invalidateProductCache();
 }
 
