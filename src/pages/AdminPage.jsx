@@ -193,6 +193,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [reorderCategory, setReorderCategory] = useState(categories[0]?.id || '');
   const [reorderProducts, setReorderProducts] = useState([]);
   const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   const [orders, setOrders] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
@@ -446,6 +447,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   };
 
   const swapReorder = (targetId) => {
+    setDragOverId(null);
     if (!dragId || dragId === targetId) { setDragId(null); return; }
     setReorderProducts((prev) => {
       const fromIdx = prev.findIndex((p) => p.id === dragId);
@@ -840,21 +842,38 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-                  {reorderProducts.map((product) => (
-                    <div key={product.id} draggable onDragStart={() => setDragId(product.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => swapReorder(product.id)} className={`adm-reorder-card${dragId === product.id ? ' adm-reorder-card--dragging' : ''}`}>
-                      <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="adm-muted">No image</span>}</div>
-                      <div style={{ fontWeight: 800, fontSize: 13 }}>{product.name}</div>
-                      <div className="adm-muted">{product.code}</div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
-                        className="adm-icon-btn"
-                        title="Edit image & description"
-                        style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                  {reorderProducts.map((product) => {
+                    const isDragging = dragId === product.id;
+                    const isOver = dragOverId === product.id && !isDragging;
+                    return (
+                      <div
+                        key={product.id}
+                        draggable
+                        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(product.id); }}
+                        onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                        onDragEnter={(e) => { e.preventDefault(); if (product.id !== dragId) setDragOverId(product.id); }}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null); }}
+                        onDrop={(e) => { e.preventDefault(); swapReorder(product.id); }}
+                        className={`adm-reorder-card${isDragging ? ' adm-reorder-card--dragging' : ''}${isOver ? ' adm-reorder-card--over' : ''}`}
                       >
-                        <ImagePlus size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="adm-reorder-handle">
+                          <Grip size={14} />
+                          <span className="adm-muted" style={{ fontSize: 10 }}>drag to reorder</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
+                            className="adm-icon-btn"
+                            title="Edit image & description"
+                          >
+                            <ImagePlus size={13} />
+                          </button>
+                        </div>
+                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="adm-muted">No image</span>}</div>
+                        <div style={{ fontWeight: 800, fontSize: 13, marginTop: 8 }}>{product.name}</div>
+                        <div className="adm-muted" style={{ fontSize: 11 }}>{product.code}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
