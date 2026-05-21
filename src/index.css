@@ -2761,7 +2761,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .adm-thumb {
   aspect-ratio: 1;
   border-radius: 12px;
-  background: #f8fafc;
+  background: #f8f9fb;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -38,6 +38,7 @@ import {
   fetchProductsByMainCategory,
   invalidateAdminCache,
   invalidateProductCache,
+  saveSortOrder,
   updateProduct,
 } from '../lib/products';
 import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
@@ -154,6 +155,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [activeSection, setActiveSection] = useState('products');
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(null);
+  const [loadingError, setLoadingError] = useState('');
   const [liveCategories, setLiveCategories] = useState([]);
   const [saving, setSaving] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -215,19 +217,25 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
   const loadProducts = async () => {
     setLoadingProgress(0);
+    setLoadingError('');
     try {
       const data = await fetchAdminProductsPage({ page: productPage, pageSize: ADMIN_PAGE_SIZE, searchQuery: productSearch, categoryFilter: productCategory, onProgress: setLoadingProgress });
       setProductRows(data.rows);
       setProductTotal(data.total);
+    } catch (err) {
+      setLoadingError(err.message || 'Failed to load products');
     } finally { setLoadingProgress(null); }
   };
 
   const loadArchive = async () => {
     setLoadingProgress(0);
+    setLoadingError('');
     try {
       const data = await fetchAdminProductsPage({ page: archivePage, pageSize: ADMIN_PAGE_SIZE, searchQuery: archiveSearch, zeroStockOnly: true, onProgress: setLoadingProgress });
       setArchiveRows(data.rows);
       setArchiveTotal(data.total);
+    } catch (err) {
+      setLoadingError(err.message || 'Failed to load archive');
     } finally { setLoadingProgress(null); }
   };
 
@@ -245,7 +253,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     try {
       const rows = await fetchProductsByMainCategory(categoryId, { limit: CATEGORY_WORK_SIZE });
       if (target === 'pricing') setPricingProducts(rows);
-      if (target === 'reorder') setReorderProducts(applySavedOrder(rows, categoryId));
+      // Reorder shows the live site order (sort_order from DB) — no localStorage override
+      if (target === 'reorder') setReorderProducts(rows);
     } finally { setLoading(false); }
   };
 
@@ -457,13 +466,18 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     });
   };
 
+  const persistOrder = (next) => {
+    const updates = next.map((p, i) => ({ websiteSku: p.id, sortOrder: i + 1 }));
+    saveSortOrder(updates).catch(console.error);
+  };
+
   const moveSelectedToTop = () => {
     if (!selectedIds.size) return;
     setReorderProducts((prev) => {
       const moving = prev.filter((p) => selectedIds.has(p.id));
       const rest = prev.filter((p) => !selectedIds.has(p.id));
       const next = [...moving, ...rest];
-      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      persistOrder(next);
       return next;
     });
     setSelectedIds(new Set());
@@ -477,7 +491,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       const moving = prev.filter((p) => toMove.has(p.id));
       const rest = prev.filter((p) => !toMove.has(p.id));
       const next = [...moving, ...rest];
-      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      persistOrder(next);
       return next;
     });
     setDragId(null);
@@ -488,14 +502,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     if (!dragId || dragId === targetId) { setDragId(null); return; }
     setReorderProducts((prev) => {
       const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
-      // If dropping onto another selected card, bail — no sensible position
       if (toMove.has(targetId)) return prev;
       const moving = prev.filter((p) => toMove.has(p.id));
       const rest = prev.filter((p) => !toMove.has(p.id));
       const insertAt = rest.findIndex((p) => p.id === targetId);
       if (insertAt < 0) return prev;
       const next = [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
-      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      persistOrder(next);
       return next;
     });
     setDragId(null);
@@ -599,6 +612,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
             )}
             {loading && loadingProgress === null && (
               <div className="adm-loading-bar"><Loader2 size={16} className="spin" /> Loading…</div>
+            )}
+            {loadingError && (
+              <div style={{ margin: '12px 0', padding: '10px 16px', background: '#fef2f2', borderRadius: 8, color: '#c40000', fontSize: 13, fontWeight: 600 }}>
+                Error: {loadingError}
+              </div>
             )}
 
             {/* PRODUCTS */}
@@ -865,7 +883,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 <div className="adm-section-head">
                   <div>
                     <h2 className="adm-section-title">Reorder Grid</h2>
-                    <p className="adm-section-note">Click cards to select multiple, then move to top. Or drag any card anywhere.</p>
+                    <p className="adm-section-note">Live reflection of the site. Drag to reorder — changes save to the database immediately.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     {selectedIds.size > 0 && (
@@ -879,11 +897,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                     </select>
                     <button
-                      onClick={() => { setSelectedIds(new Set()); saveCategoryOrder(reorderCategory, []); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
+                      onClick={() => { setSelectedIds(new Set()); invalidateAdminCache(); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
                       className="adm-btn-ghost"
-                      title="Reset to default order"
+                      title="Reload from site"
                     >
-                      Reset
+                      Refresh
                     </button>
                   </div>
                 </div>
@@ -936,7 +954,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                             <ImagePlus size={13} />
                           </button>
                         </div>
-                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="adm-muted">No image</span>}</div>
+                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ maxWidth: '90%', maxHeight: '90%', width: 'auto', height: 'auto', objectFit: 'contain' }} /> : <span className="adm-muted">No image</span>}</div>
                         <div style={{ fontWeight: 800, fontSize: 13, marginTop: 8 }}>{product.name}</div>
                         <div className="adm-muted" style={{ fontSize: 11 }}>{product.code}</div>
                       </div>

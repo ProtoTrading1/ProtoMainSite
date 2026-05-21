@@ -360,6 +360,19 @@ export async function updateProduct(websiteSku, payload) {
   invalidateProductCache();
 }
 
+export async function saveSortOrder(updates) {
+  // updates: [{ websiteSku, sortOrder }]
+  const res = await fetch('/api/save-sort-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates }),
+  });
+  const json = await res.json();
+  if (!res.ok && res.status !== 207) throw new Error(json.error || 'Save failed');
+  // Clear admin cache so next reorder load gets fresh DB order
+  invalidateAdminCache();
+}
+
 export async function archiveProduct() { throw new Error('Products are managed in the stock system'); }
 export async function setSpecial() { throw new Error('Not supported'); }
 export async function updateSortOrder() { throw new Error('Not supported'); }

@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     );
 
     const [wpRows, stockRows] = await Promise.all([
-      fetchAllRows(supabase, 'website_products', '*', (q) => q.eq('active', true)),
+      fetchAllRows(supabase, 'website_products', '*', (q) => q.eq('active', true).order('sort_order', { ascending: true })),
       fetchAllRows(supabase, 'products', 'sku,sell_price,stock_qty,yearly_sales,supplier'),
     ]);
 
