@@ -194,6 +194,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [reorderProducts, setReorderProducts] = useState([]);
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const [orders, setOrders] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
@@ -446,16 +447,52 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally { setSaving(''); }
   };
 
+  const toggleSelectReorder = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const moveSelectedToTop = () => {
+    if (!selectedIds.size) return;
+    setReorderProducts((prev) => {
+      const moving = prev.filter((p) => selectedIds.has(p.id));
+      const rest = prev.filter((p) => !selectedIds.has(p.id));
+      const next = [...moving, ...rest];
+      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      return next;
+    });
+    setSelectedIds(new Set());
+  };
+
+  const dropToTop = () => {
+    setDragOverId(null);
+    if (!dragId) return;
+    setReorderProducts((prev) => {
+      const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
+      const moving = prev.filter((p) => toMove.has(p.id));
+      const rest = prev.filter((p) => !toMove.has(p.id));
+      const next = [...moving, ...rest];
+      saveCategoryOrder(reorderCategory, next.map((p) => p.id));
+      return next;
+    });
+    setDragId(null);
+  };
+
   const swapReorder = (targetId) => {
     setDragOverId(null);
     if (!dragId || dragId === targetId) { setDragId(null); return; }
     setReorderProducts((prev) => {
-      const fromIdx = prev.findIndex((p) => p.id === dragId);
-      const toIdx = prev.findIndex((p) => p.id === targetId);
-      if (fromIdx < 0 || toIdx < 0) return prev;
-      const next = [...prev];
-      const [item] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, item);
+      const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
+      const moving = prev.filter((p) => toMove.has(p.id));
+      const rest = prev.filter((p) => !toMove.has(p.id));
+      const insertAt = rest.findIndex((p) => p.id === targetId);
+      const next = insertAt < 0
+        ? [...rest, ...moving]
+        : [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
       saveCategoryOrder(reorderCategory, next.map((p) => p.id));
       return next;
     });
@@ -826,14 +863,21 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 <div className="adm-section-head">
                   <div>
                     <h2 className="adm-section-title">Reorder Grid</h2>
-                    <p className="adm-section-note">Drag cards to reorder within the category. Loads one category at a time.</p>
+                    <p className="adm-section-note">Click cards to select multiple, then move to top. Or drag any card anywhere.</p>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <select value={reorderCategory} onChange={(e) => setReorderCategory(e.target.value)} className="adm-select">
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {selectedIds.size > 0 && (
+                      <>
+                        <span className="adm-pill">{selectedIds.size} selected</span>
+                        <button onClick={moveSelectedToTop} className="adm-btn-red">Move to top</button>
+                        <button onClick={() => setSelectedIds(new Set())} className="adm-btn-ghost">Clear</button>
+                      </>
+                    )}
+                    <select value={reorderCategory} onChange={(e) => { setSelectedIds(new Set()); setReorderCategory(e.target.value); }} className="adm-select">
                       {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                     </select>
                     <button
-                      onClick={() => { saveCategoryOrder(reorderCategory, []); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
+                      onClick={() => { setSelectedIds(new Set()); saveCategoryOrder(reorderCategory, []); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
                       className="adm-btn-ghost"
                       title="Reset to default order"
                     >
@@ -841,25 +885,40 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                     </button>
                   </div>
                 </div>
+
+                {/* Top drop zone — visible whenever a drag is in progress */}
+                <div
+                  onDragEnter={(e) => { e.preventDefault(); setDragOverId('__top__'); }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null); }}
+                  onDrop={(e) => { e.preventDefault(); dropToTop(); }}
+                  className={`adm-reorder-top-zone${dragId ? ' adm-reorder-top-zone--visible' : ''}${dragOverId === '__top__' ? ' adm-reorder-top-zone--over' : ''}`}
+                >
+                  ↑ Drop here to move to top
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                   {reorderProducts.map((product) => {
                     const isDragging = dragId === product.id;
                     const isOver = dragOverId === product.id && !isDragging;
+                    const isSelected = selectedIds.has(product.id);
                     return (
                       <div
                         key={product.id}
                         draggable
+                        onClick={(e) => { if (e.target.closest('button')) return; toggleSelectReorder(product.id); }}
                         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(product.id); }}
                         onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                         onDragEnter={(e) => { e.preventDefault(); if (product.id !== dragId) setDragOverId(product.id); }}
                         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null); }}
                         onDrop={(e) => { e.preventDefault(); swapReorder(product.id); }}
-                        className={`adm-reorder-card${isDragging ? ' adm-reorder-card--dragging' : ''}${isOver ? ' adm-reorder-card--over' : ''}`}
+                        className={`adm-reorder-card${isDragging ? ' adm-reorder-card--dragging' : ''}${isOver ? ' adm-reorder-card--over' : ''}${isSelected ? ' adm-reorder-card--selected' : ''}`}
                       >
                         <div className="adm-reorder-handle">
                           <Grip size={14} />
                           <span className="adm-muted" style={{ fontSize: 10 }}>drag to reorder</span>
+                          {isSelected && <Check size={12} style={{ color: '#8B1A1A' }} />}
                           <button
                             onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
                             className="adm-icon-btn"

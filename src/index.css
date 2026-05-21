@@ -2720,6 +2720,44 @@ input, select, textarea { font-family: inherit; outline: none; }
   margin-left: auto;
 }
 
+.adm-reorder-card--selected {
+  border-color: #8B1A1A;
+  background: #fff8f8;
+  box-shadow: 0 0 0 2px rgba(139,26,26,0.25);
+}
+
+.adm-reorder-top-zone {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 2px dashed transparent;
+  margin-bottom: 0;
+  color: #8B1A1A;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: height 0.15s, margin-bottom 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  cursor: default;
+  user-select: none;
+}
+
+.adm-reorder-top-zone--visible {
+  display: flex;
+  height: 52px;
+  margin-bottom: 14px;
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.adm-reorder-top-zone--over {
+  border-color: #8B1A1A;
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(139,26,26,0.12);
+}
+
 .adm-thumb {
   aspect-ratio: 1;
   border-radius: 12px;
