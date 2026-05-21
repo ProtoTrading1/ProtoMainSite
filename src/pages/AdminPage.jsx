@@ -36,6 +36,7 @@ import {
   fetchAdminProductsPage,
   fetchDistinctCategories,
   fetchProductsByMainCategory,
+  invalidateAdminCache,
   invalidateProductCache,
   updateProduct,
 } from '../lib/products';
@@ -382,7 +383,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   };
 
   const refreshCurrentSection = async () => {
-    if (activeSection === 'products' || activeSection === 'archive') invalidateProductCache();
+    if (activeSection === 'products' || activeSection === 'archive') invalidateAdminCache();
     if (activeSection === 'products') return loadProducts();
     if (activeSection === 'archive') return loadArchive();
     if (activeSection === 'customers') return loadCustomers();

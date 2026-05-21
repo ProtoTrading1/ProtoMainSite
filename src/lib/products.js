@@ -24,11 +24,13 @@ function loadFromLocalCache() {
 
 const PAGE_SIZE = 1000;
 
-async function fetchAllRows(table, selectCols = '*', extraFilter = null) {
+async function fetchAllRows(table, selectCols = '*', extraFilter = null, orderBy = null) {
   const rows = [];
   let from = 0;
   while (true) {
-    let q = supabaseStock.from(table).select(selectCols).order('sort_order', { ascending: true }).range(from, from + PAGE_SIZE - 1);
+    let q = supabaseStock.from(table).select(selectCols);
+    if (orderBy) q = q.order(orderBy, { ascending: true });
+    q = q.range(from, from + PAGE_SIZE - 1);
     if (extraFilter) q = extraFilter(q);
     const { data, error } = await q;
     if (error) throw error;
@@ -99,8 +101,9 @@ function adapt(wpRow, stockRow) {
 async function loadAllFromDB({ includeInactive = false, onProgress } = {}) {
   onProgress?.(8);
   // Fetch both tables in parallel — no huge .in() filter, join client-side
+  // sort_order only exists on website_products, NOT on products (stock table)
   const [wpRows, stockRows] = await Promise.all([
-    fetchAllRows('website_products', '*', includeInactive ? null : (q) => q.eq('active', true)).then((r) => { onProgress?.(55); return r; }),
+    fetchAllRows('website_products', '*', includeInactive ? null : (q) => q.eq('active', true), 'sort_order').then((r) => { onProgress?.(55); return r; }),
     fetchAllRows('products', 'sku,sell_price,stock_qty,yearly_sales,supplier').then((r) => { onProgress?.(85); return r; }),
   ]);
 
@@ -182,6 +185,13 @@ export function invalidateProductCache() {
   _adminCache = null;
   _adminLoadPromise = null;
   try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
+// Clears only the admin cache — use this for admin panel refreshes so the
+// public catalog cache and localStorage are left intact.
+export function invalidateAdminCache() {
+  _adminCache = null;
+  _adminLoadPromise = null;
 }
 
 // Live stock check — always a fresh single-row query
