@@ -430,6 +430,7 @@ function Questionnaire({ onLogin }) {
   const [city, setCity] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [otherType, setOtherType] = useState('');
+  const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const canNext = () => {
     if (step === 0) return businessName.trim() && contactName.trim();
     if (step === 1) return email.trim() && phone.trim() && password.trim().length >= 8;
@@ -466,6 +467,7 @@ function Questionnaire({ onLogin }) {
         province: province || null,
         city: city.trim() || null,
         businessType: businessType === 'Other' ? otherType.trim() : businessType,
+        whatsappOptIn: whatsappOptIn === true,
       });
       setDone(true);
     } catch (err) {
@@ -555,6 +557,41 @@ function Questionnaire({ onLogin }) {
                   placeholder="+27"
                 />
               </div>
+              {phone.replace(/\D/g, '').length >= 8 && (
+                <div className="lp-quiz-field lp-quiz-field--full">
+                  <label>Join our WhatsApp channel?</label>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setWhatsappOptIn(true)}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '8px', fontSize: '14px',
+                        fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit',
+                        border: whatsappOptIn === true ? 'none' : '1px solid #333',
+                        backgroundColor: whatsappOptIn === true ? '#25D366' : 'transparent',
+                        color: whatsappOptIn === true ? '#fff' : '#ccc',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      Yes, add me
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWhatsappOptIn(false)}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '8px', fontSize: '14px',
+                        fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit',
+                        border: whatsappOptIn === false ? 'none' : '1px solid #333',
+                        backgroundColor: whatsappOptIn === false ? '#333' : 'transparent',
+                        color: '#ccc',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      No thanks
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Create a password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
                 <div className="lp-quiz-pw-wrap">

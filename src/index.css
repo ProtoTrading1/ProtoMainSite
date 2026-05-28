@@ -175,6 +175,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   .cart-drawer { display: none; }
 }
 
+@media (min-width: 1201px) {
+  .mobile-cart-backdrop { display: none !important; }
+}
+
 /* ── Mobile Cart FAB ── */
 .mobile-cart-fab {
   display: none;
