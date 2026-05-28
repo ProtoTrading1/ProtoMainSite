@@ -149,6 +149,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             template_name: 'proto_trading_welcome',
             broadcast_name: broadcastName,
+            parameters: [{ name: 'name', value: contactName || businessName || 'Valued Customer' }],
           }),
         });
         const watiBody = await watiRes.text();
