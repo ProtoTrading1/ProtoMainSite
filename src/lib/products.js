@@ -74,7 +74,7 @@ function adapt(wpRow, stockRow) {
     name: wpRow.title,
     description: wpRow.description || '',
     price: Number(stockRow?.sell_price ?? 0),
-    image: wpRow.image_url || '',
+    image: (wpRow.image_url || '').split(',')[0].trim(),
     stockQty,
     stockOnHand: stockQty,
     colour: wpRow.colour || '',
