@@ -14,19 +14,52 @@ import ProductCard from './ProductCard';
 import Breadcrumb from './Breadcrumb';
 
 const CATEGORY_LABELS = {
+  // Departments
   'arts-crafts-stationery': 'Arts & Crafts',
   'beads-jewellery': 'Beads & Jewellery',
-  'beauty-personal-care': 'Beauty & Care',
-  'confectionery': 'Confectionery',
-  'events-hospitality': 'Events',
-  'fashion-accessories': 'Fashion',
-  'hardware': 'Hardware',
-  'homeware-kitchen': 'Homeware',
-  'packaging': 'Packaging',
-  'toys-games-novelty': 'Toys & Games',
+  'beauty-personal-care': 'Beauty & Personal Care',
+  'events-parties': 'Events & Parties',
+  'fashion-accessories': 'Fashion & Accessories',
   'food-drinks': 'Food & Drinks',
+  'hardware': 'Hardware',
+  'homeware-kitchen': 'Homeware & Kitchen',
+  'packaging': 'Packaging',
   'textiles': 'Textiles',
-  'uncategorized': 'General',
+  'toys-games-kids': 'Toys, Games & Kids',
+  // Sub1
+  'notebooks-paper': 'Notebooks & Paper',
+  'paint-brushes': 'Paint & Brushes',
+  'pens-markers-pencils': 'Pens, Markers & Pencils',
+  'school-essentials': 'School Essentials',
+  'acrylic-plastic-beads': 'Acrylic & Plastic Beads',
+  'elastic-cord-wire': 'Elastic, Cord & Wire',
+  'glass-beads': 'Glass Beads',
+  'jewellery-tools': 'Jewellery Tools',
+  'pendants-charms': 'Pendants & Charms',
+  'seed-beads': 'Seed Beads',
+  'wooden-beads': 'Wooden Beads',
+  'beauty-tools': 'Beauty Tools',
+  'cosmetics': 'Cosmetics',
+  'hair-care': 'Hair Care',
+  'skin-body-care': 'Skin & Body Care',
+  'travel-toiletry': 'Travel & Toiletry',
+  'costume-novelty': 'Costume & Novelty',
+  'party-decor': 'Party Decor',
+  'scarves-wraps': 'Scarves & Wraps',
+  'sunglasses-accessories': 'Sunglasses & Accessories',
+  'wallets-purses': 'Wallets & Purses',
+  'drinks-coffee': 'Drinks & Coffee',
+  'pantry-spices': 'Pantry & Spices',
+  'snacks': 'Snacks',
+  'electrical-accessories': 'Electrical Accessories',
+  'tools': 'Tools',
+  'decor-household': 'Decor & Household',
+  'kitchen-tools': 'Kitchen Tools',
+  'display-packaging': 'Display Packaging',
+  'gift-boxes': 'Gift Boxes',
+  'fabric-felt': 'Fabric & Felt',
+  'sewing-accessories': 'Sewing Accessories',
+  'pocket-money-toys': 'Pocket Money Toys',
 };
 
 export function catLabel(slug) {
@@ -73,8 +106,10 @@ export default function MainContent({
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = isAllProductsPage && !searchQuery && browseCategories.length > 0;
   const currentLabel = isCategoryPage
-    ? (path[0] || 'Products')
+    ? catLabel(path[path.length - 1])
     : isAllProductsPage ? 'All Wholesale Products' : collectionLabel;
+  const backPath = path && path.length > 1 ? path.slice(0, -1) : [];
+  const backLabel = backPath.length ? catLabel(backPath[backPath.length - 1]) : 'All departments';
 
   return (
     <div className="catalog-page">
@@ -144,8 +179,8 @@ export default function MainContent({
       {/* Back button when browsing a category */}
       {isCategoryPage && (
         <div className="cat-back-bar">
-          <button className="cat-back-btn" onClick={() => navigate([])} type="button">
-            <ArrowLeft size={15} /> All departments
+          <button className="cat-back-btn" onClick={() => navigate(backPath)} type="button">
+            <ArrowLeft size={15} /> {backLabel}
           </button>
           <h2 className="cat-current-label">{currentLabel}</h2>
         </div>

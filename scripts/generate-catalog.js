@@ -75,7 +75,12 @@ function adapt(wpRow, stockRow) {
   const deptSlug = DEPT_SLUG_MAP[rawDept] || labelToSlug(rawDept);
   const subs = SKU_SUBS[wpRow.website_sku] || [];
   const sub1Slug = subs[0] ? labelToSlug(subs[0]) : '';
-  const categoryPath = deptSlug ? (sub1Slug ? [deptSlug, sub1Slug] : [deptSlug]) : [];
+  const sub2Slug = subs[1] ? labelToSlug(subs[1]) : '';
+  const categoryPath = deptSlug
+    ? sub1Slug
+      ? sub2Slug ? [deptSlug, sub1Slug, sub2Slug] : [deptSlug, sub1Slug]
+      : [deptSlug]
+    : [];
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
