@@ -152,23 +152,12 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cart-drawer {
-  position: absolute;
-  right: 0;
-  top: 0;
   height: 100%;
   width: var(--drawer-width);
+  flex-shrink: 0;
   border-left: 1px solid var(--border-light);
   overflow: hidden;
   background-color: #ffffff;
-  transform: translateX(calc(100% - 28px));
-  transition: transform 0.24s ease, box-shadow 0.24s ease;
-  z-index: 10;
-}
-
-.cart-drawer:hover,
-.cart-drawer.peek {
-  transform: translateX(0);
-  box-shadow: -20px 0 36px rgba(0, 0, 0, 0.35);
 }
 
 @media (max-width: 1200px) {
@@ -339,10 +328,8 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 /* Make the order-drawer visible and full-width inside the mobile sheet */
 .mobile-cart-sheet-body .order-drawer {
-  opacity: 1 !important;
-  transform: none !important;
-  width: 100% !important;
-  height: auto !important;
+  width: 100%;
+  height: auto;
 }
 .mobile-cart-sheet-body .drawer-items {
   max-height: calc(60vh - 120px);
@@ -1741,20 +1728,11 @@ input, select, textarea { font-family: inherit; outline: none; }
 
 .order-drawer {
   height: 100%;
-  width: var(--drawer-width);
+  width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  opacity: 0;
-  transform: translateX(22px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
   background: #fff;
-}
-
-.cart-drawer:hover .order-drawer,
-.cart-drawer.peek .order-drawer {
-  opacity: 1;
-  transform: translateX(0);
 }
 .drawer-header,
 .drawer-footer {
