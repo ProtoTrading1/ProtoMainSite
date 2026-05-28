@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import Drawer from './components/Drawer';
 import OrderConfirmModal from './components/OrderConfirmModal';
-import MobileNav from './components/MobileNav';
 import ReorderModal from './components/ReorderModal';
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
@@ -394,20 +393,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         orderError={orderError}
         customerDetails={customerDetails}
         setCustomerDetails={setCustomerDetails}
-      />
-
-      <MobileNav
-        isOpen={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-        categories={categories}
-        path={path}
-        navigate={navigate}
-        counts={counts}
-        breadcrumb={breadcrumb}
-        customer={customer}
-        onViewProfile={onViewProfile}
-        onViewAdmin={onViewAdmin}
-        onLogout={onLogout}
       />
 
       {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}

@@ -17,6 +17,7 @@ export default function Sidebar({ categories, path, navigate, counts }) {
   return (
     <div
       className="sidebar-container"
+      onMouseLeave={() => setOpenCategoryId(null)}
       style={{
         position: 'relative',
         height: '100%',
@@ -52,20 +53,13 @@ export default function Sidebar({ categories, path, navigate, counts }) {
       </div>
 
       {menuOpen && menuNode && (
-        <>
-          {/* Transparent backdrop — clicking outside the mega-menu closes it */}
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 200 }}
-            onClick={() => setOpenCategoryId(null)}
-          />
-          <MegaMenu
-            key={menuNode.id}
-            l1Node={menuNode}
-            navigate={navigate}
-            counts={counts}
-            onClose={() => setOpenCategoryId(null)}
-          />
-        </>
+        <MegaMenu
+          key={menuNode.id}
+          l1Node={menuNode}
+          navigate={navigate}
+          counts={counts}
+          onClose={() => setOpenCategoryId(null)}
+        />
       )}
     </div>
   );

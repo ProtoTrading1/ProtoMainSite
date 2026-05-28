@@ -165,31 +165,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   z-index: 10;
 }
 
-.cart-drawer::before {
-  content: 'My order';
-  position: absolute;
-  top: 22px;
-  left: 4px;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  color: #1f2937;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.72;
-  transition: opacity 0.18s ease;
-}
-
 .cart-drawer:hover,
 .cart-drawer.peek {
   transform: translateX(0);
   box-shadow: -20px 0 36px rgba(0, 0, 0, 0.35);
-}
-
-.cart-drawer:hover::before,
-.cart-drawer.peek::before {
-  opacity: 0;
 }
 
 @media (max-width: 1200px) {
@@ -523,8 +502,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
   gap: 10px;
   padding: 11px 24px;
-  background: #1a1e2e;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #000;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   color: #94a3b8;
 }
 .header-search-drop input {
@@ -1868,9 +1847,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   line-height: 1.35;
 }
 .drawer-line-body > span {
-  color: #1f2937;
+  color: #9ca3af;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 .drawer-line-footer {
   justify-content: space-between;
@@ -1897,43 +1877,50 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .subtotal-row span,
 .minimum-copy span {
-  color: #667085;
-  font-size: 12px;
-  font-weight: 900;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
-.subtotal-row strong { font-size: 28px; }
+.subtotal-row strong {
+  font-size: 26px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  color: #0f172a;
+}
 .drawer-totals {
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 5px;
+  margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #e4e7ec;
+  border-top: 1px solid #f1f5f9;
 }
 .drawer-totals div {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: #667085;
 }
 .drawer-totals span {
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 500;
+  color: #9ca3af;
 }
 .drawer-totals strong {
-  color: #000000;
+  color: #374151;
   font-size: 13px;
+  font-weight: 600;
 }
 .minimum-card {
   margin: 14px 0;
-  padding: 13px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  padding: 12px 14px;
+  border: 1px solid #e8eaed;
+  border-radius: 10px;
+  background: #fafafa;
 }
-.minimum-copy strong { color: var(--proto-red); }
+.minimum-copy strong { color: #0f172a; font-weight: 700; }
 .progress-track {
-  height: 8px;
+  height: 5px;
   margin-top: 10px;
   overflow: hidden;
   border-radius: 999px;
@@ -1942,60 +1929,41 @@ input, select, textarea { font-family: inherit; outline: none; }
 .progress-track div {
   height: 100%;
   border-radius: inherit;
-  background: var(--proto-red);
+  background: #000;
 }
 .locked-order-button {
-  height: 40px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px dashed #d0d5dd;
-  border-radius: 7px;
-  color: #1f2937;
-  font-weight: 850;
+  border: 1.5px dashed #d1d5db;
+  border-radius: 10px;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 13px;
 }
 .clear-button {
   width: 100%;
   display: flex;
   justify-content: center;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 6px;
   padding: 7px;
-  color: #374151;
+  color: #9ca3af;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
+.clear-button:hover { color: #374151; }
 .drawer-trust {
   display: flex;
   justify-content: center;
   gap: 6px;
   margin-top: 10px;
-  color: #374151;
+  color: #9ca3af;
   font-size: 11px;
 }
-.quote-steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.quote-steps li {
-  min-height: 42px;
-  display: grid;
-  place-items: center;
-  padding: 6px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #475569;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.25;
-}
+.quote-steps { display: none; }
 .sticky-order-bar {
   height: var(--sticky-bar-height);
   display: flex;

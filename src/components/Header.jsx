@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  Info, LayoutDashboard, LogOut, MapPin, Menu, RotateCcw,
+  Info, LayoutDashboard, LogOut, MapPin, RotateCcw,
   Search, ShoppingCart, Star, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
@@ -134,9 +134,6 @@ export default function Header({
       <header className="app-header">
         {/* Brand */}
         <div className="brand-block">
-          <button className="icon-button mobile-menu-button" onClick={onMenuClick} aria-label="Open categories">
-            <Menu size={21} />
-          </button>
           <div className="brand-mark brand-logo">
             <img src="/proto-logo.png" alt="Proto Trading logo" />
           </div>

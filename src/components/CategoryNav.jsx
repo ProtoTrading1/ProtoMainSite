@@ -19,11 +19,12 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
     <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 0' }}>
       <button
         onClick={() => { navigate([]); onToggleL1(null); }}
+        onMouseEnter={() => onToggleL1(null)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '11px 12px', margin: '0 8px 10px', borderRadius: '10px',
           border: '1px solid #e5e7eb', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-          backgroundColor: !activeL1 ? '#111827' : '#ffffff',
+          backgroundColor: !activeL1 ? '#000' : '#ffffff',
           color: !activeL1 ? '#fff' : '#111827',
         }}
       >
@@ -45,10 +46,8 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
         return (
           <button
             key={cat.id}
-            onClick={() => {
-              navigate([cat.id]);
-              onToggleL1(isOpen ? null : cat.id);
-            }}
+            onClick={() => navigate([cat.id])}
+            onMouseEnter={() => onToggleL1(cat.id)}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '11px 12px', margin: '0 8px 4px', borderRadius: '9px',
@@ -71,7 +70,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
               {counts?.[cat.id] != null && (
                 <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '700' }}>{counts[cat.id]}</span>
               )}
-              {hasChildren ? (isOpen ? <ChevronDown size={15} color="#DC2626" /> : <ChevronRight size={15} color="#D1D5DB" />) : null}
+              {hasChildren ? <ChevronRight size={15} color={isOpen ? '#DC2626' : '#D1D5DB'} /> : null}
             </div>
           </button>
         );
