@@ -180,13 +180,13 @@ export default function Header({
         {/* Right actions */}
         <div className="header-actions">
           {customer?.role === 'admin' && (
-            <button className="header-action desktop-only" type="button" onClick={onViewAdmin}>
+            <a className="header-action desktop-only" href="https://protoportal-admin.vercel.app" target="_blank" rel="noreferrer">
               <LayoutDashboard size={19} />
               <span>
                 <small>Admin</small>
                 Dashboard
               </span>
-            </button>
+            </a>
           )}
 
           <button className="header-action desktop-only" type="button" onClick={onViewProfile}>

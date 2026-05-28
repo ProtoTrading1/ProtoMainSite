@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import App from './App';
 import LandingPage from './pages/LandingPage';
 import LoginModal from './components/LoginModal';
@@ -7,8 +7,6 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import WorldClassPortal from './worldclass/WorldClassPortal';
 import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
-
-const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 export default function Root() {
   const [session, setSession] = useState(undefined);
@@ -48,9 +46,7 @@ export default function Root() {
       if (!profile) return;
 
       if (profile.is_approved || profile.role === 'admin') {
-        const preferred = window.sessionStorage.getItem('proto-surface');
-        if (profile.role === 'admin' && preferred === 'admin') setSurface('admin');
-        else setSurface('portal');
+        setSurface('portal');
         return;
       }
 
@@ -151,18 +147,6 @@ export default function Root() {
     );
   }
 
-  if (session && customer?.role === 'admin' && view === 'admin') {
-    return (
-      <Suspense fallback={(
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#e2e8f0' }}>
-          Loading admin…
-        </div>
-      )}>
-        <AdminPage customer={customer} onLogout={handleLogout} onViewPortal={() => setSurface('portal')} />
-      </Suspense>
-    );
-  }
-
   if (session && view === 'profile') {
     return (
       <ProfilePage
@@ -179,7 +163,7 @@ export default function Root() {
         customer={customer}
         onLogout={handleLogout}
         onViewProfile={() => setSurface('profile')}
-        onViewAdmin={() => setSurface('admin')}
+        onViewAdmin={null}
       />
     );
   }
