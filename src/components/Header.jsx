@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Info, LayoutDashboard, LogOut, MapPin, Menu, RotateCcw,
   Search, ShoppingCart, Star, User, X,
 } from 'lucide-react';
+import { getSuggestions } from '../lib/fuzzySearch';
 
 function AboutModal({ onClose }) {
   return (
@@ -74,19 +75,58 @@ export default function Header({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showFindUs, setShowFindUs] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const productsCache = useRef(null);
+
+  const loadProductsOnce = async () => {
+    if (productsCache.current) return productsCache.current;
+    try {
+      const res = await fetch('/products.json');
+      productsCache.current = await res.json();
+    } catch {
+      productsCache.current = [];
+    }
+    return productsCache.current;
+  };
+
+  const updateSuggestions = (query, products) => {
+    if (!query.trim()) { setSuggestions([]); return; }
+    setSuggestions(getSuggestions(products, query, 8));
+  };
 
   const toggleSearch = () => {
     setSearchOpen((v) => {
-      if (v) setSearchQuery('');
+      if (v) { setSearchQuery(''); setSuggestions([]); setActiveIdx(-1); }
+      else loadProductsOnce();
       return !v;
     });
   };
 
   const toggleMobileSearch = () => {
     setMobileSearchOpen((v) => {
-      if (v) setSearchQuery('');
+      if (v) { setSearchQuery(''); setSuggestions([]); setActiveIdx(-1); }
+      else loadProductsOnce();
       return !v;
     });
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Escape') { toggleSearch(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
+    if (e.key === 'Enter' && activeIdx >= 0 && suggestions[activeIdx]) {
+      e.preventDefault();
+      setSearchQuery(suggestions[activeIdx].name);
+      setSuggestions([]);
+      setActiveIdx(-1);
+    }
+  };
+
+  const pickSuggestion = (name) => {
+    setSearchQuery(name);
+    setSuggestions([]);
+    setActiveIdx(-1);
   };
 
   return (
@@ -179,24 +219,48 @@ export default function Header({
 
       {/* Desktop search bar */}
       {searchOpen && (
-        <div className="header-search-drop">
-          <Search size={16} />
-          <input
-            autoFocus
-            type="search"
-            placeholder="Search products, codes…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') toggleSearch(); }}
-          />
-          {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search">
+        <div className="search-drop-wrap">
+          <div className="header-search-drop">
+            <Search size={16} />
+            <input
+              autoFocus
+              type="search"
+              placeholder="Search products, codes, categories…"
+              value={searchQuery}
+              onChange={async (e) => {
+                setSearchQuery(e.target.value);
+                setActiveIdx(-1);
+                const products = await loadProductsOnce();
+                updateSuggestions(e.target.value, products);
+              }}
+              onKeyDown={handleSearchKeyDown}
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); }} aria-label="Clear search">
+                <X size={15} />
+              </button>
+            )}
+            <button type="button" onClick={toggleSearch} aria-label="Close search">
               <X size={15} />
             </button>
+          </div>
+          {suggestions.length > 0 && (
+            <div className="search-suggestions">
+              <span className="search-suggestions-label">Suggestions</span>
+              {suggestions.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`search-suggestion-item${i === activeIdx ? ' active' : ''}`}
+                  onMouseDown={(e) => { e.preventDefault(); pickSuggestion(p.name); }}
+                >
+                  <span className="search-suggestion-code">{p.code}</span>
+                  <span className="search-suggestion-name">{p.name}</span>
+                  {p.price > 0 && <span className="search-suggestion-price">R{p.price.toFixed(2)}</span>}
+                </button>
+              ))}
+            </div>
           )}
-          <button type="button" onClick={toggleSearch} aria-label="Close search">
-            <X size={15} />
-          </button>
         </div>
       )}
 
@@ -234,11 +298,22 @@ export default function Header({
           type="search"
           placeholder="Search products, codes…"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Escape') toggleMobileSearch(); }}
+          onChange={async (e) => {
+            setSearchQuery(e.target.value);
+            setActiveIdx(-1);
+            const products = await loadProductsOnce();
+            updateSuggestions(e.target.value, products);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') toggleMobileSearch();
+            if (e.key === 'Enter' && activeIdx >= 0 && suggestions[activeIdx]) {
+              e.preventDefault();
+              pickSuggestion(suggestions[activeIdx].name);
+            }
+          }}
         />
         {searchQuery && (
-          <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear">
+          <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); }} aria-label="Clear">
             <X size={15} />
           </button>
         )}
@@ -246,6 +321,22 @@ export default function Header({
           <X size={15} />
         </button>
       </div>
+      {mobileSearchOpen && suggestions.length > 0 && (
+        <div className="search-suggestions" style={{ position: 'relative', borderTop: '1px solid #e2e8f0', borderRadius: 0, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+          {suggestions.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`search-suggestion-item${i === activeIdx ? ' active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); pickSuggestion(p.name); toggleMobileSearch(); }}
+            >
+              <span className="search-suggestion-code">{p.code}</span>
+              <span className="search-suggestion-name">{p.name}</span>
+              {p.price > 0 && <span className="search-suggestion-price">R{p.price.toFixed(2)}</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showFindUs && <FindUsModal onClose={() => setShowFindUs(false)} />}

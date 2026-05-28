@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Lock, PackageCheck, ShieldCheck, Trash2 } from 'lucide-react';
+import { FileText, Lock, PackageCheck, ShoppingCart, Trash2 } from 'lucide-react';
 
 const MIN_ORDER = 1000;
 
@@ -42,7 +42,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
         <div>
           <span className="eyebrow">Wholesale order</span>
           <h2>My Order</h2>
-          <p>{cartItems.length ? `${cartItems.length} quote line items` : 'No items added yet'}</p>
+          <p>{cartItems.length ? `${cartItems.length} line item${cartItems.length !== 1 ? 's' : ''}` : 'No items yet'}</p>
         </div>
         {isReady && <span className="ready-pill">Ready</span>}
       </div>
@@ -50,9 +50,11 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
       <div className="drawer-items">
         {cartItems.length === 0 && (
           <div className="drawer-empty">
-            <ShieldCheck size={30} />
-            <strong>Start a trade order</strong>
-            <span>Add products from the catalogue to build a quote request.</span>
+            <div className="drawer-empty-icon">
+              <ShoppingCart size={22} />
+            </div>
+            <strong>Your basket is empty</strong>
+            <span>Browse the catalogue and add wholesale lines to build your quote.</span>
           </div>
         )}
 

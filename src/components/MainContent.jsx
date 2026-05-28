@@ -2,8 +2,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Flame,
-  LayoutGrid,
-  List,
   Loader2,
   PackageCheck,
   PackageX,
@@ -14,6 +12,26 @@ import {
 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import Breadcrumb from './Breadcrumb';
+
+const CATEGORY_LABELS = {
+  'arts-crafts-stationery': 'Arts & Crafts',
+  'beads-jewellery': 'Beads & Jewellery',
+  'beauty-personal-care': 'Beauty & Care',
+  'confectionery': 'Confectionery',
+  'events-hospitality': 'Events',
+  'fashion-accessories': 'Fashion',
+  'hardware': 'Hardware',
+  'homeware-kitchen': 'Homeware',
+  'packaging': 'Packaging',
+  'toys-games-novelty': 'Toys & Games',
+  'food-drinks': 'Food & Drinks',
+  'textiles': 'Textiles',
+  'uncategorized': 'General',
+};
+
+export function catLabel(slug) {
+  return CATEGORY_LABELS[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const shortcuts = [
   { id: 'start', icon: PackageCheck, title: 'All Products' },
@@ -100,23 +118,23 @@ export default function MainContent({
         })}
       </div>
 
-      {/* Category browse grid */}
+      {/* Category browse pills */}
       {showCategoryGrid && (
         <section className="cat-browse">
           <div className="cat-browse-head">
             <span className="eyebrow">Shop by department</span>
             <h2 className="cat-browse-title">What are you looking for?</h2>
           </div>
-          <div className="cat-grid">
-            {browseCategories.map((cat) => (
+          <div className="cat-pill-row">
+            {browseCategories.filter((c) => c !== 'uncategorized').map((cat) => (
               <button
                 key={cat}
-                className="cat-card"
+                className="cat-pill"
                 onClick={() => navigate([cat])}
                 type="button"
               >
-                <span className="cat-card-name">{cat}</span>
-                <span className="cat-card-count">{categoryCounts[cat] ?? 0} products</span>
+                <span className="cat-pill-name">{catLabel(cat)}</span>
+                <span className="cat-pill-count">{categoryCounts[cat] ?? 0}</span>
               </button>
             ))}
           </div>
