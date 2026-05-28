@@ -57,7 +57,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, password, contactName, businessName, phone, country, province, city, businessType } = req.body || {};
+  const { email, password, contactName, businessName, phone, country, province, city, businessType, address, whatsappOptIn } = req.body || {};
 
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
 
@@ -101,6 +101,7 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      delivery_address: address || null,
       is_approved: false,
       tier: 'regular',
     }, { onConflict: 'id' });
@@ -127,6 +128,32 @@ export default async function handler(req, res) {
   } catch (emailErr) {
     // Don't fail the registration if email sending fails
     console.error('Welcome email error:', emailErr.message);
+  }
+
+  // Send WATI WhatsApp welcome broadcast if customer opted in
+  if (whatsappOptIn && phone) {
+    try {
+      const watiUrl = process.env.WATI_API_URL;
+      const watiToken = process.env.WATI_API_TOKEN;
+      if (watiUrl && watiToken) {
+        // WATI expects phone without + or spaces, e.g. 27821234567
+        const cleanPhone = phone.replace(/\D/g, '');
+        await fetch(`${watiUrl}/api/v1/sendTemplateMessage?whatsappNumber=${cleanPhone}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${watiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            template_name: 'proto_trading_welcome',
+            broadcast_name: 'proto_trading_welcome',
+          }),
+        });
+      }
+    } catch (watiErr) {
+      // Don't fail the registration if WhatsApp sending fails
+      console.error('WATI broadcast error:', watiErr.message);
+    }
   }
 
   return res.status(200).json({ ok: true });
