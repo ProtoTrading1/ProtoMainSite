@@ -138,7 +138,9 @@ export default async function handler(req, res) {
       if (watiUrl && watiToken) {
         // WATI expects phone without + or spaces, e.g. 27821234567
         const cleanPhone = phone.replace(/\D/g, '');
-        await fetch(`${watiUrl}/api/v1/sendTemplateMessage?whatsappNumber=${cleanPhone}`, {
+        // broadcast_name must be unique per send
+        const broadcastName = `proto_trading_welcome_${Date.now()}`;
+        const watiRes = await fetch(`${watiUrl}/api/v1/sendTemplateMessage?whatsappNumber=${cleanPhone}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${watiToken}`,
@@ -146,12 +148,13 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             template_name: 'proto_trading_welcome',
-            broadcast_name: 'proto_trading_welcome',
+            broadcast_name: broadcastName,
           }),
         });
+        const watiBody = await watiRes.text();
+        console.log('WATI response:', watiRes.status, watiBody);
       }
     } catch (watiErr) {
-      // Don't fail the registration if WhatsApp sending fails
       console.error('WATI broadcast error:', watiErr.message);
     }
   }
