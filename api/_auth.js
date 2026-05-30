@@ -1,13 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-function getAnonClient() {
-  return createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.VITE_SUPABASE_ANON_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
-
 function getServiceClient() {
   return createClient(
     process.env.VITE_SUPABASE_URL,
@@ -22,7 +14,7 @@ export async function requireAuth(req, res) {
     res.status(401).json({ error: 'Unauthorized' });
     return null;
   }
-  const { data: { user }, error } = await getAnonClient().auth.getUser(header.slice(7));
+  const { data: { user }, error } = await getServiceClient().auth.getUser(header.slice(7));
   if (error || !user) {
     res.status(401).json({ error: 'Unauthorized' });
     return null;
