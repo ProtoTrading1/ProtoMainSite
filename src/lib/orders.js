@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { authHeaders } from './authHeaders';
 
 const PAGE_SIZE = 1000;
 
@@ -74,7 +75,7 @@ export async function fetchLastOrder(customerId) {
 }
 
 export async function fetchAllOrdersAdmin(limit = 150) {
-  const res = await fetch(`/api/admin-orders?limit=${limit}`);
+  const res = await fetch(`/api/admin-orders?limit=${limit}`, { headers: await authHeaders() });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to fetch orders');
   return json.rows || [];
@@ -83,7 +84,7 @@ export async function fetchAllOrdersAdmin(limit = 150) {
 export async function updateOrderAdmin(id, fields) {
   const res = await fetch('/api/admin-orders', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ id, ...fields }),
   });
   const json = await res.json();

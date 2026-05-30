@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_auth.js';
 
 const BUCKET = 'site-config';
 const FILE = 'specials.json';
@@ -29,6 +30,8 @@ export default async function handler(req, res) {
 
   // POST — save specials (max 10)
   if (req.method === 'POST') {
+    const adminUser = await requireAdmin(req, res);
+    if (!adminUser) return;
     try {
       const body = req.body || {};
       const items = (body.items || []).slice(0, 10);

@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   );
 
   // Find user by email
-  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers({ filter: `email.eq.${email}` });
   if (listError) return res.status(500).json({ error: 'Server error' });
 
   const user = users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());

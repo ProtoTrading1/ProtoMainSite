@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_auth.js';
 
 function getAdminClient() {
   return createClient(
@@ -9,6 +10,9 @@ function getAdminClient() {
 }
 
 export default async function handler(req, res) {
+  const user = await requireAdmin(req, res);
+  if (!user) return;
+
   const supabase = getAdminClient();
 
   // GET — list orders (service role bypasses RLS)

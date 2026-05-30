@@ -44,6 +44,7 @@ import {
 import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
 import { fetchAllOrdersAdmin, updateOrderAdmin } from '../lib/orders';
 import { fetchSpecials, saveSpecials } from '../lib/specials';
+import { authHeaders } from '../lib/authHeaders';
 import categories from '../data/categories.json';
 
 // ─── Reorder sort order — stored in localStorage, applied client-side ─────────
@@ -321,7 +322,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       });
       const res = await fetch('/api/upload-product-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ filename: file.name, contentType: file.type, base64 }),
       });
       const json = await res.json();

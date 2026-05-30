@@ -11,6 +11,7 @@ import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
+import { authHeaders } from './lib/authHeaders';
 import categories from './data/categories.json';
 import './index.css';
 
@@ -276,7 +277,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
       const response = await fetch('/api/send-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify(payload),
       });
       const result = await response.json().catch(() => ({}));

@@ -1,4 +1,5 @@
 import { supabaseStock } from './supabaseStock';
+import { authHeaders } from './authHeaders';
 
 // Promise singletons — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -336,7 +337,7 @@ export async function updateProduct(websiteSku, payload) {
   if (Object.keys(contentFields).length) {
     const res = await fetch('/api/update-product', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({ websiteSku, ...contentFields }),
     });
     const json = await res.json();
@@ -364,7 +365,7 @@ export async function saveSortOrder(updates) {
   // updates: [{ websiteSku, sortOrder }]
   const res = await fetch('/api/save-sort-order', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ updates }),
   });
   const json = await res.json();

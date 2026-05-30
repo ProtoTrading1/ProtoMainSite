@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from './_auth.js';
 
 function getAdminClient() {
   return createClient(
@@ -13,8 +14,24 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).end();
 
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ error: 'userId required' });
+
+  // Users may only fetch their own profile unless they are admin
+  if (user.id !== userId) {
+    const supabase = getAdminClient();
+    const { data: caller } = await supabase
+      .from('customers')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (caller?.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
 
   try {
     const supabase = getAdminClient();

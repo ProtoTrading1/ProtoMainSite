@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_auth.js';
 
 function getStockAdminClient() {
   return createClient(
@@ -11,6 +12,9 @@ function getStockAdminClient() {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
+
+  const user = await requireAdmin(req, res);
+  if (!user) return;
 
   const { updates } = req.body || {};
   if (!Array.isArray(updates) || !updates.length) {

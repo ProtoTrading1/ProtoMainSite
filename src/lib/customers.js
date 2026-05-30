@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { authHeaders } from './authHeaders';
 
 const PAGE_SIZE = 1000;
 
@@ -35,7 +36,7 @@ export async function fetchAllCustomers() {
 
 export async function fetchCustomersPage({ page = 1, pageSize = 50, tab = 'regular', searchQuery = '' } = {}) {
   const params = new URLSearchParams({ tab, page: String(page), pageSize: String(pageSize), search: searchQuery });
-  const res = await fetch(`/api/admin-customers?${params}`);
+  const res = await fetch(`/api/admin-customers?${params}`, { headers: await authHeaders() });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to fetch customers');
   // orderCount is now included server-side — no second round-trip needed
@@ -50,7 +51,7 @@ export async function fetchCustomersPage({ page = 1, pageSize = 50, tab = 'regul
 export async function deleteCustomer(id) {
   const res = await fetch('/api/admin-customers', {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ id }),
   });
   const json = await res.json();

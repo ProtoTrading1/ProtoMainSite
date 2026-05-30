@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_auth.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
 
@@ -16,9 +17,17 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
 
+  const user = await requireAdmin(req, res);
+  if (!user) return;
+
   const { filename, contentType, base64 } = req.body || {};
   if (!filename || !contentType || !base64) {
     return res.status(400).json({ error: 'filename, contentType, and base64 are required' });
+  }
+
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!ALLOWED_TYPES.includes(contentType)) {
+    return res.status(400).json({ error: 'Only image files are allowed' });
   }
 
   const supabase = getStockAdminClient();

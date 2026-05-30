@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from './_auth.js';
 
 function getStockAdminClient() {
   return createClient(
@@ -11,6 +12,9 @@ function getStockAdminClient() {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
+
+  const user = await requireAdmin(req, res);
+  if (!user) return;
 
   const { websiteSku, image, description } = req.body || {};
   if (!websiteSku) return res.status(400).json({ error: 'websiteSku is required' });

@@ -1,3 +1,5 @@
+import { authHeaders } from './authHeaders';
+
 let _cache = null;
 let _loadPromise = null;
 
@@ -18,7 +20,7 @@ export async function saveSpecials(items) {
   _cache = null;
   const res = await fetch('/api/specials', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ items: items.slice(0, 10) }),
   });
   const json = await res.json();

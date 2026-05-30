@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { Resend } from 'resend';
+import { requireAuth } from './_auth.js';
 
 const DEFAULT_TO = 'orders@prototrading.co.za';
 const DEFAULT_FROM = 'Proto Trading Portal <onboarding@resend.dev>';
@@ -16,9 +17,17 @@ function isPdfKitImage(url = '') {
   return /\.(png|jpe?g)(\?.*)?$/i.test(url);
 }
 
+const ALLOWED_IMAGE_HOSTS = [
+  process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).host : null,
+  process.env.VITE_STOCK_SUPABASE_URL ? new URL(process.env.VITE_STOCK_SUPABASE_URL).host : null,
+].filter(Boolean);
+
 async function fetchImageBuffer(url) {
   if (!url || !isPdfKitImage(url)) return null;
   try {
+    const parsed = new URL(url);
+    if (!['https:'].includes(parsed.protocol)) return null;
+    if (!ALLOWED_IMAGE_HOSTS.some((host) => parsed.host === host)) return null;
     const response = await fetch(url);
     if (!response.ok) return null;
     const arrayBuffer = await response.arrayBuffer();
@@ -150,6 +159,9 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
 
   if (!process.env.RESEND_API_KEY) {
     return res.status(500).json({ error: 'Missing RESEND_API_KEY environment variable' });
