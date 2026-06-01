@@ -261,32 +261,6 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
         )}
       </div>
 
-      {/* Column 4 — Theme cards (visual merchandising) */}
-      {themeCards.length > 0 && (
-        <div style={{
-          width: 260, display: 'flex', flexDirection: 'column', minWidth: 0,
-          borderLeft: '1px solid #F0F1F3', background: '#FAFAFA',
-        }}>
-          <div style={{
-            padding: '13px 16px 10px',
-            borderBottom: '1px solid #F0F1F3',
-            fontSize: '10px', fontWeight: '800', color: '#9CA3AF',
-            textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0,
-          }}>
-            Shop by use case
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {themeCards.map((card) => (
-              <FlyoutThemeCard
-                key={card.id}
-                card={card}
-                color={color}
-                onClick={() => { if (card.path) go(card.path); }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
