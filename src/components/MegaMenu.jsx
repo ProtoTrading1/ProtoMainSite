@@ -1,16 +1,87 @@
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+
+const RED = '#DC2626';
 
 function Count({ value }) {
   if (value == null) return null;
-  return <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '700' }}>{value}</span>;
+  return (
+    <sup style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600', marginLeft: '3px', top: '-0.4em', position: 'relative' }}>
+      {value}
+    </sup>
+  );
+}
+
+function PanelHeader({ label, onViewAll }) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 18px 12px', borderBottom: '1px solid #F0F1F3', flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: '12px', fontWeight: '800', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onViewAll}
+        style={{
+          fontSize: '10px', fontWeight: '700', color: RED, textTransform: 'uppercase', letterSpacing: '0.05em',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px',
+        }}
+      >
+        View All
+      </button>
+    </div>
+  );
+}
+
+function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '9px 18px 9px 15px', width: '100%',
+        borderLeftWidth: '3px', borderLeftStyle: 'solid',
+        borderLeftColor: active ? RED : 'transparent',
+        borderTop: 'none', borderRight: 'none', borderBottom: 'none',
+        background: active ? '#fff5f7' : 'transparent',
+        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+        transition: 'background 0.12s ease',
+      }}
+    >
+      <span style={{
+        fontSize: '13px', fontWeight: active ? '700' : '500',
+        color: active ? '#111827' : '#374151',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {label}
+        <Count value={count} />
+      </span>
+      {hasArrow && (
+        <span style={{ fontSize: '15px', lineHeight: 1, color: active ? RED : '#C7CBD1', flexShrink: 0, marginLeft: '8px' }}>
+          &rsaquo;
+        </span>
+      )}
+    </button>
+  );
 }
 
 export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
+  const [hoveredL2Id, setHoveredL2Id] = useState(null);
+
   if (!l1Node) return null;
 
-  const countFor = (path) => counts?.[path.join('/')] ?? null;
-  const go = (path) => {
-    navigate(path);
+  const l2List = l1Node.children || [];
+  const hoveredL2 = l2List.find((c) => c.id === hoveredL2Id) || null;
+  const l3List = hoveredL2?.children || [];
+
+  const countFor = (...segments) => counts?.[segments.join('/')] ?? null;
+  const go = (segments) => {
+    navigate(segments);
     onClose();
   };
 
@@ -18,106 +89,66 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
     <div
       style={{
         position: 'absolute',
-        left: 'calc(100% + 8px)',
-        top: 12,
-        width: 380,
-        maxHeight: 'calc(100% - 24px)',
-        overflowY: 'auto',
+        left: '100%',
+        top: 0,
+        height: '100%',
+        display: 'flex',
         background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 18,
-        boxShadow: '0 24px 55px rgba(15, 23, 42, 0.14)',
-        padding: 18,
+        borderTop: '1px solid #e5e7eb',
+        borderRight: '1px solid #e5e7eb',
+        borderBottom: '1px solid #e5e7eb',
+        boxShadow: '12px 0 30px rgba(15, 23, 42, 0.08)',
         zIndex: 300,
+        fontFamily: 'Outfit, sans-serif',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Category menu
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <h3 style={{ fontSize: 22, lineHeight: 1.05, color: '#111827', fontFamily: 'Outfit, sans-serif', margin: 0 }}>
-              {l1Node.label}
-            </h3>
-            <p style={{ marginTop: 6, color: '#64748B', fontSize: 13 }}>
-              Keep it simple — choose the section you want, then browse the products.
-            </p>
-          </div>
-          <Count value={countFor([l1Node.id])} />
+      {/* Column 2 — L2 */}
+      <div style={{ width: 280, display: 'flex', flexDirection: 'column', borderRight: '1px solid #F0F1F3', minWidth: 0 }}>
+        <PanelHeader label={l1Node.label} onViewAll={() => go([l1Node.id])} />
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+          {l2List.map((l2) => {
+            const hasChildren = !!l2.children?.length;
+            return (
+              <ListItem
+                key={l2.id}
+                label={l2.label}
+                count={countFor(l1Node.id, l2.id)}
+                hasArrow={hasChildren}
+                active={hoveredL2Id === l2.id}
+                onClick={() => go([l1Node.id, l2.id])}
+                onMouseEnter={() => setHoveredL2Id(l2.id)}
+              />
+            );
+          })}
         </div>
-        <button
-          type="button"
-          onClick={() => go([l1Node.id])}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            width: '100%', padding: '12px 14px', borderRadius: 12,
-            border: '1px solid #fecdd3', background: '#fff5f7', color: '#be123c', fontWeight: 800,
-          }}
-        >
-          <span>Shop all {l1Node.label}</span>
-          <ArrowRight size={16} />
-        </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {(l1Node.children || []).map((group) => (
-          <section key={group.id} style={{ border: '1px solid #f1f5f9', borderRadius: 14, padding: 14, background: '#fff' }}>
-            <button
-              type="button"
-              onClick={() => go([l1Node.id, group.id])}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                textAlign: 'left', padding: 0, color: '#111827', fontWeight: 800,
-              }}
-            >
-              <span>{group.label}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Count value={countFor([l1Node.id, group.id])} />
-                <ChevronRight size={16} color="#D1D5DB" />
-              </div>
-            </button>
-
-            {!!group.children?.length && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                {group.children.map((child) => (
-                  <div key={child.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => go([l1Node.id, group.id, child.id])}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-                        padding: '10px 12px', borderRadius: 10, background: '#f8fafc', color: '#334155', fontWeight: 700,
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span>{child.label}</span>
-                      <Count value={countFor([l1Node.id, group.id, child.id])} />
-                    </button>
-
-                    {!!child.children?.length && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {child.children.map((leaf) => (
-                          <button
-                            key={leaf.id}
-                            type="button"
-                            onClick={() => go([l1Node.id, group.id, child.id, leaf.id])}
-                            style={{
-                              padding: '8px 10px', borderRadius: 999,
-                              border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 12, fontWeight: 700,
-                            }}
-                          >
-                            {leaf.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
+      {/* Column 3 — L3 */}
+      <div style={{ width: 280, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {hoveredL2 && l3List.length > 0 ? (
+          <>
+            <PanelHeader label={hoveredL2.label} onViewAll={() => go([l1Node.id, hoveredL2.id])} />
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+              {l3List.map((l3) => (
+                <ListItem
+                  key={l3.id}
+                  label={l3.label}
+                  count={countFor(l1Node.id, hoveredL2.id, l3.id)}
+                  hasArrow={false}
+                  active={false}
+                  onClick={() => go([l1Node.id, hoveredL2.id, l3.id])}
+                  onMouseEnter={undefined}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '500', lineHeight: 1.5 }}>
+              Hover a category to explore
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -34,12 +34,6 @@ export default function Sidebar({ categories, path, navigate, counts }) {
           zIndex: 210,
         }}
       >
-        <div style={{ padding: '14px 16px 6px', borderBottom: '1px solid #F0F1F3', flexShrink: 0 }}>
-          <div style={{ fontSize: '10px', fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            Browse Categories
-          </div>
-        </div>
-
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '12px' }}>
           <CategoryNav
             categories={categories}
