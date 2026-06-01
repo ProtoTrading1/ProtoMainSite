@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
+import { optimizedImageUrl } from '../lib/imageUrl';
 
 // ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
@@ -9,7 +10,13 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
     <div className="strip-card">
       <div className="strip-card-img">
         {product.image
-          ? <img src={product.image} alt={product.name} loading="lazy" />
+          ? <img
+              src={optimizedImageUrl(product.image, { width: 200, quality: 75 })}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              style={{ mixBlendMode: 'multiply' }}
+            />
           : <div className="strip-card-no-img"><ImageOff size={20} /></div>}
       </div>
       <div className="strip-card-body">

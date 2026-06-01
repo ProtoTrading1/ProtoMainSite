@@ -1,71 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { checkStock } from '../lib/products';
+import { optimizedImageUrl } from '../lib/imageUrl';
 
-function TrimmedProductImage({ src, alt }) {
-  const isRemoteCatalogueImage = String(src || '').startsWith('http');
-  const [displaySrc, setDisplaySrc] = useState(src);
+// Fast CSS-only approach: mix-blend-mode:multiply makes white product backgrounds
+// invisible against white card backgrounds — same visual result as the old canvas
+// trimming but with zero JS processing and zero extra network requests.
+function ProductImage({ src, alt, width = 400 }) {
   const [broken, setBroken] = useState(false);
-
-  // All hooks before any conditional return
-  useEffect(() => {
-    setBroken(false);
-    setDisplaySrc(src);
-    if (!isRemoteCatalogueImage || !src) return;
-
-    let cancelled = false;
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-
-    image.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return;
-
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        ctx.drawImage(image, 0, 0);
-
-        const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let minX = width, minY = height, maxX = 0, maxY = 0;
-
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const i = (y * width + x) * 4;
-            const a = data[i + 3];
-            const isWhite = data[i] > 246 && data[i + 1] > 246 && data[i + 2] > 246;
-            if (a > 20 && !isWhite) {
-              minX = Math.min(minX, x); minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
-            }
-          }
-        }
-
-        if (maxX <= minX || maxY <= minY) return;
-        const pad = Math.round(Math.min(width, height) * 0.045);
-        const cx = Math.max(0, minX - pad);
-        const cy = Math.max(0, minY - pad);
-        const cw = Math.min(width - cx, maxX - minX + pad * 2);
-        const ch = Math.min(height - cy, maxY - minY + pad * 2);
-        if (cw < width * 0.2 || ch < height * 0.2) return;
-
-        const out = document.createElement('canvas');
-        out.width = cw; out.height = ch;
-        const outCtx = out.getContext('2d');
-        if (!outCtx) return;
-        outCtx.drawImage(image, cx, cy, cw, ch, 0, 0, cw, ch);
-        if (!cancelled) setDisplaySrc(out.toDataURL('image/png'));
-      } catch {
-        if (!cancelled) setDisplaySrc(src);
-      }
-    };
-
-    image.onerror = () => { if (!cancelled) setDisplaySrc(src); };
-    image.src = src;
-    return () => { cancelled = true; };
-  }, [src, isRemoteCatalogueImage]);
+  const optimized = optimizedImageUrl(src, { width, quality: 78 });
 
   if (!src || broken) {
     return (
@@ -77,11 +21,12 @@ function TrimmedProductImage({ src, alt }) {
 
   return (
     <img
-      className={isRemoteCatalogueImage ? 'catalogue-photo trimmed-catalogue-photo' : ''}
-      src={displaySrc}
+      src={optimized}
       alt={alt}
       loading="lazy"
+      decoding="async"
       onError={() => setBroken(true)}
+      style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }}
     />
   );
 }
@@ -188,7 +133,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               })}
             </div>
           )}
-          <TrimmedProductImage src={product.localImage || product.image} alt={product.name} />
+          <ProductImage src={product.localImage || product.image} alt={product.name} />
           <SpecialRibbon special={special} />
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
         </button>
@@ -267,7 +212,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   })}
                 </div>
               )}
-              <TrimmedProductImage src={product.localImage || product.image} alt={product.name} />
+              <ProductImage src={product.localImage || product.image} alt={product.name} width={1200} />
               {special && (
                 <div className="pz-special-badge">
                   {special.deal === 'discount' && special.discountPct ? `${special.discountPct}% OFF`
