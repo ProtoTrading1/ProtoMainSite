@@ -4355,6 +4355,87 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 8px;
 }
 
+/* ── Flyout theme cards (compact, vertical, in mega menu) ── */
+.flyout-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: transform 0.14s, box-shadow 0.14s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.flyout-theme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+}
+
+.flyout-theme-card:active {
+  transform: scale(0.98);
+}
+
+.flyout-theme-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.flyout-theme-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.flyout-theme-card-badge {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.flyout-theme-card-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.72);
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.flyout-theme-card-cta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Inter', sans-serif;
+  margin-top: 4px;
+  transition: gap 0.12s;
+}
+
+.flyout-theme-card:hover .flyout-theme-card-cta { gap: 6px; }
+
 /* ── Depth-aware subcategory grid variants ───────────────── */
 
 /* L1: larger cards, bolder */

@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
-import { DEPT_THEME_CARDS } from '../lib/themeCards';
-import ThemeCardGrid from './ThemeCardGrid';
 
 // ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
@@ -81,9 +79,6 @@ export default function CategoryLanding({
   const subcats    = categoryNode.children || [];
   const totalCount = counts?.[categoryNode.id] || products.length;
 
-  // Theme cards only shown at L1 depth
-  const themeCards = isL1 ? (DEPT_THEME_CARDS[categoryNode.id] || []) : [];
-
   const hotSellers = useMemo(
     () => [...products].sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0)).slice(0, 14),
     [products]
@@ -115,18 +110,6 @@ export default function CategoryLanding({
           </div>
         </div>
       </div>
-
-      {/* ── L1 only: Theme cards (visual merchandising) ───── */}
-      {isL1 && themeCards.length > 0 && (
-        <div className="cat-landing-section cat-landing-section--theme">
-          <ThemeCardGrid
-            cards={themeCards}
-            color={color}
-            iconName={iconName}
-            navigate={navigate}
-          />
-        </div>
-      )}
 
       {/* ── Use-case shortcuts (L1 only) ──────────────────── */}
       {isL1 && useCases.length > 0 && (

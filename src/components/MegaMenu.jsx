@@ -1,5 +1,48 @@
 import { useRef, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
+import { DEPT_THEME_CARDS } from '../lib/themeCards';
+
+// Compact theme card for the flyout 3rd column
+function FlyoutThemeCard({ card, color, onClick }) {
+  const badge = card.badge;
+  const BADGE_COLORS = {
+    'Best Seller': { bg: '#FEF3C7', color: '#92400E' },
+    'Popular':     { bg: '#DBEAFE', color: '#1E40AF' },
+    'Hot':         { bg: '#FEE2E2', color: '#991B1B' },
+    'Seasonal':    { bg: '#D1FAE5', color: '#065F46' },
+  };
+  const badgeStyle = badge ? BADGE_COLORS[badge] : null;
+
+  function darken(hex, r = 0.2) {
+    const n = parseInt(hex.replace('#',''), 16);
+    const c = (v) => Math.max(0, Math.min(255, Math.round(v * (1 - r))));
+    const rd = c(n >> 16); const g = c((n >> 8) & 0xff); const b = c(n & 0xff);
+    return `#${((rd << 16)|(g << 8)|b).toString(16).padStart(6,'0')}`;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flyout-theme-card"
+      style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color)} 100%)` }}
+    >
+      <div className="flyout-theme-card-top">
+        <span className="flyout-theme-card-title">{card.title}</span>
+        {badgeStyle && (
+          <span className="flyout-theme-card-badge" style={{ background: badgeStyle.bg, color: badgeStyle.color }}>
+            {badge}
+          </span>
+        )}
+      </div>
+      <p className="flyout-theme-card-sub">{card.subtitle}</p>
+      <div className="flyout-theme-card-cta">
+        <span>Shop</span><ArrowRight size={11} />
+      </div>
+    </button>
+  );
+}
 
 function Count({ value }) {
   if (value == null) return null;
@@ -77,6 +120,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
 
   const color = DEPT_COLORS[l1Node.id] || '#DC2626';
   const Icon = LUCIDE_ICON_MAP[l1Node.icon] || null;
+  const themeCards = (DEPT_THEME_CARDS[l1Node.id] || []).slice(0, 4);
 
   const hoveredL2 = l2List.find((c) => c.id === hoveredL2Id) || l2List[0] || null;
   const l3List = hoveredL2?.children || [];
@@ -216,6 +260,33 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
           </div>
         )}
       </div>
+
+      {/* Column 4 — Theme cards (visual merchandising) */}
+      {themeCards.length > 0 && (
+        <div style={{
+          width: 260, display: 'flex', flexDirection: 'column', minWidth: 0,
+          borderLeft: '1px solid #F0F1F3', background: '#FAFAFA',
+        }}>
+          <div style={{
+            padding: '13px 16px 10px',
+            borderBottom: '1px solid #F0F1F3',
+            fontSize: '10px', fontWeight: '800', color: '#9CA3AF',
+            textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0,
+          }}>
+            Shop by use case
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {themeCards.map((card) => (
+              <FlyoutThemeCard
+                key={card.id}
+                card={card}
+                color={color}
+                onClick={() => { if (card.path) go(card.path); }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
