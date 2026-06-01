@@ -159,6 +159,16 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     : path.map((seg, i) => ({ label: seg, path: path.slice(0, i + 1) }));
   const recommendationProducts = useMemo(() => catalogProducts.slice(0, 4), [catalogProducts]);
 
+  // Resolve the category node for the current path (used by CategoryLanding)
+  const categoryNode = useMemo(() => {
+    if (!path.length) return null;
+    let node = categories.find((c) => c.id === path[0]) || null;
+    for (let i = 1; i < path.length && node; i++) {
+      node = (node.children || []).find((c) => c.id === path[i]) || null;
+    }
+    return node;
+  }, [path]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [orderText, setOrderText] = useState('');
   const [orderStatus, setOrderStatus] = useState('idle');
@@ -369,6 +379,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             usingFallback={usingFallback}
             browseCategories={browseCategories}
             categoryCounts={counts}
+            categoryNode={categoryNode}
           />
         </main>
 

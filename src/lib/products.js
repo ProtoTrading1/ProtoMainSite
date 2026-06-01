@@ -218,7 +218,13 @@ function applyCollection(products, collection) {
 
 function applyPathFilter(products, categoryPath) {
   if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
-  return products.filter((p) => categoryPath.every((seg, i) => p.categoryPath[i] === seg));
+  return products.filter((p) => {
+    const cp = p.categoryPath || [];
+    // Match by the depth of the product's own categoryPath — if products aren't yet
+    // sub-categorised beyond L1, an L2 filter still returns the parent L1 results.
+    const depth = Math.min(cp.length, categoryPath.length);
+    return depth > 0 && categoryPath.slice(0, depth).every((seg, i) => cp[i] === seg);
+  });
 }
 
 function applySearchFilter(products, searchQuery) {

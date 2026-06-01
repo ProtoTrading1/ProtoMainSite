@@ -1,3 +1,5 @@
+import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
+
 const RED = '#DC2626';
 
 function Count({ value }) {
@@ -14,7 +16,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', fontFamily: 'Outfit, sans-serif' }}>
-      {/* Header row: ALL CATEGORIES + VIEW ALL */}
+      {/* Header */}
       <div
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -43,33 +45,48 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
           const isOpen = openCategoryId === cat.id;
           const highlighted = isActive || isOpen;
           const hasChildren = !!cat.children?.length;
+          const deptColor = DEPT_COLORS[cat.id] || RED;
+          const Icon = LUCIDE_ICON_MAP[cat.icon] || null;
 
           return (
             <button
               key={cat.id}
               onClick={() => navigate([cat.id])}
               onMouseEnter={() => onToggleL1(cat.id)}
+              type="button"
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '9px 16px 9px 13px',
-                borderLeft: highlighted ? `3px solid ${RED}` : '3px solid transparent',
-                background: highlighted ? '#fff5f7' : 'transparent',
+                display: 'flex', alignItems: 'center', gap: '9px',
+                padding: '8px 16px 8px 13px',
+                borderLeft: highlighted ? `3px solid ${deptColor}` : '3px solid transparent',
+                background: highlighted ? `${deptColor}0d` : 'transparent',
                 border: 'none', borderLeftWidth: '3px', borderLeftStyle: 'solid',
-                borderLeftColor: highlighted ? RED : 'transparent',
+                borderLeftColor: highlighted ? deptColor : 'transparent',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%',
                 transition: 'background 0.12s ease',
               }}
             >
+              {Icon && (
+                <span style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '22px', height: '22px', borderRadius: '5px', flexShrink: 0,
+                  background: highlighted ? `${deptColor}22` : '#F3F4F6',
+                  color: highlighted ? deptColor : '#6B7280',
+                  transition: 'background 0.12s, color 0.12s',
+                }}>
+                  <Icon size={12} />
+                </span>
+              )}
               <span style={{
                 fontSize: '13px', fontWeight: highlighted ? '700' : '500',
                 color: highlighted ? '#111827' : '#374151',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                flex: 1,
               }}>
                 {cat.label}
                 <Count value={counts?.[cat.id]} />
               </span>
               {hasChildren && (
-                <span style={{ fontSize: '15px', lineHeight: 1, color: highlighted ? RED : '#C7CBD1', flexShrink: 0, marginLeft: '8px' }}>
+                <span style={{ fontSize: '15px', lineHeight: 1, color: highlighted ? deptColor : '#C7CBD1', flexShrink: 0 }}>
                   &rsaquo;
                 </span>
               )}
