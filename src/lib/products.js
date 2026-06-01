@@ -8,7 +8,7 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v4';
+const LS_KEY = 'proto_catalog_v5';
 const LS_TTL = 15 * 60 * 1000;
 
 function saveToLocalCache(data) {

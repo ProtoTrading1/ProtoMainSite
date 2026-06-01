@@ -106,7 +106,7 @@ export default function MainContent({
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
-  const showCategoryGrid = isAllProductsPage && !searchQuery && browseCategories.length > 0;
+  const showCategoryGrid = false; // removed: department pills now live in the sidebar
   const currentLabel = isCategoryPage
     ? catLabel(path[path.length - 1])
     : isAllProductsPage ? 'All Wholesale Products' : collectionLabel;
