@@ -3,9 +3,9 @@ const RED = '#DC2626';
 function Count({ value }) {
   if (value == null) return null;
   return (
-    <sup style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600', marginLeft: '3px', top: '-0.4em', position: 'relative' }}>
+    <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600', marginLeft: '4px', verticalAlign: '0.25em' }}>
       {value}
-    </sup>
+    </span>
   );
 }
 

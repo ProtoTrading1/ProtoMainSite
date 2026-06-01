@@ -39,17 +39,14 @@ const DEPT_SLUG_MAP = {
   'Arts, Crafts & Stationery': 'arts-crafts-stationery',
   'Beads, Jewellery & Accessories': 'beads-jewellery',
   'Beauty & Personal Care': 'beauty-personal-care',
-  'Confectionery': 'confectionery',
-  'Events, Parties & Hospitality': 'events-parties-hospitality',
-  'Events & Parties': 'events-parties-hospitality',
+  'Events & Parties': 'events-parties',
   'Fashion & Accessories': 'fashion-accessories',
   'Food & Drinks': 'food-drinks',
   'Hardware': 'hardware',
   'Homeware & Kitchen': 'homeware-kitchen',
   'Packaging': 'packaging',
   'Textiles': 'textiles',
-  'Toys, Games & Novelty': 'toys-games-novelty',
-  'Toys, Games & Kids': 'toys-games-novelty',
+  'Toys, Games & Kids': 'toys-games-kids',
 };
 
 function labelToSlug(label) {
