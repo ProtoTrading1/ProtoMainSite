@@ -57,12 +57,7 @@ export default function Root() {
   }, [setSurface]);
 
   useEffect(() => {
-    // Race against a 4-second timeout so a slow/hanging Supabase call
-    // never leaves the app stuck on the loading screen indefinitely.
-    const timeout = new Promise((resolve) =>
-      setTimeout(() => resolve({ data: { session: null } }), 4000)
-    );
-    Promise.race([supabase.auth.getSession(), timeout]).then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null);
       if (data.session?.user) {
         void loadCustomer(data.session.user.id);
