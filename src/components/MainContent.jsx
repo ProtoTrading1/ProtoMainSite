@@ -250,7 +250,7 @@ export default function MainContent({
       ) : (
         <>
           <div className="product-grid">
-            {products.map((product) => (
+            {products.map((product, idx) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -258,6 +258,7 @@ export default function MainContent({
                 cartQty={cartQtyMap[product.id] || 0}
                 onCartQtyChange={onCartQtyChange}
                 special={specialsMap[product.id] || null}
+                priority={idx < 8}
               />
             ))}
           </div>

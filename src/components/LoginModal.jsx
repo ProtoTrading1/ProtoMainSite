@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { resetPassword, signIn, signUp } from '../lib/auth';
 
@@ -53,23 +52,8 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
   const switchMode = () => { setMode(m => m === 'login' ? 'signup' : 'login'); setError(''); setInfo(''); };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="lm-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.22 }}
-        onClick={onClose}
-      >
-        <motion.div
-          className="lm-card"
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-          onClick={(e) => e.stopPropagation()}
-        >
+    <div className="lm-backdrop" onClick={onClose}>
+      <div className="lm-card" onClick={(e) => e.stopPropagation()}>
           {/* Close */}
           <button className="lm-close" type="button" onClick={onClose}>
             <X size={18} />
@@ -185,8 +169,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
             <ShieldCheck size={13} />
             B2B wholesale — accounts require admin approval
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </div>
   );
 }

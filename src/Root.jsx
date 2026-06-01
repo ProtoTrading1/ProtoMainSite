@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import App from './App';
 import LandingPage from './pages/LandingPage';
-import LoginModal from './components/LoginModal';
-import ProfilePage from './pages/ProfilePage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import WorldClassPortal from './worldclass/WorldClassPortal';
 import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
+
+// Lazy-loaded: these only load when the user actually needs them.
+// Removes LoginModal (+ motion library), ProfilePage, ResetPasswordPage,
+// and WorldClassPortal from the critical bundle path.
+const LoginModal = lazy(() => import('./components/LoginModal'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const WorldClassPortal = lazy(() => import('./worldclass/WorldClassPortal'));
 
 export default function Root() {
   const [session, setSession] = useState(undefined);
@@ -90,19 +94,21 @@ export default function Root() {
     window.location.hash = '';
   };
 
-  if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
+  if (route.startsWith('#/worldclass')) return <Suspense fallback={null}><WorldClassPortal /></Suspense>;
   if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
 
   if (passwordRecovery) {
     return (
-      <ResetPasswordPage
-        token={null}
-        onDone={() => {
-          setPasswordRecovery(false);
-          window.location.hash = '';
-          setSurface('login');
-        }}
-      />
+      <Suspense fallback={null}>
+        <ResetPasswordPage
+          token={null}
+          onDone={() => {
+            setPasswordRecovery(false);
+            window.location.hash = '';
+            setSurface('login');
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -110,13 +116,15 @@ export default function Root() {
     const params = new URLSearchParams(route.replace('#/reset-password?', '').replace('#/reset-password', ''));
     const token = params.get('token');
     return (
-      <ResetPasswordPage
-        token={token}
-        onDone={() => {
-          window.location.hash = '';
-          setSurface('login');
-        }}
-      />
+      <Suspense fallback={null}>
+        <ResetPasswordPage
+          token={token}
+          onDone={() => {
+            window.location.hash = '';
+            setSurface('login');
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -145,11 +153,13 @@ export default function Root() {
 
   if (session && view === 'profile') {
     return (
-      <ProfilePage
-        customer={customer}
-        onBack={() => setSurface('portal')}
-        onProfileUpdate={(updated) => setCustomer(updated)}
-      />
+      <Suspense fallback={null}>
+        <ProfilePage
+          customer={customer}
+          onBack={() => setSurface('portal')}
+          onProfileUpdate={(updated) => setCustomer(updated)}
+        />
+      </Suspense>
     );
   }
 
@@ -181,11 +191,13 @@ export default function Root() {
         }}
       />
       {view === 'login' && (
-        <LoginModal
-          onLogin={handleLogin}
-          onClose={() => setSurface('landing')}
-          onApply={() => { setSurface('landing'); scrollToApply(); }}
-        />
+        <Suspense fallback={null}>
+          <LoginModal
+            onLogin={handleLogin}
+            onClose={() => setSurface('landing')}
+            onApply={() => { setSurface('landing'); scrollToApply(); }}
+          />
+        </Suspense>
       )}
     </>
   );

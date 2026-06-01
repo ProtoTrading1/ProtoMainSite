@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
 import Header from './components/Header';
-import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
-import OrderConfirmModal from './components/OrderConfirmModal';
-import ReorderModal from './components/ReorderModal';
+
+// Lazy-loaded: only fetched when the user actually triggers these interactions.
+const CartFlyAnimation = lazy(() => import('./components/CartFlyAnimation'));
+const OrderConfirmModal = lazy(() => import('./components/OrderConfirmModal'));
+const ReorderModal = lazy(() => import('./components/ReorderModal'));
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
@@ -421,21 +423,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         </aside>
       </div>
 
-      <OrderConfirmModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        cartItems={cartItems}
-        cartTotal={cartTotal}
-        orderText={orderText}
-        orderStatus={orderStatus}
-        orderError={orderError}
-        customerDetails={customerDetails}
-        setCustomerDetails={setCustomerDetails}
-      />
+      <Suspense fallback={null}>
+        <OrderConfirmModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          cartItems={cartItems}
+          cartTotal={cartTotal}
+          orderText={orderText}
+          orderStatus={orderStatus}
+          orderError={orderError}
+          customerDetails={customerDetails}
+          setCustomerDetails={setCustomerDetails}
+        />
+      </Suspense>
 
-      {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}
+      {reorderModal && <Suspense fallback={null}><ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
 
-      {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
+      {flyAnim && <Suspense fallback={null}><CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} /></Suspense>}
 
       <MobileNav
         isOpen={mobileMenuOpen}

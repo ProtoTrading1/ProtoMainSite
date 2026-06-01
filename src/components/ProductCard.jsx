@@ -7,7 +7,7 @@ import { optimizedImageUrl } from '../lib/imageUrl';
 // Fast CSS-only approach: mix-blend-mode:multiply makes white product backgrounds
 // invisible against white card backgrounds — same visual result as the old canvas
 // trimming but with zero JS processing and zero extra network requests.
-function ProductImage({ src, alt, width = 400 }) {
+function ProductImage({ src, alt, width = 400, priority = false }) {
   const [broken, setBroken] = useState(false);
   const optimized = optimizedImageUrl(src, { width, quality: 78 });
 
@@ -23,7 +23,8 @@ function ProductImage({ src, alt, width = 400 }) {
     <img
       src={optimized}
       alt={alt}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchpriority={priority ? 'high' : 'auto'}
       decoding="async"
       onError={() => setBroken(true)}
       style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }}
@@ -66,7 +67,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special }) {
+export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false }) {
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showStock, setShowStock] = useState(false);
@@ -133,7 +134,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               })}
             </div>
           )}
-          <ProductImage src={product.localImage || product.image} alt={product.name} />
+          <ProductImage src={product.localImage || product.image} alt={product.name} priority={priority} />
           <SpecialRibbon special={special} />
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
         </button>
