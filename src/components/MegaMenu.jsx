@@ -1,6 +1,5 @@
 import { useState } from 'react';
-
-const RED = '#DC2626';
+import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 
 function Count({ value }) {
   if (value == null) return null;
@@ -11,7 +10,7 @@ function Count({ value }) {
   );
 }
 
-function PanelHeader({ label, onViewAll }) {
+function PanelHeader({ label, onViewAll, color }) {
   return (
     <div
       style={{
@@ -26,7 +25,7 @@ function PanelHeader({ label, onViewAll }) {
         type="button"
         onClick={onViewAll}
         style={{
-          fontSize: '10px', fontWeight: '700', color: RED, textTransform: 'uppercase', letterSpacing: '0.05em',
+          fontSize: '10px', fontWeight: '700', color: color, textTransform: 'uppercase', letterSpacing: '0.05em',
           background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px',
         }}
       >
@@ -36,7 +35,7 @@ function PanelHeader({ label, onViewAll }) {
   );
 }
 
-function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter }) {
+function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color }) {
   return (
     <button
       type="button"
@@ -46,9 +45,9 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '9px 18px 9px 15px', width: '100%',
         borderLeftWidth: '3px', borderLeftStyle: 'solid',
-        borderLeftColor: active ? RED : 'transparent',
+        borderLeftColor: active ? color : 'transparent',
         borderTop: 'none', borderRight: 'none', borderBottom: 'none',
-        background: active ? '#fff5f7' : 'transparent',
+        background: active ? `${color}0d` : 'transparent',
         cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
         transition: 'background 0.12s ease',
       }}
@@ -62,7 +61,7 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter }) {
         <Count value={count} />
       </span>
       {hasArrow && (
-        <span style={{ fontSize: '15px', lineHeight: 1, color: active ? RED : '#C7CBD1', flexShrink: 0, marginLeft: '8px' }}>
+        <span style={{ fontSize: '15px', lineHeight: 1, color: active ? color : '#C7CBD1', flexShrink: 0, marginLeft: '8px' }}>
           &rsaquo;
         </span>
       )}
@@ -75,6 +74,8 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
 
   if (!l1Node) return null;
 
+  const color = DEPT_COLORS[l1Node.id] || '#DC2626';
+  const Icon = LUCIDE_ICON_MAP[l1Node.icon] || null;
   const l2List = l1Node.children || [];
   const hoveredL2 = l2List.find((c) => c.id === hoveredL2Id) || null;
   const l3List = hoveredL2?.children || [];
@@ -100,11 +101,50 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
         boxShadow: '12px 0 30px rgba(15, 23, 42, 0.08)',
         zIndex: 300,
         fontFamily: 'Outfit, sans-serif',
+        overflow: 'hidden',
       }}
     >
       {/* Column 2 — L2 */}
-      <div style={{ width: 280, display: 'flex', flexDirection: 'column', borderRight: '1px solid #F0F1F3', minWidth: 0 }}>
-        <PanelHeader label={l1Node.label} onViewAll={() => go([l1Node.id])} />
+      <div style={{ width: 260, display: 'flex', flexDirection: 'column', borderRight: '1px solid #F0F1F3', minWidth: 0 }}>
+        {/* Dept accent header */}
+        <div style={{
+          padding: '12px 18px',
+          borderBottom: `3px solid ${color}`,
+          background: `${color}0a`,
+          display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0,
+        }}>
+          {Icon && (
+            <span style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '26px', height: '26px', borderRadius: '6px',
+              background: `${color}22`, color,
+            }}>
+              <Icon size={14} />
+            </span>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.06em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {l1Node.label}
+            </div>
+            {counts?.[l1Node.id] != null && (
+              <div style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '500' }}>
+                {counts[l1Node.id]} products
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => go([l1Node.id])}
+            style={{
+              marginLeft: 'auto', fontSize: '10px', fontWeight: '700', color, textTransform: 'uppercase',
+              letterSpacing: '0.05em', background: 'none', border: 'none', cursor: 'pointer',
+              padding: '2px 0', fontFamily: 'inherit', flexShrink: 0,
+            }}
+          >
+            View All
+          </button>
+        </div>
+
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
           {l2List.map((l2) => {
             const hasChildren = !!l2.children?.length;
@@ -115,6 +155,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
                 count={countFor(l1Node.id, l2.id)}
                 hasArrow={hasChildren}
                 active={hoveredL2Id === l2.id}
+                color={color}
                 onClick={() => go([l1Node.id, l2.id])}
                 onMouseEnter={() => setHoveredL2Id(l2.id)}
               />
@@ -124,10 +165,10 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
       </div>
 
       {/* Column 3 — L3 */}
-      <div style={{ width: 280, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ width: 240, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {hoveredL2 && l3List.length > 0 ? (
           <>
-            <PanelHeader label={hoveredL2.label} onViewAll={() => go([l1Node.id, hoveredL2.id])} />
+            <PanelHeader label={hoveredL2.label} onViewAll={() => go([l1Node.id, hoveredL2.id])} color={color} />
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
               {l3List.map((l3) => (
                 <ListItem
@@ -136,6 +177,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
                   count={countFor(l1Node.id, hoveredL2.id, l3.id)}
                   hasArrow={false}
                   active={false}
+                  color={color}
                   onClick={() => go([l1Node.id, hoveredL2.id, l3.id])}
                   onMouseEnter={undefined}
                 />

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import Breadcrumb from './Breadcrumb';
+import CategoryLanding from './CategoryLanding';
 
 const CATEGORY_LABELS = {
   // Departments
@@ -101,6 +102,7 @@ export default function MainContent({
   usingFallback = false,
   browseCategories = [],
   categoryCounts = {},
+  categoryNode = null,
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
@@ -110,6 +112,9 @@ export default function MainContent({
     : isAllProductsPage ? 'All Wholesale Products' : collectionLabel;
   const backPath = path && path.length > 1 ? path.slice(0, -1) : [];
   const backLabel = backPath.length ? catLabel(backPath[backPath.length - 1]) : 'All departments';
+
+  // Show the discovery landing when on a dept/category that has subcategories and no active search
+  const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
 
   return (
     <div className="catalog-page">
@@ -176,8 +181,19 @@ export default function MainContent({
         </section>
       )}
 
-      {/* Back button when browsing a category */}
-      {isCategoryPage && (
+      {/* Category discovery landing OR back bar */}
+      {isCategoryPage && showLanding && (
+        <CategoryLanding
+          categoryNode={categoryNode}
+          products={products}
+          counts={categoryCounts}
+          navigate={navigate}
+          addToCart={addToCart}
+          cartQtyMap={cartQtyMap}
+          onCartQtyChange={onCartQtyChange}
+        />
+      )}
+      {isCategoryPage && !showLanding && (
         <div className="cat-back-bar">
           <button className="cat-back-btn" onClick={() => navigate(backPath)} type="button">
             <ArrowLeft size={15} /> {backLabel}

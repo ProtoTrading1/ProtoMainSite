@@ -1,4 +1,5 @@
 import { X, ChevronLeft, ChevronRight, LayoutGrid, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 
 export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout }) {
   if (!isOpen) return null;
@@ -122,34 +123,49 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               {counts?.[''] != null && <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600' }}>({counts['']})</span>}
             </button>
 
-            {currentCategories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleSelect(cat.id)}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  border: 'none',
-                  background: 'none',
-                  borderBottom: '1px solid #F3F4F6',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '600', color: '#111827' }}>{cat.label}</span>
-                  {counts?.[[...path, cat.id].join('/')] != null && (
-                    <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600' }}>
-                      ({counts[[...path, cat.id].join('/')]})
-                    </span>
-                  )}
-                </div>
-                {cat.children && cat.children.length > 0 && <ChevronRight size={18} color="#D1D5DB" />}
-              </button>
-            ))}
+            {currentCategories.map((cat) => {
+              const deptColor = DEPT_COLORS[cat.id] || '#374151';
+              const Icon = cat.icon ? LUCIDE_ICON_MAP[cat.icon] : null;
+              const isTopLevel = path.length === 0;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleSelect(cat.id)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: 'none',
+                    background: 'none',
+                    borderBottom: '1px solid #F3F4F6',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                    {isTopLevel && Icon && (
+                      <span style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '30px', height: '30px', borderRadius: '7px', flexShrink: 0,
+                        background: `${deptColor}18`, color: deptColor,
+                      }}>
+                        <Icon size={14} />
+                      </span>
+                    )}
+                    <span style={{ fontSize: '15px', fontWeight: '600', color: '#111827', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
+                    {counts?.[[...path, cat.id].join('/')] != null && (
+                      <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600', flexShrink: 0 }}>
+                        {counts[[...path, cat.id].join('/')]}
+                      </span>
+                    )}
+                  </div>
+                  {cat.children && cat.children.length > 0 && <ChevronRight size={18} color="#D1D5DB" style={{ flexShrink: 0 }} />}
+                </button>
+              );
+            })}
           </div>
 
           {currentCategories.length === 0 && (
