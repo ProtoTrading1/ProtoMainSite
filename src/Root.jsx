@@ -14,7 +14,10 @@ export default function Root() {
   const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
-  const loadingCustomerRef = useRef(false);
+  // Nonce: each loadCustomer call increments this; stale completions are ignored.
+  // Replaces the old boolean lock that blocked login when a stale-session fetch
+  // was in-flight (e.g. token refresh on regular-tab load with old cookies).
+  const loadNonce = useRef(0);
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -37,23 +40,16 @@ export default function Root() {
   }, [view]);
 
   const loadCustomer = useCallback(async (userId) => {
-    if (loadingCustomerRef.current) return;
-    loadingCustomerRef.current = true;
-    try {
-      const profile = await getCustomerProfile(userId);
-      setCustomer(profile);
-
-      if (!profile) return;
-
-      if (profile.is_approved || profile.role === 'admin') {
-        setSurface('portal');
-        return;
-      }
-
-      setView('pending');
-    } finally {
-      loadingCustomerRef.current = false;
+    const nonce = ++loadNonce.current;
+    const profile = await getCustomerProfile(userId);
+    if (nonce !== loadNonce.current) return; // a newer call started — discard this result
+    setCustomer(profile);
+    if (!profile) return;
+    if (profile.is_approved || profile.role === 'admin') {
+      setSurface('portal');
+      return;
     }
+    setView('pending');
   }, [setSurface]);
 
   useEffect(() => {
