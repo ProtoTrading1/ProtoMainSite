@@ -89,6 +89,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setPage(1);
   }, [searchQuery, sort, activeCollection, path.join('/')]);
 
+  // Scroll content area back to top whenever the category path changes
+  useEffect(() => {
+    document.querySelector('.content-area')?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [path.join('/')]);
+
   useEffect(() => {
     if (!customer?.id) return;
     fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
@@ -122,6 +127,26 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         if (cancelled) return;
         setUsingFallback(false);
+
+        // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
+        // fall back to showing the top-level department so the page isn't empty.
+        if (pageData.total === 0 && path.length > 1 && !searchQuery && activeCollection === 'all') {
+          const l1Data = await fetchProductPage({
+            page: 1,
+            pageSize: CATALOG_PAGE_SIZE,
+            searchQuery: '',
+            categoryPath: path.slice(0, 1),
+            collection: 'all',
+            sort,
+          });
+          if (!cancelled && l1Data.total > 0) {
+            setCatalogProducts(l1Data.products);
+            setCatalogTotal(l1Data.total);
+            setCounts(nextCounts);
+            return;
+          }
+        }
+
         setCatalogProducts(pageData.products);
         setCatalogTotal(pageData.total);
         setCounts(nextCounts);

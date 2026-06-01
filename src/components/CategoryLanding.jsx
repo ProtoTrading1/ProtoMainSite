@@ -81,7 +81,6 @@ export default function CategoryLanding({
         </div>
         <div className="cat-landing-hero-copy">
           <h2 className="cat-landing-title">{categoryNode.label}</h2>
-          {description && <p className="cat-landing-desc">{description}</p>}
           <div className="cat-landing-meta">
             <span className="cat-landing-count">{totalCount} products</span>
             {subcategories.length > 0 && (
