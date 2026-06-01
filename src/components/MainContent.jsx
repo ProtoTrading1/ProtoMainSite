@@ -191,6 +191,7 @@ export default function MainContent({
           addToCart={addToCart}
           cartQtyMap={cartQtyMap}
           onCartQtyChange={onCartQtyChange}
+          depth={path.length}
         />
       )}
       {isCategoryPage && !showLanding && (

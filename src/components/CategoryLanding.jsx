@@ -1,20 +1,18 @@
 import { useMemo } from 'react';
 import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-react';
-import { DEPT_COLORS, DEPT_DESCRIPTIONS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
+import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
+import { DEPT_THEME_CARDS } from '../lib/themeCards';
+import ThemeCardGrid from './ThemeCardGrid';
 
+// ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
   const inCart = cartQty > 0;
-
   return (
     <div className="strip-card">
       <div className="strip-card-img">
-        {product.image ? (
-          <img src={product.image} alt={product.name} loading="lazy" />
-        ) : (
-          <div className="strip-card-no-img">
-            <ImageOff size={20} />
-          </div>
-        )}
+        {product.image
+          ? <img src={product.image} alt={product.name} loading="lazy" />
+          : <div className="strip-card-no-img"><ImageOff size={20} /></div>}
       </div>
       <div className="strip-card-body">
         <span className="strip-card-code">{product.code}</span>
@@ -28,11 +26,7 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
               <button onClick={() => onCartQtyChange(product, cartQty + 1)} type="button">+</button>
             </div>
           ) : (
-            <button
-              className="strip-card-add"
-              onClick={() => addToCart(product, product.minQty || 1)}
-              type="button"
-            >
+            <button className="strip-card-add" onClick={() => addToCart(product, product.minQty || 1)} type="button">
               <ShoppingCart size={11} /> Add
             </button>
           )}
@@ -42,6 +36,32 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
   );
 }
 
+// ─── Product strip section ────────────────────────────────────
+function ProductStrip({ products, icon: Icon, title, subtitle, color, addToCart, cartQtyMap, onCartQtyChange }) {
+  if (!products.length) return null;
+  return (
+    <div className="cat-landing-section">
+      <div className="cat-section-header">
+        {Icon && <Icon size={14} style={{ color }} />}
+        <h3 className="cat-section-title">{title}</h3>
+        <span className="cat-section-sub">{subtitle}</span>
+      </div>
+      <div className="cat-product-strip">
+        {products.map((p) => (
+          <StripCard
+            key={p.id}
+            product={p}
+            addToCart={addToCart}
+            cartQty={cartQtyMap?.[p.id] || 0}
+            onCartQtyChange={onCartQtyChange}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main export ─────────────────────────────────────────────
 export default function CategoryLanding({
   categoryNode,
   products,
@@ -50,48 +70,66 @@ export default function CategoryLanding({
   addToCart,
   cartQtyMap,
   onCartQtyChange,
+  depth = 1,   // 1 = L1 dept, 2 = L2 category, 3+ = deep
 }) {
-  const color = DEPT_COLORS[categoryNode.id] || '#DC2626';
-  const iconName = categoryNode.icon || 'Package';
-  const Icon = LUCIDE_ICON_MAP[iconName] || LUCIDE_ICON_MAP.Package;
-  const description = DEPT_DESCRIPTIONS[categoryNode.id] || '';
-  const useCases = USE_CASES[categoryNode.id] || [];
-  const subcategories = categoryNode.children || [];
+  const isL1 = depth === 1;
+
+  const color      = DEPT_COLORS[categoryNode.id] || '#DC2626';
+  const iconName   = categoryNode.icon || 'Package';
+  const Icon       = LUCIDE_ICON_MAP[iconName] || null;
+  const useCases   = USE_CASES[categoryNode.id] || [];
+  const subcats    = categoryNode.children || [];
   const totalCount = counts?.[categoryNode.id] || products.length;
+
+  // Theme cards only shown at L1 depth
+  const themeCards = isL1 ? (DEPT_THEME_CARDS[categoryNode.id] || []) : [];
 
   const hotSellers = useMemo(
     () => [...products].sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0)).slice(0, 14),
     [products]
   );
-
   const newArrivals = useMemo(
-    () =>
-      [...products]
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-        .slice(0, 14),
+    () => [...products].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 14),
     [products]
   );
 
   return (
-    <div className="cat-landing">
-      {/* Department Hero */}
-      <div className="cat-landing-hero" style={{ '--dept-color': color, borderLeftColor: color }}>
-        <div className="cat-landing-hero-icon" style={{ background: `${color}1a`, color }}>
-          <Icon size={22} />
-        </div>
+    <div className={`cat-landing cat-landing--l${Math.min(depth, 3)}`}>
+
+      {/* ── Hero ──────────────────────────────────────────── */}
+      <div className="cat-landing-hero" style={{ borderLeftColor: color }}>
+        {Icon && (
+          <div className="cat-landing-hero-icon" style={{ background: `${color}1a`, color }}>
+            <Icon size={isL1 ? 22 : 18} />
+          </div>
+        )}
         <div className="cat-landing-hero-copy">
-          <h2 className="cat-landing-title">{categoryNode.label}</h2>
+          <h2 className="cat-landing-title" style={{ fontSize: isL1 ? undefined : '18px' }}>
+            {categoryNode.label}
+          </h2>
           <div className="cat-landing-meta">
             <span className="cat-landing-count">{totalCount} products</span>
-            {subcategories.length > 0 && (
-              <span className="cat-landing-cats">· {subcategories.length} categories</span>
+            {subcats.length > 0 && (
+              <span className="cat-landing-cats">· {subcats.length} categories</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Use Case Shortcuts */}
-      {useCases.length > 0 && (
+      {/* ── L1 only: Theme cards (visual merchandising) ───── */}
+      {isL1 && themeCards.length > 0 && (
+        <div className="cat-landing-section cat-landing-section--theme">
+          <ThemeCardGrid
+            cards={themeCards}
+            color={color}
+            iconName={iconName}
+            navigate={navigate}
+          />
+        </div>
+      )}
+
+      {/* ── Use-case shortcuts (L1 only) ──────────────────── */}
+      {isL1 && useCases.length > 0 && (
         <div className="cat-landing-usecases">
           <span className="cat-usecase-label">Shop by type</span>
           <div className="cat-usecase-pills">
@@ -110,12 +148,14 @@ export default function CategoryLanding({
         </div>
       )}
 
-      {/* Subcategory Grid */}
-      {subcategories.length > 0 && (
+      {/* ── Subcategory grid ──────────────────────────────── */}
+      {subcats.length > 0 && (
         <div className="cat-landing-section">
-          <h3 className="cat-section-title">Browse all categories</h3>
-          <div className="cat-subcat-grid">
-            {subcategories.map((sub) => (
+          <h3 className="cat-section-title">
+            {isL1 ? 'Browse all categories' : 'Subcategories'}
+          </h3>
+          <div className={`cat-subcat-grid${isL1 ? ' cat-subcat-grid--l1' : ' cat-subcat-grid--l2'}`}>
+            {subcats.map((sub) => (
               <button
                 key={sub.id}
                 className="cat-subcat-card"
@@ -136,54 +176,37 @@ export default function CategoryLanding({
         </div>
       )}
 
-      {/* Hot Sellers Strip */}
-      {hotSellers.length > 0 && (
-        <div className="cat-landing-section">
-          <div className="cat-section-header">
-            <Flame size={14} style={{ color }} />
-            <h3 className="cat-section-title">Hot Sellers</h3>
-            <span className="cat-section-sub">Most popular in {categoryNode.label}</span>
-          </div>
-          <div className="cat-product-strip">
-            {hotSellers.map((product) => (
-              <StripCard
-                key={product.id}
-                product={product}
-                addToCart={addToCart}
-                cartQty={cartQtyMap?.[product.id] || 0}
-                onCartQtyChange={onCartQtyChange}
-              />
-            ))}
-          </div>
-        </div>
+      {/* ── Hot Sellers strip ─────────────────────────────── */}
+      <ProductStrip
+        products={hotSellers}
+        icon={Flame}
+        title="Hot Sellers"
+        subtitle={`Most popular in ${categoryNode.label}`}
+        color={color}
+        addToCart={addToCart}
+        cartQtyMap={cartQtyMap}
+        onCartQtyChange={onCartQtyChange}
+      />
+
+      {/* ── New Arrivals strip (L1 only — keeps L2 lean) ─── */}
+      {isL1 && (
+        <ProductStrip
+          products={newArrivals}
+          icon={Sparkles}
+          title="New Arrivals"
+          subtitle={`Recently added to ${categoryNode.label}`}
+          color={color}
+          addToCart={addToCart}
+          cartQtyMap={cartQtyMap}
+          onCartQtyChange={onCartQtyChange}
+        />
       )}
 
-      {/* New Arrivals Strip */}
-      {newArrivals.length > 0 && (
-        <div className="cat-landing-section">
-          <div className="cat-section-header">
-            <Sparkles size={14} style={{ color }} />
-            <h3 className="cat-section-title">New Arrivals</h3>
-            <span className="cat-section-sub">Recently added to {categoryNode.label}</span>
-          </div>
-          <div className="cat-product-strip">
-            {newArrivals.map((product) => (
-              <StripCard
-                key={product.id}
-                product={product}
-                addToCart={addToCart}
-                cartQty={cartQtyMap?.[product.id] || 0}
-                onCartQtyChange={onCartQtyChange}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Separator before the full product grid */}
+      {/* ── Divider before full product grid ──────────────── */}
       <div className="cat-landing-divider">
         <span>All products in {categoryNode.label}</span>
       </div>
+
     </div>
   );
 }

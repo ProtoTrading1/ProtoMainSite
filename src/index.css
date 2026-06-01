@@ -4236,3 +4236,196 @@ input, select, textarea { font-family: inherit; outline: none; }
     gap: 8px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THEME CARD GRID — visual merchandising tiles on L1 dept pages
+   ══════════════════════════════════════════════════════════════ */
+
+.cat-landing-section--theme {
+  margin-bottom: 32px;
+}
+
+.theme-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.theme-card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 18px 14px;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  transition: transform 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.18s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+}
+
+.theme-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.2);
+}
+
+.theme-card:active {
+  transform: scale(0.98);
+}
+
+/* Badge */
+.theme-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Decorative background icon */
+.theme-card-bg-icon {
+  position: absolute;
+  bottom: -10px;
+  right: -8px;
+  opacity: 0.12;
+  color: #fff;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Text content */
+.theme-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  z-index: 1;
+  position: relative;
+}
+
+.theme-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.theme-card-subtitle {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.45;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* CTA bar */
+.theme-card-cta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Inter', sans-serif;
+  z-index: 1;
+  position: relative;
+  margin-top: 10px;
+  transition: gap 0.15s;
+}
+
+.theme-card:hover .theme-card-cta {
+  gap: 8px;
+}
+
+/* ── Depth-aware subcategory grid variants ───────────────── */
+
+/* L1: larger cards, bolder */
+.cat-subcat-grid--l1 {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.cat-subcat-grid--l1 .cat-subcat-card {
+  padding: 13px 16px;
+  border-radius: 10px;
+  border-width: 1.5px;
+}
+
+.cat-subcat-grid--l1 .cat-subcat-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* L2: compact cards, tighter */
+.cat-subcat-grid--l2 {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 7px;
+}
+
+.cat-subcat-grid--l2 .cat-subcat-card {
+  padding: 10px 13px;
+}
+
+.cat-subcat-grid--l2 .cat-subcat-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── L-depth class variants on the landing wrapper ─────── */
+.cat-landing--l1 .cat-landing-hero {
+  margin-bottom: 24px;
+}
+
+.cat-landing--l2 .cat-landing-hero {
+  margin-bottom: 16px;
+  padding: 14px 0 12px 14px;
+}
+
+.cat-landing--l2 .cat-landing-title {
+  font-size: 18px;
+}
+
+/* ── Mobile theme card grid ─────────────────────────────── */
+@media (max-width: 900px) {
+  .theme-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .theme-card {
+    height: 148px;
+    padding: 14px 14px 12px;
+  }
+
+  .theme-card-title {
+    font-size: 14px;
+  }
+
+  .theme-card-subtitle {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
