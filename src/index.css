@@ -258,6 +258,14 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: #fbbf24;
 }
 .mobile-action-bar button.specials-btn:hover { color: #f59e0b; }
+.mobile-action-bar button.mobile-menu-btn {
+  color: #fff;
+  font-weight: 700;
+}
+.mobile-action-bar button.mobile-menu-btn:hover {
+  color: #fff;
+  border-bottom-color: #DC2626;
+}
 .mobile-action-search-drop {
   display: none;
   background: #111;

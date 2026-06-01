@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  Info, LayoutDashboard, LogOut, MapPin, RotateCcw,
+  Info, LayoutDashboard, LayoutGrid, LogOut, MapPin, RotateCcw,
   Search, ShoppingCart, Star, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
@@ -263,6 +263,10 @@ export default function Header({
 
       {/* Mobile action bar */}
       <div className="mobile-action-bar">
+        <button type="button" onClick={onMenuClick} className="mobile-menu-btn">
+          <LayoutGrid size={14} />
+          Categories
+        </button>
         <button type="button" className={mobileSearchOpen ? 'active' : ''} onClick={toggleMobileSearch}>
           <Search size={14} />
           Search

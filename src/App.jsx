@@ -4,6 +4,7 @@ import Header from './components/Header';
 import CartFlyAnimation from './components/CartFlyAnimation';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
+import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import OrderConfirmModal from './components/OrderConfirmModal';
 import ReorderModal from './components/ReorderModal';
@@ -410,6 +411,20 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       {reorderModal && <ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} />}
 
       {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
+
+      <MobileNav
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        categories={categories}
+        path={path}
+        navigate={(p) => { navigate(p); setMobileMenuOpen(false); }}
+        counts={counts}
+        breadcrumb={breadcrumb}
+        customer={customer}
+        onViewProfile={onViewProfile}
+        onViewAdmin={onViewAdmin}
+        onLogout={onLogout}
+      />
 
       {/* Mobile cart FAB */}
       <button
