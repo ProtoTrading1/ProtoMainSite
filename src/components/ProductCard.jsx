@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { checkStock } from '../lib/products';
@@ -68,6 +68,9 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 }
 
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false }) {
+  const safePrice = Number(product?.price) || 0;
+  const safeTags = Array.isArray(product?.tags) ? product.tags : [];
+  const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showStock, setShowStock] = useState(false);
@@ -75,7 +78,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const [stockLoading, setStockLoading] = useState(false);
   const addButtonRef = useRef(null);
 
-  const lineTotal = (product.price * qty).toFixed(2);
+  const lineTotal = (safePrice * qty).toFixed(2);
   const inCart = cartQty > 0;
 
   const openPreview = () => setZoomOpen(true);
@@ -122,9 +125,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
           type="button"
           aria-label={`View ${product.name}`}
         >
-          {product.tags?.length > 0 && (
+          {safeTags.length > 0 && (
             <div className="tag-row">
-              {product.tags.map((tag) => {
+              {safeTags.map((tag) => {
                 const label = tag.label || tag;
                 return (
                   <span key={label} style={tag.bg ? { backgroundColor: tag.bg, color: tag.color } : undefined}>
@@ -152,14 +155,14 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             <h3>{product.name}</h3>
           </button>
 
-          {product.badges?.length > 0 && (
+          {safeBadges.length > 0 && (
             <div className="product-badges">
-              {product.badges.map((b) => <span key={b}>{b}</span>)}
+              {safeBadges.map((b) => <span key={b}>{b}</span>)}
             </div>
           )}
 
           <div className="price-row">
-            <strong>R{product.price.toFixed(2)}</strong>
+            <strong>R{safePrice.toFixed(2)}</strong>
             <span>excl. VAT · min {product.minQty || 1}</span>
           </div>
 
@@ -205,9 +208,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <button className="pz-close" onClick={closePreview} type="button" aria-label="Close">
                 <X size={18} />
               </button>
-              {product.tags?.length > 0 && (
+              {safeTags.length > 0 && (
                 <div className="pz-tags">
-                  {product.tags.map((tag) => {
+                  {safeTags.map((tag) => {
                     const label = tag.label || tag;
                     return <span key={label}>{label}</span>;
                   })}
@@ -265,7 +268,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               {/* Fixed buy bar */}
               <div className="pz-buy-bar">
                 <div className="pz-price-row">
-                  <span className="pz-price">R{product.price.toFixed(2)}</span>
+                  <span className="pz-price">R{safePrice.toFixed(2)}</span>
                   <span className="pz-price-note">excl. VAT · min {product.minQty || 1}</span>
                 </div>
                 <div className="pz-qty-row">
