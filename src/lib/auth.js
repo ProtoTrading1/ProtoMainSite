@@ -16,11 +16,11 @@ export async function signUp(email, password, name) {
   return data;
 }
 
-export async function submitTradeApplication({ email, password, contactName, businessName, phone, country, province, city, businessType, whatsappOptIn }) {
+export async function submitTradeApplication({ email, username, password, contactName, businessName, phone, companyAddress, deliveryAddress, vatNumber, country, province, city, businessType }) {
   const res = await fetch('/api/register-trade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, contactName, businessName, phone, country, province, city, businessType, whatsappOptIn }),
+    body: JSON.stringify({ email, username, password, contactName, businessName, phone, companyAddress, deliveryAddress, vatNumber, country, province, city, businessType }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Registration failed');

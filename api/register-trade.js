@@ -57,9 +57,25 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, password, contactName, businessName, phone, country, province, city, businessType, address, whatsappOptIn } = req.body || {};
+  const {
+    email,
+    username,
+    password,
+    contactName,
+    businessName,
+    phone,
+    companyAddress,
+    deliveryAddress,
+    vatNumber,
+    country,
+    province,
+    city,
+    businessType,
+  } = req.body || {};
 
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  if (!email || !username || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
+    return res.status(400).json({ error: 'Please complete all required fields' });
+  }
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -67,15 +83,38 @@ export default async function handler(req, res) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedUsername = username.trim();
+  const normalizedContactName = contactName.trim();
+  const normalizedBusinessName = businessName.trim();
+  const normalizedPhone = phone.trim();
+  const normalizedCompanyAddress = companyAddress.trim();
+  const normalizedDeliveryAddress = deliveryAddress.trim();
+  const normalizedVatNumber = vatNumber?.trim() || null;
+
+  const { data: usernameMatch, error: usernameLookupError } = await supabase
+    .from('customers')
+    .select('id')
+    .ilike('username', normalizedUsername)
+    .limit(1);
+
+  if (!usernameLookupError && usernameMatch?.length) {
+    return res.status(400).json({ error: 'That username is already in use' });
+  }
+
   // Create the user via admin API — skips Supabase's own confirmation email
   const { data, error } = await supabase.auth.admin.createUser({
-    email: email.trim(),
+    email: normalizedEmail,
     password,
     email_confirm: true,
     user_metadata: {
-      name: contactName || businessName || '',
-      phone: phone || null,
-      business_name: businessName || null,
+      name: normalizedContactName,
+      phone: normalizedPhone,
+      username: normalizedUsername,
+      business_name: normalizedBusinessName,
+      company_address: normalizedCompanyAddress,
+      delivery_address: normalizedDeliveryAddress,
+      vat_number: normalizedVatNumber,
       country: country || null,
       province: province || null,
       city: city || null,
@@ -91,21 +130,41 @@ export default async function handler(req, res) {
   // Insert customers row manually (in case the DB trigger doesn't fire for admin-created users)
   const userId = data.user?.id;
   if (userId) {
-    const { error: custError } = await supabase.from('customers').upsert({
+    const customerPayload = {
       id: userId,
-      email: email.trim(),
-      name: contactName || businessName || '',
-      phone: phone || null,
-      business_name: businessName || null,
+      email: normalizedEmail,
+      name: normalizedContactName,
+      phone: normalizedPhone,
+      username: normalizedUsername,
+      business_name: normalizedBusinessName,
+      company_address: normalizedCompanyAddress,
+      delivery_address: normalizedDeliveryAddress,
+      vat_number: normalizedVatNumber,
       country: country || null,
       province: province || null,
       city: city || null,
       business_type: businessType || null,
-      delivery_address: address || null,
       is_approved: false,
       tier: 'regular',
-    }, { onConflict: 'id' });
-    if (custError) console.error('customers upsert error:', custError.message);
+    };
+
+    let { error: custError } = await supabase.from('customers').upsert(customerPayload, { onConflict: 'id' });
+
+    if (custError) {
+      const fallbackPayload = {
+        id: userId,
+        email: normalizedEmail,
+        name: normalizedContactName,
+        phone: normalizedPhone,
+        delivery_address: normalizedDeliveryAddress,
+        is_approved: false,
+        tier: 'regular',
+      };
+      const fallback = await supabase.from('customers').upsert(fallbackPayload, { onConflict: 'id' });
+      custError = fallback.error;
+      if (custError) console.error('customers upsert error:', custError.message);
+      else console.warn('customers upsert fell back to base columns; new fields remain in auth metadata until schema migration is applied');
+    }
   }
 
   // Send branded welcome email via Brevo SMTP
@@ -121,43 +180,13 @@ export default async function handler(req, res) {
     });
     await transporter.sendMail({
       from: `"Proto Trading Online" <${process.env.BREVO_SMTP_USER}>`,
-      to: email.trim(),
+      to: normalizedEmail,
       subject: 'Your Proto Trading application has been received',
-      html: WELCOME_HTML(contactName || businessName || ''),
+      html: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
     });
   } catch (emailErr) {
     // Don't fail the registration if email sending fails
     console.error('Welcome email error:', emailErr.message);
-  }
-
-  // Send WATI WhatsApp welcome broadcast if customer opted in
-  if (whatsappOptIn && phone) {
-    try {
-      const watiUrl = process.env.WATI_API_URL;
-      const watiToken = process.env.WATI_API_TOKEN;
-      if (watiUrl && watiToken) {
-        // WATI expects phone without + or spaces, e.g. 27821234567
-        const cleanPhone = phone.replace(/\D/g, '');
-        // broadcast_name must be unique per send
-        const broadcastName = `proto_trading_welcome_${Date.now()}`;
-        const watiRes = await fetch(`${watiUrl}/api/v1/sendTemplateMessage?whatsappNumber=${cleanPhone}`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${watiToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            template_name: 'proto_trading_welcome',
-            broadcast_name: broadcastName,
-            parameters: [{ name: 'name', value: contactName || businessName || 'Valued Customer' }],
-          }),
-        });
-        const watiBody = await watiRes.text();
-        console.log('WATI response:', watiRes.status, watiBody);
-      }
-    } catch (watiErr) {
-      console.error('WATI broadcast error:', watiErr.message);
-    }
   }
 
   return res.status(200).json({ ok: true });

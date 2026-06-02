@@ -1713,7 +1713,8 @@
 }
 
 .lp-quiz-field input,
-.lp-quiz-field select {
+.lp-quiz-field select,
+.lp-quiz-field textarea {
   min-height: 48px;
   padding: 0 14px;
   border-radius: 10px;
@@ -1725,12 +1726,21 @@
   transition: border-color 0.2s, background 0.2s;
 }
 
-.lp-quiz-field input::placeholder {
+.lp-quiz-field textarea {
+  min-height: 112px;
+  padding: 12px 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.lp-quiz-field input::placeholder,
+.lp-quiz-field textarea::placeholder {
   color: rgba(255,255,255,0.22);
 }
 
 .lp-quiz-field input:focus,
-.lp-quiz-field select:focus {
+.lp-quiz-field select:focus,
+.lp-quiz-field textarea:focus {
   outline: none;
   border-color: rgba(255,255,255,0.38);
   background: rgba(255,255,255,0.08);

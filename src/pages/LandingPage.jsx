@@ -88,7 +88,7 @@ const BUSINESS_TYPES = [
   'Other',
 ];
 
-const STEP_LABELS = ['Business', 'Contact', 'Location', 'Business type'];
+const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
 
 function CustomerIcon() {
@@ -365,31 +365,26 @@ function Questionnaire({ onLogin }) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [otherType, setOtherType] = useState('');
-  const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const canNext = () => {
-    if (step === 0) return businessName.trim() && contactName.trim();
-    if (step === 1) return email.trim() && phone.trim() && password.trim().length >= 8;
-    if (step === 2) {
-      if (!country) return false;
-      if (country === 'South Africa') return province && city.trim();
-      return true;
-    }
-    if (step === 3) {
-      if (!businessType) return false;
-      if (businessType === 'Other') return otherType.trim();
-      return true;
-    }
+    if (step === 0) return companyName.trim() && contactName.trim();
+    if (step === 1) return email.trim() && username.trim() && phone.trim() && password.trim().length >= 8;
+    if (step === 2) return companyAddress.trim() && deliveryAddress.trim();
+    if (step === 3) return true;
     return false;
   };
 
@@ -406,15 +401,18 @@ function Questionnaire({ onLogin }) {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
       await submitTradeApplication({
         email: email.trim(),
+        username: username.trim(),
         password,
         contactName: contactName.trim(),
-        businessName: businessName.trim(),
+        businessName: companyName.trim(),
         phone: phone.trim(),
-        country,
+        companyAddress: companyAddress.trim(),
+        deliveryAddress: deliveryAddress.trim(),
+        vatNumber: vatNumber.trim() || null,
+        country: country || null,
         province: province || null,
         city: city.trim() || null,
-        businessType: businessType === 'Other' ? otherType.trim() : businessType,
-        whatsappOptIn: whatsappOptIn === true,
+        businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
       });
       setDone(true);
     } catch (err) {
@@ -456,24 +454,33 @@ function Questionnaire({ onLogin }) {
       >
         {step === 0 && (
           <div className="lp-quiz-step">
-            <h3>Tell us about your business.</h3>
+            <h3>Start with the core company details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
-                <label>Business name</label>
+                <label>Company name</label>
                 <input
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Registered business name"
+                  placeholder="Registered company name"
                 />
               </div>
               <div className="lp-quiz-field">
-                <label>Contact person</label>
+                <label>Contact person name and surname</label>
                 <input
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Full name"
+                  placeholder="Full contact name"
+                />
+              </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label>VAT number <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
+                <input
+                  value={vatNumber}
+                  onChange={(e) => setVatNumber(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="VAT registration number"
                 />
               </div>
             </div>
@@ -482,7 +489,7 @@ function Questionnaire({ onLogin }) {
 
         {step === 1 && (
           <div className="lp-quiz-step">
-            <h3>How can we reach you?</h3>
+            <h3>Add the account and contact details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
                 <label>Email address</label>
@@ -495,6 +502,15 @@ function Questionnaire({ onLogin }) {
                 />
               </div>
               <div className="lp-quiz-field">
+                <label>Username</label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Choose a username"
+                />
+              </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Phone number</label>
                 <input
                   type="tel"
@@ -504,43 +520,8 @@ function Questionnaire({ onLogin }) {
                   placeholder="+27"
                 />
               </div>
-              {phone.replace(/\D/g, '').length >= 8 && (
-                <div className="lp-quiz-field lp-quiz-field--full">
-                  <label>Join our WhatsApp channel?</label>
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setWhatsappOptIn(true)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '8px', fontSize: '14px',
-                        fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit',
-                        border: whatsappOptIn === true ? 'none' : '1px solid #333',
-                        backgroundColor: whatsappOptIn === true ? '#25D366' : 'transparent',
-                        color: whatsappOptIn === true ? '#fff' : '#ccc',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      Yes, add me
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWhatsappOptIn(false)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '8px', fontSize: '14px',
-                        fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit',
-                        border: whatsappOptIn === false ? 'none' : '1px solid #333',
-                        backgroundColor: whatsappOptIn === false ? '#333' : 'transparent',
-                        color: '#ccc',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      No thanks
-                    </button>
-                  </div>
-                </div>
-              )}
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Create a password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
+                <label>Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
                     type={showPw ? 'text' : 'password'}
@@ -560,7 +541,38 @@ function Questionnaire({ onLogin }) {
 
         {step === 2 && (
           <div className="lp-quiz-step">
-            <h3>Where is your business based?</h3>
+            <h3>Enter the two addresses we need.</h3>
+            <div className="lp-quiz-fields">
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label>Full company address</label>
+                <textarea
+                  value={companyAddress}
+                  onChange={(e) => setCompanyAddress(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Street address, suburb, city, postcode"
+                  rows={4}
+                />
+              </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label>Full delivery address</label>
+                <textarea
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Delivery street address, suburb, city, postcode"
+                  rows={4}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="lp-quiz-step">
+            <h3>Optional: add any extra business details.</h3>
+            <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
+              These details help the team, but they are not required to submit your trade request.
+            </p>
             <div className="lp-quiz-countries">
               {SADC_COUNTRIES.map((c) => (
                 <button
@@ -600,12 +612,7 @@ function Questionnaire({ onLogin }) {
                 </div>
               </motion.div>
             )}
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="lp-quiz-step">
-            <h3>Best describe your business.</h3>
+            <div style={{ height: '18px' }} />
             <div className="lp-quiz-types">
               {BUSINESS_TYPES.map((t) => (
                 <button
@@ -705,10 +712,6 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Original hero ── */}
         <section className="access-hero premium-hero">
           <div className="access-hero-copy">
-            <div className="access-kicker">
-              <span />
-              Retailers, resellers and trade buyers
-            </div>
             <h1>Unlock Proto Trading's private wholesale catalogue.</h1>
             <p>
               See product images, catalogue codes and department ranges before you request a quote. Trade pricing and stock checks stay reserved for approved customers.
