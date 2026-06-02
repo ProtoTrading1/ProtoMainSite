@@ -21,6 +21,7 @@ import './index.css';
 const HEADER_H = 72;
 const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
+const DRAWER_PEEK_MS = 5000;
 
 function getProductImageUrl(product, siteOrigin = '') {
   const src = product.localImage || product.image || '';
@@ -80,7 +81,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartItems, setCartItems] = useState([]);
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
+  const [drawerPeekProgress, setDrawerPeekProgress] = useState(0);
   const drawerTimerRef = useRef(null);
+  const drawerPeekDeadlineRef = useRef(0);
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -223,6 +226,27 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [customer?.name, customer?.email, customer?.phone, customer?.delivery_address]);
 
+  useEffect(() => {
+    if (!drawerPeek) {
+      setDrawerPeekProgress(0);
+      drawerPeekDeadlineRef.current = 0;
+      return undefined;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, drawerPeekDeadlineRef.current - Date.now());
+      setDrawerPeekProgress((remaining / DRAWER_PEEK_MS) * 100);
+    };
+
+    tick();
+    const intervalId = window.setInterval(tick, 50);
+    return () => window.clearInterval(intervalId);
+  }, [drawerPeek]);
+
+  useEffect(() => () => {
+    if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
+  }, []);
+
   const addToCart = (product, qty, buttonPos = null) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
@@ -233,8 +257,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (buttonPos) setFlyAnim(buttonPos);
 
     setDrawerPeek(true);
+    drawerPeekDeadlineRef.current = Date.now() + DRAWER_PEEK_MS;
+    setDrawerPeekProgress(100);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
-    drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), 5000);
+    drawerTimerRef.current = setTimeout(() => {
+      setDrawerPeek(false);
+      setDrawerPeekProgress(0);
+    }, DRAWER_PEEK_MS);
   };
 
   const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })));
@@ -425,6 +454,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             removeFromCart={removeFromCart}
             clearCart={clearCart}
             sendOrderEmail={sendOrderEmail}
+            autoCloseProgress={drawerPeekProgress}
+            showAutoCloseBar={drawerPeek}
           />
         </aside>
       </div>

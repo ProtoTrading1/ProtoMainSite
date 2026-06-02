@@ -29,7 +29,7 @@
   /* Layout */
   --header-height: 72px;
   --sidebar-width: 248px;
-  --drawer-width: 360px;
+  --drawer-width: clamp(430px, 42vw, 560px);
   --sticky-bar-height: 56px;
   --max-width: 1280px;
   
@@ -1990,7 +1990,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .drawer-header,
 .drawer-footer {
-  padding: 20px 22px;
+  padding: 18px 22px;
 }
 .drawer-header {
   display: flex;
@@ -2011,6 +2011,15 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .drawer-header h2 { margin: 0 0 4px; font-size: 20px; color: #fff; }
 .drawer-header p { color: rgba(255,255,255,0.45); font-size: 13px; }
+.drawer-auto-close {
+  height: 4px;
+  background: rgba(225, 29, 72, 0.16);
+}
+.drawer-auto-close div {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444 0%, #991b1b 100%);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+}
 .ready-pill {
   align-self: flex-start;
   padding: 4px 10px;
@@ -2026,7 +2035,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .drawer-items {
   flex: 1;
   overflow: auto;
-  padding: 0 22px;
+  padding: 0 22px 18px;
   background: #ffffff;
 }
 .drawer-empty {
@@ -2052,13 +2061,13 @@ input, select, textarea { font-family: inherit; outline: none; }
 .drawer-line {
   display: flex;
   gap: 12px;
-  padding: 15px 0;
+  padding: 13px 0;
   border-bottom: 1px solid #edf0f3;
   background: #fff;
 }
 .drawer-thumb {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -2123,7 +2132,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .drawer-totals {
   display: grid;
   gap: 5px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding-top: 10px;
   border-top: 1px solid #f1f5f9;
 }
@@ -2143,8 +2152,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   font-weight: 600;
 }
 .minimum-card {
-  margin: 14px 0;
-  padding: 12px 14px;
+  margin: 12px 0;
+  padding: 11px 14px;
   border: 1px solid #e8eaed;
   border-radius: 10px;
   background: #fafafa;

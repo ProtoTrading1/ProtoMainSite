@@ -29,7 +29,16 @@ function QuantityInput({ item, updateQty }) {
   );
 }
 
-export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail }) {
+export default function Drawer({
+  cartItems,
+  cartTotal,
+  removeFromCart,
+  updateQty,
+  clearCart,
+  sendOrderEmail,
+  autoCloseProgress = 0,
+  showAutoCloseBar = false,
+}) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
   const isReady = cartTotal >= MIN_ORDER;
@@ -46,6 +55,11 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
         </div>
         {isReady && <span className="ready-pill">Ready</span>}
       </div>
+      {showAutoCloseBar && (
+        <div className="drawer-auto-close" aria-hidden="true">
+          <div style={{ width: `${Math.max(0, Math.min(100, autoCloseProgress))}%` }} />
+        </div>
+      )}
 
       <div className="drawer-items">
         {cartItems.length === 0 && (
