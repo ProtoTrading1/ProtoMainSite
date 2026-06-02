@@ -40,9 +40,9 @@ export default function Root() {
     if (area) area.scrollTop = 0;
   }, [view]);
 
-  const loadCustomer = useCallback(async (userId) => {
+  const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {
     const nonce = ++loadNonce.current;
-    const profile = await getCustomerProfile(userId);
+    const profile = await getCustomerProfile(userId, sessionOrToken);
     if (nonce !== loadNonce.current) return; // a newer call started — discard this result
     setCustomer(profile);
     if (!profile) return;
@@ -58,7 +58,7 @@ export default function Root() {
       authBootstrapped.current = true;
       setSession(sess ?? null);
       if (sess?.user) {
-        void loadCustomer(sess.user.id);
+        void loadCustomer(sess.user.id, sess);
       } else {
         setCustomer(null);
       }
@@ -87,7 +87,7 @@ export default function Root() {
       clearTimeout(bootstrapTimer);
       setSession(sess ?? null);
       if (sess?.user) {
-        await loadCustomer(sess.user.id);
+        await loadCustomer(sess.user.id, sess);
       } else {
         setCustomer(null);
       }
@@ -101,7 +101,7 @@ export default function Root() {
 
   const handleLogin = async (sess) => {
     setSession(sess);
-    await loadCustomer(sess.user.id);
+    await loadCustomer(sess.user.id, sess);
   };
 
   const handleLogout = async () => {

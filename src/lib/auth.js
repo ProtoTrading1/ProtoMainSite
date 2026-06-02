@@ -49,12 +49,12 @@ export async function getSession() {
   return data.session;
 }
 
-export async function getCustomerProfile(userId) {
+export async function getCustomerProfile(userId, sessionOrToken = null) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`/api/customer-profile?userId=${encodeURIComponent(userId)}`, {
-      headers: await authHeaders(),
+      headers: await authHeaders(sessionOrToken),
       signal: controller.signal,
     });
     clearTimeout(timeout);
