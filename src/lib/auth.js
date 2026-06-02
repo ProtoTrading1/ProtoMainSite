@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { authHeaders } from './authHeaders';
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -51,6 +50,7 @@ export async function getSession() {
 
 export async function getCustomerProfile(userId, sessionOrToken = null) {
   try {
+    const { authHeaders } = await import('./authHeaders');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`/api/customer-profile?userId=${encodeURIComponent(userId)}`, {

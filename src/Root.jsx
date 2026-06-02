@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import App from './App';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
-import LoginModal from './components/LoginModal';
-import ProfilePage from './pages/ProfilePage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import WorldClassPortal from './worldclass/WorldClassPortal';
-import { getCustomerProfile, signOut } from './lib/auth';
-import { supabase } from './lib/supabase';
+
+const App = lazy(() => import('./App'));
+const LoginModal = lazy(() => import('./components/LoginModal'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const WorldClassPortal = lazy(() => import('./worldclass/WorldClassPortal'));
 
 export default function Root() {
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
+  const [view, setView] = useState('landing');
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const authBootstrapped = useRef(false);
@@ -30,7 +29,11 @@ export default function Root() {
 
   const setSurface = useCallback((next) => {
     setView(next);
-    if (['portal', 'admin', 'profile', 'login', 'landing'].includes(next)) {
+    if (next === 'landing') {
+      window.sessionStorage.removeItem('proto-surface');
+      return;
+    }
+    if (next === 'profile') {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
@@ -46,6 +49,7 @@ export default function Root() {
     const nonce = ++loadNonce.current;
     setCustomerLoading(true);
     try {
+      const { getCustomerProfile } = await import('./lib/auth');
       const profile = await getCustomerProfile(userId, sessionOrToken);
       if (nonce !== loadNonce.current) return; // a newer call started — discard this result
       setCustomer(profile);
@@ -63,6 +67,8 @@ export default function Root() {
   }, [setSurface]);
 
   useEffect(() => {
+    let cancelled = false;
+    let unsubscribe = () => {};
     const finishBootstrap = (sess) => {
       authBootstrapped.current = true;
       setSession(sess ?? null);
@@ -80,33 +86,45 @@ export default function Root() {
       }
     }, 3500);
 
-    supabase.auth.getSession()
-      .then(({ data }) => {
-        finishBootstrap(data.session ?? null);
-      })
-      .catch(() => {
-        finishBootstrap(null);
-      });
+    (async () => {
+      try {
+        const { supabase } = await import('./lib/supabase');
+        if (cancelled) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sess) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setPasswordRecovery(true);
-        return;
+        supabase.auth.getSession()
+          .then(({ data }) => {
+            if (!cancelled) finishBootstrap(data.session ?? null);
+          })
+          .catch(() => {
+            if (!cancelled) finishBootstrap(null);
+          });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sess) => {
+          if (event === 'PASSWORD_RECOVERY') {
+            setPasswordRecovery(true);
+            return;
+          }
+          authBootstrapped.current = true;
+          clearTimeout(bootstrapTimer);
+          setSession(sess ?? null);
+          if (sess?.user) {
+            await loadCustomer(sess.user.id, sess);
+          } else {
+            setCustomerLoading(false);
+            setCustomer(null);
+          }
+        });
+
+        unsubscribe = () => subscription.unsubscribe();
+      } catch {
+        if (!cancelled) finishBootstrap(null);
       }
-      authBootstrapped.current = true;
-      clearTimeout(bootstrapTimer);
-      setSession(sess ?? null);
-      if (sess?.user) {
-        await loadCustomer(sess.user.id, sess);
-      } else {
-        setCustomerLoading(false);
-        setCustomer(null);
-      }
-    });
+    })();
 
     return () => {
+      cancelled = true;
       clearTimeout(bootstrapTimer);
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, [loadCustomer]);
 
@@ -116,6 +134,7 @@ export default function Root() {
   };
 
   const handleLogout = async () => {
+    const { signOut } = await import('./lib/auth');
     await signOut();
     setSession(null);
     setCustomer(null);
@@ -125,19 +144,30 @@ export default function Root() {
     window.location.hash = '';
   };
 
-  if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
-  if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
+  const authSurfaceFallback = (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Loading portal…</div>
+        <div style={{ color: '#94a3b8', fontSize: '13px' }}>Preparing your account view.</div>
+      </div>
+    </div>
+  );
+
+  if (route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
+  if (route.startsWith('#/portal-preview')) return <Suspense fallback={authSurfaceFallback}><App customer={null} onLogout={handleLogout} /></Suspense>;
 
   if (passwordRecovery) {
     return (
-      <ResetPasswordPage
-        token={null}
-        onDone={() => {
-          setPasswordRecovery(false);
-          window.location.hash = '';
-          setSurface('login');
-        }}
-      />
+      <Suspense fallback={authSurfaceFallback}>
+        <ResetPasswordPage
+          token={null}
+          onDone={() => {
+            setPasswordRecovery(false);
+            window.location.hash = '';
+            setSurface('login');
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -145,17 +175,19 @@ export default function Root() {
     const params = new URLSearchParams(route.replace('#/reset-password?', '').replace('#/reset-password', ''));
     const token = params.get('token');
     return (
-      <ResetPasswordPage
-        token={token}
-        onDone={() => {
-          window.location.hash = '';
-          setSurface('login');
-        }}
-      />
+      <Suspense fallback={authSurfaceFallback}>
+        <ResetPasswordPage
+          token={token}
+          onDone={() => {
+            window.location.hash = '';
+            setSurface('login');
+          }}
+        />
+      </Suspense>
     );
   }
 
-  if (session === undefined) {
+  if (session === undefined && ['portal', 'admin', 'profile'].includes(view)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505' }}>
         <div style={{ color: '#e11d48', fontSize: '14px' }}>Loading…</div>
@@ -191,23 +223,27 @@ export default function Root() {
 
   if (session && view === 'profile') {
     return (
-      <ProfilePage
-        customer={customer}
-        onBack={() => setSurface('portal')}
-        onProfileUpdate={(updated) => setCustomer(updated)}
-      />
+      <Suspense fallback={authSurfaceFallback}>
+        <ProfilePage
+          customer={customer}
+          onBack={() => setSurface('portal')}
+          onProfileUpdate={(updated) => setCustomer(updated)}
+        />
+      </Suspense>
     );
   }
 
   if (session && (view === 'portal' || view === 'admin')) {
     return (
       <PortalErrorBoundary>
-        <App
-          customer={customer}
-          onLogout={handleLogout}
-          onViewProfile={() => setSurface('profile')}
-          onViewAdmin={null}
-        />
+        <Suspense fallback={authSurfaceFallback}>
+          <App
+            customer={customer}
+            onLogout={handleLogout}
+            onViewProfile={() => setSurface('profile')}
+            onViewAdmin={null}
+          />
+        </Suspense>
       </PortalErrorBoundary>
     );
   }
@@ -229,11 +265,13 @@ export default function Root() {
         }}
       />
       {view === 'login' && (
-        <LoginModal
-          onLogin={handleLogin}
-          onClose={() => setSurface('landing')}
-          onApply={() => { setSurface('landing'); scrollToApply(); }}
-        />
+        <Suspense fallback={null}>
+          <LoginModal
+            onLogin={handleLogin}
+            onClose={() => setSurface('landing')}
+            onApply={() => { setSurface('landing'); scrollToApply(); }}
+          />
+        </Suspense>
       )}
     </>
   );

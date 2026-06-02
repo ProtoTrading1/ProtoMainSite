@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'motion/react';
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import {
   ArrowDown,
   ArrowRight,
@@ -11,7 +10,6 @@ import {
   Lock,
   PackageSearch,
 } from 'lucide-react';
-import { submitTradeApplication } from '../lib/auth';
 import '../landing.css';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
@@ -19,14 +17,14 @@ const SADC_IDS = new Set([24, 72, 426, 454, 508, 516, 710, 748, 894, 716, 834, 1
 const HIGHLIGHT_SEQ = [24, 180, 894, 454, 508, 516, 72, 716, 748, 426, 834, 710];
 
 const departments = [
-  { name: 'Packaging',     count: 1840 },
-  { name: 'Stationery',   count: 2240 },
+  { name: 'Packaging', count: 1840 },
+  { name: 'Stationery', count: 2240 },
   { name: 'Bags & Wallets', count: 680 },
-  { name: 'Toys',          count: 420 },
-  { name: 'Crafts',        count: 960 },
-  { name: 'Jewellery',     count: 820 },
-  { name: 'Homeware',      count: 560 },
-  { name: 'Seasonal',      count: 380 },
+  { name: 'Toys', count: 420 },
+  { name: 'Crafts', count: 960 },
+  { name: 'Jewellery', count: 820 },
+  { name: 'Homeware', count: 560 },
+  { name: 'Seasonal', count: 380 },
 ];
 
 const steps = [
@@ -91,6 +89,7 @@ const BUSINESS_TYPES = [
 ];
 
 const STEP_LABELS = ['Business', 'Contact', 'Location', 'Business type'];
+const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
 
 function CustomerIcon() {
   return (
@@ -361,59 +360,6 @@ function DeptCountCard({ name, count, active, delay = 0 }) {
   );
 }
 
-function SouthernAfricaMap() {
-  const [lit, setLit] = useState(new Set());
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-100px' });
-
-  useEffect(() => {
-    if (!inView) return;
-    let i = 0;
-    const timer = setInterval(() => {
-      if (i >= HIGHLIGHT_SEQ.length) { clearInterval(timer); return; }
-      setLit((prev) => new Set([...prev, HIGHLIGHT_SEQ[i]]));
-      i++;
-    }, 160);
-    return () => clearInterval(timer);
-  }, [inView]);
-
-  return (
-    <div ref={ref} className="lp-map-inner">
-      <ComposableMap
-        projection="geoMercator"
-        projectionConfig={{ center: [25, -22], scale: 680 }}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <Geographies geography={GEO_URL}>
-          {({ geographies }) =>
-            geographies
-              .filter((g) => SADC_IDS.has(+g.id))
-              .map((geo) => {
-                const id = +geo.id;
-                const isSA = id === 710;
-                const isLit = lit.has(id);
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill={isLit ? (isSA ? '#ffffff' : '#8B1A1A') : '#1a0505'}
-                    stroke="#000"
-                    strokeWidth={1}
-                    style={{
-                      default: { outline: 'none', transition: 'fill 0.5s ease' },
-                      hover: { outline: 'none' },
-                      pressed: { outline: 'none' },
-                    }}
-                  />
-                );
-              })
-          }
-        </Geographies>
-      </ComposableMap>
-    </div>
-  );
-}
-
 function Questionnaire({ onLogin }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
@@ -457,6 +403,7 @@ function Questionnaire({ onLogin }) {
     setSubmitting(true);
     setSubmitError('');
     try {
+      const { submitTradeApplication } = await import('../lib/tradeApplication');
       await submitTradeApplication({
         email: email.trim(),
         password,
@@ -732,7 +679,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.png" alt="Proto Trading" />
+          <img src="/proto-logo.png" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
           <div>
             <strong>PROTO <span>TRADING</span></strong>
             <small>Wholesale supplier since 1987</small>
@@ -800,7 +747,7 @@ export default function LandingPage({ onLogin, onApply }) {
               {showcaseProducts.map((product) => (
                 <article className="hero-product-card" key={product.code}>
                   <div className="hero-product-image">
-                    <img src={product.image} alt={product.name} />
+                    <img src={product.image} alt={product.name} loading="eager" fetchPriority="high" decoding="async" />
                   </div>
                   <div>
                     <small>{product.dept}</small>
@@ -852,7 +799,9 @@ export default function LandingPage({ onLogin, onApply }) {
               Proto Trading ships to retailers and resellers throughout South Africa and the wider SADC region. One supplier, nationwide reach.
             </p>
           </div>
-          <SouthernAfricaMap />
+          <Suspense fallback={<div className="lp-map-inner" aria-hidden="true" />}>
+            <SouthernAfricaMap />
+          </Suspense>
         </motion.section>
 
         {/* ── Departments ── */}
