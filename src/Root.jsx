@@ -1,16 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import App from './App';
 import LandingPage from './pages/LandingPage';
-import { getCustomerProfile, onAuthChange, signOut } from './lib/auth';
+import LoginModal from './components/LoginModal';
+import ProfilePage from './pages/ProfilePage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import WorldClassPortal from './worldclass/WorldClassPortal';
+import { getCustomerProfile, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
-
-// Lazy-loaded: these only load when the user actually needs them.
-// Removes LoginModal (+ motion library), ProfilePage, ResetPasswordPage,
-// and WorldClassPortal from the critical bundle path.
-const LoginModal = lazy(() => import('./components/LoginModal'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
-const WorldClassPortal = lazy(() => import('./worldclass/WorldClassPortal'));
 
 export default function Root() {
   const [session, setSession] = useState(undefined);
@@ -18,6 +14,7 @@ export default function Root() {
   const [view, setView] = useState(() => window.sessionStorage.getItem('proto-surface') || 'landing');
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const authBootstrapped = useRef(false);
   // Nonce: each loadCustomer call increments this; stale completions are ignored.
   // Replaces the old boolean lock that blocked login when a stale-session fetch
   // was in-flight (e.g. token refresh on regular-tab load with old cookies).
@@ -57,18 +54,37 @@ export default function Root() {
   }, [setSurface]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      if (data.session?.user) {
-        void loadCustomer(data.session.user.id);
+    const finishBootstrap = (sess) => {
+      authBootstrapped.current = true;
+      setSession(sess ?? null);
+      if (sess?.user) {
+        void loadCustomer(sess.user.id);
+      } else {
+        setCustomer(null);
       }
-    });
+    };
+
+    const bootstrapTimer = window.setTimeout(() => {
+      if (!authBootstrapped.current) {
+        setSession(null);
+      }
+    }, 3500);
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        finishBootstrap(data.session ?? null);
+      })
+      .catch(() => {
+        finishBootstrap(null);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sess) => {
       if (event === 'PASSWORD_RECOVERY') {
         setPasswordRecovery(true);
         return;
       }
+      authBootstrapped.current = true;
+      clearTimeout(bootstrapTimer);
       setSession(sess ?? null);
       if (sess?.user) {
         await loadCustomer(sess.user.id);
@@ -77,7 +93,10 @@ export default function Root() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(bootstrapTimer);
+      subscription.unsubscribe();
+    };
   }, [loadCustomer]);
 
   const handleLogin = async (sess) => {
@@ -94,21 +113,19 @@ export default function Root() {
     window.location.hash = '';
   };
 
-  if (route.startsWith('#/worldclass')) return <Suspense fallback={null}><WorldClassPortal /></Suspense>;
+  if (route.startsWith('#/worldclass')) return <WorldClassPortal />;
   if (route.startsWith('#/portal-preview')) return <App customer={null} onLogout={handleLogout} />;
 
   if (passwordRecovery) {
     return (
-      <Suspense fallback={null}>
-        <ResetPasswordPage
-          token={null}
-          onDone={() => {
-            setPasswordRecovery(false);
-            window.location.hash = '';
-            setSurface('login');
-          }}
-        />
-      </Suspense>
+      <ResetPasswordPage
+        token={null}
+        onDone={() => {
+          setPasswordRecovery(false);
+          window.location.hash = '';
+          setSurface('login');
+        }}
+      />
     );
   }
 
@@ -116,15 +133,13 @@ export default function Root() {
     const params = new URLSearchParams(route.replace('#/reset-password?', '').replace('#/reset-password', ''));
     const token = params.get('token');
     return (
-      <Suspense fallback={null}>
-        <ResetPasswordPage
-          token={token}
-          onDone={() => {
-            window.location.hash = '';
-            setSurface('login');
-          }}
-        />
-      </Suspense>
+      <ResetPasswordPage
+        token={token}
+        onDone={() => {
+          window.location.hash = '';
+          setSurface('login');
+        }}
+      />
     );
   }
 
@@ -153,13 +168,11 @@ export default function Root() {
 
   if (session && view === 'profile') {
     return (
-      <Suspense fallback={null}>
-        <ProfilePage
-          customer={customer}
-          onBack={() => setSurface('portal')}
-          onProfileUpdate={(updated) => setCustomer(updated)}
-        />
-      </Suspense>
+      <ProfilePage
+        customer={customer}
+        onBack={() => setSurface('portal')}
+        onProfileUpdate={(updated) => setCustomer(updated)}
+      />
     );
   }
 
@@ -191,13 +204,11 @@ export default function Root() {
         }}
       />
       {view === 'login' && (
-        <Suspense fallback={null}>
-          <LoginModal
-            onLogin={handleLogin}
-            onClose={() => setSurface('landing')}
-            onApply={() => { setSurface('landing'); scrollToApply(); }}
-          />
-        </Suspense>
+        <LoginModal
+          onLogin={handleLogin}
+          onClose={() => setSurface('landing')}
+          onApply={() => { setSurface('landing'); scrollToApply(); }}
+        />
       )}
     </>
   );

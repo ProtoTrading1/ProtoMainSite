@@ -93,7 +93,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   // Scroll content area back to top whenever the category path changes
   useEffect(() => {
-    document.querySelector('.content-area')?.scrollTo({ top: 0, behavior: 'instant' });
+    const area = document.querySelector('.content-area');
+    if (!area) return;
+    try {
+      area.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {
+      area.scrollTop = 0;
+    }
   }, [path.join('/')]);
 
   useEffect(() => {
