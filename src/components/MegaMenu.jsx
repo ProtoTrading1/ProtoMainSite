@@ -118,7 +118,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
 
   if (!l1Node) return null;
 
-  const color = DEPT_COLORS[l1Node.id] || '#DC2626';
+  const color = DEPT_COLORS[l1Node.id] || '#7F1D1D';
   const Icon = LUCIDE_ICON_MAP[l1Node.icon] || null;
   const themeCards = (DEPT_THEME_CARDS[l1Node.id] || []).slice(0, 4);
 

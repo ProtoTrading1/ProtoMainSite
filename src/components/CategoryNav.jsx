@@ -1,11 +1,12 @@
+import { Home } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 
-const RED = '#DC2626';
+const RED = '#7F1D1D';
 
 function Count({ value }) {
   if (value == null) return null;
   return (
-    <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600', marginLeft: '4px', verticalAlign: '0.25em' }}>
+    <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600', marginLeft: '5px' }}>
       {value}
     </span>
   );
@@ -31,15 +32,17 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
           onClick={() => { navigate([]); onToggleL1(null); }}
           onMouseEnter={() => onToggleL1(null)}
           style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
             fontSize: '10px', fontWeight: '700', color: RED, textTransform: 'uppercase', letterSpacing: '0.05em',
             background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit',
           }}
         >
-          View All
+          <Home size={11} />
+          Home
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', padding: '6px 0' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', padding: '4px 0' }}>
         {categories.map((cat) => {
           const isActive = activeL1 === cat.id;
           const isOpen = openCategoryId === cat.id;
@@ -55,39 +58,42 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
               onMouseEnter={() => onToggleL1(cat.id)}
               type="button"
               style={{
-                display: 'flex', alignItems: 'center', gap: '9px',
-                padding: '8px 16px 8px 13px',
-                borderLeft: highlighted ? `3px solid ${deptColor}` : '3px solid transparent',
-                background: highlighted ? `${deptColor}0d` : 'transparent',
-                border: 'none', borderLeftWidth: '3px', borderLeftStyle: 'solid',
+                display: 'flex', alignItems: 'center', gap: '11px',
+                padding: '11px 14px 11px 13px',
+                borderLeft: '3px solid transparent',
                 borderLeftColor: highlighted ? deptColor : 'transparent',
+                borderLeftStyle: 'solid',
+                borderLeftWidth: '3px',
+                background: highlighted ? `${deptColor}10` : 'transparent',
+                border: 'none',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%',
                 transition: 'background 0.12s ease',
+                minHeight: '46px',
               }}
             >
               {Icon && (
                 <span style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: '22px', height: '22px', borderRadius: '5px', flexShrink: 0,
-                  background: highlighted ? `${deptColor}22` : '#F3F4F6',
-                  color: highlighted ? deptColor : '#6B7280',
-                  transition: 'background 0.12s, color 0.12s',
+                  width: '30px', height: '30px', borderRadius: '7px', flexShrink: 0,
+                  background: highlighted ? `${deptColor}` : `${deptColor}18`,
+                  color: highlighted ? '#fff' : deptColor,
+                  transition: 'background 0.15s, color 0.15s',
+                  boxShadow: highlighted ? `0 2px 8px ${deptColor}40` : 'none',
                 }}>
-                  <Icon size={12} />
+                  <Icon size={15} />
                 </span>
               )}
               <span style={{
-                fontSize: '13px', fontWeight: highlighted ? '700' : '500',
+                fontSize: '13.5px', fontWeight: highlighted ? '700' : '500',
                 color: highlighted ? '#111827' : '#374151',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                flex: 1,
+                flex: 1, lineHeight: 1.3,
               }}>
                 {cat.label}
                 <Count value={counts?.[cat.id]} />
               </span>
               {hasChildren && (
-                <span style={{ fontSize: '15px', lineHeight: 1, color: highlighted ? deptColor : '#C7CBD1', flexShrink: 0 }}>
-                  &rsaquo;
+                <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300' }}>
+                  ›
                 </span>
               )}
             </button>

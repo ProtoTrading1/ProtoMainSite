@@ -95,7 +95,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <LayoutGrid size={16} color="#DC2626" />
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#DC2626' }}>View all {currentLabel}</span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#7F1D1D' }}>View all {currentLabel}</span>
               </div>
             </button>
           )}
@@ -176,7 +176,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
                 style={{
                   padding: '12px 24px',
                   borderRadius: '8px',
-                  backgroundColor: '#DC2626',
+                  backgroundColor: '#7F1D1D',
                   color: '#fff',
                   border: 'none',
                   fontWeight: '700',
@@ -218,7 +218,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               style={{ width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <LogOut size={18} color="#DC2626" />
-              <span style={{ fontSize: '14px', fontWeight: '700', color: '#DC2626' }}>Log Out</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#7F1D1D' }}>Log Out</span>
             </button>
           )}
         </div>

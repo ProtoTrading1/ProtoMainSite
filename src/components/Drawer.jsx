@@ -48,10 +48,13 @@ export default function Drawer({
   return (
     <div className="order-drawer">
       <div className="drawer-header">
-        <div>
-          <span className="eyebrow">Wholesale order</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <h2>My Order</h2>
-          <p>{cartItems.length ? `${cartItems.length} line item${cartItems.length !== 1 ? 's' : ''}` : 'No items yet'}</p>
+          {cartItems.length > 0 && (
+            <span style={{ fontSize: '11px', fontWeight: '700', background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '2px 7px', borderRadius: '999px' }}>
+              {cartItems.length}
+            </span>
+          )}
         </div>
         {isReady && <span className="ready-pill">Ready</span>}
       </div>

@@ -220,7 +220,7 @@ export default function TradeAccessForm() {
                 <div style={{
                   backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)',
                   borderRadius: '10px', padding: '12px 16px', marginBottom: '16px',
-                  fontSize: '14px', color: '#dc2626',
+                  fontSize: '14px', color: '#7F1D1D',
                 }}>
                   {submitError}
                 </div>

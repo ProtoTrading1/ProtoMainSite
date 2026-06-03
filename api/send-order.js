@@ -1,9 +1,7 @@
 import PDFDocument from 'pdfkit';
-import { Resend } from 'resend';
 import { requireAuth } from './_auth.js';
 
 const DEFAULT_TO = 'orders@prototrading.co.za';
-const DEFAULT_FROM = 'Proto Trading Portal <onboarding@resend.dev>';
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -163,8 +161,8 @@ export default async function handler(req, res) {
   const user = await requireAuth(req, res);
   if (!user) return;
 
-  if (!process.env.RESEND_API_KEY) {
-    return res.status(500).json({ error: 'Missing RESEND_API_KEY environment variable' });
+  if (!process.env.BREVO_API_KEY) {
+    return res.status(500).json({ error: 'Brevo API key not configured' });
   }
 
   const { items = [], customer = {}, totals = {} } = req.body || {};
@@ -173,28 +171,40 @@ export default async function handler(req, res) {
   }
 
   const preparedItems = await prepareItems(items);
-  const resend = new Resend(process.env.RESEND_API_KEY);
   const pdfBuffer = await buildPdfBuffer({ items: preparedItems, customer, totals });
   const to = process.env.ORDER_TO_EMAIL || DEFAULT_TO;
-  const from = process.env.ORDER_FROM_EMAIL || DEFAULT_FROM;
 
-  const response = await resend.emails.send({
-    from,
-    to,
-    replyTo: customer.email ? cleanText(customer.email) : undefined,
-    subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-    html: buildEmailHtml({ items: preparedItems, customer, totals }),
-    attachments: [
-      {
-        filename: `proto-order-${Date.now()}.pdf`,
-        content: pdfBuffer.toString('base64'),
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
       },
-    ],
-  });
-
-  if (response.error) {
-    return res.status(502).json({ error: response.error.message || 'Email could not be sent' });
+      body: JSON.stringify({
+        sender: { name: 'Proto Trading Portal', email: 'online@proto.co.za' },
+        to: [{ email: to }],
+        replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
+        subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
+        htmlContent: buildEmailHtml({ items: preparedItems, customer, totals }),
+        attachment: [
+          {
+            name: `proto-order-${Date.now()}.pdf`,
+            content: pdfBuffer.toString('base64'),
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      console.error('Brevo API error:', resp.status, JSON.stringify(body));
+      return res.status(502).json({ error: 'Email could not be sent' });
+    }
+  } catch (err) {
+    console.error('Brevo fetch error:', err.message);
+    return res.status(502).json({ error: 'Email could not be sent' });
   }
 
-  return res.status(200).json({ success: true, id: response.data?.id });
+  return res.status(200).json({ success: true });
 }

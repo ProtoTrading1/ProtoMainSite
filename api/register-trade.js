@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import nodemailer from 'nodemailer';
 
 const WELCOME_HTML = (name) => `<!DOCTYPE html>
 <html lang="en">
@@ -167,26 +166,31 @@ export default async function handler(req, res) {
     }
   }
 
-  // Send branded welcome email via Brevo SMTP
-  try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_PASS,
-      },
-    });
-    await transporter.sendMail({
-      from: `"Proto Trading Online" <${process.env.BREVO_SMTP_USER}>`,
-      to: normalizedEmail,
-      subject: 'Your Proto Trading application has been received',
-      html: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
-    });
-  } catch (emailErr) {
-    // Don't fail the registration if email sending fails
-    console.error('Welcome email error:', emailErr.message);
+  // Send branded welcome email via Brevo REST API
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'api-key': process.env.BREVO_API_KEY,
+        },
+        body: JSON.stringify({
+          sender: { name: 'Proto Trading Online', email: 'online@proto.co.za' },
+          to: [{ email: normalizedEmail }],
+          subject: 'Your Proto Trading application has been received',
+          htmlContent: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
+        }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        console.error('Welcome email Brevo error:', resp.status, JSON.stringify(body));
+      }
+    } catch (emailErr) {
+      // Don't fail the registration if email sending fails
+      console.error('Welcome email error:', emailErr.message);
+    }
   }
 
   return res.status(200).json({ ok: true });

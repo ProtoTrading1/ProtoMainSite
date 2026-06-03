@@ -79,7 +79,7 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
           </div>
 
           {error && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#7F1D1D', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
               {error}
             </div>
           )}

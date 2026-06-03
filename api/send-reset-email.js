@@ -1,5 +1,4 @@
 import { createHmac } from 'crypto';
-import { Resend } from 'resend';
 
 function makeToken(email, secret) {
   const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + 3600000 })).toString('base64url');
@@ -60,26 +59,36 @@ export default async function handler(req, res) {
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey || resendKey === '""' || resendKey.startsWith('"')) {
-    console.error('RESEND_API_KEY is not configured');
+  if (!process.env.BREVO_API_KEY) {
+    console.error('BREVO_API_KEY not configured');
     return res.status(500).json({ error: 'Email service not configured' });
   }
 
   const token = makeToken(email.trim(), secret);
   const resetLink = `https://protoportal-main.vercel.app/#/reset-password?token=${encodeURIComponent(token)}`;
 
-  const resend = new Resend(resendKey);
-
-  const { error } = await resend.emails.send({
-    from: 'Proto Trading Online <onboarding@resend.dev>',
-    to: [email.trim()],
-    subject: 'Reset your Proto Trading password',
-    html: RESET_HTML(resetLink),
-  });
-
-  if (error) {
-    console.error('Resend error:', JSON.stringify(error));
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: 'Proto Trading Online', email: 'online@proto.co.za' },
+        to: [{ email: email.trim() }],
+        subject: 'Reset your Proto Trading password',
+        htmlContent: RESET_HTML(resetLink),
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      console.error('Brevo API error:', resp.status, JSON.stringify(body));
+      return res.status(500).json({ error: 'Failed to send email. Please try again.' });
+    }
+  } catch (err) {
+    console.error('Brevo fetch error:', err.message);
     return res.status(500).json({ error: 'Failed to send email. Please try again.' });
   }
 

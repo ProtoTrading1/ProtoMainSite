@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
+import ProductCard from './components/ProductCard';
 
 // Lazy-loaded: only fetched when the user actually triggers these interactions.
 const CartFlyAnimation = lazy(() => import('./components/CartFlyAnimation'));
@@ -81,9 +82,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartItems, setCartItems] = useState([]);
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
-  const [drawerPeekProgress, setDrawerPeekProgress] = useState(0);
   const drawerTimerRef = useRef(null);
-  const drawerPeekDeadlineRef = useRef(0);
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -226,23 +225,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [customer?.name, customer?.email, customer?.phone, customer?.delivery_address]);
 
-  useEffect(() => {
-    if (!drawerPeek) {
-      setDrawerPeekProgress(0);
-      drawerPeekDeadlineRef.current = 0;
-      return undefined;
-    }
-
-    const tick = () => {
-      const remaining = Math.max(0, drawerPeekDeadlineRef.current - Date.now());
-      setDrawerPeekProgress((remaining / DRAWER_PEEK_MS) * 100);
-    };
-
-    tick();
-    const intervalId = window.setInterval(tick, 50);
-    return () => window.clearInterval(intervalId);
-  }, [drawerPeek]);
-
   useEffect(() => () => {
     if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
   }, []);
@@ -257,13 +239,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (buttonPos) setFlyAnim(buttonPos);
 
     setDrawerPeek(true);
-    drawerPeekDeadlineRef.current = Date.now() + DRAWER_PEEK_MS;
-    setDrawerPeekProgress(100);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
-    drawerTimerRef.current = setTimeout(() => {
-      setDrawerPeek(false);
-      setDrawerPeekProgress(0);
-    }, DRAWER_PEEK_MS);
+    drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
   };
 
   const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })));
@@ -383,6 +360,37 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setReorderModal(false);
   };
 
+  const [previewProduct, setPreviewProduct] = useState(null);
+
+  // Group products sharing the same parentSku into a single card with "Multiple Variants"
+  const displayProducts = useMemo(() => {
+    const groups = new Map();
+    const order = [];
+    for (const p of catalogProducts) {
+      if (p.parentSku) {
+        if (!groups.has(p.parentSku)) {
+          groups.set(p.parentSku, []);
+          order.push({ type: 'group', key: p.parentSku });
+        }
+        groups.get(p.parentSku).push(p);
+      } else {
+        order.push({ type: 'single', product: p });
+      }
+    }
+    return order.map((entry) => {
+      if (entry.type === 'single') return entry.product;
+      const variants = groups.get(entry.key);
+      if (variants.length === 1) return variants[0];
+      const rep = variants[0];
+      return {
+        ...rep,
+        id: `group_${entry.key}`,
+        isVariantGroup: true,
+        variants,
+      };
+    });
+  }, [catalogProducts]);
+
   const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
@@ -417,7 +425,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         <main className="content-area">
           <MainContent
-            products={catalogProducts}
+            products={displayProducts}
             allProductCount={counts[''] || catalogTotal}
             categoryProductCount={catalogTotal}
             addToCart={addToCart}
@@ -443,6 +451,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             browseCategories={browseCategories}
             categoryCounts={counts}
             categoryNode={categoryNode}
+            onProductPreview={setPreviewProduct}
           />
         </main>
 
@@ -454,8 +463,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             removeFromCart={removeFromCart}
             clearCart={clearCart}
             sendOrderEmail={sendOrderEmail}
-            autoCloseProgress={drawerPeekProgress}
-            showAutoCloseBar={drawerPeek}
+            autoCloseProgress={0}
+            showAutoCloseBar={false}
           />
         </aside>
       </div>
@@ -477,6 +486,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       {reorderModal && <Suspense fallback={null}><ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
 
       {flyAnim && <Suspense fallback={null}><CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} /></Suspense>}
+
+      {/* Global product preview — triggered from strip cards in category landings */}
+      {previewProduct && (
+        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}>
+          <ProductCard
+            product={previewProduct}
+            addToCart={addToCart}
+            cartQty={cartQtyMap[previewProduct.id] || 0}
+            onCartQtyChange={handleCartQtyChange}
+            special={specialsMap[previewProduct.id] || null}
+            initialZoomOpen={true}
+            onZoomClose={() => setPreviewProduct(null)}
+          />
+        </div>
+      )}
 
       <MobileNav
         isOpen={mobileMenuOpen}

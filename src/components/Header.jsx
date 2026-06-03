@@ -185,7 +185,9 @@ function SearchPanel({ query, suggestions, catMatches, recentSearches, activeIdx
         <div className="sp-section">
           <div className="sp-section-head">
             <span>Products</span>
-            <span className="sp-result-count">{suggestions.length} results</span>
+            <button type="button" className="sp-view-all-link" onMouseDown={(e) => { e.preventDefault(); onPickTerm(query); }}>
+              View all results →
+            </button>
           </div>
           {suggestions.map((p, i) => (
             <button
@@ -255,7 +257,7 @@ export default function Header({
 
   const updateSuggestions = (query, products) => {
     if (!query.trim()) { setSuggestions([]); setCatMatches([]); return; }
-    setSuggestions(getSuggestions(products, query, 6));
+    setSuggestions(getSuggestions(products, query, 20));
     setCatMatches(matchCategories(query));
   };
 
@@ -351,7 +353,7 @@ export default function Header({
     setSearchQuery(val);
     const products = await loadProductsOnce();
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
-    setMobileSuggestions(getSuggestions(products, val, 5));
+    setMobileSuggestions(getSuggestions(products, val, 12));
     setMobileCatMatches(matchCategories(val));
   };
 

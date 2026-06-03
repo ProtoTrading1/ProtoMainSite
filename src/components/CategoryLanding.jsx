@@ -4,11 +4,16 @@ import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
 import { optimizedImageUrl } from '../lib/imageUrl';
 
 // ─── Product strip card ───────────────────────────────────────
-function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
+function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPreview }) {
   const inCart = cartQty > 0;
   return (
     <div className="strip-card">
-      <div className="strip-card-img">
+      <button
+        type="button"
+        className="strip-card-img strip-card-img-btn"
+        onClick={() => onProductPreview?.(product)}
+        aria-label={`View ${product.name}`}
+      >
         {product.image
           ? <img
               src={optimizedImageUrl(product.image, { width: 200, quality: 75 })}
@@ -18,10 +23,16 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
               style={{ mixBlendMode: 'multiply' }}
             />
           : <div className="strip-card-no-img"><ImageOff size={20} /></div>}
-      </div>
+      </button>
       <div className="strip-card-body">
         <span className="strip-card-code">{product.code}</span>
-        <p className="strip-card-name">{product.name}</p>
+        <button
+          type="button"
+          className="strip-card-name-btn"
+          onClick={() => onProductPreview?.(product)}
+        >
+          <p className="strip-card-name">{product.name}</p>
+        </button>
         <div className="strip-card-footer">
           <strong className="strip-card-price">R{product.price.toFixed(2)}</strong>
           {inCart ? (
@@ -42,7 +53,7 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange }) {
 }
 
 // ─── Product strip section ────────────────────────────────────
-function ProductStrip({ products, icon: Icon, title, subtitle, color, addToCart, cartQtyMap, onCartQtyChange }) {
+function ProductStrip({ products, icon: Icon, title, subtitle, color, addToCart, cartQtyMap, onCartQtyChange, onProductPreview }) {
   if (!products.length) return null;
   return (
     <div className="cat-landing-section">
@@ -59,6 +70,7 @@ function ProductStrip({ products, icon: Icon, title, subtitle, color, addToCart,
             addToCart={addToCart}
             cartQty={cartQtyMap?.[p.id] || 0}
             onCartQtyChange={onCartQtyChange}
+            onProductPreview={onProductPreview}
           />
         ))}
       </div>
@@ -75,11 +87,12 @@ export default function CategoryLanding({
   addToCart,
   cartQtyMap,
   onCartQtyChange,
+  onProductPreview,
   depth = 1,   // 1 = L1 dept, 2 = L2 category, 3+ = deep
 }) {
   const isL1 = depth === 1;
 
-  const color      = DEPT_COLORS[categoryNode.id] || '#DC2626';
+  const color      = DEPT_COLORS[categoryNode.id] || '#7F1D1D';
   const iconName   = categoryNode.icon || 'Package';
   const Icon       = LUCIDE_ICON_MAP[iconName] || null;
   const useCases   = USE_CASES[categoryNode.id] || [];
@@ -176,6 +189,7 @@ export default function CategoryLanding({
         addToCart={addToCart}
         cartQtyMap={cartQtyMap}
         onCartQtyChange={onCartQtyChange}
+        onProductPreview={onProductPreview}
       />
 
       {/* ── New Arrivals strip (L1 only — keeps L2 lean) ─── */}
@@ -189,6 +203,7 @@ export default function CategoryLanding({
           addToCart={addToCart}
           cartQtyMap={cartQtyMap}
           onCartQtyChange={onCartQtyChange}
+          onProductPreview={onProductPreview}
         />
       )}
 

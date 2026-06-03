@@ -16,7 +16,7 @@ export default function Breadcrumb({ crumbs, navigate }) {
         style={{
           display: 'flex', alignItems: 'center', gap: '4px',
           fontSize: '13px', fontWeight: crumbs.length === 0 ? '700' : '500',
-          color: crumbs.length === 0 ? '#DC2626' : '#6B7280',
+          color: crumbs.length === 0 ? '#7F1D1D' : '#6B7280',
           background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px',
           transition: 'color 0.12s'
         }}

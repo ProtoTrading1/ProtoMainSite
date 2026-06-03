@@ -8,6 +8,36 @@ function normalize(value) {
     .trim();
 }
 
+// Lightweight stemmer — normalises common English morphological endings so that
+// "batteries" and "battery" both reduce to "batter", etc.
+function stem(word) {
+  if (word.length <= 3) return word;
+  // ies → y  (batteries → battery, flies → fly)
+  if (word.endsWith('ies')) return word.slice(0, -3) + 'y';
+  // ves → f  (knives → knife)
+  if (word.endsWith('ves') && word.length > 4) return word.slice(0, -3) + 'f';
+  // sses / shes / ches / xes → strip es
+  if (/(?:ss|sh|ch|x)es$/.test(word)) return word.slice(0, -2);
+  // ses → s  (passes → pass)
+  if (word.endsWith('ses') && word.length > 4) return word.slice(0, -2);
+  // ing → (strip, but keep root if it would be < 3 chars)
+  if (word.endsWith('ing') && word.length > 5) {
+    const root = word.slice(0, -3);
+    // double consonant before -ing: running → run
+    if (root.length >= 2 && root[root.length - 1] === root[root.length - 2]) return root.slice(0, -1);
+    return root;
+  }
+  // ed → strip
+  if (word.endsWith('ed') && word.length > 4) {
+    const root = word.slice(0, -2);
+    if (root.length >= 2 && root[root.length - 1] === root[root.length - 2]) return root.slice(0, -1);
+    return root;
+  }
+  // plain plural s (not ss)
+  if (word.endsWith('s') && !word.endsWith('ss') && word.length > 3) return word.slice(0, -1);
+  return word;
+}
+
 function compact(value) {
   return normalize(value).replace(/\s+/g, '');
 }
@@ -59,6 +89,7 @@ function scoreProduct(product, queryTokens) {
   const text = normalize(rawText);
   const textCompact = compact(rawText);
   const textWords = text.split(/\s+/).filter(Boolean);
+  const stemmedWords = textWords.map(stem);
   const code = normalize(product.code);
   const codeCompact = compact(product.code);
   let score = 0;
@@ -67,6 +98,7 @@ function scoreProduct(product, queryTokens) {
   for (const token of queryTokens) {
     const tokenCompact = compact(token);
     if (!tokenCompact) continue;
+    const tokenStem = stem(token);
 
     if (code === token || codeCompact === tokenCompact) {
       score += 220; matched = true; continue;
@@ -78,17 +110,42 @@ function scoreProduct(product, queryTokens) {
       score += 95; matched = true; continue;
     }
 
+    // Stem match — "batteries" stem "batter" matches "battery" stem "batter"
+    if (tokenStem !== token && stemmedWords.includes(tokenStem)) {
+      score += 80; matched = true; continue;
+    }
+    // Stem prefix — "batter" starts with "batter"
+    if (tokenStem.length >= 4 && stemmedWords.some((w) => w.startsWith(tokenStem) || tokenStem.startsWith(w))) {
+      score += 65; matched = true; continue;
+    }
+
     // Fuzzy / typo tolerance — compare token against each word in product text
+    // Also try stemmed form of token vs stemmed words for plurals + typos
     const allowed = maxEdits(token.length);
     if (allowed > 0) {
       let bestDist = Infinity;
-      for (const word of textWords) {
-        if (Math.abs(word.length - token.length) > allowed) continue;
-        const d = editDistance(token, word);
-        if (d < bestDist) bestDist = d;
+      for (let i = 0; i < textWords.length; i++) {
+        const word = textWords[i];
+        const sWord = stemmedWords[i];
+        // compare raw token vs raw word
+        if (Math.abs(word.length - token.length) <= allowed + 1) {
+          const d = editDistance(token, word);
+          if (d < bestDist) bestDist = d;
+        }
+        // compare stemmed token vs stemmed word (catches plurals + 1 typo)
+        if (tokenStem !== token && Math.abs(sWord.length - tokenStem.length) <= allowed + 1) {
+          const d = editDistance(tokenStem, sWord);
+          if (d < bestDist) bestDist = d;
+        }
       }
       if (bestDist <= allowed) {
         score += bestDist === 1 ? 55 : 30;
+        matched = true;
+        continue;
+      }
+      // Slightly looser: one extra allowed edit for stem comparisons
+      if (bestDist <= allowed + 1 && tokenStem !== token) {
+        score += 20;
         matched = true;
         continue;
       }

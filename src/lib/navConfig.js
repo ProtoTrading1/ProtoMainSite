@@ -1,37 +1,38 @@
 import {
-  Cookie, Gem, Gift, Home, Layers, Package, PenTool, Shirt, Smile, ToyBrick, Wrench,
+  Brush, Gem, PartyPopper, Shirt, UtensilsCrossed, Hammer, Box, Scissors, Gamepad2, FlaskConical, Apple,
 } from 'lucide-react';
 
 // Maps the icon name string from categories.json → Lucide component
-// Scissors (beads) overridden to Gem; Wind (textiles) overridden to Layers
 export const LUCIDE_ICON_MAP = {
-  PenTool,
-  Scissors: Gem,
-  Smile,
-  Gift,
-  Shirt,
-  Cookie,
-  Wrench,
-  Home,
-  Package,
-  Wind: Layers,
-  ToyBrick,
+  PenTool: Brush,           // arts & crafts → paint brush
+  Scissors: Gem,            // beads & jewellery → gem stone
+  Smile: FlaskConical,      // beauty & personal care → flask/cosmetics
+  Gift: PartyPopper,        // events & parties → party popper
+  Shirt,                    // fashion & accessories
+  Cookie: Apple,            // food & drinks → apple
+  Wrench: Hammer,           // hardware → hammer
+  Home: UtensilsCrossed,    // homeware & kitchen → crossed utensils
+  Package: Box,             // packaging → open box
+  Wind: Scissors,           // textiles → scissors (fabric cutting)
+  ToyBrick: Gamepad2,       // toys & games → gamepad
   Gem,
-  Layers,
+  Brush,
 };
 
+const BRAND_RED = '#7F1D1D';
+
 export const DEPT_COLORS = {
-  'arts-crafts-stationery': '#7C3AED',
-  'beads-jewellery': '#DB2777',
-  'beauty-personal-care': '#059669',
-  'events-parties': '#D97706',
-  'fashion-accessories': '#2563EB',
-  'food-drinks': '#EA580C',
-  'hardware': '#475569',
-  'homeware-kitchen': '#16A34A',
-  'packaging': '#0891B2',
-  'textiles': '#9333EA',
-  'toys-games-kids': '#DC2626',
+  'arts-crafts-stationery': BRAND_RED,
+  'beads-jewellery': BRAND_RED,
+  'beauty-personal-care': BRAND_RED,
+  'events-parties': BRAND_RED,
+  'fashion-accessories': BRAND_RED,
+  'food-drinks': BRAND_RED,
+  'hardware': BRAND_RED,
+  'homeware-kitchen': BRAND_RED,
+  'packaging': BRAND_RED,
+  'textiles': BRAND_RED,
+  'toys-games-kids': BRAND_RED,
 };
 
 export const DEPT_DESCRIPTIONS = {

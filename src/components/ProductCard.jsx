@@ -67,22 +67,30 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false }) {
+export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose }) {
   const safePrice = Number(product?.price) || 0;
-  const safeTags = Array.isArray(product?.tags) ? product.tags : [];
+  const isVariantGroup = product?.isVariantGroup === true;
+  const variants = product?.variants || [];
+  const baseTags = Array.isArray(product?.tags) ? product.tags : [];
+  const safeTags = isVariantGroup
+    ? [{ label: 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
+    : baseTags;
   const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
-  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
   const [showStock, setShowStock] = useState(false);
   const [liveStock, setLiveStock] = useState(null);
   const [stockLoading, setStockLoading] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState(null);
   const addButtonRef = useRef(null);
 
-  const lineTotal = (safePrice * qty).toFixed(2);
+  const activeProduct = selectedVariant || product;
+  const activePrice = Number(activeProduct?.price) || 0;
+  const lineTotal = (activePrice * qty).toFixed(2);
   const inCart = cartQty > 0;
 
   const openPreview = () => setZoomOpen(true);
-  const closePreview = () => { setZoomOpen(false); setShowStock(false); setLiveStock(null); };
+  const closePreview = () => { setZoomOpen(false); setShowStock(false); setLiveStock(null); onZoomClose?.(); };
 
   const handleStockCheck = async () => {
     if (showStock) { setShowStock(false); setLiveStock(null); return; }
@@ -216,7 +224,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   })}
                 </div>
               )}
-              <ProductImage src={product.localImage || product.image} alt={product.name} width={1200} />
+              <ProductImage src={activeProduct.localImage || activeProduct.image} alt={activeProduct.name} width={1200} />
               {special && (
                 <div className="pz-special-badge">
                   {special.deal === 'discount' && special.discountPct ? `${special.discountPct}% OFF`
@@ -229,8 +237,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             {/* White details panel */}
             <div className="pz-details">
               <div className="pz-scroll">
-                <span className="pz-code">{product.code}</span>
-                <h2 className="pz-name">{product.name}</h2>
+                <span className="pz-code">{activeProduct.code}</span>
+                <h2 className="pz-name">{activeProduct.name}</h2>
 
                 {/* Live stock check */}
                 <div className="pz-stock-zone">
@@ -262,21 +270,50 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   </div>
                 )}
 
+                {/* Variant list for grouped products — click to swap image */}
+                {isVariantGroup && variants.length > 0 && (
+                  <div className="pz-variants">
+                    <span className="pz-variants-label">Select a variant</span>
+                    <div className="pz-variants-list">
+                      {variants.map((v) => {
+                        const isSelected = (selectedVariant?.id || product.id) === v.id;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className={`pz-variant-row${isSelected ? ' pz-variant-row--selected' : ''}`}
+                            onClick={() => { setSelectedVariant(v); setQty(v.minQty || 1); }}
+                          >
+                            {v.image && (
+                              <img src={v.image} alt={v.name} className="pz-variant-img" />
+                            )}
+                            <div className="pz-variant-info">
+                              <span className="pz-variant-name">{v.name}</span>
+                              {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
+                            </div>
+                            <span className="pz-variant-price">R{Number(v.price || 0).toFixed(2)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {product.tradeNote && <p className="pz-trade-note">{product.tradeNote}</p>}
               </div>
 
               {/* Fixed buy bar */}
               <div className="pz-buy-bar">
                 <div className="pz-price-row">
-                  <span className="pz-price">R{safePrice.toFixed(2)}</span>
-                  <span className="pz-price-note">excl. VAT · min {product.minQty || 1}</span>
+                  <span className="pz-price">R{activePrice.toFixed(2)}</span>
+                  <span className="pz-price-note">excl. VAT · min {activeProduct.minQty || 1}</span>
                 </div>
                 <div className="pz-qty-row">
                   <div className="qty-stepper" aria-label="Quantity in preview">
-                    <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                    <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
                       <Minus size={14} />
                     </button>
-                    <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                    <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
                     <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
                       <Plus size={14} />
                     </button>
@@ -286,10 +323,16 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <strong>R{lineTotal}</strong>
                   </div>
                 </div>
-                <button className="pz-add-btn" onClick={() => { handleAdd(); closePreview(); }} type="button">
-                  <ShoppingCart size={16} />
-                  Add {qty} to order
-                </button>
+                {isVariantGroup && !selectedVariant ? (
+                  <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', margin: 0 }}>
+                    Select a variant above to add to order
+                  </p>
+                ) : (
+                  <button className="pz-add-btn" onClick={() => { addToCart(activeProduct, qty); closePreview(); }} type="button">
+                    <ShoppingCart size={16} />
+                    Add {qty} to order
+                  </button>
+                )}
               </div>
             </div>
 

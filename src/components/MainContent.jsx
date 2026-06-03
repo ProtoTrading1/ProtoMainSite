@@ -103,6 +103,7 @@ export default function MainContent({
   browseCategories = [],
   categoryCounts = {},
   categoryNode = null,
+  onProductPreview = null,
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
@@ -191,6 +192,7 @@ export default function MainContent({
           addToCart={addToCart}
           cartQtyMap={cartQtyMap}
           onCartQtyChange={onCartQtyChange}
+          onProductPreview={onProductPreview}
           depth={path.length}
         />
       )}
