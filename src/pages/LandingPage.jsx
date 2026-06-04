@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   Lock,
+  MessageCircle,
   PackageSearch,
 } from 'lucide-react';
 import '../landing.css';
@@ -373,6 +374,7 @@ function Questionnaire({ onLogin }) {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
+  const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const [companyAddress, setCompanyAddress] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [country, setCountry] = useState('');
@@ -413,6 +415,7 @@ function Questionnaire({ onLogin }) {
         province: province || null,
         city: city.trim() || null,
         businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
+        acceptWhatsapp: whatsappOptIn === true,
       });
       setDone(true);
     } catch (err) {
@@ -520,6 +523,61 @@ function Questionnaire({ onLogin }) {
                   placeholder="+27"
                 />
               </div>
+
+              {/* WhatsApp opt-in CTA — appears once phone is filled */}
+              {phone.replace(/\D/g, '').length >= 8 && (
+                <motion.div
+                  className="lp-quiz-field lp-quiz-field--full"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div style={{
+                    background: 'rgba(22,163,74,0.1)',
+                    border: '1px solid rgba(22,163,74,0.35)',
+                    borderRadius: '12px',
+                    padding: '16px 18px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <MessageCircle size={18} color="#4ade80" style={{ flexShrink: 0 }} />
+                      <div>
+                        <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Can we message you on WhatsApp?</div>
+                        <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', marginTop: '2px' }}>Get specials, stock alerts and order updates straight to your phone.</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setWhatsappOptIn(true)}
+                        style={{
+                          flex: 1, padding: '11px', borderRadius: '8px', border: 'none',
+                          fontFamily: 'inherit', fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+                          background: whatsappOptIn === true ? '#16a34a' : 'rgba(22,163,74,0.2)',
+                          color: whatsappOptIn === true ? '#fff' : '#4ade80',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        ✓ Yes, WhatsApp me
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWhatsappOptIn(false)}
+                        style={{
+                          flex: 1, padding: '11px', borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          fontFamily: 'inherit', fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+                          background: whatsappOptIn === false ? 'rgba(255,255,255,0.08)' : 'transparent',
+                          color: whatsappOptIn === false ? '#fff' : 'rgba(255,255,255,0.45)',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        No thanks
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
                 <div className="lp-quiz-pw-wrap">

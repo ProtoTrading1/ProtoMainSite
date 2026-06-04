@@ -62,6 +62,7 @@ function collectionLabel(collection) {
   if (collection === 'hot') return 'Hot Sellers';
   if (collection === 'new') return 'New Stock';
   if (collection === 'clearance') return 'Clearance Stock';
+  if (collection === 'specials') return "This Week's Specials";
   if (collection === 'instock') return 'In Stock';
   if (collection === 'soldout') return 'Out of Stock';
   return 'All Products';
@@ -123,6 +124,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     const load = async () => {
       setLoading(true);
       try {
+        const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
         const [pageData, nextCounts] = await Promise.all([
           fetchProductPage({
             page,
@@ -131,6 +133,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categoryPath: path,
             collection: activeCollection,
             sort,
+            specialIds,
           }),
           fetchCategoryCounts({ collection: activeCollection }),
         ]);
@@ -279,6 +282,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       setSearchQuery('');
       navigate([]);
     }
+    if (id === 'specials') {
+      setActiveCollection('specials');
+      setSearchQuery('');
+      navigate([]);
+    }
     if (id === 'instock') {
       setActiveCollection('instock');
       setSearchQuery('');
@@ -408,7 +416,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onReorder={() => setReorderModal(true)}
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
-        onSpecials={() => handleShortcut('clearance')}
+        onSpecials={() => handleShortcut('specials')}
         onCartClick={() => setMobileCartOpen(true)}
       />
 
@@ -420,6 +428,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             navigate={navigate}
             setRefinement={setRefinement}
             counts={counts}
+            customer={customer}
           />
         </aside>
 

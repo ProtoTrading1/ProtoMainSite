@@ -1,48 +1,156 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import MegaMenu from './MegaMenu';
 
-export default function Sidebar({ categories, path, navigate, counts }) {
+function ProductRequestModal({ onClose, customer }) {
+  const [description, setDescription] = useState('');
+  const [qty, setQty] = useState('');
+  const [image, setImage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  const handleFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) { setError('Please select an image file.'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImage({ base64: ev.target.result.split(',')[1], name: file.name, type: file.type, preview: ev.target.result });
+      setError('');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async () => {
+    if (!description.trim()) { setError('Please describe the product.'); return; }
+    if (!image) { setError('Please attach a reference image.'); return; }
+    setSubmitting(true); setError('');
+    try {
+      const res = await fetch('/api/product-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type, customerEmail: customer?.email || '', customerName: customer?.name || '' }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to send.');
+      setDone(true);
+    } catch (err) { setError(err.message); }
+    finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="topnav-modal-backdrop" onClick={onClose}>
+      <div className="topnav-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <button className="topnav-modal-close" onClick={onClose} type="button"><X size={18} /></button>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <PackageSearch size={40} style={{ color: '#8B1A1A', margin: '0 auto 16px', display: 'block' }} />
+            <h2 style={{ marginBottom: 8 }}>Request sent!</h2>
+            <p style={{ color: '#6b7280', fontSize: 14 }}>Our team will get back to you shortly.</p>
+            <button onClick={onClose} style={{ marginTop: 20, padding: '10px 24px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
+              <PackageSearch size={20} style={{ color: '#8B1A1A', flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>Can't find what you're looking for?</h2>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 13 }}>Describe the product and attach a reference image — we'll source it for you.</p>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Description <span style={{ color: '#e11d48' }}>*</span></label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Size, colour, material, use case…" rows={3} style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Quantity <span style={{ color: '#9ca3af', fontWeight: 500, textTransform: 'none', fontSize: 11 }}>(optional)</span></label>
+              <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 100" style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Reference image <span style={{ color: '#e11d48' }}>*</span></label>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+              <div onClick={() => fileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+                style={{ border: `2px dashed ${image ? '#d1d5db' : '#cbd5e1'}`, borderRadius: 10, minHeight: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 6, padding: image ? 0 : 14 }}>
+                {image ? <><img src={image.preview} alt="ref" style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', padding: 8 }} /><div style={{ fontSize: 12, color: '#6b7280', paddingBottom: 8 }}>Click or drop to change</div></> : <><Upload size={22} style={{ color: '#9ca3af' }} /><div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>Drop image or click to browse</div></>}
+              </div>
+            </div>
+            {error && <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#7f1d1d', fontSize: 13 }}>{error}</div>}
+            <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', padding: 13, background: '#8B1A1A', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'inherit', fontWeight: 800, fontSize: 14, cursor: submitting ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? <><Loader2 size={16} className="spin-icon" /> Sending…</> : <><PackageSearch size={16} /> Send Request</>}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function Sidebar({ categories, path, navigate, counts, customer }) {
   const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
+  const [menuTopOffset, setMenuTopOffset] = useState(0);
+  const [showRequest, setShowRequest] = useState(false);
+  const containerRef = useRef(null);
 
   const activeRoot = path?.[0] || null;
 
   const menuNode = useMemo(() => {
     const targetId = openCategoryId || activeRoot;
-    return targetId ? categories.find((category) => category.id === targetId) : null;
+    return targetId ? categories.find((c) => c.id === targetId) : null;
   }, [activeRoot, categories, openCategoryId]);
 
   const menuOpen = Boolean(menuNode?.children?.length && openCategoryId);
 
+  const handleToggleL1 = (id, btnEl) => {
+    setOpenCategoryId(id);
+    if (id && btnEl && containerRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const btnRect = btnEl.getBoundingClientRect();
+      setMenuTopOffset(Math.max(0, btnRect.top - containerRect.top));
+    }
+  };
+
   return (
     <div
+      ref={containerRef}
       className="sidebar-container"
       onMouseLeave={() => setOpenCategoryId(null)}
-      style={{
-        position: 'relative',
-        height: '100%',
-        backgroundColor: '#fff',
-        zIndex: 100,
-      }}
+      style={{ position: 'relative', height: '100%', backgroundColor: '#fff', zIndex: 100 }}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          position: 'relative',
-          zIndex: 210,
-        }}
-      >
-        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 210 }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '8px' }}>
           <CategoryNav
             categories={categories}
             path={path}
             navigate={navigate}
             counts={counts}
             openCategoryId={openCategoryId}
-            onToggleL1={setOpenCategoryId}
+            onToggleL1={handleToggleL1}
           />
+        </div>
+
+        {/* CTA buttons — below category list */}
+        <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setShowRequest(true)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid #e8eaed', borderRadius: 10, background: '#fafafa', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8B1A1A'; e.currentTarget.style.color = '#8B1A1A'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8eaed'; e.currentTarget.style.color = '#374151'; }}
+          >
+            <PackageSearch size={15} style={{ color: '#8B1A1A', flexShrink: 0 }} />
+            Can't find it?
+          </button>
+          <button
+            type="button"
+            onClick={() => typeof window.Intercom === 'function' && window.Intercom('show')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid #e8eaed', borderRadius: 10, background: '#fafafa', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; e.currentTarget.style.color = '#0f172a'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8eaed'; e.currentTarget.style.color = '#374151'; }}
+          >
+            <MessageCircle size={15} style={{ flexShrink: 0 }} />
+            Chat with us
+          </button>
         </div>
       </div>
 
@@ -53,8 +161,11 @@ export default function Sidebar({ categories, path, navigate, counts }) {
           navigate={navigate}
           counts={counts}
           onClose={() => setOpenCategoryId(null)}
+          topOffset={menuTopOffset}
         />
       )}
+
+      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
     </div>
   );
 }

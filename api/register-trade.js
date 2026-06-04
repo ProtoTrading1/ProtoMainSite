@@ -70,6 +70,7 @@ export default async function handler(req, res) {
     province,
     city,
     businessType,
+    acceptWhatsapp,
   } = req.body || {};
 
   if (!email || !username || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
@@ -143,6 +144,7 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      accept_whatsapp: acceptWhatsapp === true,
       is_approved: false,
       tier: 'regular',
     };
@@ -179,7 +181,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           sender: { name: 'Proto Trading Online', email: 'online@proto.co.za' },
           to: [{ email: normalizedEmail }],
-          subject: 'Your Proto Trading application has been received',
+          subject: 'We have received your request — you will hear from us within 24 hours',
           htmlContent: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
         }),
       });

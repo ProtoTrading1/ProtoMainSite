@@ -1,5 +1,6 @@
 import { supabaseStock } from './supabaseStock';
 import { authHeaders } from './authHeaders';
+import { fuzzyFilter } from './fuzzySearch';
 
 // Promise singletons — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -75,6 +76,7 @@ function adapt(wpRow, stockRow) {
     name: wpRow.title,
     description: wpRow.description || '',
     price: Number(stockRow?.sell_price ?? 0),
+    images: (wpRow.image_url || '').split(',').map((u) => u.trim()).filter(Boolean),
     image: (wpRow.image_url || '').split(',')[0].trim(),
     stockQty,
     stockOnHand: stockQty,
@@ -208,11 +210,12 @@ export async function checkStock(barcode) {
 
 // ─── Filtering / sorting helpers ──────────────────────────────────────────────
 
-function applyCollection(products, collection) {
+function applyCollection(products, collection, specialIds = null) {
   if (collection === 'instock') return products.filter((p) => p.stockQty > 0);
   if (collection === 'soldout') return products.filter((p) => p.stockQty <= 0);
   if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
   if (collection === 'new') return [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (collection === 'specials' && specialIds) return products.filter((p) => specialIds.has(p.id));
   return products;
 }
 
@@ -261,11 +264,12 @@ export async function fetchProductPage({
   categoryPath = [],
   collection = 'all',
   sort = 'featured',
+  specialIds = null,
 } = {}) {
   let products = await getAllCached();
-  products = applyCollection(products, collection);
+  products = applyCollection(products, collection, specialIds);
   products = applyPathFilter(products, categoryPath);
-  products = applySearchFilter(products, searchQuery);
+  products = searchQuery.trim() ? fuzzyFilter(products, searchQuery) : products;
   products = applySort(products, sort);
 
   const total = products.length;
@@ -313,7 +317,7 @@ export async function fetchAdminProductsPage({
   if (zeroStockOnly) rows = rows.filter((p) => p.stockQty === 0);
   else rows = rows.filter((p) => p.stockQty > 0);
   if (categoryFilter && categoryFilter !== 'all') rows = rows.filter((p) => p.category === categoryFilter);
-  rows = applySearchFilter(rows, searchQuery);
+  rows = searchQuery.trim() ? fuzzyFilter(rows, searchQuery) : rows;
   rows = [...rows].sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name));
   const total = rows.length;
   const from = (page - 1) * pageSize;

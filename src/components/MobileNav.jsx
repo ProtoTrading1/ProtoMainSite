@@ -1,7 +1,67 @@
-import { X, ChevronLeft, ChevronRight, LayoutGrid, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 
+function MobileProductRequest({ onClose: closeAll, customer }) {
+  const [description, setDescription] = useState('');
+  const [qty, setQty] = useState('');
+  const [image, setImage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  const handleFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) { setError('Select an image file.'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => { setImage({ base64: ev.target.result.split(',')[1], name: file.name, type: file.type, preview: ev.target.result }); setError(''); };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async () => {
+    if (!description.trim()) { setError('Please describe the product.'); return; }
+    if (!image) { setError('Please attach a reference image.'); return; }
+    setSubmitting(true); setError('');
+    try {
+      const res = await fetch('/api/product-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type, customerEmail: customer?.email || '', customerName: customer?.name || '' }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed.');
+      setDone(true);
+    } catch (err) { setError(err.message); }
+    finally { setSubmitting(false); }
+  };
+
+  if (done) return (
+    <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+      <PackageSearch size={36} style={{ color: '#8B1A1A', margin: '0 auto 12px', display: 'block' }} />
+      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Request sent!</div>
+      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>Our team will get back to you shortly.</p>
+      <button onClick={closeAll} style={{ padding: '10px 24px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '16px 20px' }}>
+      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Can't find what you're looking for?</div>
+      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>Describe it and attach a reference image.</p>
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the product…" rows={3} style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+      <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Quantity (optional)" style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+      <div onClick={() => fileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+        style={{ border: `2px dashed ${image ? '#d1d5db' : '#cbd5e1'}`, borderRadius: 8, minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 10, gap: 6, padding: image ? 0 : 12 }}>
+        {image ? <><img src={image.preview} alt="" style={{ maxWidth: '100%', maxHeight: 140, objectFit: 'contain', padding: 8 }} /><div style={{ fontSize: 11, color: '#6b7280', paddingBottom: 6 }}>Tap to change</div></> : <><Upload size={20} style={{ color: '#9ca3af' }} /><div style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>Tap to add reference image *</div></>}
+      </div>
+      {error && <div style={{ marginBottom: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, color: '#7f1d1d', fontSize: 13 }}>{error}</div>}
+      <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', padding: 12, background: '#8B1A1A', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'inherit', fontWeight: 800, fontSize: 14, cursor: submitting ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        {submitting ? <><Loader2 size={15} className="spin-icon" /> Sending…</> : <><PackageSearch size={15} /> Send Request</>}
+      </button>
+    </div>
+  );
+}
+
 export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout }) {
+  const [showProductRequest, setShowProductRequest] = useState(false);
+
   if (!isOpen) return null;
 
   let currentCategories = categories;
@@ -188,6 +248,36 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             </div>
           )}
         </div>
+
+        {/* Can't find / Chat CTAs */}
+        {!showProductRequest && (
+          <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 16px', display: 'flex', gap: 10, flexShrink: 0 }}>
+            <button
+              onClick={() => setShowProductRequest(true)}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
+            >
+              <PackageSearch size={15} style={{ color: '#8B1A1A' }} /> Can't find it?
+            </button>
+            <button
+              onClick={() => { typeof window.Intercom === 'function' && window.Intercom('show'); onClose(); }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
+            >
+              <MessageCircle size={15} style={{ color: '#374151' }} /> Chat with us
+            </button>
+          </div>
+        )}
+
+        {/* Product request inline form */}
+        {showProductRequest && (
+          <div style={{ borderTop: '1px solid #f1f5f9', flexShrink: 0, overflowY: 'auto', maxHeight: '60vh' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px 0' }}>
+              <button onClick={() => setShowProductRequest(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
+                <ChevronLeft size={16} /> Back
+              </button>
+            </div>
+            <MobileProductRequest onClose={() => { setShowProductRequest(false); onClose(); }} customer={customer} />
+          </div>
+        )}
 
         {/* Account actions at bottom */}
         <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 0', flexShrink: 0 }}>
