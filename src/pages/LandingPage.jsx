@@ -957,7 +957,7 @@ export default function LandingPage({ onLogin, onApply }) {
         </section>
 
         {/* ── Footer ── */}
-        <footer className="lp-footer">
+        <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
             <img src="/proto-logo.png" alt="Proto Trading" />
             <div>
@@ -965,7 +965,28 @@ export default function LandingPage({ onLogin, onApply }) {
               <small>Wholesale supplier since 1987</small>
             </div>
           </div>
-          <p>Trade access only. Not open to the general public.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+            <p style={{ margin: 0 }}>Trade access only. Not open to the general public.</p>
+            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {[
+                { label: 'Returns Policy', hash: '#/policies/returns' },
+                { label: 'Shipping Policy', hash: '#/policies/shipping' },
+                { label: 'Terms & Conditions', hash: '#/policies/terms' },
+                { label: 'Privacy Policy', hash: '#/policies/privacy' },
+              ].map(({ label, hash }) => (
+                <a
+                  key={hash}
+                  href={hash}
+                  onClick={(e) => { e.preventDefault(); window.location.hash = hash.slice(1); }}
+                  style={{ color: '#475569', fontSize: '12px', fontWeight: 700, textDecoration: 'none', transition: 'color 0.15s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; }}
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+          </div>
           <button className="access-login" type="button" onClick={onLogin}>
             <Lock size={15} />
             Customer login

@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage';
 
 const App = lazy(() => import('./App'));
 const LoginModal = lazy(() => import('./components/LoginModal'));
+const PoliciesPage = lazy(() => import('./pages/PoliciesPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const WorldClassPortal = lazy(() => import('./worldclass/WorldClassPortal'));
@@ -153,6 +154,7 @@ export default function Root() {
     </div>
   );
 
+  if (route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
   if (route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
   if (route.startsWith('#/portal-preview')) return <Suspense fallback={authSurfaceFallback}><App customer={null} onLogout={handleLogout} /></Suspense>;
 
