@@ -767,10 +767,13 @@ export default function LandingPage({ onLogin, onApply }) {
       </header>
 
       <main>
-        {/* ── Original hero ── */}
-        <section className="access-hero premium-hero">
+        {/* ── Hero ── */}
+        <section className="access-hero hero-photo-bg">
           <div className="access-hero-copy">
-            <h1>Unlock Proto Trading's private wholesale catalogue.</h1>
+            <h1>
+              <span style={{ color: '#ffffff', display: 'block' }}>Built for</span>
+              <span style={{ color: '#dc2626', display: 'block' }}>retail success.</span>
+            </h1>
             <p>
               See product images, catalogue codes and department ranges before you request a quote. Trade pricing and stock checks stay reserved for approved customers.
             </p>
@@ -790,41 +793,6 @@ export default function LandingPage({ onLogin, onApply }) {
               <span>Established wholesale supplier</span>
               <strong>Since 1987</strong>
               <span>Nationwide trade support</span>
-            </div>
-          </div>
-
-          <div className="premium-product-wall" aria-label="Catalogue preview">
-            <div className="wall-header">
-              <div>
-                <span>Catalogue preview</span>
-                <strong>Real products. Trade access required.</strong>
-              </div>
-              <div className="locked-price-pill">
-                <Lock size={14} />
-                Pricing locked
-              </div>
-            </div>
-            <div className="wall-grid">
-              {showcaseProducts.map((product) => (
-                <article className="hero-product-card" key={product.code}>
-                  <div className="hero-product-image">
-                    <img src={product.image} alt={product.name} loading="eager" fetchPriority="high" decoding="async" />
-                  </div>
-                  <div>
-                    <small>{product.dept}</small>
-                    <strong>{product.name}</strong>
-                    <span>{product.code}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="wall-footer">
-              {unlocks.map((item) => (
-                <div key={item.label}>
-                  <PackageSearch size={16} />
-                  <span>{item.label}</span>
-                </div>
-              ))}
             </div>
           </div>
         </section>
