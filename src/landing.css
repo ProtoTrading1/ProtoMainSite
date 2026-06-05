@@ -2457,11 +2457,11 @@
     min-height: 100svh !important;
     display: flex !important;
     flex-direction: column;
-    justify-content: flex-end;
-    padding: 0 24px 52px !important;
+    justify-content: flex-start;
+    padding: 32px 24px 0 !important;
     background:
-      linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 100%),
-      url('/hero-bg.jpg') center right / cover no-repeat !important;
+      linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0) 60%),
+      url('/hero-bg-mobile.jpg') center / cover no-repeat !important;
   }
 
   .hero-photo-bg .access-hero-copy {
@@ -2842,7 +2842,7 @@
   }
 
   .hero-photo-bg {
-    padding: 0 18px 40px !important;
+    padding: 28px 18px 0 !important;
   }
 
   .hero-photo-bg h1 {
