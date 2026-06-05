@@ -164,45 +164,6 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
         style={{ width: 280, display: 'flex', flexDirection: 'column', borderRight: '1px solid #F0F1F3', minWidth: 0 }}
         onMouseLeave={handleL2Leave}
       >
-        {/* Dept accent header */}
-        <div style={{
-          padding: '13px 20px',
-          borderBottom: `3px solid ${color}`,
-          background: `${color}0a`,
-          display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0,
-        }}>
-          {Icon && (
-            <span style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '28px', height: '28px', borderRadius: '7px',
-              background: `${color}22`, color, flexShrink: 0,
-            }}>
-              <Icon size={14} />
-            </span>
-          )}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.06em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {l1Node.label}
-            </div>
-            {counts?.[l1Node.id] != null && (
-              <div style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '500' }}>
-                {counts[l1Node.id].toLocaleString()} products
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => go([l1Node.id])}
-            style={{
-              fontSize: '10px', fontWeight: '700', color, textTransform: 'uppercase',
-              letterSpacing: '0.05em', background: 'none', border: 'none', cursor: 'pointer',
-              padding: '2px 0', fontFamily: 'inherit', flexShrink: 0,
-            }}
-          >
-            View All
-          </button>
-        </div>
-
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
           {l2List.map((l2) => (
             <ListItem
@@ -223,7 +184,6 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
       <div style={{ width: 260, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {hoveredL2 && l3List.length > 0 && (
           <>
-            <PanelHeader label={hoveredL2.label} onViewAll={() => go([l1Node.id, hoveredL2.id])} color={color} />
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
               {l3List.map((l3) => (
                 <ListItem
