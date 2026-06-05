@@ -140,22 +140,6 @@ export default function MainContent({
         </section>
       )}
 
-      {/* Collection filter tabs */}
-      <div className="shortcut-pills">
-        {shortcuts.map((item) => {
-          const isActive = (item.id === 'start' && activeCollection === 'all' && !isCategoryPage) || item.id === activeCollection;
-          return (
-            <button
-              key={item.id}
-              className={`shortcut-pill${isActive ? ' active' : ''}`}
-              onClick={() => { onShortcut(item.id); }}
-              type="button"
-            >
-              {item.title}
-            </button>
-          );
-        })}
-      </div>
 
       {/* Category browse pills */}
       {showCategoryGrid && (
