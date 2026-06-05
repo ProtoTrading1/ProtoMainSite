@@ -67,7 +67,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
               }}
             >
               <span style={{
-                fontSize: '13px', fontWeight: highlighted ? '700' : '500',
+                fontSize: '13px', fontWeight: '700',
                 color: highlighted ? deptColor : '#374151',
                 flex: 1, lineHeight: 1.2,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

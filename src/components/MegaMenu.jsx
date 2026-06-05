@@ -95,7 +95,7 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
       }}
     >
       <span style={{
-        fontSize: '13px', fontWeight: active ? '700' : '500',
+        fontSize: '13px', fontWeight: '700',
         color: active ? '#111827' : '#374151',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
