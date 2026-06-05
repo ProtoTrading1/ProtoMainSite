@@ -68,6 +68,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 }
 
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose }) {
+  const VAT = 0.15;
   const safePrice = Number(product?.price) || 0;
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
@@ -82,10 +83,15 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const [liveStock, setLiveStock] = useState(null);
   const [stockLoading, setStockLoading] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [justAdded, setJustAdded] = useState(false);
   const addButtonRef = useRef(null);
 
   const activeProduct = selectedVariant || product;
   const activePrice = Number(activeProduct?.price) || 0;
+  const galleryImages = Array.isArray(activeProduct.images) && activeProduct.images.length > 1
+    ? activeProduct.images
+    : null;
   const lineTotal = (activePrice * qty).toFixed(2);
   const inCart = cartQty > 0;
 
@@ -171,7 +177,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <div className="price-row">
             <strong>R{safePrice.toFixed(2)}</strong>
-            <span>excl. VAT · min {product.minQty || 1}</span>
+            <span>incl. VAT · min {product.minQty || 1}</span>
           </div>
 
           <div className="buy-row">
@@ -224,7 +230,26 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   })}
                 </div>
               )}
-              <ProductImage src={activeProduct.localImage || activeProduct.image} alt={activeProduct.name} width={1200} />
+              <ProductImage
+                src={galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image)}
+                alt={activeProduct.name}
+                width={1200}
+              />
+              {galleryImages && (
+                <div className="pz-gallery-strip">
+                  {galleryImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`pz-gallery-thumb${idx === activeImageIdx ? ' pz-gallery-thumb--active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); setActiveImageIdx(idx); }}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <img src={img} alt={`${activeProduct.name} ${idx + 1}`} />
+                    </button>
+                  ))}
+                </div>
+              )}
               {special && (
                 <div className="pz-special-badge">
                   {special.deal === 'discount' && special.discountPct ? `${special.discountPct}% OFF`
@@ -261,9 +286,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 </div>
 
                 {/* Specs */}
-                {(product.category || product.colour || product.casePack || product.leadTime) && (
+                {(product.colour || product.casePack || product.leadTime) && (
                   <div className="pz-specs">
-                    {product.category && <span>{product.category}</span>}
                     {product.colour && <span>Colour: {product.colour}</span>}
                     {product.casePack && <span>{product.casePack}</span>}
                     {product.leadTime && <span>{product.leadTime}</span>}
@@ -282,7 +306,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                             key={v.id}
                             type="button"
                             className={`pz-variant-row${isSelected ? ' pz-variant-row--selected' : ''}`}
-                            onClick={() => { setSelectedVariant(v); setQty(v.minQty || 1); }}
+                            onClick={() => { setSelectedVariant(v); setQty(v.minQty || 1); setActiveImageIdx(0); }}
                           >
                             {v.image && (
                               <img src={v.image} alt={v.name} className="pz-variant-img" />
@@ -306,7 +330,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <div className="pz-buy-bar">
                 <div className="pz-price-row">
                   <span className="pz-price">R{activePrice.toFixed(2)}</span>
-                  <span className="pz-price-note">excl. VAT · min {activeProduct.minQty || 1}</span>
+                  <span className="pz-price-note">incl. VAT · min {activeProduct.minQty || 1}</span>
                 </div>
                 <div className="pz-qty-row">
                   <div className="qty-stepper" aria-label="Quantity in preview">
@@ -328,9 +352,17 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     Select a variant above to add to order
                   </p>
                 ) : (
-                  <button className="pz-add-btn" onClick={() => { addToCart(activeProduct, qty); closePreview(); }} type="button">
+                  <button
+                    className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
+                    onClick={() => {
+                      addToCart(activeProduct, qty, null, true);
+                      setJustAdded(true);
+                      setTimeout(() => setJustAdded(false), 1800);
+                    }}
+                    type="button"
+                  >
                     <ShoppingCart size={16} />
-                    Add {qty} to order
+                    {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
                   </button>
                 )}
               </div>

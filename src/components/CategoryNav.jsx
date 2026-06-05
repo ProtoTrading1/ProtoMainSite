@@ -29,16 +29,15 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
         </span>
         <button
           type="button"
-          onClick={() => { navigate([]); onToggleL1(null); }}
-          onMouseEnter={() => onToggleL1(null)}
+          onClick={() => { navigate([]); onToggleL1(null, null); }}
+          onMouseEnter={() => onToggleL1(null, null)}
           style={{
             display: 'flex', alignItems: 'center', gap: '4px',
             fontSize: '10px', fontWeight: '700', color: RED, textTransform: 'uppercase', letterSpacing: '0.05em',
             background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit',
           }}
         >
-          <Home size={11} />
-          Home
+          <Home size={15} />
         </button>
       </div>
 
@@ -55,11 +54,11 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
             <button
               key={cat.id}
               onClick={() => navigate([cat.id])}
-              onMouseEnter={() => onToggleL1(cat.id)}
+              onMouseEnter={(e) => onToggleL1(cat.id, e.currentTarget)}
               type="button"
               style={{
                 display: 'flex', alignItems: 'center', gap: '11px',
-                padding: '11px 14px 11px 13px',
+                padding: '10px 14px 10px 13px',
                 borderLeft: '3px solid transparent',
                 borderLeftColor: highlighted ? deptColor : 'transparent',
                 borderLeftStyle: 'solid',
@@ -68,7 +67,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
                 border: 'none',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%',
                 transition: 'background 0.12s ease',
-                minHeight: '46px',
+                height: '46px',
               }}
             >
               {Icon && (
@@ -84,15 +83,16 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
                 </span>
               )}
               <span style={{
-                fontSize: '13.5px', fontWeight: highlighted ? '700' : '500',
+                fontSize: '13px', fontWeight: highlighted ? '700' : '500',
                 color: highlighted ? '#111827' : '#374151',
-                flex: 1, lineHeight: 1.3,
+                flex: 1, lineHeight: 1.2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {cat.label}
                 <Count value={counts?.[cat.id]} />
               </span>
               {hasChildren && (
-                <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300' }}>
+                <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300', marginLeft: 'auto' }}>
                   ›
                 </span>
               )}

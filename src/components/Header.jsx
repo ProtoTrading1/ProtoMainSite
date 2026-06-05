@@ -52,17 +52,38 @@ function matchCategories(query) {
 function AboutModal({ onClose }) {
   return (
     <div className="topnav-modal-backdrop" onClick={onClose}>
-      <div className="topnav-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="about-modal" onClick={(e) => e.stopPropagation()}>
         <button className="topnav-modal-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-        <h2>About Proto Trading</h2>
-        <p>Established in 1987, Proto Trading is a South African wholesale supplier serving independent retailers and trade buyers across the country.</p>
-        <p>We stock over 5,000 catalogue lines — from household goods to seasonal specials — with competitive trade pricing, reliable stock, and a sales team that actually picks up the phone.</p>
-        <p>Build your basket here and send us a quote request. We confirm availability, pricing, and delivery by reply — usually same day.</p>
-        <div className="topnav-modal-stat-row">
-          <div><strong>1987</strong><span>Est.</span></div>
-          <div><strong>5,000+</strong><span>Lines</span></div>
-          <div><strong>SA-wide</strong><span>Delivery</span></div>
+
+        <div className="about-hero">
+          <p className="about-eyebrow">Since 1987</p>
+          <h2 className="about-title">About Proto Trading</h2>
+          <p className="about-tagline">Serving South African businesses for nearly four decades</p>
         </div>
+
+        <div className="about-body">
+          <p>For nearly four decades, Proto Trading has been a trusted partner to retailers, resellers, schools, manufacturers, online sellers, event companies, and businesses across South Africa.</p>
+          <p>Established in 1987, Proto Trading has grown from a small wholesale operation into one of South Africa's most diverse importers and distributors, supplying thousands of products across multiple categories from a single source.</p>
+          <p>Our success has been built on a simple principle: provide customers with quality products, competitive pricing, reliable service, and long-term value.</p>
+        </div>
+
+        <div className="about-section">
+          <h3 className="about-section-title">Why customers choose Proto</h3>
+          <ul className="about-list">
+            {['Extensive product selection', 'Competitive wholesale pricing', 'Consistent stock availability', 'Nationwide supply capability', 'Reliable customer service', 'Long-standing industry experience', 'Commitment to quality and value'].map((item) => (
+              <li key={item}><span className="about-check">✓</span>{item}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="about-stats">
+          <div><strong>1987</strong><span>Established</span></div>
+          <div><strong>5,000+</strong><span>Product lines</span></div>
+          <div><strong>SA-wide</strong><span>Delivery</span></div>
+          <div><strong>40 yrs</strong><span>Experience</span></div>
+        </div>
+
+        <p className="about-footer">Whether you're purchasing a single product category or sourcing across multiple departments, our goal remains the same: to make wholesale buying easier, more efficient, and more profitable.</p>
       </div>
     </div>
   );
@@ -225,7 +246,6 @@ function SearchPanel({ query, suggestions, catMatches, recentSearches, activeIdx
           <div className="sp-dept-grid">
             {topDepts.map((dept) => {
               const color = DEPT_COLORS[dept.id] || '#374151';
-              const Icon = LUCIDE_ICON_MAP[dept.icon] || null;
               return (
                 <button
                   key={dept.id}
@@ -234,7 +254,6 @@ function SearchPanel({ query, suggestions, catMatches, recentSearches, activeIdx
                   onClick={() => onPickCategory(dept.path || [dept.id])}
                   style={{ '--chip-color': color }}
                 >
-                  {Icon && <span className="sp-dept-icon" style={{ background: `${color}18`, color }}><Icon size={13} /></span>}
                   <span>{dept.label}</span>
                 </button>
               );
@@ -306,6 +325,24 @@ function SearchPanel({ query, suggestions, catMatches, recentSearches, activeIdx
           <Search size={24} />
           <p>No results for "<strong>{query}</strong>"</p>
           <span>Try a different spelling or browse by department above</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Cart progress fill icon ──────────────────────────────────
+const MIN_ORDER = 1000;
+
+function CartProgressIcon({ cartTotal, size = 22 }) {
+  const pct = Math.min(100, Math.max(0, (cartTotal / MIN_ORDER) * 100));
+  const clipY = ((1 - pct / 100) * size).toFixed(1);
+  return (
+    <div style={{ position: 'relative', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <ShoppingCart size={size} style={{ color: pct === 0 ? 'currentColor' : '#94a3b8' }} />
+      {pct > 0 && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', clipPath: `inset(${clipY}px 0 0 0)` }}>
+          <ShoppingCart size={size} style={{ color: '#8B1A1A' }} />
         </div>
       )}
     </div>
@@ -465,11 +502,11 @@ export default function Header({
         {/* Centre navigation */}
         <nav className="header-nav desktop-only">
           <button
-            className={`header-nav-btn${searchOpen ? ' header-nav-btn--active' : ''}`}
+            className={`header-nav-btn header-nav-btn--search${searchOpen ? ' header-nav-btn--active' : ''}`}
             type="button"
             onClick={searchOpen ? closeSearch : openSearch}
           >
-            <Search size={14} />
+            <Search size={15} />
             Search
           </button>
 
@@ -480,9 +517,9 @@ export default function Header({
             </button>
           )}
 
-          <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
-            <Star size={14} />
-            This Week's Specials
+          <button className="header-nav-btn" type="button" onClick={() => setShowFindUs(true)}>
+            <MapPin size={14} />
+            Where to Find Us
           </button>
 
           <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
@@ -490,9 +527,9 @@ export default function Header({
             About Us
           </button>
 
-          <button className="header-nav-btn" type="button" onClick={() => setShowFindUs(true)}>
-            <MapPin size={14} />
-            Where to Find Us
+          <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
+            <Star size={14} className="spinning-star" />
+            This Week's Specials
           </button>
         </nav>
 
@@ -507,7 +544,13 @@ export default function Header({
 
           <button className="header-action desktop-only" type="button" onClick={onViewProfile}>
             <User size={19} />
-            <span><small>{customer?.tier === 'premium' ? '★ Premium' : 'Trade'}</small>My Profile</span>
+            <span>
+              <small style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                {customer?.tier === 'premium' && <Star size={11} fill="#8B1A1A" color="#8B1A1A" />}
+                {customer?.tier === 'premium' ? 'Premium' : 'Trade'}
+              </small>
+              My Profile
+            </span>
           </button>
 
           {onLogout && (
@@ -517,7 +560,7 @@ export default function Header({
           )}
 
           <div className="cart-summary" onClick={onCartClick} style={onCartClick ? { cursor: 'pointer' } : undefined}>
-            <ShoppingCart size={22} />
+            <CartProgressIcon cartTotal={cartTotal} size={22} />
             <span className="cart-count">{cartItemCount}</span>
             <span><small>Order</small>R{cartTotal.toFixed(2)}</span>
           </div>
@@ -534,21 +577,15 @@ export default function Header({
               <input
                 ref={inputRef}
                 autoFocus
-                type="search"
+                type="text"
                 placeholder="Search products, categories, codes…"
                 value={searchQuery}
                 onChange={(e) => handleInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="search-overlay-input"
               />
-              {searchQuery && (
-                <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); setCatMatches([]); inputRef.current?.focus(); }} aria-label="Clear">
-                  <X size={15} />
-                </button>
-              )}
-              <button type="button" onClick={closeSearch} className="search-overlay-close">
-                <X size={15} />
-                <span>Esc</span>
+              <button type="button" onClick={closeSearch} className="search-overlay-close-red" aria-label="Close search">
+                <X size={16} />
               </button>
             </div>
             <SearchPanel

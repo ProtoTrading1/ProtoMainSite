@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Check, CheckCircle, Copy, Loader2, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Loader2, AlertCircle, X } from 'lucide-react';
 
 export default function OrderConfirmModal({
   isOpen,
@@ -16,9 +16,7 @@ export default function OrderConfirmModal({
   useEffect(() => {
     if (!isOpen) return undefined;
     setCopied(false);
-    const handler = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
+    const handler = (event) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
@@ -28,6 +26,7 @@ export default function OrderConfirmModal({
   const copyOrder = async () => {
     await navigator.clipboard.writeText(orderText);
     setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const isSending = orderStatus === 'sending';
@@ -36,57 +35,70 @@ export default function OrderConfirmModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <section className="order-modal" onClick={(event) => event.stopPropagation()}>
-        <header>
-          <div className="success-icon"><CheckCircle size={25} /></div>
+      <section className="order-modal-v2" onClick={(e) => e.stopPropagation()}>
+
+        {/* Close */}
+        <button className="ocm-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
+
+        {/* Status header */}
+        <div className={`ocm-header ${isSent ? 'ocm-header--sent' : isError ? 'ocm-header--error' : 'ocm-header--sending'}`}>
+          <div className="ocm-header-icon">
+            {isSending && <Loader2 size={26} className="spin-icon" />}
+            {isSent && <CheckCircle2 size={26} />}
+            {isError && <AlertCircle size={26} />}
+          </div>
           <div>
-            <span className="eyebrow">Quote request</span>
-            <h2>{isSent ? 'Order request sent' : isSending ? 'Sending order request' : isError ? 'Order could not be sent' : 'Order request'}</h2>
-            <p>
-              {isSent && 'The order request PDF has been emailed to the Proto Trading team.'}
-              {isSending && 'Generating the PDF and sending it to the Proto Trading team.'}
+            <p className="ocm-eyebrow">Order Request</p>
+            <h2 className="ocm-title">
+              {isSent ? 'Order sent!' : isSending ? 'Sending your order…' : isError ? 'Could not send order' : 'Processing order'}
+            </h2>
+            <p className="ocm-subtitle">
+              {isSent && 'The Proto Trading team will confirm stock and pricing by reply.'}
+              {isSending && 'Generating the PDF and emailing the Proto Trading team.'}
               {isError && orderError}
-              {!isSent && !isSending && !isError && 'Review the summary while the request is processed.'}
+              {!isSent && !isSending && !isError && 'Processing your order request.'}
             </p>
           </div>
-          <button onClick={onClose} type="button" aria-label="Close"><X size={20} /></button>
-        </header>
+        </div>
 
-        <div className="modal-lines">
+        {/* Order lines */}
+        <div className="ocm-lines">
           {cartItems.map((item) => (
-            <div key={item.product.id}>
-              <span>{item.product.code}</span>
-              <strong>{item.product.name}</strong>
-              <b>{item.qty} x R{item.product.price.toFixed(2)}</b>
+            <div key={item.product.id} className="ocm-line">
+              <div className="ocm-line-code">{item.product.code}</div>
+              <div className="ocm-line-name">{item.product.name}</div>
+              <div className="ocm-line-qty">{item.qty} × R{item.product.price.toFixed(2)}</div>
             </div>
           ))}
         </div>
 
-        <div className="modal-total">
-          <span>Subtotal excl. VAT</span>
+        {/* Subtotal */}
+        <div className="ocm-total">
+          <span>Subtotal incl. VAT</span>
           <strong>R{cartTotal.toFixed(2)}</strong>
         </div>
 
+        {/* Buyer profile */}
         {customerDetails && (
-          <div className="modal-customer">
-            <span>Buyer profile</span>
-            <strong>{customerDetails.name}</strong>
-            <p>{customerDetails.email} | {customerDetails.phone} | {customerDetails.region}</p>
+          <div className="ocm-buyer">
+            <p className="ocm-buyer-label">Buyer Profile</p>
+            <p className="ocm-buyer-name">{customerDetails.name}</p>
+            <p className="ocm-buyer-detail">{customerDetails.email} · {customerDetails.phone} · {customerDetails.region}</p>
           </div>
         )}
 
-        <div className="modal-actions">
-          <div className={`primary-order-button ${isError ? 'order-error-state' : ''}`}>
-            {isSending && <Loader2 size={17} className="spin-icon" />}
-            {isSent && <CheckCircle size={17} />}
-            {isError && <AlertCircle size={17} />}
-            {isSending ? 'Sending...' : isSent ? 'Sent to Proto Trading' : isError ? 'Send failed' : 'Processing'}
+        {/* Actions */}
+        <div className="ocm-actions">
+          <div className={`ocm-status-pill ${isError ? 'ocm-status-pill--error' : isSent ? 'ocm-status-pill--sent' : ''}`}>
+            {isSending && <><Loader2 size={15} className="spin-icon" /> Sending…</>}
+            {isSent && <><CheckCircle2 size={15} /> Sent to Proto Trading</>}
+            {isError && <><AlertCircle size={15} /> Send failed</>}
           </div>
-          <button className="copy-button" onClick={copyOrder} type="button">
-            {copied ? <Check size={17} /> : <Copy size={17} />}
-            {copied ? 'Copied' : 'Copy request'}
+          <button className="ocm-copy-btn" onClick={copyOrder} type="button">
+            {copied ? <><Check size={15} /> Copied</> : <><Copy size={15} /> Copy request</>}
           </button>
         </div>
+
       </section>
     </div>
   );
