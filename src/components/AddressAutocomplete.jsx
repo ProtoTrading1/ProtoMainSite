@@ -19,7 +19,7 @@ function loadScript() {
   return scriptPromise;
 }
 
-export default function AddressAutocomplete({ value, onChange, className, placeholder, required, style }) {
+export default function AddressAutocomplete({ value, onChange, className, placeholder, required, style, onKeyDown }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
@@ -75,6 +75,7 @@ export default function AddressAutocomplete({ value, onChange, className, placeh
       required={required}
       autoComplete="off"
       style={style}
+      onKeyDown={onKeyDown}
     />
   );
 }

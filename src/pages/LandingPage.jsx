@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import { motion, useInView } from 'motion/react';
 import {
   ArrowDown,
@@ -603,22 +604,20 @@ function Questionnaire({ onLogin }) {
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Full company address</label>
-                <textarea
+                <AddressAutocomplete
                   value={companyAddress}
-                  onChange={(e) => setCompanyAddress(e.target.value)}
+                  onChange={setCompanyAddress}
                   onKeyDown={handleKey}
-                  placeholder="Street address, suburb, city, postcode"
-                  rows={4}
+                  placeholder="Start typing your street address…"
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Full delivery address</label>
-                <textarea
+                <AddressAutocomplete
                   value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  onChange={setDeliveryAddress}
                   onKeyDown={handleKey}
-                  placeholder="Delivery street address, suburb, city, postcode"
-                  rows={4}
+                  placeholder="Start typing delivery address…"
                 />
               </div>
             </div>
