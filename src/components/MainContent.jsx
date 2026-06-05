@@ -143,7 +143,6 @@ export default function MainContent({
       {/* Collection filter tabs */}
       <div className="shortcut-pills">
         {shortcuts.map((item) => {
-          const Icon = item.icon;
           const isActive = (item.id === 'start' && activeCollection === 'all' && !isCategoryPage) || item.id === activeCollection;
           return (
             <button
@@ -152,7 +151,6 @@ export default function MainContent({
               onClick={() => { onShortcut(item.id); }}
               type="button"
             >
-              <Icon size={14} />
               {item.title}
             </button>
           );

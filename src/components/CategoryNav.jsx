@@ -48,7 +48,6 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
           const highlighted = isActive || isOpen;
           const hasChildren = !!cat.children?.length;
           const deptColor = DEPT_COLORS[cat.id] || RED;
-          const Icon = LUCIDE_ICON_MAP[cat.icon] || null;
 
           return (
             <button
@@ -57,34 +56,20 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
               onMouseEnter={(e) => onToggleL1(cat.id, e.currentTarget)}
               type="button"
               style={{
-                display: 'flex', alignItems: 'center', gap: '11px',
-                padding: '10px 14px 10px 13px',
-                borderLeft: '3px solid transparent',
-                borderLeftColor: highlighted ? deptColor : 'transparent',
-                borderLeftStyle: 'solid',
-                borderLeftWidth: '3px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 14px 10px 16px',
+                borderLeft: `3px solid ${highlighted ? deptColor : 'transparent'}`,
                 background: highlighted ? `${deptColor}10` : 'transparent',
                 border: 'none',
+                borderLeft: `3px solid ${highlighted ? deptColor : 'transparent'}`,
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%',
                 transition: 'background 0.12s ease',
-                height: '46px',
+                height: '42px',
               }}
             >
-              {Icon && (
-                <span style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: '30px', height: '30px', borderRadius: '7px', flexShrink: 0,
-                  background: highlighted ? `${deptColor}` : `${deptColor}18`,
-                  color: highlighted ? '#fff' : deptColor,
-                  transition: 'background 0.15s, color 0.15s',
-                  boxShadow: highlighted ? `0 2px 8px ${deptColor}40` : 'none',
-                }}>
-                  <Icon size={15} />
-                </span>
-              )}
               <span style={{
                 fontSize: '13px', fontWeight: highlighted ? '700' : '500',
-                color: highlighted ? '#111827' : '#374151',
+                color: highlighted ? deptColor : '#374151',
                 flex: 1, lineHeight: 1.2,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
@@ -92,7 +77,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
                 <Count value={counts?.[cat.id]} />
               </span>
               {hasChildren && (
-                <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300' }}>
                   ›
                 </span>
               )}
