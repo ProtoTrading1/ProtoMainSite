@@ -511,10 +511,10 @@ export default function Header({
             </button>
           )}
 
-          <button className="header-nav-btn" type="button" onClick={() => setShowFindUs(true)}>
+          <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
             <MapPin size={14} />
             Where to Find Us
-          </button>
+          </a>
 
           <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
             <Info size={14} />

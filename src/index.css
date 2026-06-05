@@ -1432,7 +1432,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .product-image {
   position: relative;
-  height: 240px;
+  height: 260px;
   display: grid;
   place-items: center;
   border-bottom: 1px solid #f0f1f3;
@@ -1467,27 +1467,27 @@ input, select, textarea { font-family: inherit; outline: none; }
   transform: translateY(0);
 }
 .product-image img {
-  max-width: 92%;
-  max-height: 220px;
+  max-width: 94%;
+  max-height: 240px;
   width: auto;
   height: auto;
   object-fit: contain;
-  transform: scale(1.18);
+  transform: scale(1.2);
 }
 .product-image img.catalogue-photo {
   width: auto;
   height: auto;
-  max-width: 95%;
-  max-height: 224px;
+  max-width: 98%;
+  max-height: 248px;
   object-fit: contain;
   object-position: center;
-  transform: scale(1.22);
+  transform: scale(1.35);
   mix-blend-mode: multiply;
 }
 .product-image img.trimmed-catalogue-photo {
-  max-width: 95%;
-  max-height: 224px;
-  transform: scale(1.18);
+  max-width: 98%;
+  max-height: 248px;
+  transform: scale(1.28);
 }
 .tag-row {
   position: absolute;
