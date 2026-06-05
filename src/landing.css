@@ -144,8 +144,8 @@
 .hero-photo-bg {
   grid-template-columns: 1fr;
   background:
-    linear-gradient(to right, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.15) 100%),
-    url('/hero-bg.jpg') center / cover no-repeat;
+    linear-gradient(to right, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0) 100%),
+    url('/hero-bg.jpg') center right / cover no-repeat;
 }
 
 .hero-photo-bg h1 {
@@ -2460,8 +2460,8 @@
     justify-content: flex-end;
     padding: 0 24px 52px !important;
     background:
-      linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 45%, rgba(0,0,0,0.1) 100%),
-      url('/hero-bg.jpg') center / cover no-repeat !important;
+      linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 100%),
+      url('/hero-bg.jpg') center right / cover no-repeat !important;
   }
 
   .hero-photo-bg .access-hero-copy {
