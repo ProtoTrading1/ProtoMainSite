@@ -2453,6 +2453,20 @@
 
 /* ── Tablet (≤ 768px) — tighten hero that's now 1 column ── */
 @media (max-width: 768px) {
+  .hero-photo-bg {
+    min-height: 100svh;
+    padding: 56px 24px 48px;
+    align-items: flex-end;
+    background:
+      linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.2) 100%),
+      url('/hero-bg.jpg') center / cover no-repeat;
+  }
+
+  .hero-photo-bg h1 {
+    font-size: clamp(44px, 11vw, 64px);
+    margin-bottom: 24px;
+  }
+
   /* Hero no longer needs huge min-height when product wall is gone */
   .access-hero {
     min-height: 0;
@@ -2815,6 +2829,14 @@
 
   .access-brand strong {
     font-size: 16px;
+  }
+
+  .hero-photo-bg {
+    padding: 44px 18px 40px;
+  }
+
+  .hero-photo-bg h1 {
+    font-size: 38px;
   }
 
   .access-hero {
