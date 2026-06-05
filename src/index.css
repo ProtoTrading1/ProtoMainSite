@@ -1722,7 +1722,26 @@ input, select, textarea { font-family: inherit; outline: none; }
   margin: 0;
   appearance: none;
 }
-.add-button,
+.add-button {
+  flex: 1;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  background: #111111;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  transition: background 0.15s, transform 0.1s;
+  border: none;
+  cursor: pointer;
+}
+.add-button:hover { background: #333; transform: translateY(-1px); }
+.add-button:active { transform: translateY(0); }
+.add-button.added { background: #16a34a; }
 .primary-order-button {
   flex: 1;
   height: 54px;
@@ -1742,9 +1761,6 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .primary-order-button:hover { background: #15803d; }
 .primary-order-button:active { transform: scale(0.98); }
-.add-button:hover { background: #222; transform: translateY(-1px); }
-.add-button:active { transform: translateY(0); }
-.add-button.added { background: #16a34a; }
 .cart-in-control {
   flex: 1;
   height: 40px;
