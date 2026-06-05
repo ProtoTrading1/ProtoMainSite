@@ -792,39 +792,15 @@ export default function LandingPage({ onLogin, onApply }) {
             </div>
           </div>
 
-          <div className="premium-product-wall" aria-label="Catalogue preview">
-            <div className="wall-header">
-              <div>
-                <span>Catalogue preview</span>
-                <strong>Real products. Trade access required.</strong>
-              </div>
-              <div className="locked-price-pill">
-                <Lock size={14} />
-                Pricing locked
-              </div>
-            </div>
-            <div className="wall-grid">
-              {showcaseProducts.map((product) => (
-                <article className="hero-product-card" key={product.code}>
-                  <div className="hero-product-image">
-                    <img src={product.image} alt={product.name} loading="eager" fetchPriority="high" decoding="async" />
-                  </div>
-                  <div>
-                    <small>{product.dept}</small>
-                    <strong>{product.name}</strong>
-                    <span>{product.code}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="wall-footer">
-              {unlocks.map((item) => (
-                <div key={item.label}>
-                  <PackageSearch size={16} />
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
+          <div className="premium-product-wall" aria-label="Product showcase" style={{ padding: 0, overflow: 'hidden' }}>
+            <video
+              src="/proto.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           </div>
         </section>
 
