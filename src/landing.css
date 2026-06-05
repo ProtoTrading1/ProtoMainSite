@@ -134,8 +134,8 @@
 }
 
 .premium-hero {
-  grid-template-columns: minmax(0, 0.9fr) minmax(500px, 0.86fr);
-  gap: 54px;
+  grid-template-columns: 1fr;
+  gap: 0;
   background:
     linear-gradient(115deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.97) 50%, rgba(0, 0, 0, 0.93) 100%),
     url('/campaign-hero-v2.png') center right / cover no-repeat;
@@ -148,7 +148,6 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6);
   color: #fff;
-  height: clamp(460px, 68vh, 680px);
 }
 
 .wall-header {

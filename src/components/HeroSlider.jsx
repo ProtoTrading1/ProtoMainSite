@@ -35,7 +35,6 @@ export default function HeroSlider() {
       position: 'relative',
       width: '100%',
       height: '100%',
-      borderRadius: '20px',
       overflow: 'hidden',
       background: '#0a0a0a',
     }}>
@@ -96,7 +95,6 @@ export default function HeroSlider() {
         inset: 0,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.32) 100%)',
         zIndex: 3,
-        borderRadius: '20px',
         pointerEvents: 'none',
       }} />
 

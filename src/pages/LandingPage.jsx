@@ -793,9 +793,11 @@ export default function LandingPage({ onLogin, onApply }) {
             </div>
           </div>
 
-          <div className="premium-product-wall" aria-label="Product showcase">
-            <HeroSlider />
-          </div>
+        </section>
+
+        {/* ── Hero image slider ── */}
+        <section style={{ width: '100%', height: 'clamp(480px, 72vh, 760px)', position: 'relative', overflow: 'hidden' }}>
+          <HeroSlider />
         </section>
 
         {/* ── Scroll hint ── */}
