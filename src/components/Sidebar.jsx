@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
+import MegaMenu from './MegaMenu';
 
 function ProductRequestModal({ onClose, customer }) {
   const [description, setDescription] = useState('');
@@ -86,22 +87,45 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 export default function Sidebar({ categories, path, navigate, counts, customer }) {
+  const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
+  const [menuTopOffset, setMenuTopOffset] = useState(0);
   const [showRequest, setShowRequest] = useState(false);
   const containerRef = useRef(null);
+
+  const activeRoot = path?.[0] || null;
+
+  const menuNode = useMemo(() => {
+    const targetId = openCategoryId || activeRoot;
+    return targetId ? categories.find((c) => c.id === targetId) : null;
+  }, [activeRoot, categories, openCategoryId]);
+
+  const menuOpen = Boolean(menuNode?.children?.length && openCategoryId);
+
+  const handleToggleL1 = (id, btnEl) => {
+    setOpenCategoryId(id);
+    if (id && btnEl && containerRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const btnRect = btnEl.getBoundingClientRect();
+      setMenuTopOffset(Math.max(0, btnRect.top - containerRect.top));
+    }
+  };
 
   return (
     <div
       ref={containerRef}
       className="sidebar-container"
+      onMouseLeave={() => setOpenCategoryId(null)}
       style={{ position: 'relative', height: '100%', backgroundColor: '#fff', zIndex: 100 }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 210 }}>
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '8px' }}>
           <CategoryNav
             categories={categories}
             path={path}
             navigate={navigate}
             counts={counts}
+            openCategoryId={openCategoryId}
+            onToggleL1={handleToggleL1}
           />
         </div>
 
@@ -129,6 +153,17 @@ export default function Sidebar({ categories, path, navigate, counts, customer }
           </button>
         </div>
       </div>
+
+      {menuOpen && menuNode && (
+        <MegaMenu
+          key={menuNode.id}
+          l1Node={menuNode}
+          navigate={navigate}
+          counts={counts}
+          onClose={() => setOpenCategoryId(null)}
+          topOffset={menuTopOffset}
+        />
+      )}
 
       {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
     </div>

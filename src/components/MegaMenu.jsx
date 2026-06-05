@@ -111,7 +111,7 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
   );
 }
 
-export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
+export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset = 0 }) {
   const l2List = l1Node?.children || [];
   const [hoveredL2Id, setHoveredL2Id] = useState(l2List[0]?.id || null);
   const leaveTimerRef = useRef(null);
@@ -146,8 +146,8 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose }) {
       style={{
         position: 'absolute',
         left: '100%',
-        top: 0,
-        height: '100%',
+        top: topOffset,
+        height: `calc(100% - ${topOffset}px)`,
         display: 'flex',
         background: '#fff',
         borderTop: '1px solid #e5e7eb',
