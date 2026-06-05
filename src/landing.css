@@ -2454,16 +2454,22 @@
 /* ── Tablet (≤ 768px) — tighten hero that's now 1 column ── */
 @media (max-width: 768px) {
   .hero-photo-bg {
-    min-height: 100svh;
-    padding: 56px 24px 48px;
-    align-items: flex-end;
+    min-height: 100svh !important;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 24px 52px !important;
     background:
-      linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.2) 100%),
-      url('/hero-bg.jpg') center / cover no-repeat;
+      linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 45%, rgba(0,0,0,0.1) 100%),
+      url('/hero-bg.jpg') center / cover no-repeat !important;
+  }
+
+  .hero-photo-bg .access-hero-copy {
+    max-width: 100%;
   }
 
   .hero-photo-bg h1 {
-    font-size: clamp(44px, 11vw, 64px);
+    font-size: 48px;
     margin-bottom: 24px;
   }
 
@@ -2471,6 +2477,10 @@
   .access-hero {
     min-height: 0;
     padding: 48px 24px 40px;
+  }
+
+  .hero-photo-bg .access-note {
+    display: none;
   }
 
   /* Hide older preview cards — keep the product wall */
@@ -2832,11 +2842,11 @@
   }
 
   .hero-photo-bg {
-    padding: 44px 18px 40px;
+    padding: 0 18px 40px !important;
   }
 
   .hero-photo-bg h1 {
-    font-size: 38px;
+    font-size: 40px;
   }
 
   .access-hero {
