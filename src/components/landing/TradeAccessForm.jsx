@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Send, CheckCircle, Info, Building2, Phone, MessageCircle } from 'lucide-react';
+import AddressAutocomplete from '../AddressAutocomplete';
 
 export default function TradeAccessForm() {
   const [submitted, setSubmitted] = useState(false);
@@ -213,7 +214,13 @@ export default function TradeAccessForm() {
 
               <div className="premium-form-group">
                 <label className="premium-label">Business Address</label>
-                <textarea name="address" className="premium-input" rows="3" placeholder="Full trading address" required onChange={handleChange} style={{ resize: 'none' }}></textarea>
+                <AddressAutocomplete
+                  value={formData.address}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, address: val }))}
+                  className="premium-input"
+                  placeholder="Start typing your street address…"
+                  required
+                />
               </div>
 
               {submitError && (
