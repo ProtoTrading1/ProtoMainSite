@@ -1,6 +1,5 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import AddressAutocomplete from '../components/AddressAutocomplete';
-import HeroSlider from '../components/HeroSlider';
 import { motion, useInView } from 'motion/react';
 import {
   ArrowDown,
@@ -793,11 +792,40 @@ export default function LandingPage({ onLogin, onApply }) {
             </div>
           </div>
 
-        </section>
-
-        {/* ── Hero image slider ── */}
-        <section style={{ width: '100%', height: 'clamp(480px, 72vh, 760px)', position: 'relative', overflow: 'hidden' }}>
-          <HeroSlider />
+          <div className="premium-product-wall" aria-label="Catalogue preview">
+            <div className="wall-header">
+              <div>
+                <span>Catalogue preview</span>
+                <strong>Real products. Trade access required.</strong>
+              </div>
+              <div className="locked-price-pill">
+                <Lock size={14} />
+                Pricing locked
+              </div>
+            </div>
+            <div className="wall-grid">
+              {showcaseProducts.map((product) => (
+                <article className="hero-product-card" key={product.code}>
+                  <div className="hero-product-image">
+                    <img src={product.image} alt={product.name} loading="eager" fetchPriority="high" decoding="async" />
+                  </div>
+                  <div>
+                    <small>{product.dept}</small>
+                    <strong>{product.name}</strong>
+                    <span>{product.code}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="wall-footer">
+              {unlocks.map((item) => (
+                <div key={item.label}>
+                  <PackageSearch size={16} />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* ── Scroll hint ── */}
