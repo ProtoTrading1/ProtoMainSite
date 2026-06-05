@@ -727,6 +727,16 @@ function Questionnaire({ onLogin }) {
 }
 
 export default function LandingPage({ onLogin, onApply }) {
+  useEffect(() => {
+    const prev = document.body.style.background;
+    document.body.style.background = '#000';
+    document.documentElement.style.background = '#000';
+    return () => {
+      document.body.style.background = prev;
+      document.documentElement.style.background = '';
+    };
+  }, []);
+
   const statsRef = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
 
