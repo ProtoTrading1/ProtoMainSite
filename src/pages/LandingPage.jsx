@@ -774,9 +774,6 @@ export default function LandingPage({ onLogin, onApply }) {
               <span style={{ color: '#ffffff', display: 'block' }}>Built for</span>
               <span style={{ color: '#dc2626', display: 'block' }}>retail success.</span>
             </h1>
-            <p>
-              See product images, catalogue codes and department ranges before you request a quote. Trade pricing and stock checks stay reserved for approved customers.
-            </p>
             <div className="access-hero-buttons">
               <button className="access-apply large" type="button" onClick={scrollToForm}>
                 Apply for trade access
