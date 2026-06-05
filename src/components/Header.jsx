@@ -555,7 +555,6 @@ export default function Header({
 
           <div className="cart-summary" onClick={onCartClick} style={onCartClick ? { cursor: 'pointer' } : undefined}>
             <CartProgressIcon cartTotal={cartTotal} size={22} />
-            <span className="cart-count">{cartItemCount}</span>
             <span><small>Order</small>R{cartTotal.toFixed(2)}</span>
           </div>
         </div>
