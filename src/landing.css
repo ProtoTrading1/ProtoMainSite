@@ -148,7 +148,6 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6);
   color: #fff;
-  min-height: 480px;
 }
 
 .wall-header {
@@ -1444,11 +1443,10 @@
 }
 
 .lp-map-inner {
-  height: 420px;
-  border-radius: 18px;
+  height: 480px;
+  border-radius: 14px;
   overflow: hidden;
   background: #000000;
-  border: 1px solid rgba(139,26,26,0.3);
 }
 
 /* Eyebrow labels */
