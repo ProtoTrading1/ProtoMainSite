@@ -1432,11 +1432,11 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .product-image {
   position: relative;
-  height: 260px;
+  height: 224px;
   display: grid;
   place-items: center;
   border-bottom: 1px solid #f0f1f3;
-  background: #f8f9fb;
+  background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
 }
 .product-image-button {
   width: 100%;
@@ -1467,27 +1467,27 @@ input, select, textarea { font-family: inherit; outline: none; }
   transform: translateY(0);
 }
 .product-image img {
-  max-width: 94%;
-  max-height: 240px;
+  max-width: 90%;
+  max-height: 200px;
   width: auto;
   height: auto;
   object-fit: contain;
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 .product-image img.catalogue-photo {
   width: auto;
   height: auto;
-  max-width: 98%;
-  max-height: 248px;
+  max-width: 92%;
+  max-height: 204px;
   object-fit: contain;
   object-position: center;
-  transform: scale(1.35);
+  transform: scale(1.15);
   mix-blend-mode: multiply;
 }
 .product-image img.trimmed-catalogue-photo {
-  max-width: 98%;
-  max-height: 248px;
-  transform: scale(1.28);
+  max-width: 92%;
+  max-height: 204px;
+  transform: scale(1.12);
 }
 .tag-row {
   position: absolute;
@@ -4994,4 +4994,26 @@ input, select, textarea { font-family: inherit; outline: none; }
   .theme-card-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Google Places autocomplete dropdown — must sit above modals and drawers */
+.pac-container {
+  z-index: 99999 !important;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  font-family: inherit;
+  margin-top: 4px;
+}
+.pac-item {
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pac-item:hover {
+  background: #f8fafc;
+}
+.pac-item-query {
+  font-size: 14px;
+  font-weight: 600;
 }
