@@ -733,27 +733,6 @@ export default function LandingPage({ onLogin, onApply }) {
   const deptRef = useRef(null);
   const deptInView = useInView(deptRef, { once: true, margin: '-80px' });
 
-  const scrubSectionRef = useRef(null);
-  const scrubVideoRef = useRef(null);
-
-  useEffect(() => {
-    const section = scrubSectionRef.current;
-    const video = scrubVideoRef.current;
-    if (!section || !video) return;
-
-    function scrub() {
-      const rect = section.getBoundingClientRect();
-      const scrollable = section.offsetHeight - window.innerHeight;
-      const progress = Math.max(0, Math.min(1, -rect.top / scrollable));
-      if (video.readyState >= 2 && video.duration) {
-        video.currentTime = progress * video.duration;
-      }
-    }
-
-    window.addEventListener('scroll', scrub, { passive: true });
-    return () => window.removeEventListener('scroll', scrub);
-  }, []);
-
   const scrollToForm = () => {
     if (onApply) { onApply(); return; }
     document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
@@ -865,36 +844,25 @@ export default function LandingPage({ onLogin, onApply }) {
           </div>
         </section>
 
-        {/* ── Video scroll scrub ── */}
-        <section ref={scrubSectionRef} style={{ position: 'relative', height: '300vh', background: '#000' }}>
-          <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
-            <video
-              ref={scrubVideoRef}
-              src="/proto.mp4"
-              muted
-              playsInline
-              preload="auto"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 40%)',
-              pointerEvents: 'none',
-            }} />
-            <div style={{
-              position: 'absolute', top: '8%', left: 'clamp(28px, 6vw, 92px)',
-              color: '#fff', maxWidth: '520px', zIndex: 2,
-            }}>
-              <span className="lp-eyebrow">Catalogue showcase</span>
-              <h2 style={{ fontSize: 'clamp(30px, 3.2vw, 48px)', lineHeight: 1.05, margin: '12px 0 18px' }}>
-                Serving trade buyers across Southern Africa.
-              </h2>
-              <p style={{ color: '#94a3b8', fontSize: '17px', lineHeight: 1.65, fontWeight: 600 }}>
-                Proto Trading ships to retailers and resellers throughout South Africa and the wider SADC region.
-              </p>
-            </div>
+        {/* ── Southern Africa map ── */}
+        <motion.section
+          className="lp-map-wrapper"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+        >
+          <div className="lp-map-copy">
+            <span className="lp-eyebrow">Delivery coverage</span>
+            <h2>Serving trade buyers across Southern Africa.</h2>
+            <p>
+              Proto Trading ships to retailers and resellers throughout South Africa and the wider SADC region. One supplier, nationwide reach.
+            </p>
           </div>
-        </section>
+          <Suspense fallback={<div className="lp-map-inner" aria-hidden="true" />}>
+            <SouthernAfricaMap />
+          </Suspense>
+        </motion.section>
 
         {/* ── Departments ── */}
         <section className="lp-departments" id="lp-departments" ref={deptRef}>

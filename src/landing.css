@@ -1443,10 +1443,11 @@
 }
 
 .lp-map-inner {
-  height: 480px;
-  border-radius: 14px;
+  height: 420px;
+  border-radius: 18px;
   overflow: hidden;
   background: #000000;
+  border: 1px solid rgba(139,26,26,0.3);
 }
 
 /* Eyebrow labels */
