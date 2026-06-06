@@ -1,13 +1,14 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
+import lazyWithRetry from './lib/lazyWithRetry';
 
-const App = lazy(() => import('./App'));
-const LoginModal = lazy(() => import('./components/LoginModal'));
-const PoliciesPage = lazy(() => import('./pages/PoliciesPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
-const WorldClassPortal = lazy(() => import('./worldclass/WorldClassPortal'));
+const App = lazyWithRetry(() => import('./App'), 'root-app');
+const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
+const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-policies-page');
+const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
+const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
+const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
 
 export default function Root() {
   const [session, setSession] = useState(undefined);
@@ -197,7 +198,7 @@ export default function Root() {
     );
   }
 
-  if (session && customerLoading && (view === 'portal' || view === 'admin' || view === 'profile' || !customer)) {
+  if (session && customerLoading && !customer) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
         <div style={{ textAlign: 'center' }}>

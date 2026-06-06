@@ -743,7 +743,6 @@ export default function LandingPage({ onLogin, onApply }) {
   const deptRef = useRef(null);
   const deptInView = useInView(deptRef, { once: true, margin: '-80px' });
 
-
   const scrollToForm = () => {
     if (onApply) { onApply(); return; }
     document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
@@ -754,7 +753,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.png" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
+          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
           <div>
             <strong>PROTO <span>TRADING</span></strong>
             <small>Wholesale supplier since 1987</small>
@@ -842,14 +841,9 @@ export default function LandingPage({ onLogin, onApply }) {
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            <video
-              src="/proto.mp4"
-              autoPlay
-              loop
-              muted
-              playsInline
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
+            <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
+              <SouthernAfricaMap />
+            </Suspense>
           </motion.div>
         </motion.section>
 
@@ -947,7 +941,7 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
-            <img src="/proto-logo.png" alt="Proto Trading" />
+            <img src="/proto-logo.webp" alt="Proto Trading" />
             <div>
               <strong>PROTO <span>TRADING</span></strong>
               <small>Wholesale supplier since 1987</small>
