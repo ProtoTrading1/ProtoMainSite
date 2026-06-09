@@ -693,28 +693,10 @@ function Questionnaire({ onLogin }) {
 }
 
 function VideoHero({ onLogin, onApply }) {
-  const [textVisible, setTextVisible] = useState(false);
-
   return (
-    <section className="vhero-section">
-      <video
-        className="vhero-video"
-        src="/hero-vid.mp4"
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        onEnded={() => setTextVisible(true)}
-        style={{ pointerEvents: 'none' }}
-      />
-      <div className="vhero-overlay" />
+    <section className="vhero-section vhero-section--static">
       <div
         className="vhero-copy"
-        style={{
-          opacity: textVisible ? 1 : 0,
-          transform: textVisible ? 'translateY(0)' : 'translateY(24px)',
-          transition: 'opacity 0.9s ease, transform 0.9s ease',
-        }}
       >
         <h1>
           <span style={{ color: '#fff', display: 'block' }}>Built for</span>
@@ -915,7 +897,12 @@ export default function LandingPage({ onLogin, onApply }) {
         </section>
 
         {/* ── Featured category cards ── */}
-        <section className="lp-feat-cats">
+        <section className="lp-feat-cats-section">
+          <div className="lp-feat-cats-header">
+            <span className="lp-eyebrow">Shop by department</span>
+            <h2>11 core wholesale categories.</h2>
+          </div>
+          <div className="lp-feat-cats">
           {CAT_CARDS.map(({ id, label, img }) => (
             <div key={id} className="lp-feat-card">
               <img src={img} alt={label} className="lp-feat-card-bg" />
@@ -923,6 +910,7 @@ export default function LandingPage({ onLogin, onApply }) {
               <div className="lp-feat-card-footer">{label}</div>
             </div>
           ))}
+          </div>
         </section>
 
         {/* ── How it works ── */}
