@@ -104,7 +104,11 @@ export default function MainContent({
   categoryCounts = {},
   categoryNode = null,
   onProductPreview = null,
+  bannerConfig = null,
 }) {
+  const bannerTitle = bannerConfig?.title || 'Built for retailers who need stock that moves.';
+  const bannerBody = bannerConfig?.body || 'Browse core wholesale lines, build a quote-ready basket, and send a clean request to the Proto Trading sales team for stock, VAT, and delivery confirmation.';
+  const bannerImage = bannerConfig?.imageUrl || '/campaign-hero-v2.png?v=2';
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -123,11 +127,8 @@ export default function MainContent({
         <section className="trade-hero">
           <div className="trade-hero-copy">
             <span className="eyebrow">Established 1987 | Wholesale supply</span>
-            <h1>Built for retailers who need stock that moves.</h1>
-            <p>
-              Browse core wholesale lines, build a quote-ready basket, and send a clean request
-              to the Proto Trading sales team for stock, VAT, and delivery confirmation.
-            </p>
+            <h1>{bannerTitle}</h1>
+            <p>{bannerBody}</p>
             <div className="hero-proof">
               <span><CheckCircle2 size={15} /> Trade-only ordering</span>
               <span><CheckCircle2 size={15} /> Quote confirmed by reply</span>
@@ -135,7 +136,7 @@ export default function MainContent({
             </div>
           </div>
           <div className="trade-hero-image">
-            <img src="/campaign-hero-v2.png?v=2" alt="Premium wholesale product campaign" />
+            <img src={bannerImage} alt="Premium wholesale product campaign" />
           </div>
         </section>
       )}

@@ -18,6 +18,9 @@ import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from '
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
+import { fetchBanner } from './lib/banner';
+import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
+import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
 import categories from './data/categories.json';
 import './index.css';
@@ -104,6 +107,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [lastOrder, setLastOrder] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
+  const [bannerConfig, setBannerConfig] = useState(null);
+  const [popupConfig, setPopupConfig] = useState(null);
+  const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
@@ -135,6 +141,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     fetchSpecials().then((data) => setSpecialsMap(buildSpecialsMap(data))).catch(() => {});
+    fetchBanner().then((data) => { if (data) setBannerConfig(data); }).catch(() => {});
+    fetchPopupSpecial().then((data) => {
+      setPopupConfig(data);
+      if (shouldShowPopup(data)) setShowPopup(true);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -477,6 +488,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
+            bannerConfig={bannerConfig}
             usingFallback={usingFallback}
             browseCategories={browseCategories}
             categoryCounts={counts}
@@ -589,6 +601,16 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             </div>
           </div>
         </div>
+      )}
+
+      {showPopup && popupConfig?.imageUrl && (
+        <PopupSpecialModal
+          imageUrl={popupConfig.imageUrl}
+          onDismiss={() => {
+            dismissPopup(popupConfig);
+            setShowPopup(false);
+          }}
+        />
       )}
     </div>
   );
