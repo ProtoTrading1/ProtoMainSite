@@ -258,7 +258,7 @@
 /* ── Featured category cards ─────────────────────────────────────────────── */
 .lp-feat-cats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   background: #000;
   padding: 40px;
@@ -361,12 +361,8 @@
   transform: scale(1.4);
 }
 
-@media (max-width: 1100px) {
-  .lp-feat-cats { grid-template-columns: repeat(3, 1fr); }
-}
-
 @media (max-width: 900px) {
-  .lp-feat-cats { grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 24px; }
+  .lp-feat-cats { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 24px; }
   .lp-carousel-main, .lp-carousel-peek { width: 260px; }
   .lp-carousel-btn--prev { left: 12px; }
   .lp-carousel-btn--next { right: 12px; }
