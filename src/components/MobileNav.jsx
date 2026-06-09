@@ -259,10 +259,10 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               <PackageSearch size={15} style={{ color: '#8B1A1A' }} /> Can't find it?
             </button>
             <button
-              onClick={() => { typeof window.Intercom === 'function' && window.Intercom('show'); onClose(); }}
+              onClick={() => { window.location.href = 'mailto:online@proto.co.za'; onClose(); }}
               style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
             >
-              <MessageCircle size={15} style={{ color: '#374151' }} /> Chat with us
+              <MessageCircle size={15} style={{ color: '#374151' }} /> Email us
             </button>
           </div>
         )}

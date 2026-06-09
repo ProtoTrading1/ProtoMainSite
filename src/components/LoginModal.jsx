@@ -61,7 +61,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Brand */}
           <div className="lm-brand">
-            <img src="/proto-logo.png" alt="Proto Trading" className="lm-logo" />
+            <img src="/proto-logo.webp" alt="Proto Trading" className="lm-logo" />
             <div>
               <strong>PROTO <span>TRADING</span></strong>
               <small>Trade portal</small>
@@ -143,17 +143,10 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="lm-divider"><span>or</span></div>
-
-          {/* Toggle mode / back */}
-          {mode === 'forgot' ? (
+          {/* Back to login link when in forgot mode */}
+          {mode === 'forgot' && (
             <button type="button" className="lm-toggle" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
               ← Back to login
-            </button>
-          ) : (
-            <button type="button" className="lm-toggle" onClick={switchMode}>
-              {mode === 'login' ? 'No account? Request trade access' : 'Already have an account? Log in'}
             </button>
           )}
 

@@ -2,13 +2,30 @@ import { ArrowRight, Calendar, Package, LayoutGrid } from 'lucide-react';
 
 export default function Hero({ onLogin, onApply }) {
   return (
-    <section className="landing-hero animate-fade" style={{ 
-      minHeight: '900px', 
-      display: 'flex', 
-      alignItems: 'center', 
+    <section className="landing-hero animate-fade" style={{
+      minHeight: '900px',
+      display: 'flex',
+      alignItems: 'center',
       paddingTop: '80px',
-      background: 'radial-gradient(circle at 70% 30%, #1e1b4b 0%, #050505 70%)'
+      position: 'relative',
+      overflow: 'hidden',
+      background: '#050505',
     }}>
+      {/* Full-width background image */}
+      <picture style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+        <source srcSet="/main-banner.webp" type="image/webp" />
+        <img
+          src="/main-banner.jpg"
+          alt=""
+          aria-hidden="true"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center right', display: 'block' }}
+        />
+      </picture>
+      {/* Dark overlay — ensures left-side text stays readable */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 1,
+        background: 'linear-gradient(to right, rgba(5,5,5,0.92) 0%, rgba(5,5,5,0.7) 45%, rgba(5,5,5,0.15) 100%)'
+      }} />
       <div className="container" style={{ 
         position: 'relative', 
         zIndex: 10, 
@@ -70,25 +87,6 @@ export default function Hero({ onLogin, onApply }) {
         </div>
       </div>
 
-      {/* Hero image background - perfectly balanced */}
-      <div className="hero-image" style={{
-        position: 'absolute', right: '0%', top: '50%', transform: 'translateY(-50%)',
-        width: '48%', maxWidth: '900px', zIndex: 5, opacity: 0.95,
-        maskImage: 'linear-gradient(to right, transparent 0%, black 40%)',
-        WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 40%)'
-      }}>
-        <img src="/hero_custom.png" alt="Wholesale products" style={{ width: '100%', objectFit: 'contain' }} />
-      </div>
-
-      {/* Decorative ambient lights */}
-      <div style={{
-        position: 'absolute', top: '-10%', right: '5%', width: '500px', height: '500px',
-        background: 'var(--proto-red)', opacity: 0.1, filter: 'blur(180px)', borderRadius: '50%', zIndex: 1
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '10%', left: '-5%', width: '400px', height: '400px',
-        background: '#1e1b4b', opacity: 0.2, filter: 'blur(150px)', borderRadius: '50%', zIndex: 1
-      }} />
 
       {/* Stats bar */}
       <div className="hero-stats-container" style={{

@@ -274,8 +274,10 @@ export async function fetchProductPage({
 } = {}) {
   let products = await getAllCached();
   products = applyCollection(products, collection, specialIds);
-  products = applyPathFilter(products, categoryPath);
-  products = searchQuery.trim() ? fuzzyFilter(products, searchQuery) : products;
+  const hasSearch = Boolean(searchQuery.trim());
+  // Active search is global — category filters apply only when browsing without a query.
+  if (!hasSearch) products = applyPathFilter(products, categoryPath);
+  products = hasSearch ? fuzzyFilter(products, searchQuery) : products;
   products = applySort(products, sort);
 
   const total = products.length;

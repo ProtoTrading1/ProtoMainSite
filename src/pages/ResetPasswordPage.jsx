@@ -37,7 +37,7 @@ export default function ResetPasswordPage({ token, onDone }) {
         <div style={{ height: '6px', background: '#c40000' }} />
         <div style={{ padding: '40px 36px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-            <img src="/proto-logo.png" alt="Proto Trading" style={{ height: '32px' }} />
+            <img src="/proto-logo.webp" alt="Proto Trading" style={{ height: '32px' }} />
             <div>
               <div style={{ fontWeight: '900', fontSize: '16px', color: '#fff', fontFamily: 'Outfit, sans-serif' }}>
                 PROTO <span style={{ color: '#c40000' }}>TRADING</span>

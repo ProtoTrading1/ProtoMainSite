@@ -288,7 +288,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Header */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.png" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
+          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
           <div>
             <strong>PROTO <span>TRADING</span></strong>
             <small>Wholesale supplier since 1987</small>
@@ -451,7 +451,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Footer */}
       <footer className="lp-footer">
         <div className="lp-footer-brand">
-          <img src="/proto-logo.png" alt="Proto Trading" />
+          <img src="/proto-logo.webp" alt="Proto Trading" />
           <div>
             <strong>PROTO <span>TRADING</span></strong>
             <small>Wholesale supplier since 1987</small>

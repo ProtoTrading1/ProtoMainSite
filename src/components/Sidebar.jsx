@@ -143,13 +143,13 @@ export default function Sidebar({ categories, path, navigate, counts, customer }
           </button>
           <button
             type="button"
-            onClick={() => typeof window.Intercom === 'function' && window.Intercom('show')}
+            onClick={() => { window.location.href = 'mailto:online@proto.co.za'; }}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid #e8eaed', borderRadius: 10, background: '#fafafa', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; e.currentTarget.style.color = '#0f172a'; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8eaed'; e.currentTarget.style.color = '#374151'; }}
           >
             <MessageCircle size={15} style={{ flexShrink: 0 }} />
-            Chat with us
+            Email us
           </button>
         </div>
       </div>

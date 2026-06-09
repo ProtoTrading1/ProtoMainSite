@@ -37,6 +37,13 @@ function labelToSlug(label) {
   return label.toLowerCase().replace(/[,&]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
+function parseImageUrls(imageValue) {
+  return String(imageValue || '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
 function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
   const rawDept = (wpRow.category || '').trim();
@@ -49,6 +56,7 @@ function adapt(wpRow, stockRow) {
       ? sub2Slug ? [deptSlug, sub1Slug, sub2Slug] : [deptSlug, sub1Slug]
       : [deptSlug]
     : [];
+  const images = parseImageUrls(wpRow.image_url);
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -57,7 +65,9 @@ function adapt(wpRow, stockRow) {
     parentSku: wpRow.parent_sku,
     name: wpRow.title,
     price: Number(stockRow?.sell_price ?? 0),
-    image: wpRow.image_url || '',
+    images,
+    image: images[0] || '',
+    secondaryImage: images[1] || '',
     stockQty,
     stockOnHand: stockQty,
     colour: wpRow.colour || '',

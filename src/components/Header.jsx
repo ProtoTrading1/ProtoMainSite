@@ -347,7 +347,7 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
 export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
-  searchQuery, setSearchQuery, onSpecials, onCartClick,
+  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -392,7 +392,6 @@ export default function Header({
 
   const closeSearch = () => {
     setSearchOpen(false);
-    setSearchQuery('');
     setSuggestions([]);
     setCatMatches([]);
     setActiveIdx(-1);
@@ -423,14 +422,16 @@ export default function Header({
     saveRecent(p.name);
     setRecentSearches(loadRecent());
     setSearchQuery(p.name);
+    navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
     setActiveIdx(-1);
     setSearchOpen(false);
   };
 
-  const pickCategory = (path) => {
-    window.location.hash = '/' + path.join('/');
+  const pickCategory = (catPath) => {
+    navigateForSearch?.(catPath);
+    setSearchQuery('');
     closeSearch();
   };
 
@@ -446,6 +447,8 @@ export default function Header({
     if (!term) return;
     saveRecent(term);
     setRecentSearches(loadRecent());
+    setSearchQuery(term);
+    navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
     setActiveIdx(-1);
@@ -467,7 +470,6 @@ export default function Header({
   };
   const closeMobileSearch = () => {
     setMobileSearchOpen(false);
-    setSearchQuery('');
     setMobileSuggestions([]);
     setMobileCatMatches([]);
   };
@@ -485,7 +487,7 @@ export default function Header({
         {/* Brand */}
         <div className="brand-block">
           <div className="brand-mark brand-logo">
-            <img src="/proto-logo.png" alt="Proto Trading logo" />
+            <img src="/proto-logo.webp" alt="Proto Trading logo" />
           </div>
           <div className="brand-copy">
             <strong>PROTO</strong>
@@ -539,10 +541,7 @@ export default function Header({
           <button className="header-action desktop-only" type="button" onClick={onViewProfile}>
             <User size={19} />
             <span>
-              <small style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                {customer?.tier === 'premium' && <Star size={11} fill="#8B1A1A" color="#8B1A1A" />}
-                {customer?.tier === 'premium' ? 'Premium' : 'Trade'}
-              </small>
+              <small>Trade</small>
               My Profile
             </span>
           </button>
@@ -550,6 +549,16 @@ export default function Header({
           {onLogout && (
             <button className="header-action desktop-only" type="button" onClick={onLogout} title="Log out" style={{ opacity: 0.75 }}>
               <LogOut size={17} />
+            </button>
+          )}
+
+          {/* Mobile-only icon buttons */}
+          <button className="header-icon-mobile" type="button" onClick={onViewProfile} aria-label="My profile">
+            <User size={17} />
+          </button>
+          {onLogout && (
+            <button className="header-icon-mobile" type="button" onClick={onLogout} aria-label="Log out" style={{ opacity: 0.65 }}>
+              <LogOut size={16} />
             </button>
           )}
 

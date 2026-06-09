@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -15,6 +15,7 @@ const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmM
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
+import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { authHeaders } from './lib/authHeaders';
@@ -71,11 +72,20 @@ function collectionLabel(collection) {
 }
 
 export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) {
-  const { path, refinements, navigate, setRefinement } = useHashNav();
+  const { path, refinements, navigate: hashNavigate, setRefinement } = useHashNav();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const navigate = useCallback((newPath, newRefinements) => {
+    setSearchQuery('');
+    hashNavigate(newPath, newRefinements);
+  }, [hashNavigate]);
+
+  const navigateForSearch = useCallback((newPath, newRefinements) => {
+    hashNavigate(newPath, newRefinements);
+  }, [hashNavigate]);
   const [sort, setSort] = useState('featured');
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -83,7 +93,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [counts, setCounts] = useState({ '': 0 });
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
-  const [cartItems, setCartItems] = useState([]);
+  const [cartItems, setCartItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('proto_cart') || '[]'); } catch { return []; }
+  });
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
@@ -92,6 +104,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [lastOrder, setLastOrder] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
+
+  useEffect(() => {
+    try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
+  }, [cartItems]);
 
   useEffect(() => {
     setPage(1);
@@ -176,11 +192,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
         if (activeCollection === 'instock') rows = rows.filter((item) => (item.stockOnHand ?? 0) > 0);
         if (activeCollection === 'soldout') rows = rows.filter((item) => (item.stockOnHand ?? 0) <= 0);
-        if (path.length) rows = rows.filter((item) => path.every((seg, index) => item.categoryPath?.[index] === seg));
-        if (searchQuery.trim()) {
-          const q = searchQuery.trim().toLowerCase();
-          rows = rows.filter((item) => item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q));
+        const hasSearch = Boolean(searchQuery.trim());
+        if (!hasSearch && path.length) {
+          rows = rows.filter((item) => path.every((seg, index) => item.categoryPath?.[index] === seg));
         }
+        if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
         setUsingFallback(true);
         setCatalogTotal(rows.length);
         setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
@@ -236,10 +252,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, []);
 
   const addToCart = (product, qty, buttonPos = null) => {
+    const maxQty = product.stockQty || 9999;
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: i.qty + qty } : i));
-      return [...prev, { product, qty }];
+      if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: Math.min(maxQty, i.qty + qty) } : i));
+      return [...prev, { product, qty: Math.min(maxQty, qty) }];
     });
 
     if (buttonPos) setFlyAnim(buttonPos);
@@ -249,7 +266,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
   };
 
-  const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(9999, Number(qty) || 1)) })));
+  const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(i.product.stockQty || 9999, Number(qty) || 1)) })));
   const removeFromCart = (id) => setCartItems((prev) => prev.filter((i) => i.product.id !== id));
   const clearCart = () => setCartItems([]);
 
@@ -412,6 +429,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         cartTotal={cartTotal}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        navigateForSearch={navigateForSearch}
         onMenuClick={() => setMobileMenuOpen(true)}
         customer={customer}
         onViewProfile={onViewProfile}

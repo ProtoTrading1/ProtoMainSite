@@ -58,7 +58,6 @@ export default async function handler(req, res) {
 
   const {
     email,
-    username,
     password,
     contactName,
     businessName,
@@ -73,7 +72,7 @@ export default async function handler(req, res) {
     acceptWhatsapp,
   } = req.body || {};
 
-  if (!email || !username || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
+  if (!email || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
@@ -84,23 +83,12 @@ export default async function handler(req, res) {
   );
 
   const normalizedEmail = email.trim().toLowerCase();
-  const normalizedUsername = username.trim();
   const normalizedContactName = contactName.trim();
   const normalizedBusinessName = businessName.trim();
   const normalizedPhone = phone.trim();
   const normalizedCompanyAddress = companyAddress.trim();
   const normalizedDeliveryAddress = deliveryAddress.trim();
   const normalizedVatNumber = vatNumber?.trim() || null;
-
-  const { data: usernameMatch, error: usernameLookupError } = await supabase
-    .from('customers')
-    .select('id')
-    .ilike('username', normalizedUsername)
-    .limit(1);
-
-  if (!usernameLookupError && usernameMatch?.length) {
-    return res.status(400).json({ error: 'That username is already in use' });
-  }
 
   // Create the user via admin API — skips Supabase's own confirmation email
   const { data, error } = await supabase.auth.admin.createUser({
@@ -110,7 +98,6 @@ export default async function handler(req, res) {
     user_metadata: {
       name: normalizedContactName,
       phone: normalizedPhone,
-      username: normalizedUsername,
       business_name: normalizedBusinessName,
       company_address: normalizedCompanyAddress,
       delivery_address: normalizedDeliveryAddress,
@@ -130,12 +117,12 @@ export default async function handler(req, res) {
   // Insert customers row manually (in case the DB trigger doesn't fire for admin-created users)
   const userId = data.user?.id;
   if (userId) {
-    const customerPayload = {
+    // Try full payload first; if accept_whatsapp column doesn't exist yet, fall back without it
+    const fullPayload = {
       id: userId,
       email: normalizedEmail,
       name: normalizedContactName,
       phone: normalizedPhone,
-      username: normalizedUsername,
       business_name: normalizedBusinessName,
       company_address: normalizedCompanyAddress,
       delivery_address: normalizedDeliveryAddress,
@@ -149,22 +136,20 @@ export default async function handler(req, res) {
       tier: 'regular',
     };
 
-    let { error: custError } = await supabase.from('customers').upsert(customerPayload, { onConflict: 'id' });
+    let { error: custError } = await supabase.from('customers').upsert(fullPayload, { onConflict: 'id' });
 
     if (custError) {
-      const fallbackPayload = {
-        id: userId,
-        email: normalizedEmail,
-        name: normalizedContactName,
-        phone: normalizedPhone,
-        delivery_address: normalizedDeliveryAddress,
-        is_approved: false,
-        tier: 'regular',
-      };
-      const fallback = await supabase.from('customers').upsert(fallbackPayload, { onConflict: 'id' });
-      custError = fallback.error;
-      if (custError) console.error('customers upsert error:', custError.message);
-      else console.warn('customers upsert fell back to base columns; new fields remain in auth metadata until schema migration is applied');
+      // accept_whatsapp column may not exist yet — retry without it
+      const { accept_whatsapp: _wa, ...payloadWithoutWa } = fullPayload;
+      const retry = await supabase.from('customers').upsert(payloadWithoutWa, { onConflict: 'id' });
+      custError = retry.error;
+    }
+
+    if (custError) {
+      console.error('customers upsert error:', custError.message);
+      // Auth user exists but no customer row — clean up to avoid orphaned auth account
+      await supabase.auth.admin.deleteUser(userId);
+      return res.status(500).json({ error: 'Failed to create customer profile. Please try again.' });
     }
   }
 

@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { checkStock } from '../lib/products';
-import { optimizedImageUrl } from '../lib/imageUrl';
+import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 
-// Fast CSS-only approach: mix-blend-mode:multiply makes white product backgrounds
-// invisible against white card backgrounds — same visual result as the old canvas
-// trimming but with zero JS processing and zero extra network requests.
 function ProductImage({ src, alt, width = 400, priority = false }) {
-  const [broken, setBroken] = useState(false);
-  const optimized = optimizedImageUrl(src, { width, quality: 78 });
+  const candidates = buildImageCandidates(src);
+  const [imageIdx, setImageIdx] = useState(0);
 
-  if (!src || broken) {
+  useEffect(() => {
+    setImageIdx(0);
+  }, [src]);
+
+  if (!candidates.length || !candidates[imageIdx]) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', color: '#d1d5db' }}>
         <ImageOff size={28} />
@@ -21,13 +22,13 @@ function ProductImage({ src, alt, width = 400, priority = false }) {
 
   return (
     <img
-      src={optimized}
+      src={candidates[imageIdx]}
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}
       fetchpriority={priority ? 'high' : 'auto'}
       decoding="async"
-      onError={() => setBroken(true)}
-      style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }}
+      onError={() => setImageIdx((idx) => idx + 1)}
+      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
     />
   );
 }
@@ -231,7 +232,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 </div>
               )}
               <ProductImage
-                src={galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image)}
+                src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
                 alt={activeProduct.name}
                 width={1200}
               />
@@ -245,7 +246,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                       onClick={(e) => { e.stopPropagation(); setActiveImageIdx(idx); }}
                       aria-label={`View image ${idx + 1}`}
                     >
-                      <img src={img} alt={`${activeProduct.name} ${idx + 1}`} />
+                      <img src={optimizedImageUrl(img)} alt={`${activeProduct.name} ${idx + 1}`} />
                     </button>
                   ))}
                 </div>

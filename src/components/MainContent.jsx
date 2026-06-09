@@ -197,12 +197,30 @@ export default function MainContent({
         </div>
       )}
 
+      {searchQuery && (
+        <div className="active-search-bar">
+          <span className="active-search-label">Searching for</span>
+          <span className="active-search-chip">
+            <Search size={14} />
+            {searchQuery}
+          </span>
+          <button
+            type="button"
+            className="active-search-clear"
+            onClick={() => setSearchQuery('')}
+            aria-label="Clear search"
+          >
+            Clear search
+          </button>
+        </div>
+      )}
+
       {/* Sort + count bar — only show when browsing products, not on the category landing */}
       {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && (
         <div className="results-control">
           <span className="results-count">
             {searchQuery
-              ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''}`
+              ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''} across all categories`
               : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
           </span>
           <label className="sort-control">
@@ -261,13 +279,6 @@ export default function MainContent({
         </>
       )}
 
-      <section className="buyer-note">
-        <TimerReset size={18} />
-        <div>
-          <strong>Trade pricing is confirmed by reply.</strong>
-          <span>Prices shown are excl. VAT and intended for wholesale quote building.</span>
-        </div>
-      </section>
     </div>
   );
 }

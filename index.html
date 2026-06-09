@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Proto Trading — Wholesale Trade Portal</title>
     <!-- Preconnect to image CDN so DNS + TLS are resolved before first image request -->
     <link rel="preconnect" href="https://yiqsvwajozafvalwcero.supabase.co" crossorigin />
@@ -11,16 +11,13 @@
     <!-- Preconnect for Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="image" href="/proto-logo.png" />
-    <link rel="preload" as="image" href="/product-images/MA002-3.webp" />
-    <link rel="preload" as="image" href="/product-images/MA005-11.webp" />
+    <link rel="preload" as="image" href="/proto-logo.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/hero-bg.webp" fetchpriority="high" media="(min-width: 769px)" />
+    <link rel="preload" as="image" href="/hero-bg-mobile.webp" fetchpriority="high" media="(max-width: 768px)" />
+    <link rel="preload" as="image" href="/proto-poster.jpg" />
   </head>
   <body>
     <script>if('scrollRestoration'in history)history.scrollRestoration='manual';document.documentElement.scrollTop=0;</script>
-    <script>
-      (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',{app_id:'qk0xorsx'});}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/qk0xorsx';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(d.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
-      window.Intercom('boot', { app_id: 'qk0xorsx' });
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

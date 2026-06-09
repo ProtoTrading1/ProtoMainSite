@@ -181,7 +181,10 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
       </div>
 
       {/* Column 3 — L3 subcategories */}
-      <div style={{ width: 260, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div
+        style={{ width: 260, display: 'flex', flexDirection: 'column', minWidth: 0 }}
+        onMouseEnter={() => { if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; } }}
+      >
         {hoveredL2 && l3List.length > 0 && (
           <>
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
