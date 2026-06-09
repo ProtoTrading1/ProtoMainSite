@@ -259,13 +259,13 @@
 .lp-feat-cats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 14px;
   background: #000;
-  padding: 40px;
+  padding: 24px;
 }
 
 .lp-feat-card {
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
   cursor: default;
