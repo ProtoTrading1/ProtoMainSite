@@ -171,6 +171,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageDragOver, setImageDragOver] = useState(false);
   const imageFileInputRef = useRef(null);
+  const [editorImageUploading, setEditorImageUploading] = useState(false);
+  const [editorImageDragOver, setEditorImageDragOver] = useState(false);
+  const [editorImageError, setEditorImageError] = useState('');
+  const editorImageFileInputRef = useRef(null);
 
   const [productSearch, setProductSearch] = useState('');
   const [productCategory, setProductCategory] = useState('all');
@@ -306,13 +310,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     try { await saveSpecials([]); } catch { /* silent */ } finally { setSpecialsSaving(false); }
   };
 
-  const uploadImageFile = async (file) => {
+  const uploadImageFile = async (file, { onStart, onDone, onError, applyUrl } = {}) => {
     if (!file || !file.type.startsWith('image/')) {
-      setContentEditError('Only image files are supported.');
+      onError?.('Only image files are supported.');
       return;
     }
-    setImageUploading(true);
-    setContentEditError('');
+    onStart?.();
+    onError?.('');
     try {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -327,13 +331,27 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Upload failed');
-      setContentEditForm((f) => ({ ...f, image: json.url }));
+      applyUrl?.(json.url);
     } catch (err) {
-      setContentEditError(err.message || 'Image upload failed');
+      onError?.(err.message || 'Image upload failed');
     } finally {
-      setImageUploading(false);
+      onDone?.();
     }
   };
+
+  const uploadContentEditImageFile = async (file) => uploadImageFile(file, {
+    onStart: () => setImageUploading(true),
+    onDone: () => setImageUploading(false),
+    onError: setContentEditError,
+    applyUrl: (url) => setContentEditForm((f) => ({ ...f, image: url })),
+  });
+
+  const uploadEditorImageFile = async (file) => uploadImageFile(file, {
+    onStart: () => setEditorImageUploading(true),
+    onDone: () => setEditorImageUploading(false),
+    onError: setEditorImageError,
+    applyUrl: (url) => setProductForm((f) => ({ ...f, image: url })),
+  });
 
   const stats = useMemo(() => ({
     products: productTotal,
@@ -351,17 +369,26 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const openNewProduct = () => {
     const firstCategory = categories[0]?.id || '';
     setEditingProduct(null);
+    setEditorImageError('');
+    setEditorImageDragOver(false);
     setProductForm({ ...emptyForm, categoryId: firstCategory, subcategoryId: subcategoryOptions(firstCategory)[0]?.id || '' });
     setEditorOpen(true);
   };
 
   const openEditProduct = (product) => {
     setEditingProduct(product);
+    setEditorImageError('');
+    setEditorImageDragOver(false);
     setProductForm(productToForm(product));
     setEditorOpen(true);
   };
 
-  const closeEditor = () => { setEditorOpen(false); setEditingProduct(null); };
+  const closeEditor = () => {
+    setEditorOpen(false);
+    setEditingProduct(null);
+    setEditorImageError('');
+    setEditorImageDragOver(false);
+  };
 
   const openContentEdit = (product) => {
     setContentEditProduct(product);
@@ -439,10 +466,52 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const exportLiveXlsx = async () => {
     setSaving('export-live');
     try {
-      const data = await fetchAdminProductsPage({ page: 1, pageSize: 999999, searchQuery: productSearch, categoryFilter: productCategory });
-      const ws = XLSX.utils.json_to_sheet(data.rows.map(toXlsxRow));
+      const data = await fetchAdminProductsPage({ page: 1, pageSize: 999999, searchQuery: '', categoryFilter: 'all' });
+      const all = data.rows;
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Live Products');
+
+      categories.forEach((cat) => {
+        const catProducts = all.filter((p) => p.category === cat.id || p.categoryPath?.[0] === cat.id);
+        if (!catProducts.length) return;
+
+        const rows = [];
+        const subMap = new Map((cat.children || []).map((s) => [s.id, s.label]));
+
+        const subGroups = new Map();
+        catProducts.forEach((p) => {
+          const subId = p.categoryPath?.[1] || '__general__';
+          if (!subGroups.has(subId)) subGroups.set(subId, []);
+          subGroups.get(subId).push(p);
+        });
+
+        subGroups.forEach((prods, subId) => {
+          const subLabel = subId === '__general__' ? '' : (subMap.get(subId) || subId);
+          if (subLabel) {
+            rows.push({ Subcategory: `── ${subLabel} ──`, Code: '', Name: '', Price: '', Stock: '', SKU: '', 'Parent SKU': '' });
+          }
+          prods.forEach((p) => {
+            rows.push({
+              Subcategory: subLabel,
+              Code: p.barcode || p.code,
+              Name: p.name,
+              Price: p.price,
+              Stock: p.stockQty,
+              SKU: p.websiteSku || '',
+              'Parent SKU': p.parentSku || '',
+            });
+          });
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, cat.label.slice(0, 31));
+      });
+
+      const uncatProducts = all.filter((p) => !p.category || !categories.find((c) => c.id === p.category));
+      if (uncatProducts.length) {
+        const ws = XLSX.utils.json_to_sheet(uncatProducts.map(toXlsxRow));
+        XLSX.utils.book_append_sheet(wb, ws, 'Uncategorised');
+      }
+
       XLSX.writeFile(wb, 'proto-live-products.xlsx');
     } finally { setSaving(''); }
   };
@@ -565,7 +634,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       <header className="adm-header">
         <div className="adm-header-inner">
           <div className="adm-brand">
-            <img src="/proto-logo.png" alt="Proto Trading" style={{ height: 32 }} />
+            <img src="/proto-logo.webp" alt="Proto Trading" style={{ height: 32 }} />
             <div>
               <strong>PROTO <span style={{ color: '#8B1A1A' }}>TRADING</span></strong>
               <small>Admin portal</small>
@@ -1158,7 +1227,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               type="file"
               accept="image/*"
               style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImageFile(f); e.target.value = ''; }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadContentEditImageFile(f); e.target.value = ''; }}
             />
 
             {/* Drop zone / preview */}
@@ -1171,7 +1240,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 e.preventDefault();
                 setImageDragOver(false);
                 const file = e.dataTransfer.files?.[0];
-                if (file) void uploadImageFile(file);
+                if (file) void uploadContentEditImageFile(file);
               }}
               style={{
                 position: 'relative',
@@ -1280,6 +1349,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               </div>
               <button onClick={closeEditor} className="adm-icon-btn"><X size={16} /></button>
             </div>
+            <input
+              ref={editorImageFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadEditorImageFile(f); e.target.value = ''; }}
+            />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <AdminField label="Product code"><input value={productForm.code} onChange={(e) => setProductForm((p) => ({ ...p, code: e.target.value }))} className="adm-field-input" /></AdminField>
               <AdminField label="Product type">
@@ -1288,7 +1364,76 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </select>
               </AdminField>
               <AdminField label="Product name" full><input value={productForm.name} onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))} className="adm-field-input" /></AdminField>
-              <AdminField label="Image URL" full><input value={productForm.image} onChange={(e) => setProductForm((p) => ({ ...p, image: e.target.value }))} className="adm-field-input" /></AdminField>
+              <AdminField label="Product image" full>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div
+                    onClick={() => !editorImageUploading && editorImageFileInputRef.current?.click()}
+                    onDragEnter={(e) => { e.preventDefault(); setEditorImageDragOver(true); }}
+                    onDragOver={(e) => { e.preventDefault(); setEditorImageDragOver(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setEditorImageDragOver(false); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setEditorImageDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) void uploadEditorImageFile(file);
+                    }}
+                    style={{
+                      position: 'relative',
+                      borderRadius: 10,
+                      border: `2px dashed ${editorImageDragOver ? '#8B1A1A' : productForm.image ? '#d1d5db' : '#cbd5e1'}`,
+                      background: editorImageDragOver ? '#fff5f5' : productForm.image ? '#f8f8f8' : '#f8fafc',
+                      minHeight: 220,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: editorImageUploading ? 'wait' : 'pointer',
+                      overflow: 'hidden',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                  >
+                    {editorImageUploading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#8B1A1A' }}>
+                        <Loader2 size={32} className="spin" />
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>Uploading…</span>
+                      </div>
+                    ) : productForm.image ? (
+                      <>
+                        <img src={productForm.image} alt="Product preview" style={{ maxWidth: '100%', maxHeight: 220, objectFit: 'contain' }} />
+                        <div style={{
+                          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
+                          display: editorImageDragOver ? 'flex' : 'none',
+                          alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, color: '#fff',
+                        }}>
+                          <Upload size={28} />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>Drop to replace</span>
+                        </div>
+                        <div style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0,
+                          padding: '6px 10px', background: 'rgba(0,0,0,0.5)',
+                          color: '#fff', fontSize: 11, textAlign: 'center',
+                          display: editorImageDragOver ? 'none' : 'block',
+                        }}>
+                          Click or drag a new image to upload to Supabase
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: editorImageDragOver ? '#8B1A1A' : '#94a3b8', pointerEvents: 'none' }}>
+                        <Upload size={32} />
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>Drag & drop an image here</div>
+                          <div style={{ fontSize: 12, marginTop: 4 }}>or click to browse files</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <input value={productForm.image} onChange={(e) => setProductForm((p) => ({ ...p, image: e.target.value }))} className="adm-field-input" placeholder="Supabase image URL" />
+                  {editorImageError && (
+                    <div style={{ padding: '8px 12px', background: '#fef2f2', borderRadius: 6, color: '#c40000', fontSize: 13 }}>
+                      {editorImageError}
+                    </div>
+                  )}
+                </div>
+              </AdminField>
               <AdminField label="Price"><input value={productForm.price} onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))} className="adm-field-input" /></AdminField>
               <AdminField label="Stock on hand"><input value={productForm.stockOnHand} onChange={(e) => setProductForm((p) => ({ ...p, stockOnHand: e.target.value }))} className="adm-field-input" /></AdminField>
               <AdminField label="Main category">
@@ -1304,8 +1449,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={closeEditor} className="adm-btn-ghost"><ChevronLeft size={15} /> Cancel</button>
-              <button onClick={() => void saveProduct()} className="adm-btn-red">
-                {saving === 'new-product' || saving === editingProduct?.id ? 'Saving…' : <><Check size={15} /> Save product</>}
+              <button onClick={() => void saveProduct()} className="adm-btn-red" disabled={editorImageUploading}>
+                {saving === 'new-product' || saving === editingProduct?.id ? 'Saving…' : editorImageUploading ? 'Uploading image…' : <><Check size={15} /> Save product</>}
               </button>
             </div>
           </div>

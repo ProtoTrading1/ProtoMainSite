@@ -1437,6 +1437,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   place-items: center;
   border-bottom: 1px solid #f0f1f3;
   background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+  overflow: hidden;
 }
 .product-image-button {
   width: 100%;
@@ -1444,6 +1445,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: grid;
   place-items: center;
   cursor: zoom-in;
+  overflow: hidden;
 }
 .zoom-cue {
   position: absolute;
@@ -1472,7 +1474,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   width: auto;
   height: auto;
   object-fit: contain;
-  transform: scale(1.15);
+  mix-blend-mode: multiply;
 }
 .product-image img.catalogue-photo {
   width: auto;
@@ -1481,13 +1483,12 @@ input, select, textarea { font-family: inherit; outline: none; }
   max-height: 204px;
   object-fit: contain;
   object-position: center;
-  transform: scale(1.15);
   mix-blend-mode: multiply;
 }
 .product-image img.trimmed-catalogue-photo {
   max-width: 92%;
   max-height: 204px;
-  transform: scale(1.12);
+  mix-blend-mode: multiply;
 }
 .tag-row {
   position: absolute;
@@ -1746,24 +1747,30 @@ input, select, textarea { font-family: inherit; outline: none; }
 .add-button:active { transform: translateY(0); }
 .add-button.added { background: #16a34a; }
 .primary-order-button {
-  flex: 1;
-  height: 54px;
+  width: 100%;
+  min-height: 58px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 12px;
-  background: #16a34a;
+  gap: 10px;
+  padding: 0 18px;
+  border-radius: 16px;
+  background: #dc2626;
   color: #fff;
-  font-weight: 800;
+  font-weight: 900;
   font-size: 15px;
   letter-spacing: 0.01em;
-  transition: background 0.15s, transform 0.1s;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
   border: none;
+  box-shadow: 0 16px 34px rgba(220,38,38,0.30);
   cursor: pointer;
 }
-.primary-order-button:hover { background: #15803d; }
-.primary-order-button:active { transform: scale(0.98); }
+.primary-order-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 40px rgba(220,38,38,0.35);
+  filter: brightness(1.06);
+}
+.primary-order-button:active { transform: translateY(0); }
 .cart-in-control {
   flex: 1;
   height: 40px;

@@ -2,12 +2,15 @@ import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { motion, useInView } from 'motion/react';
 import {
-  ArrowDown,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   Clock3,
   Eye,
   EyeOff,
+  Gem,
+  Home,
+  Info,
   Lock,
   MessageCircle,
   PackageSearch,
@@ -371,7 +374,7 @@ function Questionnaire({ onLogin }) {
   const [contactName, setContactName] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
+
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
@@ -385,7 +388,7 @@ function Questionnaire({ onLogin }) {
   const [otherType, setOtherType] = useState('');
   const canNext = () => {
     if (step === 0) return companyName.trim() && contactName.trim();
-    if (step === 1) return email.trim() && username.trim() && phone.trim() && password.trim().length >= 8;
+    if (step === 1) return email.trim() && phone.trim() && password.trim().length >= 8;
     if (step === 2) return companyAddress.trim() && deliveryAddress.trim();
     if (step === 3) return true;
     return false;
@@ -404,7 +407,6 @@ function Questionnaire({ onLogin }) {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
       await submitTradeApplication({
         email: email.trim(),
-        username: username.trim(),
         password,
         contactName: contactName.trim(),
         businessName: companyName.trim(),
@@ -503,15 +505,6 @@ function Questionnaire({ onLogin }) {
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Username</label>
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Choose a username"
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
@@ -642,33 +635,6 @@ function Questionnaire({ onLogin }) {
                 </button>
               ))}
             </div>
-            {country === 'South Africa' && (
-              <motion.div
-                className="lp-quiz-sa-fields"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22 }}
-              >
-                <div className="lp-quiz-field">
-                  <label>Province</label>
-                  <select value={province} onChange={(e) => setProvince(e.target.value)}>
-                    <option value="">Select province</option>
-                    {SA_PROVINCES.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="lp-quiz-field">
-                  <label>City</label>
-                  <input
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="e.g. Cape Town"
-                  />
-                </div>
-              </motion.div>
-            )}
             <div style={{ height: '18px' }} />
             <div className="lp-quiz-types">
               {BUSINESS_TYPES.map((t) => (
@@ -726,6 +692,138 @@ function Questionnaire({ onLogin }) {
   );
 }
 
+function VideoHero({ onLogin, onApply }) {
+  const [textVisible, setTextVisible] = useState(false);
+
+  return (
+    <section className="vhero-section">
+      <video
+        className="vhero-video"
+        src="/hero-vid.mp4"
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        onEnded={() => setTextVisible(true)}
+        style={{ pointerEvents: 'none' }}
+      />
+      <div className="vhero-overlay" />
+      <div
+        className="vhero-copy"
+        style={{
+          opacity: textVisible ? 1 : 0,
+          transform: textVisible ? 'translateY(0)' : 'translateY(24px)',
+          transition: 'opacity 0.9s ease, transform 0.9s ease',
+        }}
+      >
+        <h1>
+          <span style={{ color: '#fff', display: 'block' }}>Built for</span>
+          <span style={{ color: '#dc2626', display: 'block' }}>retail success.</span>
+        </h1>
+        <div className="access-hero-buttons">
+          <button className="access-apply large" type="button" onClick={onApply}>
+            Apply for trade access <ArrowRight size={18} />
+          </button>
+          <button className="access-login large" type="button" onClick={onLogin}>
+            Existing customer login
+          </button>
+        </div>
+        <div className="access-note">
+          Applications are reviewed for genuine trade customers. Public retail sales are not available.
+        </div>
+        <div className="hero-mini-proof">
+          <span>Established wholesale supplier</span>
+          <strong>Since 1987</strong>
+          <span>Nationwide trade support</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const CAT_CARDS = [
+  {
+    id: 'cat-1',
+    label: 'Homeware & Kitchen',
+    titleLine1: 'Homeware &',
+    titleLine2: 'Kitchen',
+    desc: 'Wholesale cookware, drinkware, storage and home essentials for modern retailers.',
+    img: '/cat-new-1.jpg',
+  },
+  {
+    id: 'cat-2',
+    label: 'Beads, Jewellery & Accessories',
+    titleLine1: 'Beads,',
+    titleLine2: 'Jewellery & Accessories',
+    desc: 'A stunning range of beads, jewellery findings and accessories to bring your creations to life.',
+    img: '/cat-new-2.jpg',
+  },
+  {
+    id: 'cat-3',
+    label: 'Toys, Games & Kids',
+    titleLine1: 'Playtime for',
+    titleLine2: 'Every Imagination.',
+    desc: 'Fun toys and playful favourites for every shelf. Every day.',
+    img: '/cat-new-3.jpg',
+  },
+  {
+    id: 'cat-4',
+    label: 'Arts, Crafts & Stationery',
+    titleLine1: 'Arts, Crafts &',
+    titleLine2: 'Stationery',
+    desc: 'A comprehensive range of stationery, art materials and creative supplies for school, office and hobby projects.',
+    img: '/cat-new-4.jpg',
+  },
+];
+
+function CategoryCarousel() {
+  const [idx, setIdx] = useState(0);
+  const total = CAT_CARDS.length;
+  const prev = () => setIdx((i) => (i - 1 + total) % total);
+  const next = () => setIdx((i) => (i + 1) % total);
+  const peekIdx = (idx + 1) % total;
+
+  return (
+    <div className="lp-carousel">
+      {/* Peek card — sits behind, slightly offset right */}
+      <div className="lp-carousel-peek" key={peekIdx}>
+        <img src={CAT_CARDS[peekIdx].img} alt="" className="lp-feat-card-bg" />
+        <div className="lp-feat-card-overlay" />
+      </div>
+
+      {/* Main card */}
+      <div className="lp-carousel-main" key={idx}>
+        <img src={CAT_CARDS[idx].img} alt={CAT_CARDS[idx].label} className="lp-feat-card-bg" />
+        <div className="lp-feat-card-overlay" />
+        <div className="lp-feat-card-body">
+          <h3 className="lp-feat-card-title">
+            <span style={{ display: 'block', color: '#fff' }}>{CAT_CARDS[idx].titleLine1}</span>
+            <span style={{ display: 'block', color: '#dc2626' }}>{CAT_CARDS[idx].titleLine2}</span>
+          </h3>
+          <div className="lp-feat-card-divider" />
+          <p className="lp-feat-card-desc">{CAT_CARDS[idx].desc}</p>
+        </div>
+        <div className="lp-feat-card-footer">{CAT_CARDS[idx].label}</div>
+      </div>
+
+      {/* Arrows */}
+      <button className="lp-carousel-btn lp-carousel-btn--prev" onClick={prev} aria-label="Previous">
+        <ArrowLeft size={20} />
+      </button>
+      <button className="lp-carousel-btn lp-carousel-btn--next" onClick={next} aria-label="Next">
+        <ArrowRight size={20} />
+      </button>
+
+      {/* Dots */}
+      <div className="lp-carousel-dots">
+        {CAT_CARDS.map((_, i) => (
+          <button key={i} className={`lp-carousel-dot${i === idx ? ' active' : ''}`} onClick={() => setIdx(i)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage({ onLogin, onApply }) {
   useEffect(() => {
     const prev = document.body.style.background;
@@ -737,12 +835,12 @@ export default function LandingPage({ onLogin, onApply }) {
     };
   }, []);
 
+  const [showAbout, setShowAbout] = useState(false);
   const statsRef = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
 
   const deptRef = useRef(null);
   const deptInView = useInView(deptRef, { once: true, margin: '-80px' });
-
 
   const scrollToForm = () => {
     if (onApply) { onApply(); return; }
@@ -754,7 +852,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.png" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
+          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
           <div>
             <strong>PROTO <span>TRADING</span></strong>
             <small>Wholesale supplier since 1987</small>
@@ -762,8 +860,8 @@ export default function LandingPage({ onLogin, onApply }) {
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
-          <button type="button" onClick={() => document.getElementById('lp-how')?.scrollIntoView({ behavior: 'smooth' })}>How it works</button>
-          <button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
+<button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
+          <button type="button" onClick={() => setShowAbout(true)}>About us</button>
         </nav>
         <div className="access-actions">
           <button className="access-login" type="button" onClick={onLogin}>
@@ -777,38 +875,10 @@ export default function LandingPage({ onLogin, onApply }) {
       </header>
 
       <main>
-        {/* ── Hero ── */}
-        <section className="access-hero hero-photo-bg">
-          <div className="access-hero-copy">
-            <h1>
-              <span style={{ color: '#ffffff', display: 'block' }}>Built for</span>
-              <span style={{ color: '#dc2626', display: 'block' }}>retail success.</span>
-            </h1>
-            <div className="access-hero-buttons">
-              <button className="access-apply large" type="button" onClick={scrollToForm}>
-                Apply for trade access
-                <ArrowRight size={18} />
-              </button>
-              <button className="access-login large" type="button" onClick={onLogin}>
-                Existing customer login
-              </button>
-            </div>
-            <div className="access-note">
-              Applications are reviewed for genuine trade customers. Public retail sales are not available.
-            </div>
-            <div className="hero-mini-proof">
-              <span>Established wholesale supplier</span>
-              <strong>Since 1987</strong>
-              <span>Nationwide trade support</span>
-            </div>
-          </div>
-        </section>
+        {/* ── Video hero ── */}
+        <VideoHero onLogin={onLogin} onApply={scrollToForm} />
 
-        {/* ── Scroll hint ── */}
-        <div className="lp-scroll-hint">
-          <ArrowDown size={22} />
-        </div>
-
+        <div>
         {/* ── Animated stats ── */}
         <section className="lp-stats" ref={statsRef}>
           <StatCard value={8000} suffix="+" label="wholesale product lines" active={statsInView} duration={1600} />
@@ -842,14 +912,9 @@ export default function LandingPage({ onLogin, onApply }) {
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            <video
-              src="/proto.mp4"
-              autoPlay
-              loop
-              muted
-              playsInline
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
+            <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
+              <SouthernAfricaMap />
+            </Suspense>
           </motion.div>
         </motion.section>
 
@@ -876,6 +941,25 @@ export default function LandingPage({ onLogin, onApply }) {
               />
             ))}
           </div>
+        </section>
+
+        {/* ── Featured category cards ── */}
+        <section className="lp-feat-cats">
+          {CAT_CARDS.map(({ id, label, img, titleLine1, titleLine2, desc }) => (
+            <div key={id} className="lp-feat-card">
+              <img src={img} alt={label} className="lp-feat-card-bg" />
+              <div className="lp-feat-card-overlay" />
+              <div className="lp-feat-card-body">
+                <h3 className="lp-feat-card-title">
+                  <span style={{ display: 'block', color: '#fff' }}>{titleLine1}</span>
+                  <span style={{ display: 'block', color: '#dc2626' }}>{titleLine2}</span>
+                </h3>
+                <div className="lp-feat-card-divider" />
+                <p className="lp-feat-card-desc">{desc}</p>
+              </div>
+              <div className="lp-feat-card-footer">{label}</div>
+            </div>
+          ))}
         </section>
 
         {/* ── How it works ── */}
@@ -947,7 +1031,7 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
-            <img src="/proto-logo.png" alt="Proto Trading" />
+            <img src="/proto-logo.webp" alt="Proto Trading" />
             <div>
               <strong>PROTO <span>TRADING</span></strong>
               <small>Wholesale supplier since 1987</small>
@@ -980,8 +1064,10 @@ export default function LandingPage({ onLogin, onApply }) {
             Customer login
           </button>
         </footer>
+        </div>{/* end belowHero */}
       </main>
       <TruckScrollbar />
+      {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

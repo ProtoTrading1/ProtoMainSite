@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -7,10 +7,12 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 
+import lazyWithRetry from './lib/lazyWithRetry';
+
 // Lazy-loaded: only fetched when the user actually triggers these interactions.
-const CartFlyAnimation = lazy(() => import('./components/CartFlyAnimation'));
-const OrderConfirmModal = lazy(() => import('./components/OrderConfirmModal'));
-const ReorderModal = lazy(() => import('./components/ReorderModal'));
+const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimation'), 'app-cart-fly-animation');
+const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
+const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
 import { saveOrder, fetchLastOrder } from './lib/orders';
@@ -72,6 +74,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const { path, refinements, navigate, setRefinement } = useHashNav();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState('featured');
   const [loading, setLoading] = useState(true);
@@ -417,7 +420,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
-        onCartClick={() => setMobileCartOpen(true)}
+        onCartClick={() => { setCartDrawerOpen((prev) => !prev); setMobileCartOpen(true); }}
       />
 
       <div className="main-layout" style={{ height: bodyH }}>
@@ -464,7 +467,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </main>
 
-        <aside className={`cart-drawer${drawerPeek ? ' peek' : ''}`}>
+        <aside className={`cart-drawer${cartDrawerOpen ? ' open' : drawerPeek ? ' peek' : ''}`}>
           <Drawer
             cartItems={cartItems}
             cartTotal={cartTotal}
@@ -474,6 +477,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             sendOrderEmail={sendOrderEmail}
             autoCloseProgress={0}
             showAutoCloseBar={false}
+            onClose={() => setCartDrawerOpen(false)}
           />
         </aside>
       </div>

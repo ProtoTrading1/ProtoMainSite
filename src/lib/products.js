@@ -9,7 +9,7 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v5';
+const LS_KEY = 'proto_catalog_v6';
 const LS_TTL = 15 * 60 * 1000;
 
 function saveToLocalCache(data) {
@@ -22,6 +22,18 @@ function loadFromLocalCache() {
     const { data, ts } = JSON.parse(raw);
     return (Date.now() - ts < LS_TTL) ? data : null;
   } catch { return null; }
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal, credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`${url} ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const PAGE_SIZE = 1000;
@@ -66,7 +78,8 @@ function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
   const rawDept = (wpRow.category || '').trim();
   const deptSlug = DEPT_SLUG_MAP[rawDept] || labelToSlug(rawDept);
-  const categoryPath = deptSlug ? [deptSlug] : [];
+  const subSlug = (wpRow.subcategory || '').trim();
+  const categoryPath = deptSlug ? (subSlug ? [deptSlug, subSlug] : [deptSlug]) : [];
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -143,8 +156,8 @@ export async function fetchDistinctCategories() {
 }
 
 // Returns only in-stock, categorized, imaged products for the customer catalog.
-// Primary source: /products.json (static CDN file, generated at build time — instant).
-// Fallback 1: /api/products (edge-cached Vercel function — ~200ms warm).
+// Primary source: /products.json (static CDN file, generated at build time — fastest).
+// Fallback 1: /api/products (kept only as backup if the static file misses or fails).
 // Fallback 2: direct Supabase (if both above fail).
 function getAllCached() {
   if (!_loadPromise) {
@@ -153,15 +166,8 @@ function getAllCached() {
       _cache = local;
       _loadPromise = Promise.resolve(local);
     } else {
-      _loadPromise = fetch('/api/products')
-        .then((r) => {
-          if (!r.ok) throw new Error(`API ${r.status}`);
-          return r.json();
-        })
-        .catch(() => fetch('/products.json').then((r) => {
-          if (!r.ok) throw new Error(`products.json ${r.status}`);
-          return r.json();
-        }))
+      _loadPromise = fetchJsonWithTimeout('/products.json', 12000)
+        .catch(() => fetchJsonWithTimeout('/api/products', 8000))
         .then((products) => {
           _cache = products;
           saveToLocalCache(products);
@@ -356,9 +362,12 @@ export async function updateProduct(websiteSku, payload) {
 
   // Other fields (name, sortOrder, categoryPath) still go through the client
   const patch = {};
-  if (payload.name        !== undefined) patch.title      = payload.name;
-  if (payload.sortOrder   !== undefined) patch.sort_order = payload.sortOrder;
-  if (payload.categoryPath?.length)      patch.category   = payload.categoryPath[0];
+  if (payload.name        !== undefined) patch.title       = payload.name;
+  if (payload.sortOrder   !== undefined) patch.sort_order  = payload.sortOrder;
+  if (payload.categoryPath?.length) {
+    patch.category    = payload.categoryPath[0];
+    patch.subcategory = payload.categoryPath[1] || '';
+  }
 
   if (Object.keys(patch).length) {
     const { error } = await supabaseStock
