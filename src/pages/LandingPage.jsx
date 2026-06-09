@@ -742,38 +742,17 @@ function VideoHero({ onLogin, onApply }) {
 }
 
 const CAT_CARDS = [
-  {
-    id: 'cat-1',
-    label: 'Homeware & Kitchen',
-    titleLine1: 'Homeware &',
-    titleLine2: 'Kitchen',
-    desc: 'Wholesale cookware, drinkware, storage and home essentials for modern retailers.',
-    img: '/cat-new-1.jpg',
-  },
-  {
-    id: 'cat-2',
-    label: 'Beads, Jewellery & Accessories',
-    titleLine1: 'Beads,',
-    titleLine2: 'Jewellery & Accessories',
-    desc: 'A stunning range of beads, jewellery findings and accessories to bring your creations to life.',
-    img: '/cat-new-2.jpg',
-  },
-  {
-    id: 'cat-3',
-    label: 'Toys, Games & Kids',
-    titleLine1: 'Playtime for',
-    titleLine2: 'Every Imagination.',
-    desc: 'Fun toys and playful favourites for every shelf. Every day.',
-    img: '/cat-new-3.jpg',
-  },
-  {
-    id: 'cat-4',
-    label: 'Arts, Crafts & Stationery',
-    titleLine1: 'Arts, Crafts &',
-    titleLine2: 'Stationery',
-    desc: 'A comprehensive range of stationery, art materials and creative supplies for school, office and hobby projects.',
-    img: '/cat-new-4.jpg',
-  },
+  { id: 'cat-1',  label: 'Homeware & Kitchen',            img: '/cat-homeware.jpg' },
+  { id: 'cat-2',  label: 'Beads, Jewellery & Accessories', img: '/cat-beads.jpg' },
+  { id: 'cat-3',  label: 'Toys, Games & Kids',             img: '/cat-toys.jpg' },
+  { id: 'cat-4',  label: 'Arts, Crafts & Stationery',      img: '/cat-arts.jpg' },
+  { id: 'cat-5',  label: 'Beauty & Personal Care',         img: '/cat-beauty.jpg' },
+  { id: 'cat-6',  label: 'Fashion & Accessories',          img: '/cat-fashion.jpg' },
+  { id: 'cat-7',  label: 'Hardware & Tools',               img: '/cat-hardware.jpg' },
+  { id: 'cat-8',  label: 'Packaging',                      img: '/cat-packaging.jpg' },
+  { id: 'cat-9',  label: 'Textiles & Ribbons',             img: '/cat-textiles.jpg' },
+  { id: 'cat-10', label: 'Events & Parties',               img: '/cat-events.jpg' },
+  { id: 'cat-11', label: 'Crackers & Seasonal',            img: '/cat-crackers.jpg' },
 ];
 
 function CategoryCarousel() {
@@ -795,14 +774,6 @@ function CategoryCarousel() {
       <div className="lp-carousel-main" key={idx}>
         <img src={CAT_CARDS[idx].img} alt={CAT_CARDS[idx].label} className="lp-feat-card-bg" />
         <div className="lp-feat-card-overlay" />
-        <div className="lp-feat-card-body">
-          <h3 className="lp-feat-card-title">
-            <span style={{ display: 'block', color: '#fff' }}>{CAT_CARDS[idx].titleLine1}</span>
-            <span style={{ display: 'block', color: '#dc2626' }}>{CAT_CARDS[idx].titleLine2}</span>
-          </h3>
-          <div className="lp-feat-card-divider" />
-          <p className="lp-feat-card-desc">{CAT_CARDS[idx].desc}</p>
-        </div>
         <div className="lp-feat-card-footer">{CAT_CARDS[idx].label}</div>
       </div>
 
@@ -945,18 +916,10 @@ export default function LandingPage({ onLogin, onApply }) {
 
         {/* ── Featured category cards ── */}
         <section className="lp-feat-cats">
-          {CAT_CARDS.map(({ id, label, img, titleLine1, titleLine2, desc }) => (
+          {CAT_CARDS.map(({ id, label, img }) => (
             <div key={id} className="lp-feat-card">
               <img src={img} alt={label} className="lp-feat-card-bg" />
               <div className="lp-feat-card-overlay" />
-              <div className="lp-feat-card-body">
-                <h3 className="lp-feat-card-title">
-                  <span style={{ display: 'block', color: '#fff' }}>{titleLine1}</span>
-                  <span style={{ display: 'block', color: '#dc2626' }}>{titleLine2}</span>
-                </h3>
-                <div className="lp-feat-card-divider" />
-                <p className="lp-feat-card-desc">{desc}</p>
-              </div>
               <div className="lp-feat-card-footer">{label}</div>
             </div>
           ))}
