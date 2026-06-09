@@ -7,35 +7,70 @@
       {
         "id": "notebooks-paper",
         "label": "Notebooks & Paper",
-        "children": [
-          { "id": "cardstock", "label": "Cardstock" },
-          { "id": "notebooks", "label": "Notebooks" }
-        ]
+        "children": []
+      },
+      {
+        "id": "office-filing",
+        "label": "Office & Filing",
+        "children": []
       },
       {
         "id": "paint-brushes",
         "label": "Paint & Brushes",
         "children": [
-          { "id": "acrylic-paint", "label": "Acrylic Paint" },
-          { "id": "brush-sets", "label": "Brush Sets" },
-          { "id": "palettes", "label": "Palettes" }
+          {
+            "id": "acrylic-paint",
+            "label": "Acrylic Paint"
+          },
+          {
+            "id": "brush-sets",
+            "label": "Brush Sets"
+          },
+          {
+            "id": "easels-palettes-accessories",
+            "label": "Easels, Palettes & Accessories"
+          },
+          {
+            "id": "paint",
+            "label": "Paint"
+          }
         ]
       },
       {
         "id": "pens-markers-pencils",
         "label": "Pens, Markers & Pencils",
-        "children": [
-          { "id": "whiteboard-markers", "label": "Whiteboard Markers" }
-        ]
+        "children": []
       },
       {
         "id": "school-essentials",
         "label": "School Essentials",
         "children": [
-          { "id": "glue", "label": "Glue" },
-          { "id": "rulers", "label": "Rulers" },
-          { "id": "scissors", "label": "Scissors" }
+          {
+            "id": "glue",
+            "label": "Glue"
+          },
+          {
+            "id": "pencil-bags",
+            "label": "Pencil Bags"
+          },
+          {
+            "id": "rulers",
+            "label": "Rulers"
+          },
+          {
+            "id": "scissors",
+            "label": "Scissors"
+          },
+          {
+            "id": "whiteboard-markers",
+            "label": "Whiteboard Markers"
+          }
         ]
+      },
+      {
+        "id": "stickers-labels",
+        "label": "Stickers & Labels",
+        "children": []
       }
     ],
     "refinements": {}
@@ -49,63 +84,119 @@
         "id": "acrylic-plastic-beads",
         "label": "Acrylic & Plastic Beads",
         "children": [
-          { "id": "alphabet-beads", "label": "Alphabet Beads" },
-          { "id": "large-beads", "label": "Large Beads" },
-          { "id": "novelty-beads", "label": "Novelty Beads" },
-          { "id": "round", "label": "Round" }
+          {
+            "id": "alphabet-beads",
+            "label": "Alphabet Beads"
+          },
+          {
+            "id": "large-beads",
+            "label": "Large Beads"
+          },
+          {
+            "id": "novelty-beads",
+            "label": "Novelty Beads"
+          },
+          {
+            "id": "round",
+            "label": "Round"
+          }
         ]
       },
       {
-        "id": "elastic-cord-wire",
-        "label": "Elastic, Cord & Wire",
+        "id": "beads-stones",
+        "label": "Beads & Stones",
         "children": [
-          { "id": "beading-thread", "label": "Beading Thread" },
-          { "id": "elastic-cord", "label": "Elastic Cord" },
-          { "id": "wax-cord", "label": "Wax Cord" }
+          {
+            "id": "glass-beads",
+            "label": "Glass Beads"
+          },
+          {
+            "id": "metal-beads",
+            "label": "Metal Beads"
+          },
+          {
+            "id": "stone-semi-precious-beads",
+            "label": "Stone & Semi-Precious Beads"
+          },
+          {
+            "id": "wooden-beads",
+            "label": "Wooden Beads"
+          }
         ]
+      },
+      {
+        "id": "chains-cords-wire",
+        "label": "Chains, Cords & Wire",
+        "children": [
+          {
+            "id": "beading-thread",
+            "label": "Beading Thread"
+          },
+          {
+            "id": "chains",
+            "label": "Chains"
+          },
+          {
+            "id": "elastic-cord",
+            "label": "Elastic Cord"
+          },
+          {
+            "id": "wax-cord",
+            "label": "Wax Cord"
+          }
+        ]
+      },
+      {
+        "id": "charms-pendants",
+        "label": "Charms & Pendants",
+        "children": [
+          {
+            "id": "metal-charms",
+            "label": "Metal Charms"
+          },
+          {
+            "id": "ready-made-jewellery",
+            "label": "Ready-Made Jewellery"
+          }
+        ]
+      },
+      {
+        "id": "findings",
+        "label": "Findings",
+        "children": []
       },
       {
         "id": "glass-beads",
         "label": "Glass Beads",
         "children": [
-          { "id": "faceted", "label": "Faceted" },
-          { "id": "mixed-colours", "label": "Mixed Colours" },
-          { "id": "pearlised", "label": "Pearlised" },
-          { "id": "transparent", "label": "Transparent" }
+          {
+            "id": "faceted",
+            "label": "Faceted"
+          },
+          {
+            "id": "seed-beads",
+            "label": "Seed Beads"
+          }
         ]
       },
       {
-        "id": "jewellery-tools",
-        "label": "Jewellery Tools",
+        "id": "tools-storage",
+        "label": "Tools & Storage",
         "children": [
-          { "id": "storage-boxes", "label": "Storage Boxes" }
-        ]
-      },
-      {
-        "id": "pendants-charms",
-        "label": "Pendants & Charms",
-        "children": [
-          { "id": "metal-charms", "label": "Metal Charms" }
-        ]
-      },
-      {
-        "id": "seed-beads",
-        "label": "Seed Beads",
-        "children": [
-          { "id": "mixed-packs", "label": "Mixed Packs" },
-          { "id": "opaque", "label": "Opaque" },
-          { "id": "pearl", "label": "Pearl" },
-          { "id": "transparent", "label": "Transparent" }
+          {
+            "id": "display-packaging",
+            "label": "Display & Packaging"
+          }
         ]
       },
       {
         "id": "wooden-beads",
         "label": "Wooden Beads",
         "children": [
-          { "id": "metallic-finish", "label": "Metallic Finish" },
-          { "id": "natural", "label": "Natural" },
-          { "id": "painted", "label": "Painted" },
-          { "id": "round", "label": "Round" }
+          {
+            "id": "round",
+            "label": "Round"
+          }
         ]
       }
     ],
@@ -117,47 +208,93 @@
     "icon": "Smile",
     "children": [
       {
-        "id": "beauty-tools",
-        "label": "Beauty Tools",
-        "children": [
-          { "id": "brushes", "label": "Brushes" },
-          { "id": "sponges", "label": "Sponges" }
-        ]
+        "id": "bath-body",
+        "label": "Bath & Body",
+        "children": []
       },
       {
         "id": "cosmetics",
         "label": "Cosmetics",
         "children": [
-          { "id": "eye-makeup", "label": "Eye Makeup" },
-          { "id": "lip-products", "label": "Lip Products" },
-          { "id": "makeup-tools", "label": "Makeup Tools" },
-          { "id": "nail-items", "label": "Nail Items" }
+          {
+            "id": "eye-makeup",
+            "label": "Eye Makeup"
+          },
+          {
+            "id": "lip-products",
+            "label": "Lip Products"
+          },
+          {
+            "id": "makeup-tools",
+            "label": "Makeup Tools"
+          },
+          {
+            "id": "nail-items",
+            "label": "Nail Items"
+          }
         ]
       },
       {
-        "id": "hair-care",
-        "label": "Hair Care",
+        "id": "fragrance-deodorant",
+        "label": "Fragrance & Deodorant",
+        "children": []
+      },
+      {
+        "id": "hair-beauty-tools",
+        "label": "Hair & Beauty Tools",
         "children": [
-          { "id": "combs", "label": "Combs" },
-          { "id": "hair-tools", "label": "Hair Tools" }
+          {
+            "id": "brushes",
+            "label": "Brushes"
+          },
+          {
+            "id": "hair-beauty-tools",
+            "label": "Hair & Beauty Tools"
+          },
+          {
+            "id": "hair-tools",
+            "label": "Hair Tools"
+          },
+          {
+            "id": "sponges",
+            "label": "Sponges"
+          }
         ]
       },
       {
         "id": "skin-body-care",
         "label": "Skin & Body Care",
         "children": [
-          { "id": "body-care", "label": "Body Care" },
-          { "id": "creams", "label": "Creams" },
-          { "id": "face-care", "label": "Face Care" },
-          { "id": "lotions", "label": "Lotions" }
+          {
+            "id": "body-care",
+            "label": "Body Care"
+          },
+          {
+            "id": "creams",
+            "label": "Creams"
+          },
+          {
+            "id": "lotions",
+            "label": "Lotions"
+          },
+          {
+            "id": "skin-body-care",
+            "label": "Skin & Body Care"
+          }
         ]
       },
       {
         "id": "travel-toiletry",
         "label": "Travel & Toiletry",
         "children": [
-          { "id": "bottles", "label": "Bottles" },
-          { "id": "dispensers", "label": "Dispensers" }
+          {
+            "id": "bottles",
+            "label": "Bottles"
+          },
+          {
+            "id": "cosmetic-bags",
+            "label": "Cosmetic Bags"
+          }
         ]
       }
     ],
@@ -172,15 +309,24 @@
         "id": "costume-novelty",
         "label": "Costume & Novelty",
         "children": [
-          { "id": "masks", "label": "Masks" },
-          { "id": "party-glasses", "label": "Party Glasses" }
+          {
+            "id": "masks",
+            "label": "Masks"
+          },
+          {
+            "id": "party-glasses",
+            "label": "Party Glasses"
+          }
         ]
       },
       {
         "id": "party-decor",
         "label": "Party Decor",
         "children": [
-          { "id": "balloons", "label": "Balloons" }
+          {
+            "id": "balloons",
+            "label": "Balloons"
+          }
         ]
       }
     ],
@@ -192,28 +338,55 @@
     "icon": "Shirt",
     "children": [
       {
+        "id": "bags",
+        "label": "Bags",
+        "children": [
+          {
+            "id": "casual-utility-bags",
+            "label": "Casual & Utility Bags"
+          },
+          {
+            "id": "ladies-bags",
+            "label": "Ladies Bags"
+          }
+        ]
+      },
+      {
         "id": "scarves-wraps",
         "label": "Scarves & Wraps",
         "children": [
-          { "id": "fashion-scarves", "label": "Fashion Scarves" },
-          { "id": "printed-scarves", "label": "Printed Scarves" }
+          {
+            "id": "fashion-scarves",
+            "label": "Fashion Scarves"
+          }
         ]
       },
       {
         "id": "sunglasses-accessories",
         "label": "Sunglasses & Accessories",
         "children": [
-          { "id": "sunglasses", "label": "Sunglasses" }
+          {
+            "id": "sunglasses",
+            "label": "Sunglasses"
+          }
         ]
       },
       {
         "id": "wallets-purses",
         "label": "Wallets & Purses",
         "children": [
-          { "id": "card-holders", "label": "Card Holders" },
-          { "id": "coin-purses", "label": "Coin Purses" },
-          { "id": "ladies-wallets", "label": "Ladies Wallets" },
-          { "id": "men's-wallets", "label": "Men's Wallets" }
+          {
+            "id": "card-holders",
+            "label": "Card Holders"
+          },
+          {
+            "id": "coin-purses",
+            "label": "Coin Purses"
+          },
+          {
+            "id": "wallets-purses",
+            "label": "Wallets & Purses"
+          }
         ]
       }
     ],
@@ -228,22 +401,30 @@
         "id": "drinks-coffee",
         "label": "Drinks & Coffee",
         "children": [
-          { "id": "coffee", "label": "Coffee" }
+          {
+            "id": "coffee",
+            "label": "Coffee"
+          }
         ]
       },
       {
         "id": "pantry-spices",
         "label": "Pantry & Spices",
         "children": [
-          { "id": "condiments", "label": "Condiments" }
+          {
+            "id": "condiments",
+            "label": "Condiments"
+          }
         ]
       },
       {
         "id": "snacks",
         "label": "Snacks",
         "children": [
-          { "id": "biscuits", "label": "Biscuits" },
-          { "id": "crackers", "label": "Crackers" }
+          {
+            "id": "biscuits-crackers",
+            "label": "Biscuits & Crackers"
+          }
         ]
       }
     ],
@@ -255,20 +436,36 @@
     "icon": "Wrench",
     "children": [
       {
+        "id": "batteries",
+        "label": "Batteries",
+        "children": []
+      },
+      {
         "id": "electrical-accessories",
         "label": "Electrical Accessories",
         "children": [
-          { "id": "batteries", "label": "Batteries" },
-          { "id": "cables", "label": "Cables" }
+          {
+            "id": "cables",
+            "label": "Cables"
+          }
         ]
       },
       {
         "id": "tools",
         "label": "Tools",
         "children": [
-          { "id": "measuring-tools", "label": "Measuring Tools" },
-          { "id": "pliers", "label": "Pliers" },
-          { "id": "screwdrivers", "label": "Screwdrivers" }
+          {
+            "id": "measuring-tools",
+            "label": "Measuring Tools"
+          },
+          {
+            "id": "pliers",
+            "label": "Pliers"
+          },
+          {
+            "id": "tools",
+            "label": "Tools"
+          }
         ]
       }
     ],
@@ -283,14 +480,24 @@
         "id": "decor-household",
         "label": "Decor & Household",
         "children": [
-          { "id": "mats", "label": "Mats" }
+          {
+            "id": "mats",
+            "label": "Mats"
+          }
         ]
       },
       {
         "id": "kitchen-tools",
         "label": "Kitchen Tools",
         "children": [
-          { "id": "utensils", "label": "Utensils" }
+          {
+            "id": "aprons-oven-gloves",
+            "label": "Aprons & Oven Gloves"
+          },
+          {
+            "id": "utensils",
+            "label": "Utensils"
+          }
         ]
       }
     ],
@@ -305,17 +512,39 @@
         "id": "display-packaging",
         "label": "Display Packaging",
         "children": [
-          { "id": "display-cards", "label": "Display Cards" },
-          { "id": "hang-tabs", "label": "Hang Tabs" }
+          {
+            "id": "display-cards",
+            "label": "Display Cards"
+          },
+          {
+            "id": "display-cards-hang-tabs",
+            "label": "Display Cards & Hang Tabs"
+          }
         ]
+      },
+      {
+        "id": "gift-bags",
+        "label": "Gift Bags",
+        "children": []
       },
       {
         "id": "gift-boxes",
         "label": "Gift Boxes",
         "children": [
-          { "id": "paper-boxes", "label": "Paper Boxes" },
-          { "id": "window-boxes", "label": "Window Boxes" }
+          {
+            "id": "paper-boxes",
+            "label": "Paper Boxes"
+          },
+          {
+            "id": "window-boxes",
+            "label": "Window Boxes"
+          }
         ]
+      },
+      {
+        "id": "pouches-resealable-packets",
+        "label": "Pouches & Resealable Packets",
+        "children": []
       }
     ],
     "refinements": {}
@@ -326,19 +555,57 @@
     "icon": "Wind",
     "children": [
       {
-        "id": "fabric-felt",
-        "label": "Fabric & Felt",
+        "id": "ribbon-trim",
+        "label": "Ribbon & Trim",
         "children": [
-          { "id": "fabric-pieces", "label": "Fabric Pieces" },
-          { "id": "lace", "label": "Lace" }
+          {
+            "id": "gift-bows-sets",
+            "label": "Gift Bows & Sets"
+          },
+          {
+            "id": "jute-ribbon",
+            "label": "Jute Ribbon"
+          },
+          {
+            "id": "lace",
+            "label": "Lace"
+          },
+          {
+            "id": "organza-ribbon",
+            "label": "Organza Ribbon"
+          },
+          {
+            "id": "petersham-ribbon",
+            "label": "Petersham Ribbon"
+          },
+          {
+            "id": "ribbon-trim",
+            "label": "Ribbon & Trim"
+          },
+          {
+            "id": "satin-ribbon",
+            "label": "Satin Ribbon"
+          }
         ]
       },
       {
-        "id": "sewing-accessories",
-        "label": "Sewing Accessories",
+        "id": "sewing-haberdashery",
+        "label": "Sewing & Haberdashery",
         "children": [
-          { "id": "measuring-tape", "label": "Measuring Tape" }
+          {
+            "id": "iron-on-patches",
+            "label": "Iron-On Patches"
+          },
+          {
+            "id": "measuring-tape",
+            "label": "Measuring Tape"
+          }
         ]
+      },
+      {
+        "id": "wool-yarn",
+        "label": "Wool & Yarn",
+        "children": []
       }
     ],
     "refinements": {}
@@ -349,10 +616,34 @@
     "icon": "ToyBrick",
     "children": [
       {
-        "id": "pocket-money-toys",
-        "label": "Pocket Money Toys",
+        "id": "games-puzzles",
+        "label": "Games & Puzzles",
+        "children": []
+      },
+      {
+        "id": "toys",
+        "label": "Toys",
         "children": [
-          { "id": "novelty-toys", "label": "Novelty Toys" }
+          {
+            "id": "cars-vehicles",
+            "label": "Cars & Vehicles"
+          },
+          {
+            "id": "clay-dough",
+            "label": "Clay & Dough"
+          },
+          {
+            "id": "novelty-toys",
+            "label": "Novelty Toys"
+          },
+          {
+            "id": "outdoor-activity",
+            "label": "Outdoor & Activity"
+          },
+          {
+            "id": "soft-toys",
+            "label": "Soft Toys"
+          }
         ]
       }
     ],
