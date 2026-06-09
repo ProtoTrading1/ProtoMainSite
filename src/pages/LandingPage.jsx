@@ -386,15 +386,34 @@ function Questionnaire({ onLogin }) {
   const [city, setCity] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [otherType, setOtherType] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
+
+  const validateEmailField = (value) => {
+    const v = value.trim().toLowerCase();
+    if (!v) return 'Please enter your email address.';
+    if (!EMAIL_RE.test(v)) return 'Please enter a valid email address (e.g. name@company.co.za).';
+    const domain = v.split('@')[1];
+    if (BLOCKED_DOMAINS.includes(domain)) return 'Please use your real business email address.';
+    return '';
+  };
+
   const canNext = () => {
     if (step === 0) return companyName.trim() && contactName.trim();
-    if (step === 1) return email.trim() && phone.trim() && password.trim().length >= 8;
+    if (step === 1) return email.trim() && !validateEmailField(email) && phone.trim() && password.trim().length >= 8;
     if (step === 2) return companyAddress.trim() && deliveryAddress.trim();
     if (step === 3) return true;
     return false;
   };
 
   const advance = async () => {
+    if (step === 1) {
+      const err = validateEmailField(email);
+      setEmailError(err);
+      if (err) return;
+    }
     if (!canNext()) return;
     if (step < STEP_LABELS.length - 1) {
       setStep(step + 1);
@@ -418,7 +437,7 @@ function Questionnaire({ onLogin }) {
         province: province || null,
         city: city.trim() || null,
         businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
-        acceptWhatsapp: whatsappOptIn === true,
+        acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
       });
       setDone(true);
     } catch (err) {
@@ -437,7 +456,7 @@ function Questionnaire({ onLogin }) {
       <div className="lp-quiz-success">
         <CheckCircle2 size={48} />
         <h3>Application received</h3>
-        <p>Thank you, {contactName}. Proto Trading will review your application and contact you about trade access. Check your email to confirm your address.</p>
+        <p>Thank you, {contactName}. Proto Trading will review your application and contact you about trade access. A confirmation email has been sent to {email.trim()}.</p>
         <button type="button" onClick={onLogin}>Already approved? Log in</button>
       </div>
     );
@@ -502,10 +521,17 @@ function Questionnaire({ onLogin }) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+                  onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
+                  aria-invalid={!!emailError}
                 />
+                {emailError && (
+                  <span style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
+                    {emailError}
+                  </span>
+                )}
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label>Phone number</label>

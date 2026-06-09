@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import SKU_SUBS from './sku-subcategories.js';
+import SKU_SUBS from './_sku-subcategories.js';
 
 const PAGE_SIZE = 1000;
 

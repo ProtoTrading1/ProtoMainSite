@@ -33,8 +33,11 @@ export default async function handler(req, res) {
         'api-key': process.env.BREVO_API_KEY,
       },
       body: JSON.stringify({
-        sender: { name: 'Proto Portal', email: 'online@proto.co.za' },
-        to: [{ email: 'online@proto.co.za', name: 'Proto Trading' }],
+        sender: {
+          name: process.env.BREVO_SENDER_NAME || 'Proto Portal',
+          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+        },
+        to: [{ email: process.env.ORDER_TO_EMAIL || 'online@proto.co.za', name: 'Proto Trading' }],
         replyTo: customerEmail ? { email: customerEmail } : undefined,
         subject: `Product Request — ${description.slice(0, 60)}`,
         htmlContent: bodyHtml,

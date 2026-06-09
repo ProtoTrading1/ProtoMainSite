@@ -183,7 +183,10 @@ export default async function handler(req, res) {
         'api-key': process.env.BREVO_API_KEY,
       },
       body: JSON.stringify({
-        sender: { name: 'Proto Trading Portal', email: 'online@proto.co.za' },
+        sender: {
+          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
+          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+        },
         to: [{ email: to }],
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
         subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,

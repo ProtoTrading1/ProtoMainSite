@@ -65,7 +65,8 @@ export default async function handler(req, res) {
   }
 
   const token = makeToken(email.trim(), secret);
-  const resetLink = `https://protoportal-main.vercel.app/#/reset-password?token=${encodeURIComponent(token)}`;
+  const siteUrl = (process.env.SITE_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
+  const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
 
   try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -76,7 +77,10 @@ export default async function handler(req, res) {
         'api-key': process.env.BREVO_API_KEY,
       },
       body: JSON.stringify({
-        sender: { name: 'Proto Trading Online', email: 'online@proto.co.za' },
+        sender: {
+          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
+          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+        },
         to: [{ email: email.trim() }],
         subject: 'Reset your Proto Trading password',
         htmlContent: RESET_HTML(resetLink),

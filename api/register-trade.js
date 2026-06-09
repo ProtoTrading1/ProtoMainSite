@@ -1,5 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
 
+const BREVO_SENDER = {
+  name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
+  email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+};
+
+// Basic RFC-ish format check + common throwaway/dummy domains
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  'test.com', 'test.co.za', 'example.com', 'example.org', 'email.com',
+  'mailinator.com', 'guerrillamail.com', 'tempmail.com', 'temp-mail.org',
+  '10minutemail.com', 'yopmail.com', 'trashmail.com', 'fakeinbox.com',
+  'sharklasers.com', 'getnada.com', 'dispostable.com', 'maildrop.cc',
+]);
+const BLOCKED_LOCAL_PARTS = new Set(['test', 'asdf', 'abc', 'fake', 'dummy', 'noreply', 'no-reply']);
+
+export function validateEmail(rawEmail) {
+  const email = String(rawEmail || '').trim().toLowerCase();
+  if (!email) return { ok: false, error: 'Please enter your email address.' };
+  if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please enter a valid email address (e.g. name@company.co.za).' };
+  const [local, domain] = email.split('@');
+  if (BLOCKED_EMAIL_DOMAINS.has(domain)) {
+    return { ok: false, error: 'Please use your real business email address — temporary or test addresses are not accepted.' };
+  }
+  if (BLOCKED_LOCAL_PARTS.has(local) && (domain === 'test.com' || BLOCKED_EMAIL_DOMAINS.has(domain))) {
+    return { ok: false, error: 'Please use your real business email address.' };
+  }
+  return { ok: true, email };
+}
+
 const WELCOME_HTML = (name) => `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Welcome to Proto Trading Online</title></head>
@@ -76,13 +105,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
+  const emailCheck = validateEmail(email);
+  if (!emailCheck.ok) {
+    return res.status(400).json({ error: emailCheck.error });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = emailCheck.email;
   const normalizedContactName = contactName.trim();
   const normalizedBusinessName = businessName.trim();
   const normalizedPhone = phone.trim();
@@ -116,6 +154,7 @@ export default async function handler(req, res) {
 
   // Insert customers row manually (in case the DB trigger doesn't fire for admin-created users)
   const userId = data.user?.id;
+  let profileVerification = null;
   if (userId) {
     // Try full payload first; if accept_whatsapp column doesn't exist yet, fall back without it
     const fullPayload = {
@@ -131,7 +170,9 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
-      accept_whatsapp: acceptWhatsapp === true,
+      // null = never asked / not answered, true = opted in, false = explicitly declined
+      accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
+      whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
       is_approved: false,
       tier: 'regular',
     };
@@ -139,18 +180,30 @@ export default async function handler(req, res) {
     let { error: custError } = await supabase.from('customers').upsert(fullPayload, { onConflict: 'id' });
 
     if (custError) {
-      // accept_whatsapp column may not exist yet — retry without it
-      const { accept_whatsapp: _wa, ...payloadWithoutWa } = fullPayload;
+      // whatsapp columns may not exist yet (migrations 006/007 not applied) — retry without them
+      console.warn('customers upsert failed, retrying without whatsapp fields:', custError.message);
+      const { accept_whatsapp: _wa, whatsapp_opt_in_at: _waAt, ...payloadWithoutWa } = fullPayload;
       const retry = await supabase.from('customers').upsert(payloadWithoutWa, { onConflict: 'id' });
       custError = retry.error;
     }
 
     if (custError) {
-      console.error('customers upsert error:', custError.message);
+      console.error('customers upsert error:', custError.message, '| userId:', userId, '| email:', normalizedEmail);
       // Auth user exists but no customer row — clean up to avoid orphaned auth account
       await supabase.auth.admin.deleteUser(userId);
       return res.status(500).json({ error: 'Failed to create customer profile. Please try again.' });
     }
+
+    // Verify the saved row so the client (and logs) can confirm what was stored
+    const { data: savedProfile } = await supabase
+      .from('customers')
+      .select('id, email, accept_whatsapp')
+      .eq('id', userId)
+      .single();
+    if (!savedProfile) {
+      console.error('customer profile verification failed — row missing after upsert | userId:', userId);
+    }
+    profileVerification = savedProfile || null;
   }
 
   // Send branded welcome email via Brevo REST API
@@ -164,7 +217,7 @@ export default async function handler(req, res) {
           'api-key': process.env.BREVO_API_KEY,
         },
         body: JSON.stringify({
-          sender: { name: 'Proto Trading Online', email: 'online@proto.co.za' },
+          sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
           subject: 'We have received your request — you will hear from us within 24 hours',
           htmlContent: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
@@ -180,5 +233,10 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({
+    ok: true,
+    profile: profileVerification
+      ? { id: profileVerification.id, acceptWhatsapp: profileVerification.accept_whatsapp }
+      : null,
+  });
 }

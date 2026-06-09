@@ -16,16 +16,8 @@ export async function signUp(email, password, name) {
   return data;
 }
 
-export async function submitTradeApplication({ email, username, password, contactName, businessName, phone, companyAddress, deliveryAddress, vatNumber, country, province, city, businessType }) {
-  const res = await fetch('/api/register-trade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, username, password, contactName, businessName, phone, companyAddress, deliveryAddress, vatNumber, country, province, city, businessType }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Registration failed');
-  return data;
-}
+// Trade applications go through src/lib/tradeApplication.js (includes WhatsApp opt-in).
+export { submitTradeApplication } from './tradeApplication';
 
 export async function resetPassword(email) {
   const trimmed = email.trim();
@@ -64,6 +56,19 @@ export async function getCustomerProfile(userId, sessionOrToken = null) {
   } catch {
     return null;
   }
+}
+
+// Update WhatsApp opt-in for the logged-in user (writes accept_whatsapp + whatsapp_opt_in_at)
+export async function updateWhatsappOptIn(acceptWhatsapp, whatsappPhone = null) {
+  const { authHeaders } = await import('./authHeaders');
+  const res = await fetch('/api/customer-profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ acceptWhatsapp, whatsappPhone }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update WhatsApp preference');
+  return data.profile;
 }
 
 export function onAuthChange(callback) {

@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import SKU_SUBS from '../api/sku-subcategories.js';
+import SKU_SUBS from '../api/_sku-subcategories.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
