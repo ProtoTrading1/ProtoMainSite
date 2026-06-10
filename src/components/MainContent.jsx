@@ -4,7 +4,6 @@ import {
   Flame,
   Loader2,
   PackageCheck,
-  PackageX,
   Search,
   Sparkles,
   Tag,
@@ -13,67 +12,19 @@ import {
 import ProductCard from './ProductCard';
 import Breadcrumb from './Breadcrumb';
 import CategoryLanding from './CategoryLanding';
+import { slugToLabel } from '../lib/taxonomy';
 
-const CATEGORY_LABELS = {
-  // Departments
-  'arts-crafts-stationery': 'Arts & Crafts',
-  'beads-jewellery': 'Beads & Jewellery',
-  'beauty-personal-care': 'Beauty & Personal Care',
-  'events-parties': 'Events & Parties',
-  'fashion-accessories': 'Fashion & Accessories',
-  'food-drinks': 'Food & Drinks',
-  'hardware': 'Hardware',
-  'homeware-kitchen': 'Homeware & Kitchen',
-  'packaging': 'Packaging',
-  'textiles': 'Textiles',
-  'toys-games-kids': 'Toys, Games & Kids',
-  // Sub1
-  'notebooks-paper': 'Notebooks & Paper',
-  'paint-brushes': 'Paint & Brushes',
-  'pens-markers-pencils': 'Pens, Markers & Pencils',
-  'school-essentials': 'School Essentials',
-  'acrylic-plastic-beads': 'Acrylic & Plastic Beads',
-  'elastic-cord-wire': 'Elastic, Cord & Wire',
-  'glass-beads': 'Glass Beads',
-  'jewellery-tools': 'Jewellery Tools',
-  'pendants-charms': 'Pendants & Charms',
-  'seed-beads': 'Seed Beads',
-  'wooden-beads': 'Wooden Beads',
-  'beauty-tools': 'Beauty Tools',
-  'cosmetics': 'Cosmetics',
-  'hair-care': 'Hair Care',
-  'skin-body-care': 'Skin & Body Care',
-  'travel-toiletry': 'Travel & Toiletry',
-  'costume-novelty': 'Costume & Novelty',
-  'party-decor': 'Party Decor',
-  'scarves-wraps': 'Scarves & Wraps',
-  'sunglasses-accessories': 'Sunglasses & Accessories',
-  'wallets-purses': 'Wallets & Purses',
-  'drinks-coffee': 'Drinks & Coffee',
-  'pantry-spices': 'Pantry & Spices',
-  'snacks': 'Snacks',
-  'electrical-accessories': 'Electrical Accessories',
-  'tools': 'Tools',
-  'decor-household': 'Decor & Household',
-  'kitchen-tools': 'Kitchen Tools',
-  'display-packaging': 'Display Packaging',
-  'gift-boxes': 'Gift Boxes',
-  'fabric-felt': 'Fabric & Felt',
-  'sewing-accessories': 'Sewing Accessories',
-  'pocket-money-toys': 'Pocket Money Toys',
-};
-
+// Labels are driven by the imported taxonomy (categories.json) so site, admin,
+// and nav stay in sync with a single source of truth.
 export function catLabel(slug) {
-  return CATEGORY_LABELS[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return slugToLabel(slug);
 }
 
 const shortcuts = [
   { id: 'start', icon: PackageCheck, title: 'All Products' },
-  { id: 'instock', icon: CheckCircle2, title: 'In Stock' },
   { id: 'hot', icon: Flame, title: 'Hot Sellers' },
   { id: 'new', icon: Sparkles, title: 'New Stock' },
   { id: 'clearance', icon: Tag, title: 'Clearance' },
-  { id: 'soldout', icon: PackageX, title: 'Missed Out' },
 ];
 
 export default function MainContent({

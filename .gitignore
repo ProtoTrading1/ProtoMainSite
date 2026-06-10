@@ -26,6 +26,9 @@ dist-ssr
 
 .vercel
 
+# Supabase CLI local temp
+supabase/.temp
+
 # Environment files — never commit secrets
 .env
 .env.*

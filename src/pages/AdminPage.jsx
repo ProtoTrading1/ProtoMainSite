@@ -22,7 +22,6 @@ import {
   Search,
   Shield,
   ShoppingBag,
-  SlidersHorizontal,
   Star,
   Store,
   User,
@@ -32,6 +31,7 @@ import {
 import * as XLSX from 'xlsx';
 import {
   archiveProduct,
+  unarchiveProduct,
   createProduct,
   fetchAdminProductsPage,
   fetchDistinctCategories,
@@ -78,48 +78,37 @@ const sections = [
   { id: 'archive', label: 'Archive', icon: Archive },
   { id: 'reorder', label: 'Reorder Grid', icon: Grip },
   { id: 'customers', label: 'Customer Management', icon: Users },
-  { id: 'pricing', label: 'Pricing & Returns', icon: SlidersHorizontal },
   { id: 'orders', label: 'Order Requests', icon: ShoppingBag },
 ];
 
 const orderStatuses = ['viewed', 'order in progress', 'awaiting payment', 'paid', 'delivered'];
-const productTypes = ['General product', 'Hot seller', 'New stock', 'Clearance stock'];
 const ADMIN_PAGE_SIZE = 50;
 const CATEGORY_WORK_SIZE = 400;
 
 const emptyForm = {
-  code: '',
-  name: '',
-  image: '',
-  price: '0',
-  stockOnHand: '1',
-  categoryId: categories[0]?.id || '',
-  subcategoryId: categories[0]?.children?.[0]?.id || '',
-  productType: 'General product',
+  sku: '',
+  barcode: '',
+  title: '',
+  originalDescription: '',
+  imageOne: '',
+  imageTwo: '',
+  category: categories[0]?.label || '',
+  sub1: categories[0]?.children?.[0]?.label || '',
+  sub2: '',
+  sub3: '',
+  sub4: '',
 };
 
-function categoryLabel(id) {
-  return categories.find((item) => item.id === id)?.label || id;
-}
-
-function subcategoryOptions(categoryId) {
-  return categories.find((item) => item.id === categoryId)?.children || [];
-}
-
-function getProductType(product) {
-  const badges = product.badges || [];
-  if (badges.includes('Hot seller')) return 'Hot seller';
-  if (product.isNew) return 'New stock';
-  if (badges.includes('Clearance stock') || product.isSpecial) return 'Clearance stock';
-  return 'General product';
-}
-
-function typePatch(type, product = {}) {
-  const cleanBadges = (product.badges || []).filter((item) => !['Hot seller', 'Clearance stock'].includes(item));
-  if (type === 'Hot seller') return { badges: [...cleanBadges, 'Hot seller'], isNew: false, isSpecial: false };
-  if (type === 'New stock') return { badges: cleanBadges, isNew: true, isSpecial: false };
-  if (type === 'Clearance stock') return { badges: [...cleanBadges, 'Clearance stock'], isNew: false, isSpecial: true, specialVisibility: 'all' };
-  return { badges: cleanBadges, isNew: false, isSpecial: false };
+// Returns the child nodes at the end of a label path through the taxonomy tree.
+function childrenAt(labelPath) {
+  let nodes = categories;
+  for (const lbl of labelPath) {
+    if (!lbl) return [];
+    const node = nodes.find((n) => n.label === lbl);
+    if (!node) return [];
+    nodes = node.children || [];
+  }
+  return nodes;
 }
 
 function compactItems(items = []) {
@@ -140,15 +129,19 @@ function csvDownload(rows, filename) {
 }
 
 function productToForm(product) {
+  const subs = product.subcategoryLabels || [];
   return {
-    code: product.code || '',
-    name: product.name || '',
-    image: product.image || '',
-    price: String(product.price ?? 0),
-    stockOnHand: String(product.stockOnHand ?? 1),
-    categoryId: product.categoryPath?.[0] || categories[0]?.id || '',
-    subcategoryId: product.categoryPath?.[1] || subcategoryOptions(product.categoryPath?.[0] || categories[0]?.id || '')[0]?.id || '',
-    productType: getProductType(product),
+    sku: product.sku || product.id || '',
+    barcode: product.barcode || product.code || '',
+    title: product.title || product.name || '',
+    originalDescription: product.originalDescription || product.description || '',
+    imageOne: product.images?.[0] || product.image || '',
+    imageTwo: product.images?.[1] || '',
+    category: product.categoryLabel || categories[0]?.label || '',
+    sub1: subs[0] || '',
+    sub2: subs[1] || '',
+    sub3: subs[2] || '',
+    sub4: subs[3] || '',
   };
 }
 
@@ -193,11 +186,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [customerRows, setCustomerRows] = useState([]);
   const [customerTotal, setCustomerTotal] = useState(0);
 
-  const [pricingCategory, setPricingCategory] = useState(categories[0]?.id || '');
-  const [pricingProducts, setPricingProducts] = useState([]);
-  const [selectedPricing, setSelectedPricing] = useState([]);
-  const [priceDelta, setPriceDelta] = useState('-10');
-
   const [reorderCategory, setReorderCategory] = useState(categories[0]?.id || '');
   const [reorderProducts, setReorderProducts] = useState([]);
   const [dragId, setDragId] = useState(null);
@@ -236,7 +224,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     setLoadingProgress(0);
     setLoadingError('');
     try {
-      const data = await fetchAdminProductsPage({ page: archivePage, pageSize: ADMIN_PAGE_SIZE, searchQuery: archiveSearch, zeroStockOnly: true, onProgress: setLoadingProgress });
+      const data = await fetchAdminProductsPage({ page: archivePage, pageSize: ADMIN_PAGE_SIZE, searchQuery: archiveSearch, archived: true, onProgress: setLoadingProgress });
       setArchiveRows(data.rows);
       setArchiveTotal(data.total);
     } catch (err) {
@@ -257,8 +245,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     setLoading(true);
     try {
       const rows = await fetchProductsByMainCategory(categoryId, { limit: CATEGORY_WORK_SIZE });
-      if (target === 'pricing') setPricingProducts(rows);
-      // Reorder shows the live site order (sort_order from DB) — no localStorage override
       if (target === 'reorder') setReorderProducts(rows);
     } finally { setLoading(false); }
   };
@@ -272,7 +258,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   useEffect(() => { if (activeSection === 'products') void loadProducts(); }, [activeSection, productPage, productSearch, productCategory]);
   useEffect(() => { if (activeSection === 'archive') void loadArchive(); }, [activeSection, archivePage, archiveSearch]);
   useEffect(() => { if (activeSection === 'customers') void loadCustomers(); }, [activeSection, customerPage, customerTab, customerSearch]);
-  useEffect(() => { if (activeSection === 'pricing') void loadCategoryWorkingSet(pricingCategory, 'pricing'); }, [activeSection, pricingCategory]);
   useEffect(() => { if (activeSection === 'reorder') void loadCategoryWorkingSet(reorderCategory, 'reorder'); }, [activeSection, reorderCategory]);
   useEffect(() => { if (activeSection === 'orders' && orders.length === 0) void loadOrders(); }, [activeSection]);
 
@@ -350,7 +335,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     onStart: () => setEditorImageUploading(true),
     onDone: () => setEditorImageUploading(false),
     onError: setEditorImageError,
-    applyUrl: (url) => setProductForm((f) => ({ ...f, image: url })),
+    applyUrl: (url) => setProductForm((f) => ({ ...f, imageOne: url })),
   });
 
   const stats = useMemo(() => ({
@@ -367,11 +352,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   }, [orders, orderSearch]);
 
   const openNewProduct = () => {
-    const firstCategory = categories[0]?.id || '';
     setEditingProduct(null);
     setEditorImageError('');
     setEditorImageDragOver(false);
-    setProductForm({ ...emptyForm, categoryId: firstCategory, subcategoryId: subcategoryOptions(firstCategory)[0]?.id || '' });
+    setProductForm({ ...emptyForm });
     setEditorOpen(true);
   };
 
@@ -404,11 +388,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     setContentEditError('');
     try {
       await updateProduct(contentEditProduct.id, {
-        image: contentEditForm.image.trim(),
-        description: contentEditForm.description,
+        imageOne: contentEditForm.image.trim(),
+        originalDescription: contentEditForm.description,
       });
       // Update local lists so image/description reflects the change without a full reload
-      const patch = { image: contentEditForm.image.trim(), description: contentEditForm.description };
+      const patch = { image: contentEditForm.image.trim(), images: [contentEditForm.image.trim(), contentEditProduct.images?.[1]].filter(Boolean), originalDescription: contentEditForm.description, description: contentEditForm.description };
       setProductRows((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
       setReorderProducts((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
       closeContentEdit();
@@ -424,43 +408,54 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     if (activeSection === 'products') return loadProducts();
     if (activeSection === 'archive') return loadArchive();
     if (activeSection === 'customers') return loadCustomers();
-    if (activeSection === 'pricing') return loadCategoryWorkingSet(pricingCategory, 'pricing');
     if (activeSection === 'reorder') return loadCategoryWorkingSet(reorderCategory, 'reorder');
     if (activeSection === 'orders') return loadOrders();
   };
 
   const saveProduct = async () => {
     const payload = {
-      code: productForm.code.trim(),
-      name: productForm.name.trim(),
-      image: productForm.image.trim(),
-      price: Number(productForm.price || 0),
-      stockOnHand: Number(productForm.stockOnHand || 0),
-      categoryPath: [productForm.categoryId, productForm.subcategoryId].filter(Boolean),
-      ...typePatch(productForm.productType, editingProduct || {}),
+      sku: productForm.sku.trim(),
+      barcode: productForm.barcode.trim(),
+      title: productForm.title.trim(),
+      originalDescription: productForm.originalDescription.trim(),
+      imageOne: productForm.imageOne.trim(),
+      imageTwo: productForm.imageTwo.trim(),
+      category: productForm.category,
+      subcategoryOne: productForm.sub1 || null,
+      subcategoryTwo: productForm.sub2 || null,
+      subcategoryThree: productForm.sub3 || null,
+      subcategoryFour: productForm.sub4 || null,
     };
     setSaving(editingProduct?.id || 'new-product');
     try {
       await (editingProduct ? updateProduct(editingProduct.id, payload) : createProduct(payload));
       closeEditor();
       await loadProducts();
+    } catch (err) {
+      setEditorImageError(err.message || 'Save failed');
     } finally { setSaving(''); }
   };
 
   const toggleArchive = async (product) => {
     setSaving(product.id);
-    try { await archiveProduct(product.id, !product.isArchived); await loadProducts(); }
-    finally { setSaving(''); }
+    try {
+      if (product.isArchived) { await unarchiveProduct(product.id); await loadArchive(); }
+      else { await archiveProduct(product.id, customer?.email || 'admin'); await loadProducts(); }
+    } catch (err) {
+      setLoadingError(err.message || 'Action failed');
+    } finally { setSaving(''); }
   };
 
   const toXlsxRow = (p) => ({
-    Name: p.name,
+    'Website SKU': p.sku || p.websiteSku || '',
     Barcode: p.barcode || p.code,
-    'Website SKU': p.websiteSku || '',
-    'Parent SKU': p.parentSku || '',
-    Category: p.category || '',
-    'Price (excl. VAT)': p.price,
-    'Stock Qty': p.stockQty,
+    Title: p.name,
+    'Original Description': p.originalDescription || '',
+    Category: p.categoryLabel || '',
+    'Subcategory One': p.subcategoryLabels?.[0] || '',
+    'Subcategory Two': p.subcategoryLabels?.[1] || '',
+    'Subcategory Three': p.subcategoryLabels?.[2] || '',
+    'Subcategory Four': p.subcategoryLabels?.[3] || '',
   });
 
   const exportLiveXlsx = async () => {
@@ -471,38 +466,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       const wb = XLSX.utils.book_new();
 
       categories.forEach((cat) => {
-        const catProducts = all.filter((p) => p.category === cat.id || p.categoryPath?.[0] === cat.id);
+        const catProducts = all.filter((p) => p.category === cat.id);
         if (!catProducts.length) return;
-
-        const rows = [];
-        const subMap = new Map((cat.children || []).map((s) => [s.id, s.label]));
-
-        const subGroups = new Map();
-        catProducts.forEach((p) => {
-          const subId = p.categoryPath?.[1] || '__general__';
-          if (!subGroups.has(subId)) subGroups.set(subId, []);
-          subGroups.get(subId).push(p);
-        });
-
-        subGroups.forEach((prods, subId) => {
-          const subLabel = subId === '__general__' ? '' : (subMap.get(subId) || subId);
-          if (subLabel) {
-            rows.push({ Subcategory: `── ${subLabel} ──`, Code: '', Name: '', Price: '', Stock: '', SKU: '', 'Parent SKU': '' });
-          }
-          prods.forEach((p) => {
-            rows.push({
-              Subcategory: subLabel,
-              Code: p.barcode || p.code,
-              Name: p.name,
-              Price: p.price,
-              Stock: p.stockQty,
-              SKU: p.websiteSku || '',
-              'Parent SKU': p.parentSku || '',
-            });
-          });
-        });
-
-        const ws = XLSX.utils.json_to_sheet(rows);
+        const ws = XLSX.utils.json_to_sheet(catProducts.map(toXlsxRow));
         XLSX.utils.book_append_sheet(wb, ws, cat.label.slice(0, 31));
       });
 
@@ -519,10 +485,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const exportArchiveXlsx = async () => {
     setSaving('export-archive');
     try {
-      const data = await fetchAdminProductsPage({ page: 1, pageSize: 999999, searchQuery: archiveSearch, zeroStockOnly: true });
+      const data = await fetchAdminProductsPage({ page: 1, pageSize: 999999, searchQuery: archiveSearch, archived: true });
       const ws = XLSX.utils.json_to_sheet(data.rows.map(toXlsxRow));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Archive 0 Stock');
+      XLSX.utils.book_append_sheet(wb, ws, 'Archived');
       XLSX.writeFile(wb, 'proto-archive-products.xlsx');
     } finally { setSaving(''); }
   };
@@ -582,21 +548,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       return next;
     });
     setDragId(null);
-  };
-
-  const toggleSelectAllPricing = () => {
-    if (selectedPricing.length === pricingProducts.length) return setSelectedPricing([]);
-    setSelectedPricing(pricingProducts.map((item) => item.id));
-  };
-
-  const applyPricing = async () => {
-    const delta = Number(priceDelta || 0);
-    setSaving('pricing');
-    try {
-      const selected = pricingProducts.filter((product) => selectedPricing.includes(product.id));
-      await Promise.all(selected.map((product) => updateProduct(product.id, { price: Number(((product.price || 0) * (1 + delta / 100)).toFixed(2)) })));
-      await loadCategoryWorkingSet(pricingCategory, 'pricing');
-    } finally { setSaving(''); }
   };
 
   const updateCustomer = async (person, patch) => {
@@ -714,19 +665,19 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-list">
-                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 180px 120px' }}>
-                    <span>Product</span><span>Stock</span><span>Actions</span>
+                  <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 220px 120px' }}>
+                    <span>Product</span><span>Category</span><span>Actions</span>
                   </div>
                   {productRows.reduce((acc, product, i) => {
-                    const cat = product.category || 'Uncategorized';
-                    const prevCat = i > 0 ? (productRows[i - 1].category || 'Uncategorized') : null;
+                    const cat = product.categoryLabel || 'Uncategorized';
+                    const prevCat = i > 0 ? (productRows[i - 1].categoryLabel || 'Uncategorized') : null;
                     if (cat !== prevCat) {
                       acc.push(
                         <div key={`cat-${cat}`} className="adm-category-header">{cat}</div>
                       );
                     }
                     acc.push(
-                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 180px 120px' }}>
+                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 220px 120px' }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {product.name}
@@ -734,14 +685,15 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                             {specialsSet.has(product.id) && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#8B1A1A', borderRadius: 4, padding: '1px 5px' }}>Special</span>}
                           </div>
                           <div className="adm-muted" style={{ fontSize: 11 }}>
-                            <span title="Barcode (customer code)">BC: {product.barcode || product.code}</span>
-                            {product.websiteSku && <span title="Website SKU" style={{ marginLeft: 8 }}>WSK: {product.websiteSku}</span>}
-                            {product.parentSku && <span title="Parent SKU" style={{ marginLeft: 8 }}>PSK: {product.parentSku}</span>}
+                            <span title="Barcode">BC: {product.barcode || product.code}</span>
+                            {product.sku && <span title="Website SKU" style={{ marginLeft: 8 }}>SKU: {product.sku}</span>}
                           </div>
                         </div>
                         <div>
-                          <span style={{ fontWeight: 700 }}>{product.stockQty != null ? `${product.stockQty} units` : '—'}</span>
-                          {product.supplier && <div className="adm-muted" style={{ fontSize: 11 }}>{product.supplier}</div>}
+                          <span style={{ fontWeight: 700, fontSize: 12 }}>{product.categoryLabel || '—'}</span>
+                          {product.subcategoryLabels?.length > 0 && (
+                            <div className="adm-muted" style={{ fontSize: 11 }}>{product.subcategoryLabels.join(' › ')}</div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <button
@@ -893,8 +845,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               <div className="adm-panel">
                 <div className="adm-section-head">
                   <div>
-                    <h2 className="adm-section-title">Archive — 0 Stock</h2>
-                    <p className="adm-section-note">Products automatically moved here when stock hits exactly 0. Hidden from customers. Reappear when stock comes back in.</p>
+                    <h2 className="adm-section-title">Archive</h2>
+                    <p className="adm-section-note">Products removed from the live catalogue. Hidden from customers. Unarchive to restore them with all details intact.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     <button onClick={() => void exportArchiveXlsx()} className="adm-btn-ghost">{saving === 'export-archive' ? 'Exporting…' : 'Export Excel'}</button>
@@ -908,35 +860,41 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
                 {archiveRows.length === 0 && loadingProgress === null && (
                   <div className="adm-empty" style={{ padding: '40px 0', textAlign: 'center', color: '#64748b' }}>
-                    No products with 0 stock right now.
+                    No archived products.
                   </div>
                 )}
 
                 <div className="adm-list">
                   {archiveRows.length > 0 && (
-                    <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 120px' }}>
-                      <span>Product</span><span>Stock</span>
+                    <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 220px 120px' }}>
+                      <span>Product</span><span>Category</span><span>Actions</span>
                     </div>
                   )}
                   {archiveRows.reduce((acc, product, i) => {
-                    const cat = product.category || 'Uncategorized';
-                    const prevCat = i > 0 ? (archiveRows[i - 1].category || 'Uncategorized') : null;
+                    const cat = product.categoryLabel || 'Uncategorized';
+                    const prevCat = i > 0 ? (archiveRows[i - 1].categoryLabel || 'Uncategorized') : null;
                     if (cat !== prevCat) {
                       acc.push(<div key={`cat-${cat}`} className="adm-category-header">{cat}</div>);
                     }
                     acc.push(
-                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 120px', opacity: 0.75 }}>
+                      <div key={product.id} className="adm-list-row" style={{ gridTemplateColumns: '2fr 220px 120px' }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 14 }}>{product.name}</div>
                           <div className="adm-muted" style={{ fontSize: 11 }}>
                             <span title="Barcode">BC: {product.barcode || product.code}</span>
-                            {product.websiteSku && <span title="Website SKU" style={{ marginLeft: 8 }}>WSK: {product.websiteSku}</span>}
-                            {product.parentSku && <span title="Parent SKU" style={{ marginLeft: 8 }}>PSK: {product.parentSku}</span>}
+                            {product.sku && <span title="Website SKU" style={{ marginLeft: 8 }}>SKU: {product.sku}</span>}
                           </div>
                         </div>
                         <div>
-                          <span style={{ fontWeight: 900, color: '#8B1A1A', fontSize: 15 }}>0</span>
-                          <span className="adm-muted" style={{ fontSize: 11, marginLeft: 4 }}>units</span>
+                          <span style={{ fontWeight: 700, fontSize: 12 }}>{product.categoryLabel || '—'}</span>
+                          {product.subcategoryLabels?.length > 0 && (
+                            <div className="adm-muted" style={{ fontSize: 11 }}>{product.subcategoryLabels.join(' › ')}</div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button onClick={() => void toggleArchive(product)} className="adm-btn-ghost adm-btn-sm" disabled={saving === product.id}>
+                            {saving === product.id ? '…' : <><ArchiveRestore size={14} /> Unarchive</>}
+                          </button>
                         </div>
                       </div>
                     );
@@ -953,7 +911,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 <div className="adm-section-head">
                   <div>
                     <h2 className="adm-section-title">Reorder Grid</h2>
-                    <p className="adm-section-note">Live reflection of the site. Drag to reorder — changes save to the database immediately.</p>
+                    <p className="adm-section-note">Preview of the catalogue by category. Ordering is alphabetical on the live site; drag changes here are visual only.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     {selectedIds.size > 0 && (
@@ -1108,37 +1066,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   </div>
                 )}
                 <Pager page={customerPage} totalPages={customerPages} onChange={setCustomerPage} />
-              </div>
-            )}
-
-            {/* PRICING */}
-            {activeSection === 'pricing' && (
-              <div className="adm-panel">
-                <div className="adm-section-head">
-                  <div>
-                    <h2 className="adm-section-title">Pricing & Returns</h2>
-                    <p className="adm-section-note">Select products and apply a percentage price adjustment.</p>
-                  </div>
-                </div>
-                <div className="adm-toolbar" style={{ gridTemplateColumns: '1fr auto auto' }}>
-                  <select value={pricingCategory} onChange={(e) => { setPricingCategory(e.target.value); setSelectedPricing([]); }} className="adm-select">
-                    {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  </select>
-                  <button onClick={toggleSelectAllPricing} className="adm-btn-ghost">{selectedPricing.length === pricingProducts.length ? 'Clear all' : 'Select all'}</button>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input value={priceDelta} onChange={(e) => setPriceDelta(e.target.value)} className="adm-tiny-input" placeholder="-10" />
-                    <button onClick={() => void applyPricing()} className="adm-btn-red">{saving === 'pricing' ? 'Applying…' : 'Apply %'}</button>
-                  </div>
-                </div>
-                <div className="adm-checkbox-list">
-                  {pricingProducts.map((product) => (
-                    <label key={product.id} className="adm-checkbox-row">
-                      <input type="checkbox" checked={selectedPricing.includes(product.id)} onChange={(e) => setSelectedPricing((prev) => e.target.checked ? [...prev, product.id] : prev.filter((id) => id !== product.id))} />
-                      <span style={{ fontWeight: 700 }}>{product.name}</span>
-                      <small className="adm-muted">{product.code}</small>
-                    </label>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -1357,14 +1284,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadEditorImageFile(f); e.target.value = ''; }}
             />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <AdminField label="Product code"><input value={productForm.code} onChange={(e) => setProductForm((p) => ({ ...p, code: e.target.value }))} className="adm-field-input" /></AdminField>
-              <AdminField label="Product type">
-                <select value={productForm.productType} onChange={(e) => setProductForm((p) => ({ ...p, productType: e.target.value }))} className="adm-field-input">
-                  {productTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </AdminField>
-              <AdminField label="Product name" full><input value={productForm.name} onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))} className="adm-field-input" /></AdminField>
-              <AdminField label="Product image" full>
+              <AdminField label="Website SKU"><input value={productForm.sku} onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value }))} className="adm-field-input" disabled={!!editingProduct} placeholder="Unique SKU" /></AdminField>
+              <AdminField label="Barcode"><input value={productForm.barcode} onChange={(e) => setProductForm((p) => ({ ...p, barcode: e.target.value }))} className="adm-field-input" /></AdminField>
+              <AdminField label="Title" full><input value={productForm.title} onChange={(e) => setProductForm((p) => ({ ...p, title: e.target.value }))} className="adm-field-input" /></AdminField>
+              <AdminField label="Original description" full><textarea value={productForm.originalDescription} onChange={(e) => setProductForm((p) => ({ ...p, originalDescription: e.target.value }))} className="adm-field-input" rows={3} style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} /></AdminField>
+              <AdminField label="Primary image" full>
                 <div style={{ display: 'grid', gap: 10 }}>
                   <div
                     onClick={() => !editorImageUploading && editorImageFileInputRef.current?.click()}
@@ -1380,8 +1304,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                     style={{
                       position: 'relative',
                       borderRadius: 10,
-                      border: `2px dashed ${editorImageDragOver ? '#8B1A1A' : productForm.image ? '#d1d5db' : '#cbd5e1'}`,
-                      background: editorImageDragOver ? '#fff5f5' : productForm.image ? '#f8f8f8' : '#f8fafc',
+                      border: `2px dashed ${editorImageDragOver ? '#8B1A1A' : productForm.imageOne ? '#d1d5db' : '#cbd5e1'}`,
+                      background: editorImageDragOver ? '#fff5f5' : productForm.imageOne ? '#f8f8f8' : '#f8fafc',
                       minHeight: 220,
                       display: 'flex',
                       alignItems: 'center',
@@ -1396,9 +1320,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                         <Loader2 size={32} className="spin" />
                         <span style={{ fontSize: 13, fontWeight: 600 }}>Uploading…</span>
                       </div>
-                    ) : productForm.image ? (
+                    ) : productForm.imageOne ? (
                       <>
-                        <img src={productForm.image} alt="Product preview" style={{ maxWidth: '100%', maxHeight: 220, objectFit: 'contain' }} />
+                        <img src={productForm.imageOne} alt="Product preview" style={{ maxWidth: '100%', maxHeight: 220, objectFit: 'contain' }} />
                         <div style={{
                           position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
                           display: editorImageDragOver ? 'flex' : 'none',
@@ -1426,7 +1350,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                       </div>
                     )}
                   </div>
-                  <input value={productForm.image} onChange={(e) => setProductForm((p) => ({ ...p, image: e.target.value }))} className="adm-field-input" placeholder="Supabase image URL" />
+                  <input value={productForm.imageOne} onChange={(e) => setProductForm((p) => ({ ...p, imageOne: e.target.value }))} className="adm-field-input" placeholder="Primary image URL" />
                   {editorImageError && (
                     <div style={{ padding: '8px 12px', background: '#fef2f2', borderRadius: 6, color: '#c40000', fontSize: 13 }}>
                       {editorImageError}
@@ -1434,18 +1358,62 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   )}
                 </div>
               </AdminField>
-              <AdminField label="Price"><input value={productForm.price} onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))} className="adm-field-input" /></AdminField>
-              <AdminField label="Stock on hand"><input value={productForm.stockOnHand} onChange={(e) => setProductForm((p) => ({ ...p, stockOnHand: e.target.value }))} className="adm-field-input" /></AdminField>
+              <AdminField label="Secondary image URL" full><input value={productForm.imageTwo} onChange={(e) => setProductForm((p) => ({ ...p, imageTwo: e.target.value }))} className="adm-field-input" placeholder="Optional second image URL" /></AdminField>
               <AdminField label="Main category">
-                <select value={productForm.categoryId} onChange={(e) => setProductForm((p) => ({ ...p, categoryId: e.target.value, subcategoryId: subcategoryOptions(e.target.value)[0]?.id || '' }))} className="adm-field-input">
-                  {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                <select
+                  value={productForm.category}
+                  onChange={(e) => setProductForm((p) => ({ ...p, category: e.target.value, sub1: '', sub2: '', sub3: '', sub4: '' }))}
+                  className="adm-field-input"
+                >
+                  {categories.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
                 </select>
               </AdminField>
-              <AdminField label="Subcategory">
-                <select value={productForm.subcategoryId} onChange={(e) => setProductForm((p) => ({ ...p, subcategoryId: e.target.value }))} className="adm-field-input">
-                  {subcategoryOptions(productForm.categoryId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              <AdminField label="Subcategory one">
+                <select
+                  value={productForm.sub1}
+                  onChange={(e) => setProductForm((p) => ({ ...p, sub1: e.target.value, sub2: '', sub3: '', sub4: '' }))}
+                  className="adm-field-input"
+                >
+                  <option value="">— none —</option>
+                  {childrenAt([productForm.category]).map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
                 </select>
               </AdminField>
+              {childrenAt([productForm.category, productForm.sub1]).length > 0 && (
+                <AdminField label="Subcategory two">
+                  <select
+                    value={productForm.sub2}
+                    onChange={(e) => setProductForm((p) => ({ ...p, sub2: e.target.value, sub3: '', sub4: '' }))}
+                    className="adm-field-input"
+                  >
+                    <option value="">— none —</option>
+                    {childrenAt([productForm.category, productForm.sub1]).map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
+                  </select>
+                </AdminField>
+              )}
+              {childrenAt([productForm.category, productForm.sub1, productForm.sub2]).length > 0 && (
+                <AdminField label="Subcategory three">
+                  <select
+                    value={productForm.sub3}
+                    onChange={(e) => setProductForm((p) => ({ ...p, sub3: e.target.value, sub4: '' }))}
+                    className="adm-field-input"
+                  >
+                    <option value="">— none —</option>
+                    {childrenAt([productForm.category, productForm.sub1, productForm.sub2]).map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
+                  </select>
+                </AdminField>
+              )}
+              {childrenAt([productForm.category, productForm.sub1, productForm.sub2, productForm.sub3]).length > 0 && (
+                <AdminField label="Subcategory four">
+                  <select
+                    value={productForm.sub4}
+                    onChange={(e) => setProductForm((p) => ({ ...p, sub4: e.target.value }))}
+                    className="adm-field-input"
+                  >
+                    <option value="">— none —</option>
+                    {childrenAt([productForm.category, productForm.sub1, productForm.sub2, productForm.sub3]).map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
+                  </select>
+                </AdminField>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={closeEditor} className="adm-btn-ghost"><ChevronLeft size={15} /> Cancel</button>

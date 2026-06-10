@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageOff, Minus, Package, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
-import { checkStock } from '../lib/products';
+import { ImageOff, Minus, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 
 function ProductImage({ src, alt, width = 400, priority = false }) {
@@ -69,8 +68,6 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 }
 
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose }) {
-  const VAT = 0.15;
-  const safePrice = Number(product?.price) || 0;
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
@@ -80,38 +77,19 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
-  const [showStock, setShowStock] = useState(false);
-  const [liveStock, setLiveStock] = useState(null);
-  const [stockLoading, setStockLoading] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const addButtonRef = useRef(null);
 
   const activeProduct = selectedVariant || product;
-  const activePrice = Number(activeProduct?.price) || 0;
   const galleryImages = Array.isArray(activeProduct.images) && activeProduct.images.length > 1
     ? activeProduct.images
     : null;
-  const lineTotal = (activePrice * qty).toFixed(2);
   const inCart = cartQty > 0;
 
   const openPreview = () => setZoomOpen(true);
-  const closePreview = () => { setZoomOpen(false); setShowStock(false); setLiveStock(null); onZoomClose?.(); };
-
-  const handleStockCheck = async () => {
-    if (showStock) { setShowStock(false); setLiveStock(null); return; }
-    setShowStock(true);
-    setStockLoading(true);
-    try {
-      const qty = await checkStock(product.barcode || product.code);
-      setLiveStock(qty);
-    } catch {
-      setLiveStock(product.stockOnHand ?? 0);
-    } finally {
-      setStockLoading(false);
-    }
-  };
+  const closePreview = () => { setZoomOpen(false); onZoomClose?.(); };
 
   const handleAdd = () => {
     const rect = addButtonRef.current?.getBoundingClientRect();
@@ -161,25 +139,21 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
         <div className="product-body">
           <div className="product-meta">
             <span>{product.code}</span>
-            <strong className={product.inStock ? 'pc-instock' : 'pc-confirm'}>
-              {product.inStock ? 'In stock' : 'Confirm stock'}
-            </strong>
           </div>
 
           <button className="product-title-button" onClick={openPreview} type="button">
             <h3>{product.name}</h3>
           </button>
 
+          {product.originalDescription && (
+            <p className="product-desc">{product.originalDescription}</p>
+          )}
+
           {safeBadges.length > 0 && (
             <div className="product-badges">
               {safeBadges.map((b) => <span key={b}>{b}</span>)}
             </div>
           )}
-
-          <div className="price-row">
-            <strong>R{safePrice.toFixed(2)}</strong>
-            <span>incl. VAT · min {product.minQty || 1}</span>
-          </div>
 
           <div className="buy-row">
             {inCart ? (
@@ -266,25 +240,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 <span className="pz-code">{activeProduct.code}</span>
                 <h2 className="pz-name">{activeProduct.name}</h2>
 
-                {/* Live stock check */}
-                <div className="pz-stock-zone">
-                  {showStock ? (
-                    <div className="pz-stock-result">
-                      <div>
-                        <span className="pz-stock-label">Stock on hand</span>
-                        <span className="pz-stock-num">{liveStock ?? 0}</span>
-                      </div>
-                      <button className="pz-recheck" type="button" onClick={handleStockCheck}>
-                        Check again
-                      </button>
-                    </div>
-                  ) : (
-                    <button className="pz-stock-btn" type="button" onClick={handleStockCheck} disabled={stockLoading}>
-                      {stockLoading ? <span className="pz-spinner" /> : <Package size={16} />}
-                      {stockLoading ? 'Checking live stock…' : 'Check live stock'}
-                    </button>
-                  )}
-                </div>
+                {activeProduct.originalDescription && (
+                  <p className="pz-desc">{activeProduct.originalDescription}</p>
+                )}
 
                 {/* Specs */}
                 {(product.colour || product.casePack || product.leadTime) && (
@@ -316,7 +274,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                               <span className="pz-variant-name">{v.name}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
                             </div>
-                            <span className="pz-variant-price">R{Number(v.price || 0).toFixed(2)}</span>
                           </button>
                         );
                       })}
@@ -329,10 +286,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
               {/* Fixed buy bar */}
               <div className="pz-buy-bar">
-                <div className="pz-price-row">
-                  <span className="pz-price">R{activePrice.toFixed(2)}</span>
-                  <span className="pz-price-note">incl. VAT · min {activeProduct.minQty || 1}</span>
-                </div>
                 <div className="pz-qty-row">
                   <div className="qty-stepper" aria-label="Quantity in preview">
                     <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
@@ -342,10 +295,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
                       <Plus size={14} />
                     </button>
-                  </div>
-                  <div className="pz-total">
-                    <span>Total</span>
-                    <strong>R{lineTotal}</strong>
                   </div>
                 </div>
                 {isVariantGroup && !selectedVariant ? (

@@ -119,6 +119,15 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setPage(1);
   }, [searchQuery, sort, activeCollection, path.join('/')]);
 
+  // Graceful fallback for legacy/unknown category slugs (taxonomy changed):
+  // if the first path segment isn't a known department, resolve to the
+  // catalogue root instead of showing an empty/broken page.
+  useEffect(() => {
+    if (path.length && !categories.some((c) => c.id === path[0])) {
+      hashNavigate([]);
+    }
+  }, [path, hashNavigate]);
+
   // Scroll content area back to top whenever the category path changes
   useEffect(() => {
     const area = document.querySelector('.content-area');
@@ -201,8 +210,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (activeCollection === 'hot') rows = rows.filter((item) => (item.badges || []).includes('Hot seller'));
         if (activeCollection === 'new') rows = rows.filter((item) => item.isNew);
         if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
-        if (activeCollection === 'instock') rows = rows.filter((item) => (item.stockOnHand ?? 0) > 0);
-        if (activeCollection === 'soldout') rows = rows.filter((item) => (item.stockOnHand ?? 0) <= 0);
         const hasSearch = Boolean(searchQuery.trim());
         if (!hasSearch && path.length) {
           rows = rows.filter((item) => path.every((seg, index) => item.categoryPath?.[index] === seg));

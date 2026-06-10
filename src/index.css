@@ -1589,6 +1589,26 @@ input, select, textarea { font-family: inherit; outline: none; }
 .pc-instock { color: #15803d !important; }
 .pc-confirm { color: #92400e !important; }
 
+/* Original supplier description shown beneath the product title (muted, smaller) */
+.product-desc {
+  margin: 4px 0 0;
+  color: #9ca3af;
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pz-desc {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
 /* ── Special ribbon (top-right corner of product image) ── */
 .pc-special-corner {
   position: absolute;
