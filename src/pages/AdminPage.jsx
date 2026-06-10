@@ -34,11 +34,10 @@ import {
   unarchiveProduct,
   createProduct,
   fetchAdminProductsPage,
-  fetchDistinctCategories,
+  fetchAllProductsAdmin,
   fetchProductsByMainCategory,
   invalidateAdminCache,
   invalidateProductCache,
-  saveSortOrder,
   updateProduct,
 } from '../lib/products';
 import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
@@ -83,7 +82,6 @@ const sections = [
 
 const orderStatuses = ['viewed', 'order in progress', 'awaiting payment', 'paid', 'delivered'];
 const ADMIN_PAGE_SIZE = 50;
-const CATEGORY_WORK_SIZE = 400;
 
 const emptyForm = {
   sku: '',
@@ -150,7 +148,6 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(null);
   const [loadingError, setLoadingError] = useState('');
-  const [liveCategories, setLiveCategories] = useState([]);
   const [saving, setSaving] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -201,7 +198,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const mainCategories = categories.map((item) => ({ id: item.id, label: item.label }));
 
   useEffect(() => {
-    fetchDistinctCategories().then(setLiveCategories).catch(() => {});
+    void fetchAllProductsAdmin({ onProgress: setLoadingProgress })
+      .then((all) => setProductTotal(all.length))
+      .catch(() => {});
   }, []);
 
   useEffect(() => { setProductPage(1); }, [productSearch, productCategory]);
@@ -243,9 +242,12 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
   const loadCategoryWorkingSet = async (categoryId, target) => {
     setLoading(true);
+    setLoadingError('');
     try {
-      const rows = await fetchProductsByMainCategory(categoryId, { limit: CATEGORY_WORK_SIZE });
-      if (target === 'reorder') setReorderProducts(rows);
+      const rows = await fetchProductsByMainCategory(categoryId);
+      if (target === 'reorder') setReorderProducts(applySavedOrder(rows, categoryId));
+    } catch (err) {
+      setLoadingError(err.message || 'Failed to load category products');
     } finally { setLoading(false); }
   };
 
@@ -503,8 +505,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   };
 
   const persistOrder = (next) => {
-    const updates = next.map((p, i) => ({ websiteSku: p.id, sortOrder: i + 1 }));
-    saveSortOrder(updates).catch(console.error);
+    saveCategoryOrder(reorderCategory, next.map((p) => p.id));
   };
 
   const moveSelectedToTop = () => {
@@ -658,8 +659,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                   <label className="adm-search"><Search size={15} /><input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search by SKU or product name" className="adm-search-input" /></label>
                   <select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="adm-select">
                     <option value="all">All categories</option>
-                    {(liveCategories.length > 0 ? liveCategories : mainCategories.map((c) => c.label)).map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {mainCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.label}</option>
                     ))}
                   </select>
                 </div>
@@ -911,9 +912,12 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 <div className="adm-section-head">
                   <div>
                     <h2 className="adm-section-title">Reorder Grid</h2>
-                    <p className="adm-section-note">Preview of the catalogue by category. Ordering is alphabetical on the live site; drag changes here are visual only.</p>
+                    <p className="adm-section-note">All products in the selected category from the live catalogue. Drag to reorder — your layout is saved in this browser per category.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {reorderProducts.length > 0 && (
+                      <span className="adm-pill">{reorderProducts.length} products</span>
+                    )}
                     {selectedIds.size > 0 && (
                       <>
                         <span className="adm-pill">{selectedIds.size} selected</span>
@@ -984,7 +988,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                         </div>
                         <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ maxWidth: '90%', maxHeight: '90%', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply' }} /> : <span className="adm-muted">No image</span>}</div>
                         <div style={{ fontWeight: 800, fontSize: 13, marginTop: 8 }}>{product.name}</div>
-                        <div className="adm-muted" style={{ fontSize: 11 }}>{product.code}</div>
+                        <div className="adm-muted" style={{ fontSize: 11 }}>{product.barcode || product.code}</div>
+                        {product.subcategoryLabels?.length > 0 && (
+                          <div className="adm-muted" style={{ fontSize: 10, marginTop: 2 }}>{product.subcategoryLabels.join(' › ')}</div>
+                        )}
                       </div>
                     );
                   })}

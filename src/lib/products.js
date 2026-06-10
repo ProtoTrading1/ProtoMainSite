@@ -128,8 +128,8 @@ function getAllCachedAdmin(onProgress) {
 }
 
 export async function fetchDistinctCategories() {
-  const all = await getAllCached();
-  return [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
+  const all = await getAllCachedAdmin();
+  return [...new Set(all.map((p) => p.categoryLabel).filter(Boolean))].sort();
 }
 
 // Customer catalogue: categorised products from website_stock.
@@ -262,7 +262,9 @@ export async function fetchAdminProductsPage({
   onProgress,
 } = {}) {
   let rows = archived ? await loadArchivedFromDB() : await fetchAllProductsAdmin({ onProgress });
-  if (categoryFilter && categoryFilter !== 'all') rows = rows.filter((p) => p.category === categoryFilter);
+  if (categoryFilter && categoryFilter !== 'all') {
+    rows = rows.filter((p) => p.category === categoryFilter || p.categoryLabel === categoryFilter);
+  }
   rows = searchQuery.trim() ? fuzzyFilter(rows, searchQuery) : rows;
   rows = [...rows].sort((a, b) => (a.categoryLabel || '').localeCompare(b.categoryLabel || '') || a.name.localeCompare(b.name));
   const total = rows.length;
@@ -270,12 +272,14 @@ export async function fetchAdminProductsPage({
   return { rows: rows.slice(from, from + pageSize), total, page, pageSize };
 }
 
-export async function fetchProductsByMainCategory(mainCategory, { limit = 300 } = {}) {
-  const all = await getAllCached();
+export async function fetchProductsByMainCategory(mainCategory, { limit = 10000 } = {}) {
+  const all = await getAllCachedAdmin();
   const filtered = mainCategory && mainCategory !== 'all'
     ? all.filter((p) => p.category === mainCategory)
     : all;
-  return filtered.slice(0, limit);
+  return filtered
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, limit);
 }
 
 export async function exportProductsCsv() {
