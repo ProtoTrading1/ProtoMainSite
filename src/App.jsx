@@ -18,7 +18,7 @@ import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from '
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
-import { fetchBanner } from './lib/banner';
+import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
 import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
@@ -148,14 +148,34 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     fetchDistinctCategories().then(setBrowseCategories).catch(() => {});
   }, []);
 
+  const loadBanner = useCallback(() => {
+    invalidateBannerCache();
+    return fetchBanner({ force: true })
+      .then((data) => { if (data) setBannerConfig(data); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchSpecials().then((data) => setSpecialsMap(buildSpecialsMap(data))).catch(() => {});
-    fetchBanner().then((data) => { if (data) setBannerConfig(data); }).catch(() => {});
+    loadBanner();
     fetchPopupSpecial().then((data) => {
       setPopupConfig(data);
       if (shouldShowPopup(data)) setShowPopup(true);
     }).catch(() => {});
-  }, []);
+  }, [loadBanner]);
+
+  useEffect(() => {
+    const refresh = () => { void loadBanner(); };
+    window.addEventListener('focus', refresh);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [loadBanner]);
 
   useEffect(() => {
     let cancelled = false;

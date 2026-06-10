@@ -3,11 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 export const SITE_CONFIG_BUCKET = 'site-config';
 
 export function getPortalAdminClient() {
-  return createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const url = process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
 export async function readSiteConfigJson(file, fallback = {}) {

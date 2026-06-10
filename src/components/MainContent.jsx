@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   TimerReset,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
+import { buildImageCandidates } from '../lib/imageUrl';
 import Breadcrumb from './Breadcrumb';
 import CategoryLanding from './CategoryLanding';
 import { slugToLabel } from '../lib/taxonomy';
@@ -18,6 +20,32 @@ import { slugToLabel } from '../lib/taxonomy';
 // and nav stay in sync with a single source of truth.
 export function catLabel(slug) {
   return slugToLabel(slug);
+}
+
+function BannerHeroImage({ src, updatedAt, alt }) {
+  const busted = updatedAt
+    ? `${src}${src.includes('?') ? '&' : '?'}v=${encodeURIComponent(updatedAt)}`
+    : src;
+  const candidates = buildImageCandidates(busted);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    setIdx(0);
+  }, [busted]);
+
+  if (!candidates.length || !candidates[idx]) return null;
+
+  return (
+    <img
+      key={busted}
+      src={candidates[idx]}
+      alt={alt}
+      loading="eager"
+      fetchpriority="high"
+      decoding="async"
+      onError={() => setIdx((i) => i + 1)}
+    />
+  );
 }
 
 const shortcuts = [
@@ -60,6 +88,7 @@ export default function MainContent({
   const bannerTitle = bannerConfig?.title || 'Built for retailers who need stock that moves.';
   const bannerBody = bannerConfig?.body || 'Browse core wholesale lines, build a quote-ready basket, and send a clean request to the Proto Trading sales team for stock, VAT, and delivery confirmation.';
   const bannerImage = bannerConfig?.imageUrl || '/campaign-hero-v2.png?v=2';
+  const bannerUpdatedAt = bannerConfig?.updatedAt || null;
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -87,7 +116,7 @@ export default function MainContent({
             </div>
           </div>
           <div className="trade-hero-image">
-            <img src={bannerImage} alt="Premium wholesale product campaign" />
+            <BannerHeroImage src={bannerImage} updatedAt={bannerUpdatedAt} alt="Premium wholesale product campaign" />
           </div>
         </section>
       )}
