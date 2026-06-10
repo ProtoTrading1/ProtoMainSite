@@ -2,26 +2,33 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
+import { isAdminHost } from './lib/isAdminHost';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
+const AdminPage = lazyWithRetry(() => import('./pages/AdminPage'), 'root-admin-page');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'), 'root-login-page');
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-policies-page');
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://protoportal-main.vercel.app';
+
 export default function Root() {
+  const adminHost = isAdminHost();
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [view, setView] = useState('landing');
+  const [view, setView] = useState(() => (adminHost ? 'login' : 'landing'));
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const authBootstrapped = useRef(false);
-  // Nonce: each loadCustomer call increments this; stale completions are ignored.
-  // Replaces the old boolean lock that blocked login when a stale-session fetch
-  // was in-flight (e.g. token refresh on regular-tab load with old cookies).
   const loadNonce = useRef(0);
+
+  useEffect(() => {
+    if (adminHost) document.title = 'Proto Admin';
+  }, [adminHost]);
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -35,7 +42,7 @@ export default function Root() {
       window.sessionStorage.removeItem('proto-surface');
       return;
     }
-    if (next === 'profile') {
+    if (['profile', 'admin'].includes(next)) {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
@@ -53,9 +60,16 @@ export default function Root() {
     try {
       const { getCustomerProfile } = await import('./lib/auth');
       const profile = await getCustomerProfile(userId, sessionOrToken);
-      if (nonce !== loadNonce.current) return; // a newer call started — discard this result
+      if (nonce !== loadNonce.current) return;
       setCustomer(profile);
       if (!profile) return;
+
+      if (adminHost) {
+        if (profile.role === 'admin') setSurface('admin');
+        else setView('admin-denied');
+        return;
+      }
+
       if (profile.is_approved || profile.role === 'admin') {
         setSurface('portal');
         return;
@@ -66,7 +80,7 @@ export default function Root() {
         setCustomerLoading(false);
       }
     }
-  }, [setSurface]);
+  }, [adminHost, setSurface]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +93,7 @@ export default function Root() {
       } else {
         setCustomerLoading(false);
         setCustomer(null);
+        if (adminHost) setView('login');
       }
     };
 
@@ -114,6 +129,7 @@ export default function Root() {
           } else {
             setCustomerLoading(false);
             setCustomer(null);
+            if (adminHost) setView('login');
           }
         });
 
@@ -128,7 +144,7 @@ export default function Root() {
       clearTimeout(bootstrapTimer);
       unsubscribe();
     };
-  }, [loadCustomer]);
+  }, [adminHost, loadCustomer]);
 
   const handleLogin = async (sess) => {
     setSession(sess);
@@ -142,22 +158,32 @@ export default function Root() {
     setCustomer(null);
     setCustomerLoading(false);
     window.sessionStorage.removeItem('proto-surface');
-    setView('landing');
+    setView(adminHost ? 'login' : 'landing');
     window.location.hash = '';
   };
 
   const authSurfaceFallback = (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Loading portal…</div>
-        <div style={{ color: '#94a3b8', fontSize: '13px' }}>Preparing your account view.</div>
+        <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>
+          {adminHost ? 'Loading admin…' : 'Loading portal…'}
+        </div>
+        <div style={{ color: '#94a3b8', fontSize: '13px' }}>
+          {adminHost ? 'Preparing the dashboard.' : 'Preparing your account view.'}
+        </div>
       </div>
     </div>
   );
 
-  if (route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
-  if (route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
-  if (route.startsWith('#/portal-preview')) return <Suspense fallback={authSurfaceFallback}><App customer={null} onLogout={handleLogout} /></Suspense>;
+  if (!adminHost && route.startsWith('#/policies')) {
+    return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
+  }
+  if (!adminHost && route.startsWith('#/worldclass')) {
+    return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
+  }
+  if (!adminHost && route.startsWith('#/portal-preview')) {
+    return <Suspense fallback={authSurfaceFallback}><App customer={null} onLogout={handleLogout} /></Suspense>;
+  }
 
   if (passwordRecovery) {
     return (
@@ -167,7 +193,7 @@ export default function Root() {
           onDone={() => {
             setPasswordRecovery(false);
             window.location.hash = '';
-            setSurface('login');
+            setView(adminHost ? 'login' : 'login');
           }}
         />
       </Suspense>
@@ -183,13 +209,74 @@ export default function Root() {
           token={token}
           onDone={() => {
             window.location.hash = '';
-            setSurface('login');
+            setView(adminHost ? 'login' : 'login');
           }}
         />
       </Suspense>
     );
   }
 
+  // ─── Standalone admin deployment (protoportal-admin.vercel.app) ─────────────
+  if (adminHost) {
+    if (session === undefined) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505' }}>
+          <div style={{ color: '#e11d48', fontSize: '14px' }}>Loading…</div>
+        </div>
+      );
+    }
+
+    if (session && customerLoading && !customer) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Signing you in…</div>
+            <div style={{ color: '#94a3b8', fontSize: '13px' }}>Verifying admin access.</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (session && view === 'admin-denied') {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
+          <div style={{ fontSize: '48px' }}>🔒</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Admin access only</h1>
+          <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
+            This dashboard is restricted to admin accounts. Use the trade portal to browse and order.
+          </p>
+          <a href={PORTAL_URL} style={{ padding: '10px 24px', background: '#8B1A1A', color: '#fff', borderRadius: '8px', fontWeight: '600', textDecoration: 'none' }}>
+            Go to trade portal
+          </a>
+          <button onClick={handleLogout} type="button" style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            Log out
+          </button>
+        </div>
+      );
+    }
+
+    if (session && customer?.role === 'admin' && view === 'admin') {
+      return (
+        <PortalErrorBoundary>
+          <Suspense fallback={authSurfaceFallback}>
+            <AdminPage
+              customer={customer}
+              onLogout={handleLogout}
+              onViewPortal={() => { window.location.href = PORTAL_URL; }}
+            />
+          </Suspense>
+        </PortalErrorBoundary>
+      );
+    }
+
+    return (
+      <Suspense fallback={authSurfaceFallback}>
+        <LoginPage onLogin={handleLogin} onBack={null} />
+      </Suspense>
+    );
+  }
+
+  // ─── Public trade portal (protoportal-main) ─────────────────────────────────
   if (session === undefined && ['portal', 'admin', 'profile'].includes(view)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505' }}>
@@ -217,7 +304,7 @@ export default function Root() {
         <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
           Your trade account is pending admin approval. You will be notified once approved.
         </p>
-        <button onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+        <button onClick={handleLogout} type="button" style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
           Log Out
         </button>
       </div>
@@ -236,7 +323,7 @@ export default function Root() {
     );
   }
 
-  if (session && (view === 'portal' || view === 'admin')) {
+  if (session && view === 'portal') {
     return (
       <PortalErrorBoundary>
         <Suspense fallback={authSurfaceFallback}>

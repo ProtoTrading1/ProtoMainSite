@@ -36,9 +36,11 @@ export default function LoginPage({ onLogin, onBack }) {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-deep)', fontFamily: 'Inter, sans-serif' }}>
       <header className="landing-header" style={{ position: 'static', backgroundColor: 'transparent', borderBottom: 'none' }}>
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-white-muted)', fontSize: '14px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer' }}>
-            <ArrowLeft size={18} /> Back
-          </button>
+          {onBack ? (
+            <button onClick={onBack} type="button" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-white-muted)', fontSize: '14px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <ArrowLeft size={18} /> Back
+            </button>
+          ) : <span />}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--proto-red) 0%, var(--proto-red-dark) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '16px', color: '#fff' }}>P</div>
             <div>
