@@ -1,6 +1,7 @@
 import { supabaseStock } from './supabaseStock';
 import { authHeaders } from './authHeaders';
 import { fuzzyFilter } from './fuzzySearch';
+import { buildCategoryPath, categoryPathToDbPatch, matchesCategoryPath } from './categoryPath';
 
 // Promise singletons — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -55,31 +56,10 @@ async function fetchAllRows(table, selectCols = '*', extraFilter = null, orderBy
   return rows;
 }
 
-const DEPT_SLUG_MAP = {
-  'Arts, Crafts & Stationery': 'arts-crafts-stationery',
-  'Beads, Jewellery & Accessories': 'beads-jewellery',
-  'Beauty & Personal Care': 'beauty-personal-care',
-  'Events & Parties': 'events-parties',
-  'Fashion & Accessories': 'fashion-accessories',
-  'Food & Drinks': 'food-drinks',
-  'Hardware': 'hardware',
-  'Homeware & Kitchen': 'homeware-kitchen',
-  'Packaging': 'packaging',
-  'Textiles': 'textiles',
-  'Toys, Games & Kids': 'toys-games-kids',
-};
-
-function labelToSlug(label) {
-  if (!label) return '';
-  return label.toLowerCase().replace(/[,&]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-}
-
 function adapt(wpRow, stockRow) {
   const stockQty = stockRow?.stock_qty ?? 0;
-  const rawDept = (wpRow.category || '').trim();
-  const deptSlug = DEPT_SLUG_MAP[rawDept] || labelToSlug(rawDept);
-  const subSlug = (wpRow.subcategory || '').trim();
-  const categoryPath = deptSlug ? (subSlug ? [deptSlug, subSlug] : [deptSlug]) : [];
+  const categoryPath = buildCategoryPath(wpRow);
+  const deptSlug = categoryPath[0] || '';
   return {
     id: wpRow.website_sku,
     code: wpRow.barcode,
@@ -254,6 +234,7 @@ function applySort(products, sort) {
   else if (sort === 'price-high') arr.sort((a, b) => b.price - a.price);
   else if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   else if (sort === 'stock') arr.sort((a, b) => b.stockQty - a.stockQty);
+  else arr.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   return arr;
 }
 
@@ -333,10 +314,25 @@ export async function fetchAdminProductsPage({
 }
 
 export async function fetchProductsByMainCategory(mainCategory, { limit = 300 } = {}) {
-  const all = await getAllCached();
-  const filtered = mainCategory && mainCategory !== 'all'
-    ? all.filter((p) => p.category === mainCategory)
-    : all;
+  return fetchProductsByCategoryPath(mainCategory ? [mainCategory] : [], { limit });
+}
+
+export async function fetchProductsByCategoryPath(categoryPath = [], { limit = 400 } = {}) {
+  const all = await getAllCachedAdmin();
+  let filtered = all.filter((p) => !p.isArchived);
+
+  if (categoryPath[0] === '__unassigned__') {
+    filtered = filtered.filter((p) => (p.categoryPath || []).length <= 1);
+  } else if (categoryPath.length) {
+    filtered = filtered.filter((p) => p.category === categoryPath[0]);
+    if (categoryPath[1] === '__unassigned__') {
+      filtered = filtered.filter((p) => (p.categoryPath || []).length <= 1);
+    } else if (categoryPath.length > 1) {
+      filtered = filtered.filter((p) => matchesCategoryPath(p.categoryPath, categoryPath));
+    }
+  }
+
+  filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   return filtered.slice(0, limit);
 }
 
@@ -367,8 +363,7 @@ export async function updateProduct(websiteSku, payload) {
   if (payload.name        !== undefined) patch.title       = payload.name;
   if (payload.sortOrder   !== undefined) patch.sort_order  = payload.sortOrder;
   if (payload.categoryPath?.length) {
-    patch.category    = payload.categoryPath[0];
-    patch.subcategory = payload.categoryPath[1] || '';
+    Object.assign(patch, categoryPathToDbPatch(payload.categoryPath));
   }
 
   if (Object.keys(patch).length) {
@@ -393,6 +388,30 @@ export async function saveSortOrder(updates) {
   if (!res.ok && res.status !== 207) throw new Error(json.error || 'Save failed');
   // Clear admin cache so next reorder load gets fresh DB order
   invalidateAdminCache();
+}
+
+export async function moveProductsToCategory(moves) {
+  const res = await fetch('/api/move-products-category', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ moves }),
+  });
+  const json = await res.json();
+  if (!res.ok && res.status !== 207) throw new Error(json.error || 'Move failed');
+  invalidateProductCache();
+  invalidateAdminCache();
+  return json;
+}
+
+export async function regenerateCatalog() {
+  const res = await fetch('/api/regenerate-catalog', {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Catalog regeneration failed');
+  invalidateProductCache();
+  return json;
 }
 
 export async function archiveProduct() { throw new Error('Products are managed in the stock system'); }

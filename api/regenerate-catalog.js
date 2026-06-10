@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
+import { requireAdmin } from './_auth.js';
 import { adaptProduct } from './_adapt-product.js';
 
 const PAGE_SIZE = 1000;
@@ -19,14 +22,17 @@ async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const user = await requireAdmin(req, res);
+  if (!user) return;
 
   try {
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
     const [wpRows, stockRows] = await Promise.all([
@@ -39,13 +45,14 @@ export default async function handler(req, res) {
 
     const products = wpRows
       .map((wp) => adaptProduct(wp, stockMap[wp.barcode]))
-      .filter((p) => p.stockQty > 0 && p.category);
+      .filter((p) => p.stockQty > 0 && p.category && p.image);
 
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=3600');
-    res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(products);
+    const outPath = join(process.cwd(), 'public', 'products.json');
+    writeFileSync(outPath, JSON.stringify(products));
+
+    return res.status(200).json({ ok: true, count: products.length });
   } catch (err) {
-    console.error('products api error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch products' });
+    console.error('regenerate-catalog error:', err);
+    return res.status(500).json({ error: err.message || 'Catalog regeneration failed' });
   }
 }
