@@ -38,9 +38,9 @@ import {
   fetchProductsByMainCategory,
   invalidateAdminCache,
   invalidateProductCache,
+  saveSortOrder,
   updateProduct,
 } from '../lib/products';
-import ReorderGrid from '../components/admin/ReorderGrid';
 import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmin } from '../lib/customers';
 import { fetchAllOrdersAdmin, updateOrderAdmin } from '../lib/orders';
 import { fetchSpecials, saveSpecials } from '../lib/specials';
@@ -198,7 +198,11 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [selectedPricing, setSelectedPricing] = useState([]);
   const [priceDelta, setPriceDelta] = useState('-10');
 
-  const reorderPatchRef = useRef(null);
+  const [reorderCategory, setReorderCategory] = useState(categories[0]?.id || '');
+  const [reorderProducts, setReorderProducts] = useState([]);
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const [orders, setOrders] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
@@ -249,11 +253,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally { setLoading(false); }
   };
 
-  const loadCategoryWorkingSet = async (categoryId) => {
+  const loadCategoryWorkingSet = async (categoryId, target) => {
     setLoading(true);
     try {
       const rows = await fetchProductsByMainCategory(categoryId, { limit: CATEGORY_WORK_SIZE });
-      setPricingProducts(rows);
+      if (target === 'pricing') setPricingProducts(rows);
+      // Reorder shows the live site order (sort_order from DB) — no localStorage override
+      if (target === 'reorder') setReorderProducts(rows);
     } finally { setLoading(false); }
   };
 
@@ -266,7 +272,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   useEffect(() => { if (activeSection === 'products') void loadProducts(); }, [activeSection, productPage, productSearch, productCategory]);
   useEffect(() => { if (activeSection === 'archive') void loadArchive(); }, [activeSection, archivePage, archiveSearch]);
   useEffect(() => { if (activeSection === 'customers') void loadCustomers(); }, [activeSection, customerPage, customerTab, customerSearch]);
-  useEffect(() => { if (activeSection === 'pricing') void loadCategoryWorkingSet(pricingCategory); }, [activeSection, pricingCategory]);
+  useEffect(() => { if (activeSection === 'pricing') void loadCategoryWorkingSet(pricingCategory, 'pricing'); }, [activeSection, pricingCategory]);
+  useEffect(() => { if (activeSection === 'reorder') void loadCategoryWorkingSet(reorderCategory, 'reorder'); }, [activeSection, reorderCategory]);
   useEffect(() => { if (activeSection === 'orders' && orders.length === 0) void loadOrders(); }, [activeSection]);
 
   // Load specials on mount
@@ -403,7 +410,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
       // Update local lists so image/description reflects the change without a full reload
       const patch = { image: contentEditForm.image.trim(), description: contentEditForm.description };
       setProductRows((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
-      reorderPatchRef.current?.(contentEditProduct.id, patch);
+      setReorderProducts((prev) => prev.map((p) => p.id === contentEditProduct.id ? { ...p, ...patch } : p));
       closeContentEdit();
     } catch (err) {
       setContentEditError(err.message || 'Save failed');
@@ -417,7 +424,8 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     if (activeSection === 'products') return loadProducts();
     if (activeSection === 'archive') return loadArchive();
     if (activeSection === 'customers') return loadCustomers();
-    if (activeSection === 'pricing') return loadCategoryWorkingSet(pricingCategory);
+    if (activeSection === 'pricing') return loadCategoryWorkingSet(pricingCategory, 'pricing');
+    if (activeSection === 'reorder') return loadCategoryWorkingSet(reorderCategory, 'reorder');
     if (activeSection === 'orders') return loadOrders();
   };
 
@@ -519,6 +527,63 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally { setSaving(''); }
   };
 
+  const toggleSelectReorder = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const persistOrder = (next) => {
+    const updates = next.map((p, i) => ({ websiteSku: p.id, sortOrder: i + 1 }));
+    saveSortOrder(updates).catch(console.error);
+  };
+
+  const moveSelectedToTop = () => {
+    if (!selectedIds.size) return;
+    setReorderProducts((prev) => {
+      const moving = prev.filter((p) => selectedIds.has(p.id));
+      const rest = prev.filter((p) => !selectedIds.has(p.id));
+      const next = [...moving, ...rest];
+      persistOrder(next);
+      return next;
+    });
+    setSelectedIds(new Set());
+  };
+
+  const dropToTop = () => {
+    setDragOverId(null);
+    if (!dragId) return;
+    setReorderProducts((prev) => {
+      const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
+      const moving = prev.filter((p) => toMove.has(p.id));
+      const rest = prev.filter((p) => !toMove.has(p.id));
+      const next = [...moving, ...rest];
+      persistOrder(next);
+      return next;
+    });
+    setDragId(null);
+  };
+
+  const swapReorder = (targetId) => {
+    setDragOverId(null);
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    setReorderProducts((prev) => {
+      const toMove = selectedIds.has(dragId) ? selectedIds : new Set([dragId]);
+      if (toMove.has(targetId)) return prev;
+      const moving = prev.filter((p) => toMove.has(p.id));
+      const rest = prev.filter((p) => !toMove.has(p.id));
+      const insertAt = rest.findIndex((p) => p.id === targetId);
+      if (insertAt < 0) return prev;
+      const next = [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
+      persistOrder(next);
+      return next;
+    });
+    setDragId(null);
+  };
+
   const toggleSelectAllPricing = () => {
     if (selectedPricing.length === pricingProducts.length) return setSelectedPricing([]);
     setSelectedPricing(pricingProducts.map((item) => item.id));
@@ -530,7 +595,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     try {
       const selected = pricingProducts.filter((product) => selectedPricing.includes(product.id));
       await Promise.all(selected.map((product) => updateProduct(product.id, { price: Number(((product.price || 0) * (1 + delta / 100)).toFixed(2)) })));
-      await loadCategoryWorkingSet(pricingCategory);
+      await loadCategoryWorkingSet(pricingCategory, 'pricing');
     } finally { setSaving(''); }
   };
 
@@ -884,10 +949,89 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
 
             {/* REORDER */}
             {activeSection === 'reorder' && (
-              <ReorderGrid
-                onContentEdit={openContentEdit}
-                registerPatch={(fn) => { reorderPatchRef.current = fn; }}
-              />
+              <div className="adm-panel">
+                <div className="adm-section-head">
+                  <div>
+                    <h2 className="adm-section-title">Reorder Grid</h2>
+                    <p className="adm-section-note">Live reflection of the site. Drag to reorder — changes save to the database immediately.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {selectedIds.size > 0 && (
+                      <>
+                        <span className="adm-pill">{selectedIds.size} selected</span>
+                        <button onClick={moveSelectedToTop} className="adm-btn-red">Move to top</button>
+                        <button onClick={() => setSelectedIds(new Set())} className="adm-btn-ghost">Clear</button>
+                      </>
+                    )}
+                    <select value={reorderCategory} onChange={(e) => { setSelectedIds(new Set()); setReorderCategory(e.target.value); }} className="adm-select">
+                      {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                    </select>
+                    <button
+                      onClick={() => { setSelectedIds(new Set()); invalidateAdminCache(); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
+                      className="adm-btn-ghost"
+                      title="Reload from site"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {/* Top drop zone — visible whenever a drag is in progress */}
+                <div
+                  onDragEnter={(e) => { e.preventDefault(); setDragOverId('__top__'); }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null); }}
+                  onDrop={(e) => { e.preventDefault(); dropToTop(); }}
+                  className={`adm-reorder-top-zone${dragId ? ' adm-reorder-top-zone--visible' : ''}${dragOverId === '__top__' ? ' adm-reorder-top-zone--over' : ''}`}
+                >
+                  ↑ Drop here to move to top
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  {reorderProducts.map((product) => {
+                    const isDragging = dragId === product.id;
+                    const isOver = dragOverId === product.id && !isDragging;
+                    const isSelected = selectedIds.has(product.id);
+                    return (
+                      <div
+                        key={product.id}
+                        draggable
+                        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(product.id); }}
+                        onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                        onDragEnter={(e) => { e.preventDefault(); if (product.id !== dragId) setDragOverId(product.id); }}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null); }}
+                        onDrop={(e) => { e.preventDefault(); swapReorder(product.id); }}
+                        className={`adm-reorder-card${isDragging ? ' adm-reorder-card--dragging' : ''}${isOver ? ' adm-reorder-card--over' : ''}${isSelected ? ' adm-reorder-card--selected' : ''}`}
+                      >
+                        <div className="adm-reorder-handle">
+                          {/* onMouseDown stops the parent drag from starting when the checkbox is clicked */}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectReorder(product.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ width: 14, height: 14, flexShrink: 0, cursor: 'pointer', accentColor: '#8B1A1A' }}
+                          />
+                          <Grip size={14} />
+                          <span className="adm-muted" style={{ fontSize: 10 }}>{isSelected ? 'selected' : 'drag to reorder'}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openContentEdit(product); }}
+                            className="adm-icon-btn"
+                            title="Edit image & description"
+                          >
+                            <ImagePlus size={13} />
+                          </button>
+                        </div>
+                        <div className="adm-thumb">{product.image ? <img src={product.image} alt={product.name} style={{ maxWidth: '90%', maxHeight: '90%', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply' }} /> : <span className="adm-muted">No image</span>}</div>
+                        <div style={{ fontWeight: 800, fontSize: 13, marginTop: 8 }}>{product.name}</div>
+                        <div className="adm-muted" style={{ fontSize: 11 }}>{product.code}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             {/* CUSTOMERS */}
