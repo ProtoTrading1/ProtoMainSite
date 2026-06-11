@@ -1,5 +1,7 @@
 import { requireAuth } from './_auth.js';
 import { readSiteConfigJson } from './_site-config.js';
+import { getPortalAdminClient } from './_site-config.js';
+import { advanceOrderStatus } from './_order-status.js';
 import {
   generateAndStoreOrderPdf,
   loadOrderForPdf,
@@ -151,6 +153,31 @@ export default async function handler(req, res) {
     }
   }
 
+  const emailSent = req.body?.emailSent === true;
+  const watiComplete = recipients.length === 0 || (failed.length === 0 && sent.length === recipients.length);
+  let statusAdvanced = false;
+
+  if (emailSent && watiComplete) {
+    try {
+      const supabase = getPortalAdminClient();
+      const result = await advanceOrderStatus(supabase, orderId, 'handed over');
+      statusAdvanced = result.ok;
+      if (!result.ok && result.reason !== 'sequential-only') {
+        console.warn('order-notify: status advance skipped:', result.reason);
+      }
+      if (result.ok) {
+        const progress = await readSiteConfigJson(`fulfillment/progress/${orderId}.json`, null);
+        const hasSavedSection = progress?.sections
+          && Object.values(progress.sections).some((s) => s?.savedAt || s?.complete);
+        if (hasSavedSection) {
+          await advanceOrderStatus(supabase, orderId, 'order in progress');
+        }
+      }
+    } catch (err) {
+      console.error('order-notify: failed to set handed over status:', err.message);
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     orderId,
@@ -160,5 +187,6 @@ export default async function handler(req, res) {
     sent: sent.length,
     failed: failed.length,
     failedList: failed.slice(0, 25),
+    statusAdvanced,
   });
 }

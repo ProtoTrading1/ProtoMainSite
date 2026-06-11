@@ -370,20 +370,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setModalOpen(true);
 
     try {
+      let savedOrder = null;
       if (customer?.id) {
-        const savedOrder = await saveOrder(customer.id, cartItems, cartTotal);
+        savedOrder = await saveOrder(customer.id, cartItems, cartTotal);
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
-        // Fire-and-forget: generate/store the order PDF and broadcast the WATI
-        // WhatsApp notification to the fulfilment team. Never blocks checkout.
-        if (savedOrder?.id) {
-          authHeaders()
-            .then((headers) => fetch('/api/order-notify', {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ orderId: savedOrder.id }),
-            }))
-            .catch(() => {});
-        }
       }
 
       const payload = {
@@ -409,6 +399,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Order email could not be sent');
+
+      if (savedOrder?.id) {
+        authHeaders()
+          .then((headers) => fetch('/api/order-notify', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ orderId: savedOrder.id, emailSent: true }),
+          }))
+          .catch(() => {});
+      }
+
       setOrderStatus('sent');
     } catch (err) {
       setOrderStatus('error');
