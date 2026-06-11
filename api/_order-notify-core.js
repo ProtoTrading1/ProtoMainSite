@@ -1,4 +1,4 @@
-import { readSiteConfigJson } from './_site-config.js';
+import { readSiteConfigJson, saveOrderNotifyLog } from './_site-config.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { advanceOrderStatus } from './_order-status.js';
 import {
@@ -151,8 +151,29 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
     }
   }
 
+  const notifyLog = {
+    orderId,
+    template: ORDER_TEMPLATE,
+    pdfStored,
+    sent: sent.length,
+    failed: failed.length,
+    sentList: sent,
+    failedList: failed.slice(0, 25),
+    statusAdvanced,
+    emailSent: Boolean(emailSent),
+    at: new Date().toISOString(),
+    ok: failed.length === 0 && (sent.length > 0 || !token),
+    skippedNoToken: !token,
+  };
+
+  try {
+    await saveOrderNotifyLog(orderId, notifyLog);
+  } catch (err) {
+    console.error('order-notify: failed to save notify log:', err.message);
+  }
+
   return {
-    ok: true,
+    ok: notifyLog.ok,
     orderId,
     pdfStored,
     template: ORDER_TEMPLATE,
@@ -160,5 +181,6 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
     failed: failed.length,
     failedList: failed.slice(0, 25),
     statusAdvanced,
+    whatsappErrors: failed.length ? failed : undefined,
   };
 }
