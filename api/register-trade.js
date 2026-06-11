@@ -177,14 +177,37 @@ export default async function handler(req, res) {
       tier: 'regular',
     };
 
-    let { error: custError } = await supabase.from('customers').upsert(fullPayload, { onConflict: 'id' });
+    const {
+      accept_whatsapp: _wa,
+      whatsapp_opt_in_at: _waAt,
+      company_address: _ca,
+      vat_number: _vn,
+      business_name: _bn,
+      country: _co,
+      province: _pr,
+      city: _ci,
+      business_type: _bt,
+      ...basePayload
+    } = fullPayload;
 
-    if (custError) {
-      // whatsapp columns may not exist yet (migrations 006/007 not applied) — retry without them
-      console.warn('customers upsert failed, retrying without whatsapp fields:', custError.message);
-      const { accept_whatsapp: _wa, whatsapp_opt_in_at: _waAt, ...payloadWithoutWa } = fullPayload;
-      const retry = await supabase.from('customers').upsert(payloadWithoutWa, { onConflict: 'id' });
-      custError = retry.error;
+    const upsertAttempts = [
+      fullPayload,
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
+      basePayload,
+    ];
+
+    let custError = null;
+    for (const [i, payload] of upsertAttempts.entries()) {
+      const { error } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
+      if (!error) {
+        custError = null;
+        break;
+      }
+      custError = error;
+      if (i < upsertAttempts.length - 1) {
+        console.warn(`customers upsert attempt ${i + 1} failed, retrying with reduced payload:`, error.message);
+      }
     }
 
     if (custError) {
