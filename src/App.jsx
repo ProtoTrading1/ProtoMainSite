@@ -371,8 +371,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     try {
       if (customer?.id) {
-        await saveOrder(customer.id, cartItems, cartTotal);
+        const savedOrder = await saveOrder(customer.id, cartItems, cartTotal);
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+        // Fire-and-forget: generate/store the order PDF and broadcast the WATI
+        // WhatsApp notification to the fulfilment team. Never blocks checkout.
+        if (savedOrder?.id) {
+          authHeaders()
+            .then((headers) => fetch('/api/order-notify', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ orderId: savedOrder.id }),
+            }))
+            .catch(() => {});
+        }
       }
 
       const payload = {
