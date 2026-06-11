@@ -9,8 +9,8 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v9';
-const LS_TTL = 15 * 60 * 1000;
+const LS_KEY = 'proto_catalog_v10';
+const LS_TTL = 5 * 60 * 1000;
 
 function saveToLocalCache(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
@@ -24,11 +24,15 @@ function loadFromLocalCache() {
   } catch { return null; }
 }
 
-async function fetchJsonWithTimeout(url, timeoutMs = 4500) {
+async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal, credentials: 'same-origin' });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      credentials: 'same-origin',
+      ...(cache ? { cache } : {}),
+    });
     if (!response.ok) throw new Error(`${url} ${response.status}`);
     return await response.json();
   } finally {
@@ -130,33 +134,26 @@ export async function fetchDistinctCategories() {
   return [...new Set(all.map((p) => p.categoryLabel).filter(Boolean))].sort();
 }
 
-// Customer catalogue: categorised products from website_stock.
-// Primary source: /products.json (static, build-time). Fallbacks: /api/products, then DB.
+// Customer catalogue: live /api/products first (includes admin price edits).
+// Fallbacks: static products.json, localStorage, then direct DB.
 function getAllCached() {
   if (!_loadPromise) {
-    const local = loadFromLocalCache();
-    if (local) {
-      _cache = local;
-      _loadPromise = Promise.resolve(local);
-    } else {
-      _loadPromise = fetchJsonWithTimeout('/products.json', 12000)
-        .catch(() => fetchJsonWithTimeout('/api/products', 8000))
-        .then((products) => {
-          _cache = products;
-          saveToLocalCache(products);
-          return _cache;
-        })
-        .catch(() => loadLiveFromDB()
-          .then((all) => {
-            _cache = all.filter((p) => p.category);
-            saveToLocalCache(_cache);
-            return _cache;
-          }))
-        .catch((err) => {
-          _loadPromise = null;
-          throw err;
-        });
-    }
+    _loadPromise = fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store' })
+      .catch(() => fetchJsonWithTimeout('/products.json', 12000))
+      .catch(() => {
+        const local = loadFromLocalCache();
+        if (local) return local;
+        return loadLiveFromDB().then((all) => all.filter((p) => p.category));
+      })
+      .then((products) => {
+        _cache = products;
+        saveToLocalCache(products);
+        return _cache;
+      })
+      .catch((err) => {
+        _loadPromise = null;
+        throw err;
+      });
   }
   return _loadPromise;
 }

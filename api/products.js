@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     const rows = await fetchAllRows(supabase, 'website_stock', '*');
     const products = rows.map(adapt).filter((p) => p.category);
 
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
   } catch (err) {
