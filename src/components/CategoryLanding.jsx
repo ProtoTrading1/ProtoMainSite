@@ -33,7 +33,7 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPrev
           <p className="strip-card-name">{product.name}</p>
         </button>
         <div className="strip-card-footer">
-          <strong className="strip-card-price">R{product.price.toFixed(2)}</strong>
+          {product.price > 0 && <strong className="strip-card-price">R{product.price.toFixed(2)}</strong>}
           {inCart ? (
             <div className="strip-card-qty">
               <button onClick={() => onCartQtyChange(product, cartQty - 1)} type="button">−</button>

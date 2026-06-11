@@ -9,7 +9,7 @@ let _adminLoadPromise = null;
 let _adminCache = null;
 
 // ─── localStorage cache (15 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v7';
+const LS_KEY = 'proto_catalog_v9';
 const LS_TTL = 15 * 60 * 1000;
 
 function saveToLocalCache(data) {
@@ -56,8 +56,6 @@ async function fetchAllRows(table, selectCols = '*', extraFilter = null, orderBy
 }
 
 // Adapts a website_stock / archived_products row into the app's product shape.
-// Catalogue-only: there is no price or stock — those fields are kept as safe
-// zero-defaults so cart/order math never throws on NULL/undefined.
 function adapt(row, { archived = false } = {}) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
@@ -72,7 +70,7 @@ function adapt(row, { archived = false } = {}) {
     title: row.title,
     description: row.original_description || '',
     originalDescription: row.original_description || '',
-    price: 0,
+    price: Number(row.price) || 0,
     images,
     image: images[0] || '',
     secondaryImage: images[1] || '',

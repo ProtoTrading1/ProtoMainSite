@@ -155,6 +155,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
           )}
 
+          {activeProduct.price > 0 && (
+            <div className="price-row">
+              <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
+              <span>excl. VAT</span>
+            </div>
+          )}
+
           <div className="buy-row">
             {inCart ? (
               <div className="cart-in-control">
@@ -282,6 +289,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 )}
 
                 {product.tradeNote && <p className="pz-trade-note">{product.tradeNote}</p>}
+
+                {activeProduct.price > 0 && (
+                  <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
+                    <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
+                    <span>excl. VAT</span>
+                  </div>
+                )}
               </div>
 
               {/* Fixed buy bar */}
