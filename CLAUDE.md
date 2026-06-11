@@ -16,14 +16,10 @@ npm run preview
 ```
 
 ## Structure
-- `src/pages/AdminPage.jsx` — entire admin dashboard (all sections)
+- `src/pages/` — page components
 - `src/components/` — shared components
-- `src/lib/` — Supabase clients + utilities (`products.js`, `taxonomyAdmin.js`)
-- `migrations/` — SQL migrations (auth + stock Supabase)
-- `.cursor/skills/protoportal-admin/` — agent skill for admin architecture
+- `src/lib/` — Supabase client + utilities
+- `migrations/` — SQL migrations
 
 ## Env vars
-- Auth: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- Stock catalogue: `VITE_STOCK_SUPABASE_URL`, `VITE_STOCK_SUPABASE_KEY`
-- Admin host: `VITE_ADMIN_MODE=true` (or deploy to protoportal-admin.vercel.app)
-- Email: `RESEND_API_KEY`
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RESEND_API_KEY`
