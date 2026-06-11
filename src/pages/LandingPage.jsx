@@ -402,7 +402,11 @@ function Questionnaire({ onLogin }) {
 
   const canNext = () => {
     if (step === 0) return companyName.trim() && contactName.trim();
-    if (step === 1) return email.trim() && !validateEmailField(email) && phone.trim() && password.trim().length >= 8;
+    if (step === 1) {
+      const phoneOk = phone.replace(/\D/g, '').length >= 8;
+      const whatsappAnswered = typeof whatsappOptIn === 'boolean';
+      return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
+    }
     if (step === 2) return companyAddress.trim() && deliveryAddress.trim();
     if (step === 3) return true;
     return false;
@@ -561,7 +565,7 @@ function Questionnaire({ onLogin }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                       <MessageCircle size={18} color="#4ade80" style={{ flexShrink: 0 }} />
                       <div>
-                        <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Can we message you on WhatsApp?</div>
+                        <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Can we contact you via WhatsApp?</div>
                         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', marginTop: '2px' }}>Get specials, stock alerts and order updates straight to your phone.</div>
                       </div>
                     </div>
@@ -577,7 +581,7 @@ function Questionnaire({ onLogin }) {
                           transition: 'all 0.15s',
                         }}
                       >
-                        ✓ Yes, WhatsApp me
+                        Yes
                       </button>
                       <button
                         type="button"
@@ -591,7 +595,7 @@ function Questionnaire({ onLogin }) {
                           transition: 'all 0.15s',
                         }}
                       >
-                        No thanks
+                        No
                       </button>
                     </div>
                   </div>

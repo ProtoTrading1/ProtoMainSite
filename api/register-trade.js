@@ -173,7 +173,7 @@ export default async function handler(req, res) {
       // null = never asked / not answered, true = opted in, false = explicitly declined
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
-      is_approved: false,
+      is_approved: true,
       tier: 'regular',
     };
 
@@ -204,6 +204,44 @@ export default async function handler(req, res) {
       console.error('customer profile verification failed — row missing after upsert | userId:', userId);
     }
     profileVerification = savedProfile || null;
+
+    // WhatsApp welcome for opted-in customers (same flow as admin approval)
+    if (fullPayload.accept_whatsapp === true && normalizedPhone) {
+      const rawPhone = normalizedPhone.replace(/\D/g, '');
+      const watiPhone = rawPhone.startsWith('0') ? `27${rawPhone.slice(1)}` : rawPhone;
+      const watiBase = process.env.WATI_API_URL || 'https://live-mt-server.wati.io/10138950';
+      const watiToken = process.env.WATI_API_TOKEN;
+      if (watiToken) {
+        try {
+          await fetch(`${watiBase}/api/v1/addContact`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${watiToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: normalizedContactName || normalizedBusinessName || 'Customer',
+              phoneNumber: watiPhone,
+            }),
+          }).catch(() => {});
+          const waRes = await fetch(
+            `${watiBase}/api/v1/sendTemplateMessage?whatsappNumber=${watiPhone}`,
+            {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${watiToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                template_name: 'proto_welcome_',
+                broadcast_name: 'proto_welcome_',
+                parameters: [],
+              }),
+            },
+          );
+          if (!waRes.ok) {
+            const waBody = await waRes.json().catch(() => ({}));
+            console.error('WATI send error on signup:', waRes.status, JSON.stringify(waBody));
+          }
+        } catch (waErr) {
+          console.error('WATI signup error:', waErr.message);
+        }
+      }
+    }
   }
 
   // Send branded welcome email via Brevo REST API
