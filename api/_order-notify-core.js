@@ -45,11 +45,13 @@ async function notifyRecipient(baseUrl, token, recipient, ctx) {
 
   // proto_order_notis (UTILITY) has 4 body variables only and no buttons.
   // {{1}} Time · {{2}} Order from · {{3}} Order Summary · {{4}} Order Link
+  // We only send the short fulfillment link in {{4}} — the PDF is reachable
+  // from a button inside the page so the WhatsApp message stays tidy.
   const parameters = [
     { name: '1', value: sanitizeTemplateParam(placedAt, 120) },
     { name: '2', value: sanitizeTemplateParam(customerName, 120) },
     { name: '3', value: sanitizeTemplateParam(summary, 900) },
-    { name: '4', value: sanitizeTemplateParam(`${fulfillmentUrl} | PDF: ${pdfUrl}`, 900) },
+    { name: '4', value: sanitizeTemplateParam(fulfillmentUrl, 900) },
   ];
 
   const templateResult = await watiSendTemplate(baseUrl, token, recipient.phone, parameters);
@@ -122,7 +124,10 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   const customerName = String(customer?.name || customer?.business_name || 'Customer').trim();
   const summary = buildOrderSummary(items);
   const accessToken = orderToken(orderId);
-  const fulfillmentUrl = `${adminUrl}/fulfillment?id=${orderId}${accessToken ? `&k=${accessToken}` : ''}`;
+  // Short URL handled by Vercel rewrite: /f/:id/:token -> /fulfillment?o=:id&k=:token
+  const fulfillmentUrl = accessToken
+    ? `${adminUrl}/f/${orderId}/${accessToken}`
+    : `${adminUrl}/fulfillment?id=${orderId}`;
   const pdfUrl = `${MAIN_PORTAL_URL}/api/orders/${orderId}/pdf${accessToken ? `?k=${accessToken}` : ''}`;
   const orderRef = String(order?.order_ref || order?.reference || '').trim();
 

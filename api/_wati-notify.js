@@ -90,15 +90,14 @@ export async function watiSendSessionMessage(baseUrl, token, phone, messageText)
   return { success: true, response: json };
 }
 
-export function buildSessionOrderMessage({ placedAt, customerName, summary, fulfillmentUrl, pdfUrl, orderRef }) {
+export function buildSessionOrderMessage({ placedAt, customerName, summary, fulfillmentUrl, orderRef }) {
   const lines = [
     '🛒 *New Proto order*',
     orderRef ? `Ref: ${orderRef}` : null,
     `Time: ${placedAt}`,
     `From: ${customerName}`,
     `Items: ${summary}`,
-    `Open order: ${fulfillmentUrl}`,
-    pdfUrl ? `PDF: ${pdfUrl}` : null,
+    `Open: ${fulfillmentUrl}`,
   ].filter(Boolean);
   return lines.join('\n');
 }
