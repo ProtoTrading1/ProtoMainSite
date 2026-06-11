@@ -59,7 +59,7 @@ async function fetchAllRows(table, selectCols = '*', extraFilter = null, orderBy
 // Catalogue-only: there is no price or stock — those fields are kept as safe
 // zero-defaults so cart/order math never throws on NULL/undefined.
 function adapt(row, { archived = false } = {}) {
-  const images = [row.image_url_one, row.image_url_two].filter(Boolean);
+  const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
   return {
     id: row.sku,

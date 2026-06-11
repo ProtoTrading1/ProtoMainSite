@@ -24,7 +24,7 @@ function labelToSlug(label) {
 }
 
 function adapt(row) {
-  const images = [row.image_url_one, row.image_url_two].filter(Boolean);
+  const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
