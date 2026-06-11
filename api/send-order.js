@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { requireAuth } from './_auth.js';
+import { runOrderTeamNotify } from './_order-notify-core.js';
 
 const DEFAULT_TO = 'orders@prototrading.co.za';
 
@@ -165,7 +166,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Brevo API key not configured' });
   }
 
-  const { items = [], customer = {}, totals = {} } = req.body || {};
+  const { items = [], customer = {}, totals = {}, orderId: rawOrderId } = req.body || {};
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'No order items supplied' });
   }
@@ -209,5 +210,15 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Email could not be sent' });
   }
 
-  return res.status(200).json({ success: true });
+  const orderId = String(rawOrderId || '').trim();
+  let notifyResult = null;
+  if (orderId) {
+    try {
+      notifyResult = await runOrderTeamNotify(orderId, { emailSent: true });
+    } catch (err) {
+      console.error('send-order: team notify failed:', err.message);
+    }
+  }
+
+  return res.status(200).json({ success: true, orderId: orderId || null, notify: notifyResult });
 }

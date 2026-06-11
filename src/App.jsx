@@ -379,6 +379,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       const payload = {
         customer: customerDetails,
         totals: { subtotal: cartTotal },
+        orderId: savedOrder?.id || null,
         items: cartItems.map((item) => ({
           qty: item.qty,
           product: {
@@ -399,16 +400,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Order email could not be sent');
-
-      if (savedOrder?.id) {
-        authHeaders()
-          .then((headers) => fetch('/api/order-notify', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ orderId: savedOrder.id, emailSent: true }),
-          }))
-          .catch(() => {});
-      }
 
       setOrderStatus('sent');
     } catch (err) {
