@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Minus, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
+import { trackEvent } from '../lib/trackEvent';
 
 function ProductImage({ src, alt, width = 400, priority = false }) {
   const candidates = buildImageCandidates(src);
@@ -88,7 +89,14 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     : null;
   const inCart = cartQty > 0;
 
-  const openPreview = () => setZoomOpen(true);
+  const openPreview = () => {
+    setZoomOpen(true);
+    trackEvent({
+      eventType: 'product_view',
+      entityId: product?.id || product?.code,
+      entityLabel: product?.name || product?.code,
+    });
+  };
   const closePreview = () => { setZoomOpen(false); onZoomClose?.(); };
 
   const handleAdd = () => {

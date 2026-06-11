@@ -22,6 +22,7 @@ import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
 import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
+import { trackEvent } from './lib/trackEvent';
 import categories from './data/categories.json';
 import './index.css';
 
@@ -138,6 +139,18 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       area.scrollTop = 0;
     }
   }, [path.join('/')]);
+
+  useEffect(() => {
+    if (!path.length) return;
+    const crumbs = buildBreadcrumb(path, categories);
+    const label = crumbs.map((c) => c.label).join(' › ') || path.join(' › ');
+    trackEvent({
+      eventType: 'category_view',
+      entityId: path.join('/'),
+      entityLabel: label,
+      customerId: customer?.id,
+    });
+  }, [path.join('/'), customer?.id]);
 
   useEffect(() => {
     if (!customer?.id) return;
