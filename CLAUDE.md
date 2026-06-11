@@ -1,6 +1,8 @@
-# Proto Panel
+# Proto Panel (Main Portal)
 
-Sales/admin panel. Vite + React SPA with Supabase.
+Customer-facing wholesale trade portal. Vite + React SPA with Supabase.
+
+**Admin portal is a separate app:** https://github.com/danieljoffeinfo-web/protoportal-admin — never implement admin features here. The embedded `AdminPage.jsx` in this repo is deprecated; do not restore or deploy it.
 
 ## Stack
 - Vite + React (JSX, not TSX)

@@ -1,0 +1,24 @@
+---
+description: Admin portal is a separate app/repo — never use embedded AdminPage in this repo
+alwaysApply: true
+---
+
+# Admin portal is NOT this repo
+
+The **Admin Portal** and **Main Portal** are two completely separate applications.
+
+| App | Repo | Deploy |
+|-----|------|--------|
+| Main / trade portal | `protoportal-main` (this repo) | protoportal-main.vercel.app |
+| Admin portal | https://github.com/danieljoffeinfo-web/protoportal-admin | protoportal-admin.vercel.app |
+
+## Hard rules
+
+1. **Never** implement, fix, restore, or deploy admin features from this repo's `src/pages/AdminPage.jsx`. That embedded admin is **deprecated** and must not resurface.
+2. When the user says "admin portal", "admin dashboard", or "protoportal-admin" — work in the **protoportal-admin** repo, not here.
+3. Before admin work: `git pull` in protoportal-admin and read what's actually deployed.
+4. Do **not** deploy this repo to the `protoportal-admin` Vercel project.
+
+## This repo
+
+Trade/customer-facing portal only. `AdminPage.jsx` may still exist historically — ignore it unless explicitly removing dead code.
