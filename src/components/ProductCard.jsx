@@ -1,8 +1,67 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageOff, Minus, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
+
+// At or below this quantity we warn "Low stock". Configurable in one place.
+const LOW_STOCK_THRESHOLD = 5;
+
+// Customer-facing live stock check. Always hits /api/stock fresh on click — the
+// result is never baked in at page load and never cached across page loads.
+function StockCheck({ sku }) {
+  const [state, setState] = useState({ status: 'idle', qty: null });
+
+  const check = async () => {
+    if (!sku) return;
+    setState({ status: 'loading', qty: null });
+    try {
+      const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setState({ status: 'done', qty: Number(data.qty) || 0 });
+    } catch {
+      setState({ status: 'error', qty: null });
+    }
+  };
+
+  let readout = null;
+  if (state.status === 'done') {
+    const qty = state.qty;
+    if (qty <= 0) {
+      readout = <span className="stock-readout stock-readout--out">Out of stock</span>;
+    } else if (qty <= LOW_STOCK_THRESHOLD) {
+      readout = <span className="stock-readout stock-readout--low">Low stock: {qty} left</span>;
+    } else {
+      readout = <span className="stock-readout stock-readout--in">In stock: {qty}</span>;
+    }
+  } else if (state.status === 'error') {
+    readout = (
+      <span className="stock-readout stock-readout--error">
+        Could not check stock{' '}
+        <button type="button" className="stock-retry" onClick={check}>Retry</button>
+      </span>
+    );
+  }
+
+  return (
+    <div className="stock-check">
+      {state.status === 'idle' || state.status === 'loading' ? (
+        <button
+          type="button"
+          className="check-stock-btn"
+          onClick={check}
+          disabled={state.status === 'loading' || !sku}
+        >
+          {state.status === 'loading'
+            ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
+            : <><PackageSearch size={14} /> Check Stock</>}
+        </button>
+      ) : null}
+      <span className="stock-result" role="status" aria-live="polite">{readout}</span>
+    </div>
+  );
+}
 
 function ProductImage({ src, alt, width = 400, priority = false }) {
   const candidates = buildImageCandidates(src);
@@ -169,6 +228,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <span>excl. VAT</span>
             </div>
           )}
+
+          <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
 
           <div className="buy-row">
             {inCart ? (

@@ -1758,6 +1758,54 @@ input, select, textarea { font-family: inherit; outline: none; }
 .price-row strong { color: var(--accent); font-size: 22px; font-weight: 800; }
 .price-row span { color: #9ca3af; font-size: 11px; font-weight: 600; }
 .buy-row { gap: 8px; margin-top: 13px; }
+
+/* Live "Check Stock" — reserve a fixed row height so the card never jumps
+   when the button is replaced by the readout. */
+.stock-check {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin-top: 10px;
+}
+.check-stock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.check-stock-btn:hover:not(:disabled) { border-color: #cbd5e1; background: #f8fafc; color: #111; }
+.check-stock-btn:disabled { opacity: 0.7; cursor: default; }
+.stock-spin { animation: stock-spin 0.8s linear infinite; }
+@keyframes stock-spin { to { transform: rotate(360deg); } }
+.stock-result { display: inline-flex; align-items: center; }
+.stock-readout {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.stock-readout--in { color: #15803d; }
+.stock-readout--low { color: #b45309; }
+.stock-readout--out { color: #6b7280; }
+.stock-readout--error { color: #b91c1c; font-weight: 700; gap: 6px; }
+.stock-retry {
+  font-size: 12px;
+  font-weight: 800;
+  color: #b91c1c;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .qty-stepper,
 .mini-stepper {
   height: 42px;
