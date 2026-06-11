@@ -1,7 +1,4 @@
 import { supabase } from './supabase';
-import { authHeaders } from './authHeaders';
-
-const PAGE_SIZE = 1000;
 
 function buildOrderNumber() {
   const now = new Date();
@@ -36,18 +33,7 @@ export async function saveOrder(customerId, cartItems, totalExVat) {
     .single();
   if (error) throw error;
 
-  const qualifiesForPremium =
-    totalExVat > 4000 &&
-    cartItems.some((i) => i.qty > 10);
-
-  if (qualifiesForPremium) {
-    await supabase
-      .from('customers')
-      .update({ tier: 'premium' })
-      .eq('id', customerId)
-      .eq('tier', 'regular');
-  }
-
+  // Premium tier qualification is decided server-side in /api/send-order.
   return data;
 }
 
@@ -72,22 +58,4 @@ export async function fetchLastOrder(customerId) {
     .maybeSingle();
   if (error) throw error;
   return data;
-}
-
-export async function fetchAllOrdersAdmin(limit = 150) {
-  const res = await fetch(`/api/admin-orders?limit=${limit}`, { headers: await authHeaders() });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Failed to fetch orders');
-  return json.rows || [];
-}
-
-export async function updateOrderAdmin(id, fields) {
-  const res = await fetch('/api/admin-orders', {
-    method: 'PATCH',
-    headers: await authHeaders(),
-    body: JSON.stringify({ id, ...fields }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Failed to update order');
-  return json.row;
 }

@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { escapeHtml } from './_escape-html.js';
+import { normalizeWhatsapp } from './_wati-notify.js';
 
 const BREVO_SENDER = {
   name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -46,7 +48,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
   <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account application is under review</p>
 </td></tr>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${name || 'there'},</p>
+  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
   <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review it shortly.</p>
   <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved, you will receive a follow-up email and can log in to access our full wholesale catalogue, live stock availability, and trade pricing.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
@@ -173,7 +175,8 @@ export default async function handler(req, res) {
       // null = never asked / not answered, true = opted in, false = explicitly declined
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
-      is_approved: true,
+      // New applications require admin approval (matches the "under review" email + UI)
+      is_approved: false,
       tier: 'regular',
     };
 
@@ -230,11 +233,10 @@ export default async function handler(req, res) {
 
     // WhatsApp welcome for opted-in customers (same flow as admin approval)
     if (fullPayload.accept_whatsapp === true && normalizedPhone) {
-      const rawPhone = normalizedPhone.replace(/\D/g, '');
-      const watiPhone = rawPhone.startsWith('0') ? `27${rawPhone.slice(1)}` : rawPhone;
+      const watiPhone = normalizeWhatsapp(normalizedPhone);
       const watiBase = process.env.WATI_API_URL || 'https://live-mt-server.wati.io/10138950';
       const watiToken = process.env.WATI_API_TOKEN;
-      if (watiToken) {
+      if (watiToken && watiPhone) {
         try {
           await fetch(`${watiBase}/api/v1/addContact`, {
             method: 'POST',

@@ -1,6 +1,8 @@
 import PDFDocument from 'pdfkit';
 import { requireAuth } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
+import { escapeHtml } from './_escape-html.js';
+import { getPortalAdminClient } from './_site-config.js';
 
 const DEFAULT_TO = 'orders@prototrading.co.za';
 
@@ -121,8 +123,8 @@ function buildEmailHtml({ items, customer, totals }) {
     const price = Number(product.price || 0);
     return `
       <tr>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${cleanText(product.code)}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${cleanText(product.name)}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.code))}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.name))}</td>
         <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${qty}</td>
         <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${money(price * qty)}</td>
       </tr>
@@ -133,10 +135,10 @@ function buildEmailHtml({ items, customer, totals }) {
     <div style="font-family:Arial,sans-serif;color:#111827;">
       <h2>Proto Trading wholesale order request</h2>
       <p>A customer submitted a quote request through the trade portal. The PDF order request is attached.</p>
-      <p><strong>Customer:</strong> ${cleanText(customer?.name, 'Not provided')}<br/>
-      <strong>Email:</strong> ${cleanText(customer?.email, 'Not provided')}<br/>
-      <strong>Phone:</strong> ${cleanText(customer?.phone, 'Not provided')}<br/>
-      <strong>Delivery region:</strong> ${cleanText(customer?.region, 'To confirm')}</p>
+      <p><strong>Customer:</strong> ${escapeHtml(cleanText(customer?.name, 'Not provided'))}<br/>
+      <strong>Email:</strong> ${escapeHtml(cleanText(customer?.email, 'Not provided'))}<br/>
+      <strong>Phone:</strong> ${escapeHtml(cleanText(customer?.phone, 'Not provided'))}<br/>
+      <strong>Delivery region:</strong> ${escapeHtml(cleanText(customer?.region, 'To confirm'))}</p>
       <table style="border-collapse:collapse;width:100%;font-size:13px;">
         <thead>
           <tr>
@@ -217,6 +219,32 @@ export default async function handler(req, res) {
       notifyResult = await runOrderTeamNotify(orderId, { emailSent: true });
     } catch (err) {
       console.error('send-order: team notify failed:', err.message);
+    }
+
+    // Premium tier upgrade — recomputed server-side from the stored order row,
+    // never from client-sent totals.
+    try {
+      const supabase = getPortalAdminClient();
+      const { data: order } = await supabase
+        .from('orders')
+        .select('customer_id, items')
+        .eq('id', orderId)
+        .maybeSingle();
+      const orderItems = Array.isArray(order?.items) ? order.items : [];
+      const serverTotal = orderItems.reduce(
+        (sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0),
+        0,
+      );
+      const qualifies = serverTotal > 4000 && orderItems.some((it) => Number(it.qty || 0) > 10);
+      if (qualifies && order?.customer_id) {
+        await supabase
+          .from('customers')
+          .update({ tier: 'premium' })
+          .eq('id', order.customer_id)
+          .eq('tier', 'regular');
+      }
+    } catch (err) {
+      console.error('send-order: premium tier check failed:', err.message);
     }
   }
 

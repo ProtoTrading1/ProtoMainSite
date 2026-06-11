@@ -19,13 +19,18 @@ export default async function handler(req, res) {
   if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = process.env.RESET_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   let email;
   try {
     email = verifyToken(token, secret);
   } catch (err) {
     return res.status(400).json({ error: err.message });
+  }
+
+  // Strict format check before using email in a PostgREST filter string
+  if (!/^[^\s@,()]+@[^\s@,()]+\.[^\s@,()]+$/.test(String(email || ''))) {
+    return res.status(400).json({ error: 'Invalid reset token' });
   }
 
   const supabase = createClient(

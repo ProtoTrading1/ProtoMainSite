@@ -1,6 +1,13 @@
 import { requireAuth } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 
+function isInternalRetry(req) {
+  const secret = process.env.ORDER_NOTIFY_SECRET;
+  if (!secret) return false;
+  const header = req.headers['x-order-notify-secret'];
+  return header && header === secret;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
@@ -8,8 +15,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const user = await requireAuth(req, res);
-  if (!user) return;
+  if (!isInternalRetry(req)) {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+  }
 
   const orderId = String(req.body?.orderId || '').trim();
   if (!orderId) return res.status(400).json({ error: 'orderId is required' });

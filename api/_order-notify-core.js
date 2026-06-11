@@ -7,52 +7,21 @@ import {
   buildOrderSummary,
   formatPlacedAt,
 } from './_order-pdf.js';
+import {
+  watiConfig,
+  normalizeWhatsapp,
+  sanitizeTemplateParam,
+  watiEnsureContact,
+  watiSendTemplate,
+  watiSendSessionMessage,
+  buildSessionOrderMessage,
+} from './_wati-notify.js';
+import { orderToken } from './_order-token.js';
 
 const USERS_FILE = 'fulfillment/users.json';
-const ORDER_TEMPLATE = process.env.WATI_ORDER_TEMPLATE || 'proto_orders';
-
-function watiConfig() {
-  const baseUrl = (process.env.WATI_API_URL || 'https://live-mt-server.wati.io/10138950').replace(/\/$/, '');
-  const token = process.env.WATI_API_TOKEN;
-  return { baseUrl, token };
-}
-
-function normalizeWhatsapp(phone = '') {
-  const digits = String(phone || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('00')) return digits.slice(2);
-  if (digits.startsWith('0')) return `27${digits.slice(1)}`;
-  return digits;
-}
-
-async function watiAddContact(baseUrl, token, phone, name) {
-  try {
-    await fetch(`${baseUrl}/api/v1/addContact`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name || 'Fulfilment', phoneNumber: phone }),
-    });
-  } catch { /* best-effort */ }
-}
-
-async function watiSendTemplate(baseUrl, token, phone, parameters) {
-  const res = await fetch(`${baseUrl}/api/v1/sendTemplateMessage?whatsappNumber=${phone}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      template_name: ORDER_TEMPLATE,
-      broadcast_name: ORDER_TEMPLATE,
-      parameters,
-    }),
-  });
-  const text = await res.text();
-  let json = {};
-  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-  if (!res.ok || json?.result === false) {
-    throw new Error(json?.info || json?.message || json?.error || `WATI send failed (${res.status})`);
-  }
-  return json;
-}
+const ORDER_TEMPLATE = process.env.WATI_ORDER_TEMPLATE || 'proto_order_notis';
+const ORDER_TEMPLATE_CATEGORY = (process.env.WATI_ORDER_TEMPLATE_CATEGORY || 'UTILITY').toUpperCase();
+const MAIN_PORTAL_URL = (process.env.MAIN_PORTAL_URL || process.env.VITE_APP_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
 
 async function markHandedOver(orderId) {
   const supabase = getPortalAdminClient();
@@ -68,7 +37,66 @@ async function markHandedOver(orderId) {
   return result;
 }
 
-/** Notify fulfilment team via WATI and advance order to Handed Over when email already sent. */
+async function notifyRecipient(baseUrl, token, recipient, ctx) {
+  const { placedAt, customerName, summary, fulfillmentUrl, pdfUrl, orderRef } = ctx;
+  const detail = { name: recipient.name, phone: recipient.phone, template: null, session: null };
+
+  await watiEnsureContact(baseUrl, token, recipient.phone, recipient.name);
+
+  // proto_order_notis (UTILITY) has 4 body variables only and no buttons.
+  // {{1}} Time · {{2}} Order from · {{3}} Order Summary · {{4}} Order Link
+  const parameters = [
+    { name: '1', value: sanitizeTemplateParam(placedAt, 120) },
+    { name: '2', value: sanitizeTemplateParam(customerName, 120) },
+    { name: '3', value: sanitizeTemplateParam(summary, 900) },
+    { name: '4', value: sanitizeTemplateParam(`${fulfillmentUrl} | PDF: ${pdfUrl}`, 900) },
+  ];
+
+  const templateResult = await watiSendTemplate(baseUrl, token, recipient.phone, parameters);
+  detail.template = {
+    ok: templateResult.success,
+    error: templateResult.error || null,
+    messageId: templateResult.messageId || null,
+  };
+
+  const sessionText = buildSessionOrderMessage({
+    placedAt,
+    customerName,
+    summary,
+    fulfillmentUrl,
+    pdfUrl,
+    orderRef,
+  });
+
+  let sessionResult = null;
+  const useSessionBackup = process.env.WATI_ORDER_SESSION_BACKUP !== 'false';
+  if (useSessionBackup || !templateResult.success) {
+    sessionResult = await watiSendSessionMessage(baseUrl, token, recipient.phone, sessionText);
+    detail.session = {
+      ok: sessionResult.success,
+      error: sessionResult.error || null,
+    };
+  }
+
+  const templateOk = templateResult.success;
+  const sessionOk = sessionResult?.success ?? false;
+  const sessionExpired = /ticket has been expired|24.?hour|session expired/i.test(sessionResult?.error || '');
+
+  if (templateOk || sessionOk) {
+    const method = templateOk && sessionOk ? 'both' : templateOk ? 'template' : 'session';
+    const marketingMaybeBlocked = templateOk && !sessionOk && sessionExpired;
+    return { ok: true, method, marketingMaybeBlocked, detail };
+  }
+
+  const combinedError = [
+    templateResult.error ? `Template: ${templateResult.error}` : null,
+    sessionResult?.error ? `Session: ${sessionResult.error}` : null,
+  ].filter(Boolean).join(' · ') || 'WhatsApp delivery failed';
+
+  return { ok: false, method: null, error: combinedError, detail };
+}
+
+/** Notify fulfilment team via WATI. Handed Over only when every team member receives WhatsApp. */
 export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   let order;
   let items;
@@ -93,77 +121,117 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   const placedAt = formatPlacedAt(order.created_at);
   const customerName = String(customer?.name || customer?.business_name || 'Customer').trim();
   const summary = buildOrderSummary(items);
-  const fulfillmentUrl = `${adminUrl}/fulfillment?id=${orderId}`;
-  const pdfButtonSuffix = `${orderId}/pdf`;
+  const accessToken = orderToken(orderId);
+  const fulfillmentUrl = `${adminUrl}/fulfillment?id=${orderId}${accessToken ? `&k=${accessToken}` : ''}`;
+  const pdfUrl = `${MAIN_PORTAL_URL}/api/orders/${orderId}/pdf${accessToken ? `?k=${accessToken}` : ''}`;
+  const orderRef = String(order?.order_ref || order?.reference || '').trim();
 
-  const parameters = [
-    { name: '1', value: placedAt },
-    { name: '2', value: customerName },
-    { name: '3', value: summary },
-    { name: '4', value: fulfillmentUrl },
-    { name: '5', value: pdfButtonSuffix },
-  ];
+  const notifyCtx = { placedAt, customerName, summary, fulfillmentUrl, pdfUrl, orderRef };
 
   const { baseUrl, token } = watiConfig();
   const sent = [];
   const failed = [];
+  const deliveryLog = [];
 
-  if (token) {
-    let users = [];
-    try {
-      const data = await readSiteConfigJson(USERS_FILE, { users: [] });
-      users = Array.isArray(data?.users) ? data.users : [];
-    } catch (err) {
-      console.error('order-notify: failed to load fulfillment users:', err.message);
-    }
+  let users = [];
+  try {
+    const data = await readSiteConfigJson(USERS_FILE, { users: [] });
+    users = Array.isArray(data?.users) ? data.users : [];
+  } catch (err) {
+    console.error('order-notify: failed to load fulfillment users:', err.message);
+  }
 
-    const recipients = users
-      .map((u) => ({ name: String(u.name || '').trim(), phone: normalizeWhatsapp(u.whatsapp) }))
-      .filter((u) => u.phone);
+  const recipients = users
+    .map((u) => ({ name: String(u.name || '').trim(), phone: normalizeWhatsapp(u.whatsapp) }))
+    .filter((u) => u.phone);
 
-    const seen = new Set();
-    for (const recipient of recipients) {
-      if (seen.has(recipient.phone)) continue;
-      seen.add(recipient.phone);
+  const seen = new Set();
+  const uniqueRecipients = recipients.filter((r) => {
+    if (seen.has(r.phone)) return false;
+    seen.add(r.phone);
+    return true;
+  });
+
+  if (!token) {
+    console.warn('order-notify: WATI_API_TOKEN not configured — skipping WhatsApp broadcast');
+  } else if (!uniqueRecipients.length) {
+    console.warn('order-notify: no fulfilment team WhatsApp numbers configured');
+  } else {
+    for (const recipient of uniqueRecipients) {
       try {
-        await watiAddContact(baseUrl, token, recipient.phone, recipient.name);
-        await watiSendTemplate(baseUrl, token, recipient.phone, parameters);
-        sent.push(recipient.phone);
+        const result = await notifyRecipient(baseUrl, token, recipient, notifyCtx);
+        deliveryLog.push(result.detail);
+        if (result.ok) {
+          sent.push({
+            phone: recipient.phone,
+            name: recipient.name,
+            method: result.method,
+            marketingMaybeBlocked: Boolean(result.marketingMaybeBlocked),
+          });
+        } else {
+          failed.push({
+            name: recipient.name,
+            phone: recipient.phone,
+            error: result.error,
+          });
+        }
       } catch (err) {
         console.error(`order-notify: WATI send failed for ${recipient.name} (${recipient.phone}):`, err.message);
         failed.push({ name: recipient.name, phone: recipient.phone, error: err.message });
       }
     }
-  } else {
-    console.warn('order-notify: WATI_API_TOKEN not configured — skipping WhatsApp broadcast');
   }
 
+  const allTeamNotified = uniqueRecipients.length > 0 && sent.length === uniqueRecipients.length;
+  const whatsappOk = !token ? false : allTeamNotified;
+
   let statusAdvanced = false;
-  if (emailSent) {
+  let statusBlockedReason = null;
+
+  if (emailSent && whatsappOk) {
     try {
       const result = await markHandedOver(orderId);
       statusAdvanced = result.ok;
       if (!result.ok && result.reason !== 'sequential-only') {
+        statusBlockedReason = result.reason;
         console.warn('order-notify: status advance skipped:', result.reason);
       }
     } catch (err) {
+      statusBlockedReason = err.message;
       console.error('order-notify: failed to set handed over status:', err.message);
     }
+  } else if (emailSent && !whatsappOk) {
+    statusBlockedReason = !token
+      ? 'WATI not configured'
+      : !uniqueRecipients.length
+        ? 'No team WhatsApp numbers in Team settings'
+        : `WhatsApp failed for ${failed.length} of ${uniqueRecipients.length} team member(s)`;
+    console.warn('order-notify: keeping order pending —', statusBlockedReason);
   }
 
   const notifyLog = {
     orderId,
     template: ORDER_TEMPLATE,
+    templateCategory: ORDER_TEMPLATE_CATEGORY,
+    marketingWarning:
+      ORDER_TEMPLATE_CATEGORY !== 'UTILITY' && sent.some((s) => s.marketingMaybeBlocked)
+        ? `${ORDER_TEMPLATE} is a Marketing template — Meta may block delivery unless the recipient opted in or messaged your business recently. Recreate as UTILITY in WATI for reliable order alerts.`
+        : null,
     pdfStored,
+    teamSize: uniqueRecipients.length,
     sent: sent.length,
     failed: failed.length,
-    sentList: sent,
+    sentList: sent.map((s) => s.phone),
+    sentDetails: sent.slice(0, 25),
     failedList: failed.slice(0, 25),
+    deliveryLog: deliveryLog.slice(0, 25),
     statusAdvanced,
+    statusBlockedReason,
     emailSent: Boolean(emailSent),
     at: new Date().toISOString(),
-    ok: failed.length === 0 && (sent.length > 0 || !token),
+    ok: whatsappOk,
     skippedNoToken: !token,
+    skippedNoTeam: uniqueRecipients.length === 0,
   };
 
   try {
@@ -173,14 +241,17 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   }
 
   return {
-    ok: notifyLog.ok,
+    ok: whatsappOk,
     orderId,
     pdfStored,
     template: ORDER_TEMPLATE,
+    teamSize: uniqueRecipients.length,
     sent: sent.length,
     failed: failed.length,
+    sentDetails: sent.slice(0, 25),
     failedList: failed.slice(0, 25),
     statusAdvanced,
+    statusBlockedReason,
     whatsappErrors: failed.length ? failed : undefined,
   };
 }

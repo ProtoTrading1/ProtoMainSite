@@ -56,7 +56,7 @@ export default async function handler(req, res) {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = process.env.RESET_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
 
   if (!process.env.BREVO_API_KEY) {

@@ -5,7 +5,6 @@ import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
-const AdminPage = lazyWithRetry(() => import('./pages/AdminPage'), 'root-admin-page');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-policies-page');
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
@@ -255,17 +254,19 @@ export default function Root() {
     );
   }
 
+  // The embedded admin dashboard is deprecated — admin lives in the separate
+  // protoportal-admin app. Send admins there instead of rendering anything here.
   if (adminHost && session && customer?.role === 'admin' && view === 'admin') {
     return (
-      <PortalErrorBoundary>
-        <Suspense fallback={authSurfaceFallback}>
-          <AdminPage
-            customer={customer}
-            onLogout={handleLogout}
-            onViewPortal={() => { window.location.href = PORTAL_URL; }}
-          />
-        </Suspense>
-      </PortalErrorBoundary>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Admin has moved</h1>
+        <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
+          The admin dashboard now lives at protoportal-admin.vercel.app.
+        </p>
+        <a href="https://protoportal-admin.vercel.app" style={{ padding: '10px 24px', background: '#8B1A1A', color: '#fff', borderRadius: '8px', fontWeight: '600', textDecoration: 'none' }}>
+          Open admin dashboard
+        </a>
+      </div>
     );
   }
 
