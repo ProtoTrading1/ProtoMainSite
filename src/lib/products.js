@@ -1,6 +1,17 @@
 import { supabaseStock } from './supabaseStock';
 import { fuzzyFilter } from './fuzzySearch';
-import { buildCategoryPath, labelToSlug } from './taxonomy';
+import { buildCategoryPath, labelToSlug, slugToLabel } from './taxonomy';
+
+function matchesMainCategory(product, mainCategory) {
+  if (!mainCategory || mainCategory === 'all') return true;
+  const resolvedLabel = slugToLabel(mainCategory);
+  return (
+    product.category === mainCategory
+    || product.categoryLabel === mainCategory
+    || product.categoryLabel === resolvedLabel
+    || labelToSlug(product.categoryLabel || '') === mainCategory
+  );
+}
 
 // Promise singletons — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -263,7 +274,7 @@ export async function fetchAdminProductsPage({
 } = {}) {
   let rows = archived ? await loadArchivedFromDB() : await fetchAllProductsAdmin({ onProgress });
   if (categoryFilter && categoryFilter !== 'all') {
-    rows = rows.filter((p) => p.category === categoryFilter || p.categoryLabel === categoryFilter);
+    rows = rows.filter((p) => matchesMainCategory(p, categoryFilter));
   }
   rows = searchQuery.trim() ? fuzzyFilter(rows, searchQuery) : rows;
   rows = [...rows].sort((a, b) => (a.categoryLabel || '').localeCompare(b.categoryLabel || '') || a.name.localeCompare(b.name));
@@ -272,10 +283,10 @@ export async function fetchAdminProductsPage({
   return { rows: rows.slice(from, from + pageSize), total, page, pageSize };
 }
 
-export async function fetchProductsByMainCategory(mainCategory, { limit = 10000 } = {}) {
-  const all = await getAllCachedAdmin();
+export async function fetchProductsByMainCategory(mainCategory, { limit = 10000, onProgress } = {}) {
+  const all = await getAllCachedAdmin(onProgress);
   const filtered = mainCategory && mainCategory !== 'all'
-    ? all.filter((p) => p.category === mainCategory)
+    ? all.filter((p) => matchesMainCategory(p, mainCategory))
     : all;
   return filtered
     .sort((a, b) => a.name.localeCompare(b.name))

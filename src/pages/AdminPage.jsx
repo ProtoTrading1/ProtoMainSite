@@ -44,6 +44,12 @@ import { approveCustomer, deleteCustomer, fetchCustomersPage, updateCustomerAdmi
 import { fetchAllOrdersAdmin, updateOrderAdmin } from '../lib/orders';
 import { fetchSpecials, saveSpecials } from '../lib/specials';
 import { authHeaders } from '../lib/authHeaders';
+import {
+  createMainCategory,
+  fetchMainCategories,
+  MAIN_CATEGORY_ICON_OPTIONS,
+  renameMainCategory,
+} from '../lib/taxonomyAdmin';
 import categories from '../data/categories.json';
 
 // ─── Reorder sort order — stored in localStorage, applied client-side ─────────
@@ -166,18 +172,22 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [editorImageError, setEditorImageError] = useState('');
   const editorImageFileInputRef = useRef(null);
 
+  const [productSearchInput, setProductSearchInput] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [productCategory, setProductCategory] = useState('all');
   const [productPage, setProductPage] = useState(1);
   const [productRows, setProductRows] = useState([]);
-  const [productTotal, setProductTotal] = useState(0);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [productFilteredTotal, setProductFilteredTotal] = useState(0);
 
+  const [archiveSearchInput, setArchiveSearchInput] = useState('');
   const [archiveSearch, setArchiveSearch] = useState('');
   const [archivePage, setArchivePage] = useState(1);
   const [archiveRows, setArchiveRows] = useState([]);
   const [archiveTotal, setArchiveTotal] = useState(0);
 
   const [customerTab, setCustomerTab] = useState('requests');
+  const [customerSearchInput, setCustomerSearchInput] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerPage, setCustomerPage] = useState(1);
   const [customerRows, setCustomerRows] = useState([]);
@@ -195,17 +205,38 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   const [specials, setSpecials] = useState([]); // [{productId, productName, productCode, productImage, deal, discountPct, bogoX, bogoY}]
   const [specialsSaving, setSpecialsSaving] = useState(false);
 
-  const mainCategories = categories.map((item) => ({ id: item.id, label: item.label }));
+  const [mainCategories, setMainCategories] = useState(() => categories.map((item) => ({ id: item.id, label: item.label })));
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categoryDrafts, setCategoryDrafts] = useState({});
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('Package');
+  const [categorySaving, setCategorySaving] = useState('');
+  const [categoryError, setCategoryError] = useState('');
 
   useEffect(() => {
-    void fetchAllProductsAdmin({ onProgress: setLoadingProgress })
-      .then((all) => setProductTotal(all.length))
+    void fetchAllProductsAdmin()
+      .then((all) => setCatalogTotal(all.length))
       .catch(() => {});
   }, []);
 
-  useEffect(() => { setProductPage(1); }, [productSearch, productCategory]);
-  useEffect(() => { setArchivePage(1); }, [archiveSearch]);
-  useEffect(() => { setCustomerPage(1); }, [customerTab, customerSearch]);
+  useEffect(() => {
+    const id = setTimeout(() => setProductSearch(productSearchInput), 300);
+    return () => clearTimeout(id);
+  }, [productSearchInput]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setArchiveSearch(archiveSearchInput), 300);
+    return () => clearTimeout(id);
+  }, [archiveSearchInput]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setCustomerSearch(customerSearchInput), 300);
+    return () => clearTimeout(id);
+  }, [customerSearchInput]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [productPage, archivePage, customerPage]);
 
   const loadProducts = async () => {
     setLoadingProgress(0);
@@ -213,7 +244,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     try {
       const data = await fetchAdminProductsPage({ page: productPage, pageSize: ADMIN_PAGE_SIZE, searchQuery: productSearch, categoryFilter: productCategory, onProgress: setLoadingProgress });
       setProductRows(data.rows);
-      setProductTotal(data.total);
+      setProductFilteredTotal(data.total);
     } catch (err) {
       setLoadingError(err.message || 'Failed to load products');
     } finally { setLoadingProgress(null); }
@@ -241,14 +272,14 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   };
 
   const loadCategoryWorkingSet = async (categoryId, target) => {
-    setLoading(true);
+    setLoadingProgress(0);
     setLoadingError('');
     try {
-      const rows = await fetchProductsByMainCategory(categoryId);
+      const rows = await fetchProductsByMainCategory(categoryId, { onProgress: setLoadingProgress });
       if (target === 'reorder') setReorderProducts(applySavedOrder(rows, categoryId));
     } catch (err) {
       setLoadingError(err.message || 'Failed to load category products');
-    } finally { setLoading(false); }
+    } finally { setLoadingProgress(null); }
   };
 
   const loadOrders = async () => {
@@ -267,6 +298,16 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   useEffect(() => {
     fetchSpecials().then((data) => setSpecials(data?.items || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    void fetchMainCategories().then(setMainCategories).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (mainCategories.length && !mainCategories.some((c) => c.id === reorderCategory)) {
+      setReorderCategory(mainCategories[0].id);
+    }
+  }, [mainCategories, reorderCategory]);
 
   const specialsSet = new Set(specials.map((s) => s.productId));
 
@@ -341,12 +382,14 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
   });
 
   const stats = useMemo(() => ({
-    products: productTotal,
+    products: catalogTotal,
     archived: archiveTotal,
     customers: customerTotal,
     premiumVisible: customerRows.filter((item) => item.tier === 'premium').length,
     orders: orders.length,
-  }), [productTotal, archiveTotal, customerTotal, customerRows, orders]);
+  }), [catalogTotal, archiveTotal, customerTotal, customerRows, orders]);
+
+  const productFilterActive = Boolean(productSearch.trim() || productCategory !== 'all');
 
   const orderRows = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
@@ -403,6 +446,51 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally {
       setContentEditSaving(false);
     }
+  };
+
+  const openCategoryModal = () => {
+    setCategoryDrafts(Object.fromEntries(mainCategories.map((c) => [c.id, c.label])));
+    setNewCategoryLabel('');
+    setNewCategoryIcon('Package');
+    setCategoryError('');
+    setCategoryModalOpen(true);
+  };
+
+  const refreshMainCategories = async () => {
+    const updated = await fetchMainCategories();
+    setMainCategories(updated);
+    setCategoryDrafts(Object.fromEntries(updated.map((c) => [c.id, c.label])));
+    return updated;
+  };
+
+  const saveCategoryRename = async (id) => {
+    const draft = categoryDrafts[id];
+    const original = mainCategories.find((c) => c.id === id)?.label;
+    if (!draft?.trim() || draft === original) return;
+    setCategorySaving(id);
+    setCategoryError('');
+    try {
+      await renameMainCategory(id, draft);
+      await refreshMainCategories();
+      invalidateAdminCache();
+      if (activeSection === 'reorder') void loadCategoryWorkingSet(reorderCategory, 'reorder');
+      if (activeSection === 'products') void loadProducts();
+    } catch (err) {
+      setCategoryError(err.message || 'Save failed');
+    } finally { setCategorySaving(''); }
+  };
+
+  const addMainCategory = async () => {
+    setCategorySaving('new');
+    setCategoryError('');
+    try {
+      await createMainCategory(newCategoryLabel, newCategoryIcon);
+      await refreshMainCategories();
+      setNewCategoryLabel('');
+      setNewCategoryIcon('Package');
+    } catch (err) {
+      setCategoryError(err.message || 'Could not create category');
+    } finally { setCategorySaving(''); }
   };
 
   const refreshCurrentSection = async () => {
@@ -578,7 +666,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
     } finally { setSaving(''); }
   };
 
-  const productPages = Math.max(1, Math.ceil(productTotal / ADMIN_PAGE_SIZE));
+  const productPages = Math.max(1, Math.ceil(productFilteredTotal / ADMIN_PAGE_SIZE));
   const customerPages = Math.max(1, Math.ceil(customerTotal / ADMIN_PAGE_SIZE));
 
   return (
@@ -647,7 +735,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 <div className="adm-section-head">
                   <div>
                     <h2 className="adm-section-title">Product Manager</h2>
-                    <p className="adm-section-note">Server-side paging — search and category filters load only what you need.</p>
+                    <p className="adm-section-note">Search and filter the live catalogue client-side — 50 products per page.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <button onClick={openNewProduct} className="adm-btn-red"><PackagePlus size={15} /> Add product</button>
@@ -656,14 +744,20 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-toolbar">
-                  <label className="adm-search"><Search size={15} /><input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search by SKU or product name" className="adm-search-input" /></label>
-                  <select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="adm-select">
+                  <label className="adm-search"><Search size={15} /><input value={productSearchInput} onChange={(e) => { setProductSearchInput(e.target.value); setProductPage(1); }} placeholder="Search by SKU or product name" className="adm-search-input" /></label>
+                  <select value={productCategory} onChange={(e) => { setProductCategory(e.target.value); setProductPage(1); }} className="adm-select">
                     <option value="all">All categories</option>
                     {mainCategories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.label}</option>
                     ))}
                   </select>
                 </div>
+
+                {productFilterActive && (
+                  <p className="adm-muted" style={{ fontSize: 13, margin: '0 0 8px' }}>
+                    Showing {productFilteredTotal} of {catalogTotal} products
+                  </p>
+                )}
 
                 <div className="adm-list">
                   <div className="adm-list-head" style={{ gridTemplateColumns: '2fr 220px 120px' }}>
@@ -856,7 +950,7 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-toolbar" style={{ gridTemplateColumns: '1fr' }}>
-                  <label className="adm-search"><Search size={15} /><input value={archiveSearch} onChange={(e) => setArchiveSearch(e.target.value)} placeholder="Search archived products" className="adm-search-input" /></label>
+                  <label className="adm-search"><Search size={15} /><input value={archiveSearchInput} onChange={(e) => { setArchiveSearchInput(e.target.value); setArchivePage(1); }} placeholder="Search archived products" className="adm-search-input" /></label>
                 </div>
 
                 {archiveRows.length === 0 && loadingProgress === null && (
@@ -928,6 +1022,9 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                     <select value={reorderCategory} onChange={(e) => { setSelectedIds(new Set()); setReorderCategory(e.target.value); }} className="adm-select">
                       {mainCategories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                     </select>
+                    <button onClick={openCategoryModal} className="adm-btn-ghost" title="Rename or add main categories">
+                      <Pencil size={14} /> Manage categories
+                    </button>
                     <button
                       onClick={() => { setSelectedIds(new Set()); invalidateAdminCache(); void loadCategoryWorkingSet(reorderCategory, 'reorder'); }}
                       className="adm-btn-ghost"
@@ -948,6 +1045,13 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 >
                   ↑ Drop here to move to top
                 </div>
+
+                {!loadingProgress && !loadingError && reorderProducts.length === 0 && (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: '#6b7280' }}>
+                    <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 6px' }}>No products in this category</p>
+                    <p style={{ fontSize: 13, margin: 0 }}>Try another category or use Refresh to reload from the catalogue.</p>
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                   {reorderProducts.map((product) => {
@@ -1010,10 +1114,10 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 </div>
 
                 <div className="adm-customer-tabs">
-                  <button onClick={() => setCustomerTab('requests')} className={`adm-tab${customerTab === 'requests' ? ' adm-tab--active' : ''}`}>Trade requests</button>
-                  <button onClick={() => setCustomerTab('regular')} className={`adm-tab${customerTab === 'regular' ? ' adm-tab--active' : ''}`}>Approved</button>
-                  <button onClick={() => setCustomerTab('premium')} className={`adm-tab${customerTab === 'premium' ? ' adm-tab--active' : ''}`}>Premium</button>
-                  <label className="adm-search adm-search--inline"><Search size={14} /><input value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} placeholder="Search…" className="adm-search-input" /></label>
+                  <button onClick={() => { setCustomerTab('requests'); setCustomerPage(1); }} className={`adm-tab${customerTab === 'requests' ? ' adm-tab--active' : ''}`}>Trade requests</button>
+                  <button onClick={() => { setCustomerTab('regular'); setCustomerPage(1); }} className={`adm-tab${customerTab === 'regular' ? ' adm-tab--active' : ''}`}>Approved</button>
+                  <button onClick={() => { setCustomerTab('premium'); setCustomerPage(1); }} className={`adm-tab${customerTab === 'premium' ? ' adm-tab--active' : ''}`}>Premium</button>
+                  <label className="adm-search adm-search--inline"><Search size={14} /><input value={customerSearchInput} onChange={(e) => { setCustomerSearchInput(e.target.value); setCustomerPage(1); }} placeholder="Search…" className="adm-search-input" /></label>
                 </div>
 
                 {customerTab === 'requests' ? (
@@ -1139,6 +1243,70 @@ export default function AdminPage({ customer, onLogout, onViewPortal }) {
                 {saving === expandedCustomer.id ? 'Approving…' : <><Check size={15} /> Approve trade access</>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main category manager */}
+      {categoryModalOpen && (
+        <div className="adm-modal-backdrop">
+          <div className="adm-modal" style={{ maxWidth: 520 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 20, fontFamily: 'Outfit, sans-serif' }}>Manage main categories</h3>
+                <p className="adm-muted" style={{ marginTop: 4, fontSize: 13 }}>Renaming updates all products in that category. Subcategories stay in the catalogue tree for now.</p>
+              </div>
+              <button onClick={() => setCategoryModalOpen(false)} className="adm-icon-btn"><X size={16} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 16 }}>
+              {mainCategories.map((cat) => (
+                <div key={cat.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    value={categoryDrafts[cat.id] ?? cat.label}
+                    onChange={(e) => setCategoryDrafts((d) => ({ ...d, [cat.id]: e.target.value }))}
+                    className="adm-field-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    onClick={() => void saveCategoryRename(cat.id)}
+                    className="adm-btn-ghost adm-btn-sm"
+                    disabled={categorySaving === cat.id || (categoryDrafts[cat.id] ?? cat.label) === cat.label}
+                  >
+                    {categorySaving === cat.id ? '…' : 'Save'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+              <p style={{ fontWeight: 700, fontSize: 13, margin: '0 0 8px' }}>Add new main category</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  value={newCategoryLabel}
+                  onChange={(e) => setNewCategoryLabel(e.target.value)}
+                  className="adm-field-input"
+                  placeholder="Category name"
+                  style={{ flex: 1, minWidth: 160 }}
+                />
+                <select value={newCategoryIcon} onChange={(e) => setNewCategoryIcon(e.target.value)} className="adm-select">
+                  {MAIN_CATEGORY_ICON_OPTIONS.map((icon) => <option key={icon} value={icon}>{icon}</option>)}
+                </select>
+                <button
+                  onClick={() => void addMainCategory()}
+                  className="adm-btn-red"
+                  disabled={!newCategoryLabel.trim() || categorySaving === 'new'}
+                >
+                  {categorySaving === 'new' ? 'Adding…' : 'Add'}
+                </button>
+              </div>
+            </div>
+
+            {categoryError && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#fef2f2', borderRadius: 6, color: '#c40000', fontSize: 13 }}>
+                {categoryError}
+              </div>
+            )}
           </div>
         </div>
       )}
