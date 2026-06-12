@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('website_stock')
-      .select('sku, barcode, stock_qty, available_stock')
+      .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos')
       .or(`barcode.eq.${sku},sku.eq.${sku}`)
       .limit(1);
 
@@ -50,6 +50,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       sku,
       qty,
+      keep_live_when_oos: !!row.keep_live_when_oos,
       available_stock: Number.isFinite(avail) ? avail : null,
       stock_qty: Number.isFinite(raw) ? raw : null,
       checked_at: new Date().toISOString(),

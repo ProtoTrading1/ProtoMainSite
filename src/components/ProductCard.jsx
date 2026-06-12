@@ -10,25 +10,31 @@ const LOW_STOCK_THRESHOLD = 5;
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
 function StockCheck({ sku }) {
-  const [state, setState] = useState({ status: 'idle', qty: null });
+  const [state, setState] = useState({ status: 'idle', qty: null, keepLive: false });
 
   const check = async () => {
     if (!sku) return;
-    setState({ status: 'loading', qty: null });
+    setState({ status: 'loading', qty: null, keepLive: false });
     try {
       const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
-      setState({ status: 'done', qty: Number(data.qty) || 0 });
+      setState({
+        status: 'done',
+        qty: Number(data.qty) || 0,
+        keepLive: !!data.keep_live_when_oos,
+      });
     } catch {
-      setState({ status: 'error', qty: null });
+      setState({ status: 'error', qty: null, keepLive: false });
     }
   };
 
   let readout = null;
   if (state.status === 'done') {
     const qty = state.qty;
-    if (qty <= 0) {
+    if (state.keepLive && qty <= 0) {
+      readout = <span className="stock-readout stock-readout--in">Available</span>;
+    } else if (qty <= 0) {
       readout = <span className="stock-readout stock-readout--out">Out of stock</span>;
     } else if (qty <= LOW_STOCK_THRESHOLD) {
       readout = <span className="stock-readout stock-readout--low">Low stock: {qty} left</span>;
