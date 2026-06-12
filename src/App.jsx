@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -24,6 +24,7 @@ import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
+import { scrollToTop } from './lib/scrollToTop';
 import './index.css';
 
 const HEADER_H = 72;
@@ -87,10 +88,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
+    scrollToTop();
     hashNavigate(newPath, newRefinements);
   }, [hashNavigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
+    scrollToTop();
     hashNavigate(newPath, newRefinements);
   }, [hashNavigate]);
   const [sort, setSort] = useState('featured');
@@ -132,19 +135,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
   }, [path, hashNavigate]);
 
-  // Reset every scrollable surface to the top whenever the category path
-  // changes. We have to cover three places because the catalogue, the
-  // mobile body, and the document root each carry independent scroll state:
-  //  - `.content-area`: desktop catalogue scroller
-  //  - `window` / document root: mobile body & landing surfaces
-  //  - any open cart/mobile sheets stay where the user left them
-  useEffect(() => {
-    const area = document.querySelector('.content-area');
-    try { area?.scrollTo({ top: 0, behavior: 'auto' }); } catch { if (area) area.scrollTop = 0; }
-    try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { /* ignore */ }
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-  }, [path.join('/')]);
+  const pathKey = path.join('/');
+  const navScrollKey = `${pathKey}|${page}|${activeCollection}|${searchQuery}|${sort}`;
+
+  // useLayoutEffect so scroll resets before paint; also re-run after catalog loads
+  // because shorter pages + scroll anchoring can leave the viewport at the bottom.
+  useLayoutEffect(() => {
+    scrollToTop();
+  }, [navScrollKey]);
+
+  useLayoutEffect(() => {
+    if (!loading) scrollToTop();
+  }, [loading, navScrollKey]);
+
+  const handlePageChange = useCallback((nextPage) => {
+    scrollToTop();
+    setPage(nextPage);
+  }, []);
 
   useEffect(() => {
     if (!path.length) return;
@@ -536,7 +543,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             loading={loading}
             page={page}
             totalPages={totalPages}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
             bannerConfig={bannerConfig}
             usingFallback={usingFallback}
             browseCategories={browseCategories}

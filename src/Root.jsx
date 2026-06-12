@@ -3,6 +3,7 @@ import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
+import { scrollToTop } from './lib/scrollToTop';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -47,11 +48,7 @@ export default function Root() {
   useEffect(() => {
     const handler = () => {
       setRoute(window.location.hash);
-      // Hash navigation defaults to landing on whatever scroll position the
-      // browser thinks is appropriate. Force the top of the new page.
-      try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { /* ignore */ }
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      scrollToTop();
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
@@ -69,10 +66,7 @@ export default function Root() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    const area = document.querySelector('.content-area');
-    if (area) area.scrollTop = 0;
+    scrollToTop();
   }, [view]);
 
   const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {

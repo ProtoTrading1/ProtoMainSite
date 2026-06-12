@@ -136,6 +136,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .main-layout {
   display: flex;
   overflow: hidden;
+  overflow-anchor: none;
   max-width: 100vw;
   position: relative;
 }
@@ -150,6 +151,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .content-area {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 32px 46px 32px 40px;
   background: #ffffff;
 }

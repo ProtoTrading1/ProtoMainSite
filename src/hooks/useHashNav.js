@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { scrollToTop } from '../lib/scrollToTop';
 
 const ROUTE_PREFIXES = new Set(['portal-preview']);
 
@@ -40,13 +41,17 @@ export function useHashNav() {
   const [state, setState] = useState(parseHash);
 
   useEffect(() => {
-    const handler = () => setState(parseHash());
+    const handler = () => {
+      scrollToTop();
+      setState(parseHash());
+    };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
   const navigate = (newPath, newRefinements = {}) => {
     window.location.hash = buildHash(newPath, newRefinements, state.routePrefix);
+    scrollToTop();
   };
 
   const back = () => {
