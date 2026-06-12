@@ -111,6 +111,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
+  const lastSearchLogKeyRef = useRef('');
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -281,9 +282,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   useEffect(() => {
     if (!searchQuery.trim()) {
       searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
+      lastSearchLogKeyRef.current = '';
       return;
     }
     if (loading) return;
+
+    const logKey = `${searchQuery.trim()}|${catalogTotal}|${pathKey}|${activeCollection}`;
+    if (lastSearchLogKeyRef.current === logKey) return;
 
     let cancelled = false;
     const term = searchQuery.trim();
@@ -300,6 +305,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       filtersApplied,
     }).then((id) => {
       if (!cancelled && id) {
+        lastSearchLogKeyRef.current = logKey;
         searchTrackRef.current = { rowId: id, searchedAt, term };
       }
     });
