@@ -248,5 +248,12 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ success: true, orderId: orderId || null, notify: notifyResult });
+  return res.status(200).json({
+    success: true,
+    orderId: orderId || null,
+    notify: notifyResult,
+    notifyWarning: notifyResult && !notifyResult.ok
+      ? notifyResult.statusBlockedReason || 'WhatsApp team notification did not reach everyone'
+      : null,
+  });
 }

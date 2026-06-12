@@ -147,7 +147,10 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   }
 
   const recipients = users
-    .map((u) => ({ name: String(u.name || '').trim(), phone: normalizeWhatsapp(u.whatsapp) }))
+    .map((u) => {
+      const phone = normalizeWhatsapp(u.whatsapp || u.phone || '');
+      return { name: String(u.name || '').trim(), phone };
+    })
     .filter((u) => u.phone);
 
   const seen = new Set();
@@ -158,9 +161,9 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
   });
 
   if (!token) {
-    console.warn('order-notify: WATI_API_TOKEN not configured — skipping WhatsApp broadcast');
+    console.error('order-notify: WATI_API_TOKEN is not set on the main portal — team WhatsApp alerts are disabled. Copy WATI_API_TOKEN and WATI_API_URL from the admin Vercel project.');
   } else if (!uniqueRecipients.length) {
-    console.warn('order-notify: no fulfilment team WhatsApp numbers configured');
+    console.warn('order-notify: no fulfilment team WhatsApp numbers configured — save team members in Admin → Order Requests → Team');
   } else {
     for (const recipient of uniqueRecipients) {
       try {
