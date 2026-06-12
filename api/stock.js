@@ -43,10 +43,15 @@ export default async function handler(req, res) {
     }
 
     const row = data[0];
-    const qty = Number(row.stock_qty);
+    // available_stock is SOH (what Bladerunner/cron writes); stock_qty is the raw figure.
+    const avail = Number(row.available_stock);
+    const raw = Number(row.stock_qty);
+    const qty = Number.isFinite(avail) ? avail : (Number.isFinite(raw) ? raw : 0);
     return res.status(200).json({
       sku,
-      qty: Number.isFinite(qty) ? qty : 0,
+      qty,
+      available_stock: Number.isFinite(avail) ? avail : null,
+      stock_qty: Number.isFinite(raw) ? raw : null,
       checked_at: new Date().toISOString(),
     });
   } catch (err) {

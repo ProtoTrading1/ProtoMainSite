@@ -26,6 +26,8 @@ If you are developing a production application, we recommend using TypeScript wi
 
 The sync is a Postgres function, `public.sync_website_from_products()` (see `migrations/016_sync_website_from_products.sql`). It updates `website_stock.price`, `website_stock.stock_qty` and `website_stock.available_stock`, is idempotent (a no-change run updates 0 rows), and returns a JSON summary.
 
+**Automatic sync (migration 017):** a row-level trigger on `public.products` runs after every insert/update of `sell_price`, `stock_qty`, or `available_stock`. When the external cron writes `products`, matching `website_stock` rows (joined on `products.sku = website_stock.barcode`) update immediately — no separate script call required.
+
 ### How to trigger a manual resync
 
 Run after the Bladerunner sync has finished writing `public.products`:
