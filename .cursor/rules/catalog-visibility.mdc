@@ -1,0 +1,37 @@
+---
+description: Automatic catalogue visibility — in-stock live, out-of-stock archived
+alwaysApply: true
+---
+
+# Catalogue visibility rule (Proto Stock DB)
+
+**Source of truth:** `public.products.available_stock` (via Bladerunner cron).
+
+**Storefront reads:** `public.website_stock` only.
+
+**Join:** `products.sku = website_stock.barcode`.
+
+## Automatic behaviour (Postgres trigger + `apply_catalog_visibility_for_barcode`)
+
+| Source stock | Default action |
+|---|---|
+| `available_stock > 0` | Live on `website_stock` (auto-restore if `archived_by = 'auto-oos'`) |
+| `available_stock <= 0` | Archive to `archived_products` with `archived_by = 'auto-oos'` |
+
+## Exceptions (never auto-moved)
+
+- `keep_live_when_oos = true` on the row — stays live when OOS (admin 📌 pin in Product Manager)
+- `archived_by = 'new-products'` — dormant New Products pipeline
+- Manual archives: `product-manager`, `recycle-bin`, `admin-bulk`
+
+## Admin override
+
+Product Manager → 📌 pin toggles `keep_live_when_oos`. Pinned OOS products remain on the trade site.
+
+## Migrations
+
+- `016_sync_website_from_products.sql` — price/stock sync
+- `017_products_auto_sync_trigger.sql` — sync on every `products` write
+- `018_auto_catalog_visibility.sql` — auto live/archive rule + keep flag
+
+Do not reintroduce manual-only sync or hardcoded stock `0` in admin adapt functions.
