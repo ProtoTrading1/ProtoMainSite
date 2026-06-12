@@ -1,12 +1,5 @@
 import { supabase } from './supabase';
 
-function buildOrderNumber() {
-  const now = new Date();
-  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `PT-${date}-${suffix}`;
-}
-
 export async function saveOrder(customerId, cartItems, totalExVat) {
   const items = cartItems.map((i) => ({
     productId: i.product.id,
@@ -26,7 +19,6 @@ export async function saveOrder(customerId, cartItems, totalExVat) {
       original_items: items,
       final_items: items,
       order_match: 'order-match',
-      order_number: buildOrderNumber(),
       total_ex_vat: totalExVat,
     }])
     .select()
