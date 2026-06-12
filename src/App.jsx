@@ -287,30 +287,37 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
     if (loading) return;
 
-    const logKey = `${searchQuery.trim()}|${catalogTotal}|${pathKey}|${activeCollection}`;
+    const term = searchQuery.trim();
+    if (term.length < 3) return;
+
+    const logKey = `${term}|${pathKey}|${activeCollection}`;
     if (lastSearchLogKeyRef.current === logKey) return;
 
     let cancelled = false;
-    const term = searchQuery.trim();
     const searchedAt = new Date();
     const filtersApplied = [];
     if (activeCollection !== 'all') filtersApplied.push(collectionLabel(activeCollection));
     if (path.length) filtersApplied.push(...path);
 
-    void logSearch({
-      searchTerm: term,
-      resultsFound: catalogTotal,
-      customerId: customer?.id ?? null,
-      customerEmail: customer?.email ?? null,
-      filtersApplied,
-    }).then((id) => {
-      if (!cancelled && id) {
-        lastSearchLogKeyRef.current = logKey;
-        searchTrackRef.current = { rowId: id, searchedAt, term };
-      }
-    });
+    const timer = setTimeout(() => {
+      void logSearch({
+        searchTerm: term,
+        resultsFound: catalogTotal,
+        customerId: customer?.id ?? null,
+        customerEmail: customer?.email ?? null,
+        filtersApplied,
+      }).then((id) => {
+        if (!cancelled && id) {
+          lastSearchLogKeyRef.current = logKey;
+          searchTrackRef.current = { rowId: id, searchedAt, term };
+        }
+      });
+    }, 900);
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, catalogTotal, loading, activeCollection, pathKey, customer?.id, customer?.email]);
 
   const rawBreadcrumb = buildBreadcrumb(categories, path);

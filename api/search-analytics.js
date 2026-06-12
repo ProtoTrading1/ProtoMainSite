@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       const term = String(searchTerm || '').trim().slice(0, 200);
       const sid = String(sessionId || '').trim();
       if (!term || !sid) return res.status(400).json({ error: 'searchTerm and sessionId required' });
+      if (term.length < 3) return res.status(200).json({ ok: true, skipped: true });
 
       const { data, error } = await supabase
         .from('search_analytics')
