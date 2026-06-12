@@ -77,6 +77,8 @@ function PanelHeader({ label, onViewAll, color }) {
   );
 }
 
+const NAV_ROW_HEIGHT = 42;
+
 function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color }) {
   return (
     <button
@@ -85,7 +87,8 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
       onMouseEnter={onMouseEnter}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 20px 10px 16px', width: '100%',
+        padding: '0 20px 0 16px', width: '100%', height: NAV_ROW_HEIGHT,
+        boxSizing: 'border-box',
         borderLeftWidth: '3px', borderLeftStyle: 'solid',
         borderLeftColor: active ? color : 'transparent',
         borderTop: 'none', borderRight: 'none', borderBottom: 'none',
@@ -124,6 +127,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
 
   const hoveredL2 = l2List.find((c) => c.id === hoveredL2Id) || l2List[0] || null;
   const l3List = hoveredL2?.children || [];
+  const hoveredL2Index = Math.max(0, l2List.findIndex((c) => c.id === (hoveredL2Id || l2List[0]?.id)));
 
   const countFor = (...segments) => counts?.[segments.join('/')] ?? null;
   const go = (segments) => { navigate(segments); onClose(); };
@@ -164,7 +168,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
         style={{ width: 280, display: 'flex', flexDirection: 'column', borderRight: '1px solid #F0F1F3', minWidth: 0 }}
         onMouseLeave={handleL2Leave}
       >
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
           {l2List.map((l2) => (
             <ListItem
               key={l2.id}
@@ -187,7 +191,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
       >
         {hoveredL2 && l3List.length > 0 && (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 0, paddingTop: hoveredL2Index * NAV_ROW_HEIGHT }}>
               {l3List.map((l3) => (
                 <ListItem
                   key={l3.id}
