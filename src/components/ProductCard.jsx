@@ -133,7 +133,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose }) {
+export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
@@ -155,6 +155,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const inCart = cartQty > 0;
 
   const openPreview = () => {
+    onSearchEngage?.();
     setZoomOpen(true);
     trackEvent({
       eventType: 'product_view',

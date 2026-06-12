@@ -84,6 +84,8 @@ export default function MainContent({
   categoryNode = null,
   onProductPreview = null,
   bannerConfig = null,
+  searchActive = false,
+  onSearchProductClick = null,
 }) {
   const bannerTitle = bannerConfig?.title || 'Built for retailers who need stock that moves.';
   const bannerBody = bannerConfig?.body || 'Browse core wholesale lines, build a quote-ready basket, and send a clean request to the Proto Trading sales team for stock, VAT, and delivery confirmation.';
@@ -242,6 +244,7 @@ export default function MainContent({
                 onCartQtyChange={onCartQtyChange}
                 special={specialsMap[product.id] || null}
                 priority={idx < 8}
+                onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
               />
             ))}
           </div>

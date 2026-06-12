@@ -23,6 +23,7 @@ import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpe
 import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
+import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop } from './lib/scrollToTop';
 import './index.css';
@@ -109,6 +110,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
+  const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const [activeCollection, setActiveCollection] = useState('all');
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -276,6 +278,35 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     };
   }, [activeCollection, page, path, searchQuery, sort]);
 
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
+      return;
+    }
+    if (loading) return;
+
+    let cancelled = false;
+    const term = searchQuery.trim();
+    const searchedAt = new Date();
+    const filtersApplied = [];
+    if (activeCollection !== 'all') filtersApplied.push(collectionLabel(activeCollection));
+    if (path.length) filtersApplied.push(...path);
+
+    void logSearch({
+      searchTerm: term,
+      resultsFound: catalogTotal,
+      customerId: customer?.id ?? null,
+      customerEmail: customer?.email ?? null,
+      filtersApplied,
+    }).then((id) => {
+      if (!cancelled && id) {
+        searchTrackRef.current = { rowId: id, searchedAt, term };
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [searchQuery, catalogTotal, loading, activeCollection, pathKey, customer?.id, customer?.email]);
+
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
     : path.map((seg, i) => ({ label: seg, path: path.slice(0, i + 1) }));
@@ -322,6 +353,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: Math.min(maxQty, i.qty + qty) } : i));
       return [...prev, { product, qty: Math.min(maxQty, qty) }];
     });
+
+    if (searchTrackRef.current.rowId && searchQuery.trim()) {
+      void logSearchCartAdd(searchTrackRef.current.rowId);
+    }
 
     if (buttonPos) setFlyAnim(buttonPos);
 
@@ -428,6 +463,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (!response.ok) throw new Error(result.error || 'Order email could not be sent');
 
       setOrderStatus('sent');
+
+      if (searchTrackRef.current.rowId) {
+        void logSearchOrder({
+          searchRowId: searchTrackRef.current.rowId,
+          orderNumber: savedOrder?.id || payload.orderId || '',
+          orderValue: cartTotal,
+        });
+      }
     } catch (err) {
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');
@@ -456,6 +499,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   };
 
   const [previewProduct, setPreviewProduct] = useState(null);
+
+  const handleSearchProductClick = useCallback((product, index) => {
+    const track = searchTrackRef.current;
+    if (!track.rowId || !searchQuery.trim()) return;
+    void logSearchClick({
+      searchRowId: track.rowId,
+      clickedSku: product.code || product.id,
+      position: index + 1 + (page - 1) * CATALOG_PAGE_SIZE,
+      searchedAt: track.searchedAt,
+    });
+  }, [searchQuery, page]);
 
   // Group products sharing the same parentSku into a single card with "Multiple Variants"
   const displayProducts = useMemo(() => {
@@ -550,6 +604,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categoryCounts={counts}
             categoryNode={categoryNode}
             onProductPreview={setPreviewProduct}
+            searchActive={Boolean(searchQuery.trim())}
+            onSearchProductClick={handleSearchProductClick}
           />
         </main>
 
