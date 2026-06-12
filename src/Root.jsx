@@ -28,8 +28,31 @@ export default function Root() {
     if (adminHost) document.title = 'Proto Admin';
   }, [adminHost]);
 
+  // Browsers (esp. Chrome) try to "restore" the previous scroll position
+  // when the user navigates back, forward, or — combined with our hash
+  // routing — sometimes when arriving at a new page. That manifests as
+  // pages loading scrolled to the bottom. Opt out of the heuristic so we
+  // can drive scroll explicitly on every route change.
   useEffect(() => {
-    const handler = () => setRoute(window.location.hash);
+    if (typeof window === 'undefined' || !window.history) return;
+    try {
+      const prev = window.history.scrollRestoration;
+      window.history.scrollRestoration = 'manual';
+      return () => { window.history.scrollRestoration = prev; };
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      setRoute(window.location.hash);
+      // Hash navigation defaults to landing on whatever scroll position the
+      // browser thinks is appropriate. Force the top of the new page.
+      try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { /* ignore */ }
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);

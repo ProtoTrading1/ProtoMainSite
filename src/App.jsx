@@ -23,7 +23,7 @@ import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpe
 import PopupSpecialModal from './components/PopupSpecialModal';
 import { authHeaders } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
-import categories from './data/categories.json';
+import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import './index.css';
 
 const HEADER_H = 72;
@@ -77,6 +77,9 @@ function collectionLabel(collection) {
 
 export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) {
   const { path, refinements, navigate: hashNavigate, setRefinement } = useHashNav();
+  // Live category tree — fetched from /api/taxonomy on mount so admin renames
+  // and new subcategories show up without a redeploy of the bundled snapshot.
+  const categories = useLiveTaxonomy();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
@@ -129,15 +132,18 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
   }, [path, hashNavigate]);
 
-  // Scroll content area back to top whenever the category path changes
+  // Reset every scrollable surface to the top whenever the category path
+  // changes. We have to cover three places because the catalogue, the
+  // mobile body, and the document root each carry independent scroll state:
+  //  - `.content-area`: desktop catalogue scroller
+  //  - `window` / document root: mobile body & landing surfaces
+  //  - any open cart/mobile sheets stay where the user left them
   useEffect(() => {
     const area = document.querySelector('.content-area');
-    if (!area) return;
-    try {
-      area.scrollTo({ top: 0, behavior: 'auto' });
-    } catch {
-      area.scrollTop = 0;
-    }
+    try { area?.scrollTo({ top: 0, behavior: 'auto' }); } catch { if (area) area.scrollTop = 0; }
+    try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { /* ignore */ }
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [path.join('/')]);
 
   useEffect(() => {
