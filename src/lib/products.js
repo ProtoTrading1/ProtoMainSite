@@ -7,7 +7,7 @@ let _cache = null;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
 const LS_KEY = 'proto_catalog_v10';
-const LS_TTL = 5 * 60 * 1000;
+const LS_TTL = 90 * 1000;
 
 function saveToLocalCache(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
