@@ -82,6 +82,7 @@ export default function MainContent({
   browseCategories = [],
   categoryCounts = {},
   categoryNode = null,
+  categories = [],
   onProductPreview = null,
   bannerConfig = null,
   searchActive = false,
@@ -151,8 +152,10 @@ export default function MainContent({
       {isCategoryPage && showLanding && (
         <CategoryLanding
           categoryNode={categoryNode}
+          path={path}
           products={products}
           counts={categoryCounts}
+          categories={categories}
           navigate={navigate}
           addToCart={addToCart}
           cartQtyMap={cartQtyMap}

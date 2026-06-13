@@ -58,6 +58,55 @@ export function slugToLabel(slug) {
   return _slugToLabel[slug] || String(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Legacy nav ids whose slug no longer matches labelToSlug(label) after a rename. */
+const LEGACY_NAV_ALIASES = {
+  'arts-crafts-stationery': 'art-supplies-and-stationery',
+};
+
+/**
+ * Map a navigation path (taxonomy node ids) to product categoryPath slugs.
+ * Products derive slugs from DB labels via labelToSlug; taxonomy ids stay
+ * stable across renames — this bridges the two.
+ */
+export function resolveNavPathForProducts(navPath, categories) {
+  if (!Array.isArray(navPath) || !navPath.length) return [];
+  if (!Array.isArray(categories) || !categories.length) {
+    return navPath.map((seg, i) => (i === 0 && LEGACY_NAV_ALIASES[seg]) || seg);
+  }
+
+  const out = [];
+  let nodes = categories;
+  for (let i = 0; i < navPath.length; i += 1) {
+    const seg = navPath[i];
+    const node = (nodes || []).find((n) => n.id === seg);
+    if (!node) {
+      out.push(i === 0 && LEGACY_NAV_ALIASES[seg] ? LEGACY_NAV_ALIASES[seg] : seg);
+      break;
+    }
+    if (i === 0 && LEGACY_NAV_ALIASES[seg]) {
+      out.push(LEGACY_NAV_ALIASES[seg]);
+    } else {
+      out.push(labelToSlug(node.label));
+    }
+    nodes = node.children || [];
+  }
+  return out;
+}
+
+/** Count map keys use product slug paths — resolve nav path before lookup. */
+export function productCountKey(navPath, categories) {
+  return resolveNavPathForProducts(navPath, categories).join('/');
+}
+
+export function lookupProductCount(counts, navPath, categories) {
+  if (!counts) return null;
+  const key = productCountKey(navPath, categories);
+  if (counts[key] != null) return counts[key];
+  // Fallback for legacy count keys stored by nav id
+  const legacy = Array.isArray(navPath) ? navPath.join('/') : '';
+  return legacy ? counts[legacy] ?? null : counts[''];
+}
+
 /** Build a slug categoryPath from human labels (category + ordered subcategory levels). */
 export function buildCategoryPath(category, subLabels = []) {
   const catSlug = labelToSlug(category);

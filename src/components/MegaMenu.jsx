@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { DEPT_THEME_CARDS } from '../lib/themeCards';
+import { lookupProductCount } from '../lib/taxonomy';
 
 // Compact theme card for the flyout 3rd column
 function FlyoutThemeCard({ card, color, onClick }) {
@@ -114,7 +115,7 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
   );
 }
 
-export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset = 0 }) {
+export default function MegaMenu({ l1Node, navigate, counts, categories, onClose, topOffset = 0 }) {
   const l2List = l1Node?.children || [];
   const [hoveredL2Id, setHoveredL2Id] = useState(l2List[0]?.id || null);
   const leaveTimerRef = useRef(null);
@@ -129,7 +130,7 @@ export default function MegaMenu({ l1Node, navigate, counts, onClose, topOffset 
   const l3List = hoveredL2?.children || [];
   const hoveredL2Index = Math.max(0, l2List.findIndex((c) => c.id === (hoveredL2Id || l2List[0]?.id)));
 
-  const countFor = (...segments) => counts?.[segments.join('/')] ?? null;
+  const countFor = (...segments) => lookupProductCount(counts, segments, categories);
   const go = (segments) => { navigate(segments); onClose(); };
 
   // Delay closing L2 hover state so diagonal mouse movement to L3 doesn't flicker

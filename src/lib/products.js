@@ -1,4 +1,5 @@
 import { fuzzyFilter } from './fuzzySearch';
+import { getActiveTaxonomy, resolveNavPathForProducts } from './taxonomy';
 
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -83,10 +84,11 @@ function applyCollection(products, collection, specialIds = null) {
 
 function applyPathFilter(products, categoryPath) {
   if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
+  const resolved = resolveNavPathForProducts(categoryPath, getActiveTaxonomy());
   return products.filter((p) => {
     const cp = p.categoryPath || [];
-    const depth = Math.min(cp.length, categoryPath.length);
-    return depth > 0 && categoryPath.slice(0, depth).every((seg, i) => cp[i] === seg);
+    const depth = Math.min(cp.length, resolved.length);
+    return depth > 0 && resolved.slice(0, depth).every((seg, i) => cp[i] === seg);
   });
 }
 

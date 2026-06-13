@@ -25,6 +25,7 @@ import { authHeaders } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
+import { resolveNavPathForProducts } from './lib/taxonomy';
 import { scrollToTop } from './lib/scrollToTop';
 import './index.css';
 
@@ -261,7 +262,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
         const hasSearch = Boolean(searchQuery.trim());
         if (!hasSearch && path.length) {
-          rows = rows.filter((item) => path.every((seg, index) => item.categoryPath?.[index] === seg));
+          const resolved = resolveNavPathForProducts(path, categories);
+          rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
         }
         if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
         setUsingFallback(true);
@@ -277,7 +279,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return () => {
       cancelled = true;
     };
-  }, [activeCollection, page, path, searchQuery, sort]);
+  }, [activeCollection, page, path, searchQuery, sort, categories]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -616,6 +618,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             browseCategories={browseCategories}
             categoryCounts={counts}
             categoryNode={categoryNode}
+            categories={categories}
             onProductPreview={setPreviewProduct}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}

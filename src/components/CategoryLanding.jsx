@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
 import { buildImageCandidates } from '../lib/imageUrl';
+import { lookupProductCount } from '../lib/taxonomy';
 
 // ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPreview }) {
@@ -80,8 +81,10 @@ function ProductStrip({ products, icon: Icon, title, subtitle, color, addToCart,
 // ─── Main export ─────────────────────────────────────────────
 export default function CategoryLanding({
   categoryNode,
+  path = [],
   products,
   counts,
+  categories = [],
   navigate,
   addToCart,
   cartQtyMap,
@@ -96,7 +99,7 @@ export default function CategoryLanding({
   const Icon       = LUCIDE_ICON_MAP[iconName] || null;
   const useCases   = USE_CASES[categoryNode.id] || [];
   const subcats    = categoryNode.children || [];
-  const totalCount = counts?.[categoryNode.id] || products.length;
+  const totalCount = lookupProductCount(counts, path, categories) ?? products.length;
 
   const hotSellers = useMemo(
     () => [...products].sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0)).slice(0, 14),
@@ -161,7 +164,7 @@ export default function CategoryLanding({
               <button
                 key={sub.id}
                 className="cat-subcat-card"
-                onClick={() => navigate([categoryNode.id, sub.id])}
+                onClick={() => navigate([...path, sub.id])}
                 type="button"
                 style={{ '--dept-color': color }}
               >

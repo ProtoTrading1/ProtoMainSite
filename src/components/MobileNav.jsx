@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
+import { lookupProductCount } from '../lib/taxonomy';
 
 function MobileProductRequest({ onClose: closeAll, customer }) {
   const [description, setDescription] = useState('');
@@ -216,9 +217,9 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
                       </span>
                     )}
                     <span style={{ fontSize: '15px', fontWeight: '600', color: '#111827', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
-                    {counts?.[[...path, cat.id].join('/')] != null && (
+                    {lookupProductCount(counts, [...path, cat.id], categories) != null && (
                       <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600', flexShrink: 0 }}>
-                        {counts[[...path, cat.id].join('/')]}
+                        {lookupProductCount(counts, [...path, cat.id], categories)}
                       </span>
                     )}
                   </div>

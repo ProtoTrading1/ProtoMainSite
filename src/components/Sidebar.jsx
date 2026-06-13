@@ -160,6 +160,7 @@ export default function Sidebar({ categories, path, navigate, counts, customer }
           l1Node={menuNode}
           navigate={navigate}
           counts={counts}
+          categories={categories}
           onClose={() => setOpenCategoryId(null)}
           topOffset={menuTopOffset}
         />

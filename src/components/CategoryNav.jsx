@@ -1,5 +1,6 @@
 import { Home } from 'lucide-react';
 import { DEPT_COLORS } from '../lib/navConfig';
+import { lookupProductCount } from '../lib/taxonomy';
 
 const RED = '#7F1D1D';
 
@@ -73,7 +74,7 @@ export default function CategoryNav({ categories, path, navigate, onToggleL1, op
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {cat.label}
-                <Count value={counts?.[cat.id]} />
+                <Count value={lookupProductCount(counts, [cat.id], categories)} />
               </span>
               {hasChildren && (
                 <span style={{ fontSize: '16px', lineHeight: 1, color: highlighted ? deptColor : '#D1D5DB', flexShrink: 0, fontWeight: '300' }}>
