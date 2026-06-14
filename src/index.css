@@ -622,6 +622,15 @@ input, select, textarea { font-family: inherit; outline: none; }
   padding: 0 0 12px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.14);
 }
+.search-panel--empty {
+  padding: 20px 4px 12px;
+}
+.sp-empty-hint {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  text-align: center;
+}
 
 .sp-section {
   padding: 16px 28px 4px;

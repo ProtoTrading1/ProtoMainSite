@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Clock, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, MessageCircle, PackageSearch, RotateCcw,
-  Search, ShoppingCart, Star, TrendingUp, Upload, User, X,
+  Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, MessageCircle, PackageSearch, RotateCcw,
+  Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
@@ -20,12 +20,6 @@ function saveRecent(term) {
 function clearRecent() {
   try { localStorage.removeItem(RS_KEY); } catch {}
 }
-
-const POPULAR = [
-  'Seed Beads', 'Glass Beads', 'Acrylic Beads', 'Mixed Beads',
-  'Gift Boxes', 'Organza Bags', 'Party Supplies', 'Jewellery Findings',
-  'Elastic Cord', 'Gift Wrap',
-];
 
 // ─── Flatten categories tree for search matching ─────────────
 const FLAT_CATS = (() => {
@@ -196,64 +190,11 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, recentSearches, activeIdx, onPickProduct, onPickCategory, onPickTerm, onClearRecent, onCommitSearch }) {
-  const isEmpty = !query.trim();
-  const topDepts = categoriesData.slice(0, 8);
-
-  if (isEmpty) {
+function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory }) {
+  if (!query.trim()) {
     return (
-      <div className="search-panel">
-        {/* Recent searches */}
-        {recentSearches.length > 0 && (
-          <div className="sp-section">
-            <div className="sp-section-head">
-              <span>Recent</span>
-              <button type="button" onClick={onClearRecent} className="sp-clear">Clear</button>
-            </div>
-            <div className="sp-pills">
-              {recentSearches.map((t) => (
-                <button key={t} type="button" className="sp-pill sp-pill--recent" onClick={() => onPickTerm(t)}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Popular searches */}
-        <div className="sp-section">
-          <div className="sp-section-head">
-            <span>Popular right now</span>
-          </div>
-          <div className="sp-pills">
-            {POPULAR.map((t) => (
-              <button key={t} type="button" className="sp-pill" onClick={() => onPickTerm(t)}>
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Department shortcuts */}
-        <div className="sp-section">
-          <div className="sp-section-head"><span>Browse departments</span></div>
-          <div className="sp-dept-grid">
-            {topDepts.map((dept) => {
-              const color = DEPT_COLORS[dept.id] || '#374151';
-              return (
-                <button
-                  key={dept.id}
-                  type="button"
-                  className="sp-dept-chip"
-                  onClick={() => onPickCategory(dept.path || [dept.id])}
-                  style={{ '--chip-color': color }}
-                >
-                  <span>{dept.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div className="search-panel search-panel--empty">
+        <p className="sp-empty-hint">Start typing to search products…</p>
       </div>
     );
   }
@@ -357,36 +298,55 @@ export default function Header({
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [recentSearches, setRecentSearches] = useState(loadRecent);
   const productsCache = useRef(null);
+  const productsLoading = useRef(null);
   const inputRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  const loadProductsOnce = async () => {
+  const loadProductsOnce = useCallback(async () => {
     if (productsCache.current) return productsCache.current;
-    try {
-      const res = await fetch('/api/products');
-      productsCache.current = res.ok ? await res.json() : [];
-    } catch {
+    if (productsLoading.current) return productsLoading.current;
+    productsLoading.current = (async () => {
       try {
-        const res = await fetch('/products.json');
+        const res = await fetch('/api/products');
         productsCache.current = res.ok ? await res.json() : [];
       } catch {
-        productsCache.current = [];
+        try {
+          const res = await fetch('/products.json');
+          productsCache.current = res.ok ? await res.json() : [];
+        } catch {
+          productsCache.current = [];
+        }
       }
-    }
-    return productsCache.current;
-  };
+      productsLoading.current = null;
+      return productsCache.current;
+    })();
+    return productsLoading.current;
+  }, []);
 
-  const updateSuggestions = (query, products) => {
+  const updateSuggestions = useCallback((query, products) => {
     if (!query.trim()) { setSuggestions([]); setCatMatches([]); return; }
     setSuggestions(getSuggestions(products, query, 20));
     setCatMatches(matchCategories(query));
-  };
+  }, []);
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  const scheduleSuggestions = useCallback((query) => {
+    clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setSuggestions([]);
+      setCatMatches([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      void loadProductsOnce().then((products) => updateSuggestions(query, products));
+    }, 120);
+  }, [loadProductsOnce, updateSuggestions]);
 
   const openSearch = () => {
     setSearchOpen(true);
-    setRecentSearches(loadRecent());
-    loadProductsOnce();
+    void loadProductsOnce();
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
@@ -397,11 +357,10 @@ export default function Header({
     setActiveIdx(-1);
   };
 
-  const handleInput = async (val) => {
+  const handleInput = (val) => {
     setSearchQuery(val);
     setActiveIdx(-1);
-    const products = await loadProductsOnce();
-    updateSuggestions(val, products);
+    scheduleSuggestions(val);
   };
 
   const handleKeyDown = (e) => {
@@ -420,7 +379,6 @@ export default function Header({
 
   const pickProduct = (p) => {
     saveRecent(p.name);
-    setRecentSearches(loadRecent());
     setSearchQuery(p.name);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -435,18 +393,9 @@ export default function Header({
     closeSearch();
   };
 
-  const pickTerm = (term) => {
-    saveRecent(term);
-    setRecentSearches(loadRecent());
-    setSearchQuery(term);
-    loadProductsOnce().then((products) => updateSuggestions(term, products));
-    inputRef.current?.focus();
-  };
-
   const commitSearch = (term) => {
     if (!term) return;
     saveRecent(term);
-    setRecentSearches(loadRecent());
     setSearchQuery(term);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -455,30 +404,28 @@ export default function Header({
     setSearchOpen(false);
   };
 
-  const handleClearRecent = () => {
-    clearRecent();
-    setRecentSearches([]);
-  };
-
   // Mobile search
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
-    setRecentSearches(loadRecent());
-    loadProductsOnce();
+    void loadProductsOnce();
   };
   const closeMobileSearch = () => {
     setMobileSearchOpen(false);
     setMobileSuggestions([]);
     setMobileCatMatches([]);
   };
-  const handleMobileInput = async (val) => {
+  const handleMobileInput = (val) => {
     setSearchQuery(val);
-    const products = await loadProductsOnce();
+    clearTimeout(debounceRef.current);
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
-    setMobileSuggestions(getSuggestions(products, val, 12));
-    setMobileCatMatches(matchCategories(val));
+    debounceRef.current = setTimeout(() => {
+      void loadProductsOnce().then((products) => {
+        setMobileSuggestions(getSuggestions(products, val, 12));
+        setMobileCatMatches(matchCategories(val));
+      });
+    }, 120);
   };
 
   return (
@@ -594,13 +541,9 @@ export default function Header({
               query={searchQuery}
               suggestions={suggestions}
               catMatches={catMatches}
-              recentSearches={recentSearches}
               activeIdx={activeIdx}
               onPickProduct={pickProduct}
               onPickCategory={pickCategory}
-              onPickTerm={pickTerm}
-              onCommitSearch={commitSearch}
-              onClearRecent={handleClearRecent}
             />
           </div>
         </>
@@ -659,24 +602,8 @@ export default function Header({
       </div>
 
       {/* Mobile category + product results */}
-      {mobileSearchOpen && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0 || !searchQuery) && (
+      {mobileSearchOpen && searchQuery && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0) && (
         <div className="mobile-search-results">
-          {!searchQuery && recentSearches.length > 0 && (
-            <div className="sp-section">
-              <div className="sp-section-head">
-                <Clock size={12} />
-                <span>Recent</span>
-                <button type="button" onClick={handleClearRecent} className="sp-clear">Clear</button>
-              </div>
-              <div className="sp-pills">
-                {recentSearches.map((t) => (
-                  <button key={t} type="button" className="sp-pill sp-pill--recent" onClick={() => { setSearchQuery(t); handleMobileInput(t); }}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           {mobileCatMatches.map((cat) => (
             <button
               key={cat.id}
