@@ -5,7 +5,6 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
-  Clock3,
   Eye,
   EyeOff,
   Gem,
@@ -30,24 +29,6 @@ const departments = [
   { name: 'Jewellery', count: 820 },
   { name: 'Homeware', count: 560 },
   { name: 'Seasonal', count: 380 },
-];
-
-const steps = [
-  {
-    num: '01',
-    title: 'Apply for trade access',
-    body: 'Fill in your business details once. We review applications for genuine trade customers — retailers, resellers, and distributors.',
-  },
-  {
-    num: '02',
-    title: 'Browse the catalogue',
-    body: 'Once approved, explore 8,000+ product lines across 12 departments. Filter by department, search by code, or browse freely.',
-  },
-  {
-    num: '03',
-    title: 'Build your order',
-    body: 'Add quantities, generate a PDF with product images, and submit your quote request. Our team contacts you with trade pricing.',
-  },
 ];
 
 const unlocks = [
@@ -926,55 +907,6 @@ export default function LandingPage({ onLogin, onApply }) {
           </div>
         </section>
 
-        {/* ── Featured category cards ── */}
-        <section className="lp-feat-cats-section">
-          <div className="lp-feat-cats-header">
-            <span className="lp-eyebrow">Shop by department</span>
-            <h2>11 core wholesale categories.</h2>
-          </div>
-          <div className="lp-feat-cats">
-          {CAT_CARDS.map(({ id, label, img }) => (
-            <div key={id} className="lp-feat-card">
-              <img src={img} alt={label} className="lp-feat-card-bg" />
-              <div className="lp-feat-card-overlay" />
-              <div className="lp-feat-card-footer">{label}</div>
-            </div>
-          ))}
-          </div>
-        </section>
-
-        {/* ── How it works ── */}
-        <section className="lp-how" id="lp-how">
-          <motion.div
-            className="lp-section-header"
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.55 }}
-          >
-            <span className="lp-eyebrow">How it works</span>
-            <h2>Three steps to trade access.</h2>
-          </motion.div>
-          <div className="lp-steps">
-            {steps.map((step, i) => (
-              <motion.article
-                key={step.num}
-                className={`lp-step ${i % 2 === 1 ? 'lp-step-alt' : ''}`}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -40 : 40 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-              >
-                <div className="lp-step-num">{step.num}</div>
-                <div className="lp-step-body">
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
-                </div>
-              </motion.article>
-            ))}
-          </div>
-        </section>
-
         {/* ── Apply / Questionnaire ── */}
         <section className="lp-apply-wrapper" id="lp-apply">
           <motion.div
@@ -987,10 +919,6 @@ export default function LandingPage({ onLogin, onApply }) {
             <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
             <h2>Get access to the buying tools behind the portal.</h2>
             <p>Answer a few quick questions. Once approved, browse the catalogue, build quote requests and include product images in PDF order sheets.</p>
-            <div className="lp-apply-note">
-              <Clock3 size={18} />
-              <span>Complete trade applications reviewed within 1 business day.</span>
-            </div>
             <ul className="lp-apply-list">
               <li><CheckCircle2 size={17} />Trade-only access for retailers and resellers</li>
               <li><CheckCircle2 size={17} />Catalogue browsing by department, code and product</li>
