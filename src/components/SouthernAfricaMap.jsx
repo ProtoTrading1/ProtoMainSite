@@ -22,43 +22,77 @@ const N = REDDEN_ORDER.length;
 
 // Camera keyframes (geoMercator center [lon, lat] + scale)
 const VIEW_AFRICA = { lon: 17, lat: 3, scale: 380 };
-const VIEW_CAPE = { lon: 20, lat: -33.6, scale: 2800 };
+const VIEW_CAPE = { lon: 20, lat: -33.6, scale: 2600 };
 const CAPE_TOWN = [18.42, -33.92];
 
-// Timeline (ms)
-const GREY_HOLD = 600;
-const REDDEN_DUR = 1700;
-const RED_HOLD = 550;
-const ZOOM_DUR = 2300;
+// Looping timeline (ms) — each phase is a duration; they run back to back.
+const T = {
+  greyHold: 700,    // all grey
+  redden: 1800,     // grey → red, north to south
+  redHold: 600,     // full red, framed on Africa
+  zoomIn: 2200,     // dive toward Cape Town
+  capeHold: 1700,   // hold on Cape Town, pin pulsing
+  zoomOut: 1700,    // pull back to the full red continent
+  fullHold: 1500,   // rest on the red continent before resetting
+};
+const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 
-const COLOR_GREY = '#2b2b2b';
+const COLOR_GREY = '#333333';
 const COLOR_RED = '#a01818';
 const COLOR_SA = '#c0392b';
 
 const lerp = (a, b, t) => a + (b - a) * t;
-const easeInOutCubic = (t) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const lerpView = (from, to, t) => ({
+  lon: lerp(from.lon, to.lon, t),
+  lat: lerp(from.lat, to.lat, t),
+  scale: lerp(from.scale, to.scale, t),
+});
+
+// Returns the animation state for a given elapsed time within one cycle.
+function frameAt(t) {
+  let m = t % CYCLE;
+  // 1 — grey hold
+  if (m < T.greyHold) return { redCount: 0, view: VIEW_AFRICA, pinT: 0 };
+  m -= T.greyHold;
+  // 2 — red sweep
+  if (m < T.redden) return { redCount: Math.ceil((m / T.redden) * N), view: VIEW_AFRICA, pinT: 0 };
+  m -= T.redden;
+  // 3 — full red, hold on Africa
+  if (m < T.redHold) return { redCount: N, view: VIEW_AFRICA, pinT: 0 };
+  m -= T.redHold;
+  // 4 — zoom in to Cape Town
+  if (m < T.zoomIn) {
+    const e = easeInOut(m / T.zoomIn);
+    return { redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) };
+  }
+  m -= T.zoomIn;
+  // 5 — hold on Cape Town
+  if (m < T.capeHold) return { redCount: N, view: VIEW_CAPE, pinT: 1 };
+  m -= T.capeHold;
+  // 6 — zoom back out
+  if (m < T.zoomOut) {
+    const e = easeInOut(m / T.zoomOut);
+    return { redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: Math.max(0, 1 - e / 0.6) };
+  }
+  m -= T.zoomOut;
+  // 7 — rest on full red continent
+  return { redCount: N, view: VIEW_AFRICA, pinT: 0 };
+}
 
 export default function SouthernAfricaMap() {
   const ref = useRef(null);
   const rafRef = useRef(null);
   const [inView, setInView] = useState(false);
-  const [redCount, setRedCount] = useState(0);
-  const [view, setView] = useState(VIEW_AFRICA);
-  const [pinT, setPinT] = useState(0); // 0 → 1 as we arrive at Cape Town
+  const [{ redCount, view, pinT }, setFrame] = useState(() => frameAt(0));
 
-  // Trigger once the section scrolls into view
+  // Pause/resume with viewport visibility (keeps it cheap when off-screen)
   useEffect(() => {
     const node = ref.current;
     if (!node) return undefined;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '120px 0px' }
+      ([entry]) => setInView(entry.isIntersecting),
+      { rootMargin: '80px 0px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -72,39 +106,16 @@ export default function SouthernAfricaMap() {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (reduce) {
-      // Static end-state: all red, framed on the cape, pin shown.
-      setRedCount(N);
-      setView(VIEW_CAPE);
-      setPinT(1);
+      // Static, fully visible end-state: the whole continent in red.
+      setFrame({ redCount: N, view: VIEW_AFRICA, pinT: 0 });
       return undefined;
     }
 
     const start = performance.now();
-    const zoomStart = GREY_HOLD + REDDEN_DUR + RED_HOLD;
-    const end = zoomStart + ZOOM_DUR;
-
     const tick = (now) => {
-      const t = now - start;
-
-      // Phase 2 — red sweep, north to south
-      const rp = Math.max(0, Math.min((t - GREY_HOLD) / REDDEN_DUR, 1));
-      setRedCount(Math.round(rp * N));
-
-      // Phase 3 — dive toward Cape Town
-      const zp = Math.max(0, Math.min((t - zoomStart) / ZOOM_DUR, 1));
-      const e = easeInOutCubic(zp);
-      setView({
-        lon: lerp(VIEW_AFRICA.lon, VIEW_CAPE.lon, e),
-        lat: lerp(VIEW_AFRICA.lat, VIEW_CAPE.lat, e),
-        scale: lerp(VIEW_AFRICA.scale, VIEW_CAPE.scale, e),
-      });
-      setPinT(Math.max(0, Math.min((zp - 0.45) / 0.55, 1)));
-
-      if (t < end) {
-        rafRef.current = requestAnimationFrame(tick);
-      }
+      setFrame(frameAt(now - start));
+      rafRef.current = requestAnimationFrame(tick);
     };
-
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -134,7 +145,7 @@ export default function SouthernAfricaMap() {
                     stroke="#000"
                     strokeWidth={0.5}
                     style={{
-                      default: { outline: 'none', transition: 'fill 0.55s ease' },
+                      default: { outline: 'none', transition: 'fill 0.5s ease' },
                       hover: { outline: 'none', fill },
                       pressed: { outline: 'none', fill },
                     }}
@@ -144,28 +155,13 @@ export default function SouthernAfricaMap() {
           }
         </Geographies>
 
-        {pinT > 0 && (
+        {pinT > 0.01 && (
           <Marker coordinates={CAPE_TOWN}>
-            <g
-              transform={`translate(0, ${-14 + 6 * (1 - pinT)})`}
-              style={{ opacity: pinT }}
-            >
+            <g transform={`translate(0, ${-14 + 6 * (1 - pinT)})`} style={{ opacity: pinT }}>
               {/* pulse ring */}
               <circle r="13" fill="#c0392b" opacity={0.22 * pinT}>
-                <animate
-                  attributeName="r"
-                  from="6"
-                  to="20"
-                  dur="1.6s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="opacity"
-                  from="0.35"
-                  to="0"
-                  dur="1.6s"
-                  repeatCount="indefinite"
-                />
+                <animate attributeName="r" from="6" to="20" dur="1.6s" repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.35" to="0" dur="1.6s" repeatCount="indefinite" />
               </circle>
               {/* pin */}
               <path

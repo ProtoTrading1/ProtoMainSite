@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import AddressAutocomplete from '../components/AddressAutocomplete';
+import AboutModal from '../components/AboutModal';
 import { motion, useInView } from 'motion/react';
 import {
   ArrowRight,
