@@ -12,6 +12,7 @@
   "dependencies": {
     "@intercom/messenger-js-sdk": "^0.0.19",
     "@supabase/supabase-js": "^2.105.4",
+    "d3-geo": "^2.0.2",
     "gsap": "^3.15.0",
     "lucide-react": "^1.9.0",
     "motion": "^12.38.0",
@@ -19,7 +20,7 @@
     "prop-types": "^15.8.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-simple-maps": "^3.0.0"
+    "topojson-client": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
