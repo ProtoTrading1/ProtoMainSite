@@ -29,22 +29,21 @@ const N = REDDEN_ORDER.length;
 const W = 800;
 const H = 600;
 
-// Camera keyframes (geoMercator center [lon, lat] + scale)
+// Camera keyframes (geoMercator center [lon, lat] + scale).
+// VIEW_CAPE frames South Africa filling the canvas with the Cape Town pin —
+// a much stronger final image than zooming all the way to the empty coastline.
 const VIEW_AFRICA = { lon: 17, lat: 3, scale: 380 };
-const VIEW_CAPE = { lon: 20, lat: -33.6, scale: 2600 };
+const VIEW_CAPE = { lon: 23, lat: -30, scale: 1500 };
 const CAPE_TOWN = [18.42, -33.92];
 
-// Looping timeline (ms) — phases run back to back, then repeat.
+// One-shot timeline (ms) — plays once, then rests on the Cape Town frame.
 const T = {
-  greyHold: 700,
-  redden: 1800,
-  redHold: 600,
-  zoomIn: 2200,
-  capeHold: 1700,
-  zoomOut: 1700,
-  fullHold: 1500,
+  greyHold: 700,   // whole continent grey
+  redden: 1900,    // grey → red, north to south
+  redHold: 700,    // hold on the full red continent
+  zoomIn: 2400,    // dive in to frame South Africa + Cape Town
 };
-const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
+const END = Object.values(T).reduce((a, b) => a + b, 0);
 
 const COLOR_GREY = '#333333';
 const COLOR_RED = '#a01818';
@@ -59,7 +58,7 @@ const lerpView = (from, to, t) => ({
 });
 
 function frameAt(t) {
-  let m = t % CYCLE;
+  let m = t;
   if (m < T.greyHold) return { redCount: 0, view: VIEW_AFRICA, pinT: 0 };
   m -= T.greyHold;
   if (m < T.redden) return { redCount: Math.ceil((m / T.redden) * N), view: VIEW_AFRICA, pinT: 0 };
@@ -70,14 +69,8 @@ function frameAt(t) {
     const e = easeInOut(m / T.zoomIn);
     return { redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) };
   }
-  m -= T.zoomIn;
-  if (m < T.capeHold) return { redCount: N, view: VIEW_CAPE, pinT: 1 };
-  m -= T.capeHold;
-  if (m < T.zoomOut) {
-    const e = easeInOut(m / T.zoomOut);
-    return { redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: Math.max(0, 1 - e / 0.6) };
-  }
-  return { redCount: N, view: VIEW_AFRICA, pinT: 0 };
+  // Rest on the Cape Town frame.
+  return { redCount: N, view: VIEW_CAPE, pinT: 1 };
 }
 
 export default function SouthernAfricaMap() {
@@ -101,12 +94,17 @@ export default function SouthernAfricaMap() {
     return () => { alive = false; };
   }, []);
 
-  // Pause/resume with viewport visibility
+  // Fire the animation once, when the section first scrolls into view
   useEffect(() => {
     const node = ref.current;
     if (!node) return undefined;
     const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
       { rootMargin: '80px 0px' }
     );
     observer.observe(node);
@@ -118,13 +116,15 @@ export default function SouthernAfricaMap() {
     const reduce =
       window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
-      setFrame({ redCount: N, view: VIEW_AFRICA, pinT: 0 });
+      // Skip the motion; show the final resting frame.
+      setFrame({ redCount: N, view: VIEW_CAPE, pinT: 1 });
       return undefined;
     }
     const start = performance.now();
     const tick = (now) => {
-      setFrame(frameAt(now - start));
-      rafRef.current = requestAnimationFrame(tick);
+      const t = now - start;
+      setFrame(frameAt(t));
+      if (t < END) rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
