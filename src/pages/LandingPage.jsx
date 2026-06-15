@@ -954,7 +954,7 @@ export default function LandingPage({ onLogin, onApply }) {
             transition={{ duration: 0.6 }}
           >
             <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
-            <h2>Get access to the buying tools behind the portal.</h2>
+            <h2>Get access to Proto Trading's catalogue.</h2>
             <p>Answer a few quick questions. Once approved, browse the catalogue, build quote requests and include product images in PDF order sheets.</p>
             <ul className="lp-apply-list">
               <li><CheckCircle2 size={17} />Trade-only access for retailers and resellers</li>
