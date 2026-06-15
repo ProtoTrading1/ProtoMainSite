@@ -224,6 +224,45 @@
   background: #000;
 }
 
+/* ── Branded banner hero (Proto Trading Online showroom image) ── */
+.vhero-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
+  object-position: 72% center;
+  z-index: 0;
+}
+
+/* Darken the left so the headline + CTAs stay legible over the image. */
+.vhero-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(0, 0, 0, 0.7) 24%,
+    rgba(0, 0, 0, 0.3) 48%,
+    rgba(0, 0, 0, 0) 70%
+  );
+}
+
+@media (max-width: 700px) {
+  /* On small screens the copy sits over a fuller, evenly darkened image. */
+  .vhero-banner-img { object-position: 64% center; }
+  .vhero-banner-scrim {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.82) 0%,
+      rgba(0, 0, 0, 0.55) 45%,
+      rgba(0, 0, 0, 0.75) 100%
+    );
+  }
+}
+
 .vhero-copy {
   position: relative;
   z-index: 2;

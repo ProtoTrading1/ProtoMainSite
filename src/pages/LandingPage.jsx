@@ -803,7 +803,15 @@ function ProductStream() {
 
 function VideoHero({ onLogin, onApply }) {
   return (
-    <section className="vhero-section vhero-section--static">
+    <section className="vhero-section vhero-section--static vhero-section--banner">
+      <img
+        src="/proto-banner.jpg"
+        alt="Proto Trading Online wholesale showroom"
+        className="vhero-banner-img"
+        fetchPriority="high"
+        decoding="async"
+      />
+      <div className="vhero-banner-scrim" />
       <div
         className="vhero-copy"
       >
@@ -828,7 +836,6 @@ function VideoHero({ onLogin, onApply }) {
           <span>Nationwide trade support</span>
         </div>
       </div>
-      <ProductStream />
     </section>
   );
 }
