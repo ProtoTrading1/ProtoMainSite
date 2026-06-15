@@ -79,6 +79,20 @@
   color: #fff;
 }
 
+/* Log in — styled as a button to stand out from the text nav links */
+.access-nav button.access-nav-login {
+  color: #fff;
+  background: #dc2626;
+  padding: 8px 18px;
+  border-radius: 8px;
+  transition: background 0.18s ease;
+}
+
+.access-nav button.access-nav-login:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
 .access-actions {
   gap: 12px;
 }

@@ -39,18 +39,21 @@ const VIEW_AFRICA = { lon: 17, lat: 3, scale: 380 };
 const VIEW_CAPE = { lon: 23, lat: -30, scale: 1500 };
 const CAPE_TOWN = [18.42, -33.92];
 
-// One-shot timeline (ms) — plays once, then rests on the Cape Town frame.
+// Looping timeline (ms) — runs continuously: redden → dive to Cape Town /
+// Proto Trading → hold → pull back out → repeat.
 const T = {
   greyHold: 700,   // whole continent grey
   redden: 1900,    // grey → red, north to south
   redHold: 700,    // hold on the full red continent
   zoomIn: 2400,    // dive in to frame South Africa + Cape Town
+  capeHold: 2600,  // rest on the Proto Trading frame
+  zoomOut: 1500,   // pull back to the full continent before looping
 };
-const END = Object.values(T).reduce((a, b) => a + b, 0);
+const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 
 const COLOR_GREY = '#333333';
-const COLOR_RED = '#a01818';
-const COLOR_SA = '#c0392b';
+const COLOR_RED = '#6e0d0d';  // other African countries — dark red
+const COLOR_SA = '#ff1f1f';   // South Africa — bright red
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -72,8 +75,13 @@ function frameAt(t) {
     const e = easeInOut(m / T.zoomIn);
     return { redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) };
   }
-  // Rest on the Cape Town frame.
-  return { redCount: N, view: VIEW_CAPE, pinT: 1 };
+  m -= T.zoomIn;
+  if (m < T.capeHold) return { redCount: N, view: VIEW_CAPE, pinT: 1 };
+  m -= T.capeHold;
+  // Pull back out to the full continent, then the cycle restarts (the CSS fill
+  // transition fades the countries red → grey on the next pass).
+  const e = easeInOut(m / T.zoomOut);
+  return { redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: 1 - e };
 }
 
 export default function SouthernAfricaMap() {
@@ -116,9 +124,9 @@ export default function SouthernAfricaMap() {
     }
     const start = performance.now();
     const tick = (now) => {
-      const t = now - start;
-      setFrame(frameAt(t));
-      if (t < END) rafRef.current = requestAnimationFrame(tick);
+      // Modulo the elapsed time so the timeline plays on a constant loop.
+      setFrame(frameAt((now - start) % CYCLE));
+      rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
@@ -180,14 +188,31 @@ export default function SouthernAfricaMap() {
               />
               <circle cx="0" cy="-18" r="3.6" fill="#fff" />
             </g>
+
+            {/* Proto Trading badge — logo + name where the camera lands */}
+            <clipPath id="protoLogoClip">
+              <circle cx="0" cy="22" r="16" />
+            </clipPath>
+            <g style={{ opacity: pinT }}>
+              <circle cx="0" cy="22" r="18" fill="#fff" />
+              <image
+                href="/proto-logo.png"
+                x={-16}
+                y={6}
+                width={32}
+                height={32}
+                clipPath="url(#protoLogoClip)"
+                preserveAspectRatio="xMidYMid slice"
+              />
+            </g>
             <text
-              y="16"
+              y="56"
               textAnchor="middle"
               style={{
                 fill: '#fff',
                 fontFamily: 'Outfit, sans-serif',
                 fontWeight: 800,
-                fontSize: '13px',
+                fontSize: '14px',
                 letterSpacing: '0.5px',
                 opacity: pinT,
                 paintOrder: 'stroke',
@@ -195,7 +220,7 @@ export default function SouthernAfricaMap() {
                 strokeWidth: '3px',
               }}
             >
-              Cape Town
+              Proto Trading
             </text>
           </g>
         )}

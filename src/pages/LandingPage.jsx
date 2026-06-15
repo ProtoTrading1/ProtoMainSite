@@ -350,6 +350,7 @@ function DeptCountCard({ name, count, active, delay = 0 }) {
 function Questionnaire({ onLogin }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
+  const [instantAccess, setInstantAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -368,6 +369,7 @@ function Questionnaire({ onLogin }) {
   const [city, setCity] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [otherType, setOtherType] = useState('');
+  const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
 
   const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -410,7 +412,7 @@ function Questionnaire({ onLogin }) {
     setSubmitError('');
     try {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
-      await submitTradeApplication({
+      const result = await submitTradeApplication({
         email: email.trim(),
         password,
         contactName: contactName.trim(),
@@ -424,7 +426,9 @@ function Questionnaire({ onLogin }) {
         city: city.trim() || null,
         businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
+        customerCode: customerCode.trim() || null,
       });
+      setInstantAccess(Boolean(result?.instantAccess));
       setDone(true);
     } catch (err) {
       setSubmitError(err.message || 'Something went wrong. Please try again.');
@@ -441,9 +445,13 @@ function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success">
         <CheckCircle2 size={48} />
-        <h3>Application received</h3>
-        <p>Thank you, {contactName}. Proto Trading will review your application and contact you about trade access. A confirmation email has been sent to {email.trim()}.</p>
-        <button type="button" onClick={onLogin}>Already approved? Log in</button>
+        <h3>{instantAccess ? 'You\'re approved — log in now' : 'Application received'}</h3>
+        <p>
+          {instantAccess
+            ? `Welcome back, ${contactName}. Your email is on our active trade list — your account is live. Log in with ${email.trim()} to access the catalogue.`
+            : `Thank you, ${contactName}. Proto Trading will review your application and contact you about trade access. A confirmation email has been sent to ${email.trim()}.`}
+        </p>
+        <button type="button" onClick={onLogin}>{instantAccess ? 'Log in now' : 'Already approved? Log in'}</button>
       </div>
     );
   }
@@ -676,6 +684,20 @@ function Questionnaire({ onLogin }) {
                 />
               </motion.div>
             )}
+            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+              <label>Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
+              <input
+                value={customerCode}
+                onChange={(e) => setCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                onKeyDown={handleKey}
+                placeholder="6-character code, e.g. ETOSHA"
+                maxLength={6}
+                style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
+              />
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
+                If your email has changed since you last ordered, enter your account code so we can match and approve you instantly.
+              </p>
+            </div>
           </div>
         )}
       </motion.div>
@@ -827,6 +849,7 @@ export default function LandingPage({ onLogin, onApply }) {
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
 <button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
           <button type="button" onClick={() => setShowAbout(true)}>About us</button>
+          <button type="button" className="access-nav-login" onClick={onLogin}>Log in</button>
         </nav>
       </header>
 
