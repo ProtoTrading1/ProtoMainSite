@@ -1778,6 +1778,17 @@ input, select, textarea { font-family: inherit; outline: none; }
   min-height: 34px;
   margin-top: 10px;
 }
+/* Stock check inside the product zoom modal */
+.pz-stock-check {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f5;
+}
+.pz-stock-check .stock-check {
+  margin-top: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .check-stock-btn {
   display: inline-flex;
   align-items: center;

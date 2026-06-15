@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { geoMercator, geoPath } from 'd3-geo';
-import { feature } from 'topojson-client';
+import africaGeo from '../data/africa.geo.json';
 
-// NOTE: react-simple-maps@3 relies on function-component defaultProps, which
+// NOTE 1: react-simple-maps@3 relies on function-component defaultProps, which
 // React 19 ignores — so it renders nothing. This component draws the map
 // directly with d3-geo instead, which is React-version independent.
-
-const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+//
+// NOTE 2: the geography data is bundled locally (src/data/africa.geo.json)
+// rather than fetched from a CDN. The site's CSP `connect-src` only allows
+// 'self' + supabase + google-fonts, so a runtime CDN fetch is blocked in
+// production — which previously left the map blank.
 
 // African countries ordered roughly north → south, so the red sweep rolls
 // down the continent and lands on South Africa right before the camera dives
@@ -76,23 +79,14 @@ function frameAt(t) {
 export default function SouthernAfricaMap() {
   const ref = useRef(null);
   const rafRef = useRef(null);
-  const [geos, setGeos] = useState([]); // African country features
   const [inView, setInView] = useState(false);
   const [{ redCount, view, pinT }, setFrame] = useState(() => frameAt(0));
 
-  // Load + convert the topojson once
-  useEffect(() => {
-    let alive = true;
-    fetch(GEO_URL)
-      .then((r) => r.json())
-      .then((topo) => {
-        if (!alive) return;
-        const fc = feature(topo, topo.objects.countries);
-        setGeos(fc.features.filter((f) => AFRICA_IDS.has(+f.id)));
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  // African country features, bundled locally (no runtime fetch — see NOTE 2).
+  const geos = useMemo(
+    () => africaGeo.features.filter((f) => AFRICA_IDS.has(+f.id)),
+    []
+  );
 
   // Fire the animation once, when the section first scrolls into view
   useEffect(() => {

@@ -372,6 +372,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <span>excl. VAT</span>
                   </div>
                 )}
+
+                <div className="pz-stock-check">
+                  <StockCheck sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id} />
+                </div>
               </div>
 
               {/* Fixed buy bar */}

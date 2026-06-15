@@ -19,8 +19,7 @@
     "pdfkit": "^0.18.0",
     "prop-types": "^15.8.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "topojson-client": "^3.1.0"
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
