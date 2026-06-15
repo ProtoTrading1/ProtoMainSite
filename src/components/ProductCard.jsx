@@ -238,35 +238,25 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
 
+          {/* Always the same control: typeable quantity + Add button */}
           <div className="buy-row">
-            {inCart ? (
-              <div className="cart-in-control">
-                <button onClick={() => onCartQtyChange(product, cartQty - 1)} type="button" aria-label="Remove one">
-                  <Minus size={15} />
-                </button>
-                <span>{cartQty}</span>
-                <button onClick={() => onCartQtyChange(product, cartQty + 1)} type="button" aria-label="Add one more">
-                  <Plus size={15} />
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="qty-stepper" aria-label="Quantity">
-                  <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
-                    <Minus size={14} />
-                  </button>
-                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-                  <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
-                    <Plus size={14} />
-                  </button>
-                </div>
-                <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
-                  <ShoppingCart size={15} />
-                  Add
-                </button>
-              </>
-            )}
+            <div className="qty-stepper" aria-label="Quantity">
+              <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                <Minus size={14} />
+              </button>
+              <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+              <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                <Plus size={14} />
+              </button>
+            </div>
+            <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
+              <ShoppingCart size={15} />
+              Add
+            </button>
           </div>
+          {inCart && (
+            <span className="pc-in-order">In your order: {cartQty}</span>
+          )}
         </div>
       </article>
 

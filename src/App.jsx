@@ -436,8 +436,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const cartTotal = cartItems.reduce((acc, i) => acc + i.product.price * i.qty, 0);
   const totalItemCount = cartItems.reduce((acc, i) => acc + i.qty, 0);
 
-  const sendOrderEmail = async () => {
+  const sendOrderEmail = async (opts = {}) => {
     if (!cartItems.length) return;
+    const courierChoice = opts?.courierChoice || null;
+    const deliveryMethod = courierChoice === 'own'
+      ? "Customer's own courier"
+      : courierChoice === 'proto'
+        ? 'Proto Trading delivers'
+        : null;
     const siteOrigin = window.location.origin;
     const text = buildOrderText(cartItems, cartTotal);
     setOrderText(text);
@@ -448,13 +454,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try {
       let savedOrder = null;
       if (customer?.id) {
-        savedOrder = await saveOrder(customer.id, cartItems, cartTotal);
+        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, deliveryMethod);
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       }
 
       const payload = {
         customer: customerDetails,
         totals: { subtotal: cartTotal },
+        deliveryMethod,
         orderId: savedOrder?.id || null,
         items: cartItems.map((item) => ({
           qty: item.qty,

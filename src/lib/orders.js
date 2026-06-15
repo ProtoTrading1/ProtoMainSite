@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function saveOrder(customerId, cartItems, totalExVat) {
+export async function saveOrder(customerId, cartItems, totalExVat, deliveryMethod = null) {
   const items = cartItems.map((i) => ({
     productId: i.product.id,
     code: i.product.code,
@@ -24,6 +24,17 @@ export async function saveOrder(customerId, cartItems, totalExVat) {
     .select()
     .single();
   if (error) throw error;
+
+  // Persist the customer's chosen delivery method so it shows on the order link.
+  // Done as a separate update so a missing column (migration 024 not yet run)
+  // can never break order creation — it just logs and moves on.
+  if (deliveryMethod && data?.id) {
+    const { error: dmErr } = await supabase
+      .from('orders')
+      .update({ delivery_method: deliveryMethod })
+      .eq('id', data.id);
+    if (dmErr) console.warn('delivery_method not saved (run migration 024):', dmErr.message);
+  }
 
   // Premium tier qualification is decided server-side in /api/send-order.
   return data;

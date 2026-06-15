@@ -1770,6 +1770,14 @@ input, select, textarea { font-family: inherit; outline: none; }
 .price-row span { color: #9ca3af; font-size: 11px; font-weight: 600; }
 .buy-row { gap: 8px; margin-top: 13px; }
 
+.pc-in-order {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #16a34a;
+}
+
 /* Live "Check Stock" — reserve a fixed row height so the card never jumps
    when the button is replaced by the readout. */
 .stock-check {
