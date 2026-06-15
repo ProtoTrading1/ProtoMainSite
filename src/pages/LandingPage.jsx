@@ -42,6 +42,8 @@ const BRANDS = [
   { name: 'Marlin', src: '/brands/marlin.jpg' },
   { name: 'Waterlily', src: '/brands/waterlily.jpg' },
   { name: 'OYA', src: '/brands/oya.jpg' },
+  { name: 'amazcolor', src: '/brands/amazcolor.jpg' },
+  { name: 'Keep Smiling', src: '/brands/keepsmiling.jpg' },
 ];
 
 const unlocks = [
