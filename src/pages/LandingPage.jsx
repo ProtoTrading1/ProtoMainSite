@@ -816,8 +816,8 @@ function VideoHero({ onLogin, onApply }) {
         className="vhero-copy"
       >
         <h1>
-          <span style={{ color: '#fff', display: 'block' }}>Built for</span>
-          <span style={{ color: '#dc2626', display: 'block' }}>retail success.</span>
+          <span style={{ color: '#fff', display: 'block' }}>Proto Trading</span>
+          <span style={{ color: '#dc2626', display: 'block' }}>Online</span>
         </h1>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
