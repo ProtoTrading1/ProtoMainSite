@@ -13,11 +13,11 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
 <table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
-  <div style="display:inline-block;background:#ffffff;padding:14px 22px;border-radius:8px;margin-bottom:26px;">
-    <span style="font-size:30px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:20px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
-  </div>
+<tr><td style="padding:24px 34px 28px;background:#111111;">
+  <table cellpadding="0" cellspacing="0" style="margin-bottom:22px;"><tr>
+    <td style="vertical-align:middle;padding-right:13px;"><img src="https://protoportal-main.vercel.app/proto-logo.png" width="42" height="42" alt="Proto Trading" style="display:block;border-radius:8px;"></td>
+    <td style="vertical-align:middle;"><span style="font-size:25px;font-weight:900;color:#ffffff;letter-spacing:0.5px;">PROTO</span><span style="font-size:25px;font-weight:900;color:#dc2626;letter-spacing:0.5px;"> TRADING</span></td>
+  </tr></table>
   <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">Reset your password</h1>
   <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Secure password reset for your Proto Trading Online account</p>
 </td></tr>
