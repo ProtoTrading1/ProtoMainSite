@@ -53,7 +53,7 @@ const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 
 const COLOR_GREY = '#333333';
 const COLOR_RED = '#6e0d0d';  // other African countries — dark red
-const COLOR_SA = '#bb16a3';   // South Africa — PMS 247 C
+const COLOR_SA = '#e60000';   // South Africa — strong red
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
