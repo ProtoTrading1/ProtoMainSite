@@ -67,7 +67,7 @@ function buildPdfBuffer({ items, customer, totals }) {
 
     doc.fontSize(9).fillColor('#64748b');
     doc.text(`Date: ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}`);
-    doc.text('Prices shown excl. VAT. Stock, VAT and delivery are confirmed by reply.');
+    doc.text('All prices incl. VAT. Stock and delivery are confirmed by reply.');
     doc.moveDown(1);
 
     doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Customer details');
@@ -85,7 +85,7 @@ function buildPdfBuffer({ items, customer, totals }) {
       const product = item.product || {};
       const qty = Number(item.qty || 0);
       const price = Number(product.price || 0);
-      const lineTotal = qty * price;
+      const lineTotal = qty * price * 1.15;
       const y = doc.y;
 
       doc.roundedRect(42, y, 511, 78, 8).strokeColor('#e5e7eb').lineWidth(1).stroke();
@@ -109,7 +109,7 @@ function buildPdfBuffer({ items, customer, totals }) {
     });
 
     doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Subtotal excl. VAT: ${money(totals?.subtotal)}`, { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Subtotal incl. VAT: ${money((Number(totals?.subtotal) || 0) * 1.15)}`, { align: 'right' });
     doc.moveDown(1.2);
     doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Please confirm stock availability, wholesale pricing and delivery estimate by reply.');
     doc.end();
@@ -126,7 +126,7 @@ function buildEmailHtml({ items, customer, totals }) {
         <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.code))}</td>
         <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.name))}</td>
         <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${qty}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${money(price * qty)}</td>
+        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${money(price * qty * 1.15)}</td>
       </tr>
     `;
   }).join('');
@@ -150,7 +150,7 @@ function buildEmailHtml({ items, customer, totals }) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="font-size:16px;"><strong>Subtotal excl. VAT: ${money(totals?.subtotal)}</strong></p>
+      <p style="font-size:16px;"><strong>Subtotal incl. VAT: ${money((Number(totals?.subtotal) || 0) * 1.15)}</strong></p>
     </div>
   `;
 }
