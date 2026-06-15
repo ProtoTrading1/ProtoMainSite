@@ -62,6 +62,11 @@
 
 .access-nav {
   gap: 28px;
+  /* Centre the nav in the header regardless of what sits on either side
+     (the right-hand action buttons were removed). */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .access-nav button {
