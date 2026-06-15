@@ -38,7 +38,7 @@ const BRANDS = [
   { name: 'Mötarro', src: '/brands/motarro.jpg' },
   { name: 'STAEDTLER', src: '/brands/staedtler.jpg' },
   { name: 'Vinnic', src: '/brands/vinnic.jpg' },
-  { name: 'Croxley', src: '/brands/croxley.jpg' },
+  { name: 'Conan', src: '/brands/conan.jpg' },
   { name: 'Marlin', src: '/brands/marlin.jpg' },
   { name: 'Waterlily', src: '/brands/waterlily.jpg' },
   { name: 'OYA', src: '/brands/oya.jpg' },
@@ -921,15 +921,9 @@ export default function LandingPage({ onLogin, onApply }) {
             <span className="lp-eyebrow">Catalogue departments</span>
             <h2>8 buying departments, 5,000+ products.</h2>
           </motion.div>
-          <div className="lp-dept-grid">
-            {departments.map((dept, i) => (
-              <DeptCountCard
-                key={dept.name}
-                name={dept.name}
-                count={dept.count}
-                active={deptInView}
-                delay={i * 0.07}
-              />
+          <div className="lp-dept-tags">
+            {departments.map((dept) => (
+              <span className="lp-dept-tag" key={dept.name}>{dept.name}</span>
             ))}
           </div>
 

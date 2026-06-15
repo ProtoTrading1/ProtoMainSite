@@ -1794,6 +1794,24 @@
   gap: 14px;
 }
 
+/* ── Department name tags (counts removed) ── */
+.lp-dept-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lp-dept-tag {
+  padding: 12px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #e5e7eb;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
 /* ── Brands marquee (endless right-moving loop) ── */
 .lp-brands {
   margin-top: 60px;
