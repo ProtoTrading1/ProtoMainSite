@@ -1794,6 +1794,62 @@
   gap: 14px;
 }
 
+/* ── Brands marquee (endless right-moving loop) ── */
+.lp-brands {
+  margin-top: 60px;
+}
+
+.lp-brands-label {
+  display: block;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 26px;
+}
+
+.lp-brands-marquee {
+  overflow: hidden;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.lp-brands-track {
+  display: flex;
+  width: max-content;
+  /* Moves the strip to the right; the duplicated set makes it seamless. */
+  animation: lp-brands-scroll 45s linear infinite;
+}
+
+.lp-brand {
+  flex: 0 0 auto;
+  width: 180px;
+  height: 110px;
+  margin: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-brand img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+@keyframes lp-brands-scroll {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-brands-track { animation: none; }
+}
+
 .lp-dept-card {
   min-height: 118px;
   display: flex;

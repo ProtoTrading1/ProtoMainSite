@@ -32,6 +32,18 @@ const departments = [
   { name: 'Seasonal', count: 380 },
 ];
 
+// Brand logos shown in the endless marquee under the departments grid
+const BRANDS = [
+  { name: 'dala', src: '/brands/dala.jpg' },
+  { name: 'Mötarro', src: '/brands/motarro.jpg' },
+  { name: 'STAEDTLER', src: '/brands/staedtler.jpg' },
+  { name: 'Vinnic', src: '/brands/vinnic.jpg' },
+  { name: 'Croxley', src: '/brands/croxley.jpg' },
+  { name: 'Marlin', src: '/brands/marlin.jpg' },
+  { name: 'Waterlily', src: '/brands/waterlily.jpg' },
+  { name: 'OYA', src: '/brands/oya.jpg' },
+];
+
 const unlocks = [
   { label: 'Trade catalogue', detail: 'Images, codes and departments' },
   { label: 'Order builder', detail: 'Quantities, totals and quote flow' },
@@ -860,7 +872,7 @@ export default function LandingPage({ onLogin, onApply }) {
         <div>
         {/* ── Animated stats ── */}
         <section className="lp-stats" ref={statsRef}>
-          <StatCard value={8000} suffix="+" label="wholesale product lines" active={statsInView} duration={1600} />
+          <StatCard value={5000} suffix="+" label="wholesale product lines" active={statsInView} duration={1600} />
           <StatCard value={12} label="core buying departments" active={statsInView} duration={900} />
           <StatCard value={1987} from={2026} label="established wholesale supplier" active={statsInView} duration={1800} />
           <div className="lp-stat-card lp-stat-text">
@@ -907,7 +919,7 @@ export default function LandingPage({ onLogin, onApply }) {
             transition={{ duration: 0.55 }}
           >
             <span className="lp-eyebrow">Catalogue departments</span>
-            <h2>8 buying departments, 8,000+ lines.</h2>
+            <h2>8 buying departments, 5,000+ products.</h2>
           </motion.div>
           <div className="lp-dept-grid">
             {departments.map((dept, i) => (
@@ -919,6 +931,20 @@ export default function LandingPage({ onLogin, onApply }) {
                 delay={i * 0.07}
               />
             ))}
+          </div>
+
+          {/* ── Brands we work with (endless right-moving marquee) ── */}
+          <div className="lp-brands">
+            <span className="lp-brands-label">Brands we work with</span>
+            <div className="lp-brands-marquee">
+              <div className="lp-brands-track">
+                {[...BRANDS, ...BRANDS].map((b, i) => (
+                  <div className="lp-brand" key={`${b.name}-${i}`} aria-hidden={i >= BRANDS.length}>
+                    <img src={b.src} alt={b.name} loading="lazy" decoding="async" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
