@@ -14,6 +14,16 @@ import {
   Lock,
   MessageCircle,
   PackageSearch,
+  Palette,
+  SprayCan,
+  PartyPopper,
+  ShoppingBag,
+  CupSoda,
+  Wrench,
+  CookingPot,
+  Package,
+  Spool,
+  Gamepad2,
 } from 'lucide-react';
 import '../landing.css';
 
@@ -740,6 +750,57 @@ function Questionnaire({ onLogin }) {
   );
 }
 
+// One product per Proto Trading category, arranged into three parallax lanes
+// (back → front). The lanes flow left → right as "Proto Trading's world of
+// wholesale products in motion". Icons are isolated glyphs — no cards — so the
+// same slots can later hold real cutout product renders.
+const STREAM_LANES = [
+  // Back lane — small, dim, soft-blurred, slowest
+  { speed: 38, items: [
+    { Icon: SprayCan, label: 'Beauty & Personal Care' },
+    { Icon: Wrench, label: 'Hardware' },
+    { Icon: Spool, label: 'Textiles' },
+    { Icon: Package, label: 'Packaging' },
+  ] },
+  // Mid lane — medium scale and brightness
+  { speed: 30, items: [
+    { Icon: CookingPot, label: 'Homeware & Kitchen' },
+    { Icon: CupSoda, label: 'Food & Drinks' },
+    { Icon: PartyPopper, label: 'Events & Parties' },
+    { Icon: Palette, label: 'Art Supplies & Stationery' },
+  ] },
+  // Front lane — large, sharp, red-lit, fastest
+  { speed: 24, items: [
+    { Icon: Gem, label: 'Beads, Jewellery & Accessories' },
+    { Icon: ShoppingBag, label: 'Fashion & Accessories' },
+    { Icon: Gamepad2, label: 'Toys, Games & Kids' },
+  ] },
+];
+
+function ProductStream() {
+  return (
+    <div className="vhero-stream" aria-hidden="true">
+      <div className="vhero-stream-glow" />
+      <div className="vhero-stream-streaks">
+        <span style={{ top: '22%', animationDuration: '4.5s' }} />
+        <span style={{ top: '47%', animationDuration: '3.2s', animationDelay: '1.1s' }} />
+        <span style={{ top: '71%', animationDuration: '5.4s', animationDelay: '0.6s' }} />
+      </div>
+      {STREAM_LANES.map((lane, li) => (
+        <div className={`vhero-lane vhero-lane--${li}`} key={li}>
+          <div className="vhero-track" style={{ animationDuration: `${lane.speed}s` }}>
+            {[...lane.items, ...lane.items].map(({ Icon, label }, i) => (
+              <div className="vhero-item" key={`${label}-${i}`}>
+                <Icon strokeWidth={1.4} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function VideoHero({ onLogin, onApply }) {
   return (
     <section className="vhero-section vhero-section--static">
@@ -767,6 +828,7 @@ function VideoHero({ onLogin, onApply }) {
           <span>Nationwide trade support</span>
         </div>
       </div>
+      <ProductStream />
     </section>
   );
 }

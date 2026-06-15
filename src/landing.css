@@ -256,6 +256,133 @@
   .vhero-copy h1 { font-size: 40px; }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Hero product-motion stream (right side)
+   "Proto Trading's world of wholesale products in motion."
+   One product per category flowing left → right across three
+   parallax lanes. Depth via scale + brightness + blur (not
+   shadows); red used only as accent glow and light streaks.
+   ───────────────────────────────────────────────────────────── */
+.vhero-stream {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 64%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(18px, 4vh, 56px);
+  /* Fade in from the left (so it blends behind the headline) and out
+     softly on the right edge — the stream feels like it flows through. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 86%, transparent 100%);
+}
+
+/* Atmospheric red glow behind the stream — subliminal, never a fill. */
+.vhero-stream-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(58% 58% at 72% 50%, rgba(220, 38, 38, 0.16), transparent 70%);
+  z-index: 0;
+}
+
+/* Directional red light streaks suggesting left → right speed. */
+.vhero-stream-streaks span {
+  position: absolute;
+  left: 0;
+  width: clamp(120px, 18vw, 260px);
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.95));
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.6);
+  filter: blur(0.6px);
+  opacity: 0;
+  animation: vhero-streak linear infinite;
+}
+
+.vhero-lane {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.vhero-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  will-change: transform;
+  /* Default; per-lane duration is set inline. Moves the strip rightward;
+     the duplicated item set makes the loop seamless. */
+  animation: vhero-flow 30s linear infinite;
+}
+
+.vhero-item {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vhero-item svg {
+  display: block;
+  color: #fff;
+}
+
+/* Back lane — small, dim, soft-blurred, slowest */
+.vhero-lane--0 .vhero-track { gap: clamp(48px, 5vw, 78px); }
+.vhero-lane--0 .vhero-item svg {
+  width: clamp(26px, 2.6vw, 36px);
+  height: auto;
+  color: #868d96;
+}
+.vhero-lane--0 { filter: blur(1.1px); opacity: 0.5; }
+
+/* Mid lane — medium scale and brightness, faint red glow */
+.vhero-lane--1 .vhero-track { gap: clamp(64px, 7vw, 104px); }
+.vhero-lane--1 .vhero-item svg {
+  width: clamp(40px, 3.8vw, 54px);
+  height: auto;
+  color: #d2d6dc;
+  filter: drop-shadow(0 0 10px rgba(220, 38, 38, 0.16));
+}
+.vhero-lane--1 { opacity: 0.82; }
+
+/* Front lane — large, sharp, red-lit, fastest */
+.vhero-lane--2 .vhero-track { gap: clamp(92px, 9vw, 140px); }
+.vhero-lane--2 .vhero-item svg {
+  width: clamp(58px, 5.4vw, 78px);
+  height: auto;
+  color: #ffffff;
+  filter: drop-shadow(0 0 16px rgba(220, 38, 38, 0.45)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.25));
+}
+
+@keyframes vhero-flow {
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes vhero-streak {
+  0%   { transform: translateX(-40%); opacity: 0; }
+  12%  { opacity: 0.75; }
+  88%  { opacity: 0.75; }
+  100% { transform: translateX(620%); opacity: 0; }
+}
+
+/* Keep mobile clean and performant — this is a desktop hero visual. */
+@media (max-width: 900px) {
+  .vhero-stream { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vhero-track { animation: none; }
+  .vhero-stream-streaks span { animation: none; opacity: 0; }
+}
+
 /* ── Featured category cards (11 departments) ────────────────────────────── */
 .lp-feat-cats-section {
   background: #000;
