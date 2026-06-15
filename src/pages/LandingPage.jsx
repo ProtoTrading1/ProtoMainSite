@@ -828,15 +828,6 @@ export default function LandingPage({ onLogin, onApply }) {
 <button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
           <button type="button" onClick={() => setShowAbout(true)}>About us</button>
         </nav>
-        <div className="access-actions">
-          <button className="access-login" type="button" onClick={onLogin}>
-            <Lock size={16} />
-            Log in
-          </button>
-          <button className="access-apply" type="button" onClick={scrollToForm}>
-            Apply for access
-          </button>
-        </div>
       </header>
 
       <main>
