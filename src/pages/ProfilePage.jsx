@@ -24,7 +24,11 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
     name: customer?.name || '',
     phone: customer?.phone || '',
     delivery_address: customer?.delivery_address || '',
+    business_type: customer?.business_type || '',
+    monthly_spend: customer?.monthly_spend || '',
+    website: customer?.website || '',
   });
+  const SPEND_BANDS = ['R0 – R5,000', 'R5,000 – R10,000', 'R10,000 – R500,000', 'R500,000 – R1,000,000', 'R1,000,000+'];
   const [orders, setOrders] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,7 +94,8 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             <ProfileField icon={Mail} label="Email" value={customer?.email} />
             <ProfileField icon={Phone} label="Phone" value={customer?.phone} />
             <ProfileField icon={Store} label="Business type" value={customer?.business_type} />
-            <ProfileField icon={Globe} label="Country" value={customer?.country} />
+            {customer?.monthly_spend && <ProfileField icon={Store} label="Monthly spend" value={customer.monthly_spend} />}
+            {customer?.website && <ProfileField icon={Globe} label="Website / social" value={customer.website} />}
             <ProfileField icon={MapPin} label="Province" value={customer?.province} />
             <ProfileField icon={MapPin} label="City" value={customer?.city} />
             {customer?.vat_number && <ProfileField icon={ShieldCheck} label="VAT number" value={customer.vat_number} />}
@@ -120,6 +125,40 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
                 />
               </div>
             ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Business type</label>
+              <input
+                type="text" value={form.business_type} onChange={set('business_type')} placeholder="e.g. Retail store"
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
+                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Monthly spend</label>
+              <select
+                value={form.monthly_spend} onChange={set('monthly_spend')}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff' }}
+                onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
+                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              >
+                <option value="">Select…</option>
+                {SPEND_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Website or social media</label>
+            <input
+              type="text" value={form.website} onChange={set('website')} placeholder="www.yourshop.co.za or @yourshop"
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
+              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+            />
           </div>
 
           <div style={{ marginBottom: 20 }}>

@@ -17,6 +17,49 @@ const BLOCKED_EMAIL_DOMAINS = new Set([
 ]);
 const BLOCKED_LOCAL_PARTS = new Set(['test', 'asdf', 'abc', 'fake', 'dummy', 'noreply', 'no-reply']);
 
+const PROTO_ACTIVE_SELECT = 'id, account_code, name, contact_name, first_name, email, sales_last_12_months, invoice_count, last_purchase_date';
+
+async function findProtoActiveCustomer(supabase, email, customerCode) {
+  const normalizedCode = customerCode
+    ? String(customerCode).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+    : '';
+
+  if (email) {
+    const { data } = await supabase
+      .from('proto_active_customers')
+      .select(PROTO_ACTIVE_SELECT)
+      .eq('email', email)
+      .maybeSingle();
+    if (data) return { row: data, emailUpdated: false };
+  }
+
+  if (normalizedCode && /^[A-Z0-9]{6}$/.test(normalizedCode)) {
+    const { data: matches } = await supabase
+      .from('proto_active_customers')
+      .select(PROTO_ACTIVE_SELECT)
+      .eq('account_code', normalizedCode)
+      .order('sales_last_12_months', { ascending: false })
+      .limit(1);
+    const data = matches?.[0] ?? null;
+    if (!data) return { row: null, emailUpdated: false };
+
+    if (email && data.email !== email) {
+      const { error } = await supabase
+        .from('proto_active_customers')
+        .update({ email })
+        .eq('id', data.id);
+      if (error) {
+        console.warn('proto_active email update failed:', error.message);
+        return { row: data, emailUpdated: false };
+      }
+      return { row: { ...data, email }, emailUpdated: true };
+    }
+    return { row: data, emailUpdated: false };
+  }
+
+  return { row: null, emailUpdated: false };
+}
+
 export function validateEmail(rawEmail) {
   const email = String(rawEmail || '').trim().toLowerCase();
   if (!email) return { ok: false, error: 'Please enter your email address.' };
@@ -84,6 +127,28 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 </table>
 </body></html>`;
 
+const APPROVED_HTML = (name) => `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Your Proto Trading account is ready</title></head>
+<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;">
+<tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;">
+<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
+  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">You're approved</h1>
+  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account is live — log in now</p>
+</td></tr>
+<tr><td style="padding:42px 38px 34px;background:#ffffff;">
+  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
+  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Your email is on our active trade customer list. Your account has been approved automatically — you can log in right away to browse the wholesale catalogue, live stock, and trade pricing.</p>
+  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> · <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -100,7 +165,10 @@ export default async function handler(req, res) {
     province,
     city,
     businessType,
+    monthlySpend,
+    website,
     acceptWhatsapp,
+    customerCode,
   } = req.body || {};
 
   if (!email || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
@@ -130,6 +198,18 @@ export default async function handler(req, res) {
   const normalizedDeliveryAddress = deliveryAddress.trim();
   const normalizedVatNumber = vatNumber?.trim() || null;
 
+  let protoActive = null;
+  try {
+    const match = await findProtoActiveCustomer(supabase, normalizedEmail, customerCode);
+    protoActive = match.row;
+    if (match.emailUpdated) {
+      console.info('proto_active email updated for code', protoActive?.account_code, '→', normalizedEmail);
+    }
+  } catch (lookupErr) {
+    console.warn('proto_active_customers lookup:', lookupErr?.message || lookupErr);
+  }
+  const isProtoActive = Boolean(protoActive?.account_code);
+
   // Create the user via admin API — skips Supabase's own confirmation email
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
@@ -146,6 +226,8 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      monthly_spend: monthlySpend || null,
+      website: website || null,
     },
   });
 
@@ -163,8 +245,10 @@ export default async function handler(req, res) {
       id: userId,
       email: normalizedEmail,
       name: normalizedContactName,
+      contact_name: protoActive?.contact_name || normalizedContactName,
+      first_name: protoActive?.first_name || normalizedContactName.split(/\s+/)[0] || null,
       phone: normalizedPhone,
-      business_name: normalizedBusinessName,
+      business_name: (isProtoActive && protoActive?.name) ? protoActive.name : normalizedBusinessName,
       company_address: normalizedCompanyAddress,
       delivery_address: normalizedDeliveryAddress,
       vat_number: normalizedVatNumber,
@@ -172,17 +256,23 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
-      // null = never asked / not answered, true = opted in, false = explicitly declined
+      monthly_spend: monthlySpend || null,
+      website: website || null,
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
-      // New applications require admin approval (matches the "under review" email + UI)
-      is_approved: false,
+      is_approved: isProtoActive,
+      customer_code: isProtoActive ? String(protoActive.account_code).toUpperCase().slice(0, 6) : null,
+      sales_last_12_months: isProtoActive ? Number(protoActive.sales_last_12_months) || 0 : null,
+      invoice_count: isProtoActive ? Number(protoActive.invoice_count) || 0 : null,
+      last_purchase_date: isProtoActive ? protoActive.last_purchase_date : null,
       tier: 'regular',
     };
 
     const {
       accept_whatsapp: _wa,
       whatsapp_opt_in_at: _waAt,
+      monthly_spend: _ms,
+      website: _wb,
       company_address: _ca,
       vat_number: _vn,
       business_name: _bn,
@@ -190,11 +280,19 @@ export default async function handler(req, res) {
       province: _pr,
       city: _ci,
       business_type: _bt,
+      customer_code: _cc,
+      sales_last_12_months: _sl,
+      invoice_count: _ic,
+      last_purchase_date: _lp,
+      contact_name: _cn,
+      first_name: _fn,
       ...basePayload
     } = fullPayload;
 
     const upsertAttempts = [
       fullPayload,
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
       basePayload,
@@ -231,8 +329,8 @@ export default async function handler(req, res) {
     }
     profileVerification = savedProfile || null;
 
-    // WhatsApp welcome for opted-in customers (same flow as admin approval)
-    if (fullPayload.accept_whatsapp === true && normalizedPhone) {
+    // WhatsApp welcome for opted-in customers (not proto-active allowlist — they default to No)
+    if (!isProtoActive && fullPayload.accept_whatsapp === true && normalizedPhone) {
       const watiPhone = normalizeWhatsapp(normalizedPhone);
       const watiBase = process.env.WATI_API_URL || 'https://live-mt-server.wati.io/10138950';
       const watiToken = process.env.WATI_API_TOKEN;
@@ -282,8 +380,12 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
-          subject: 'We have received your request — you will hear from us within 24 hours',
-          htmlContent: WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
+          subject: isProtoActive
+            ? 'Your Proto Trading trade account is ready — log in now'
+            : 'We have received your request — you will hear from us within 24 hours',
+          htmlContent: isProtoActive
+            ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
+            : WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
         }),
       });
       if (!resp.ok) {
@@ -298,6 +400,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
+    instantAccess: isProtoActive,
     profile: profileVerification
       ? { id: profileVerification.id, acceptWhatsapp: profileVerification.accept_whatsapp }
       : null,

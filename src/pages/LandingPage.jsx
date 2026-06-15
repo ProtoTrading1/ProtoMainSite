@@ -96,7 +96,21 @@ const BUSINESS_TYPES = [
   'Market trader / spaza shop',
   'School or institution',
   'Events, parties & décor',
+  'Craft & bead shop',
+  'Packaging supplier',
+  'Gift shop',
+  'Educational supplier',
+  'Religious / church store',
+  'Promotional products',
   'Other',
+];
+
+const MONTHLY_SPEND_BANDS = [
+  'R0 – R5,000',
+  'R5,000 – R10,000',
+  'R10,000 – R500,000',
+  'R500,000 – R1,000,000',
+  'R1,000,000+',
 ];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
@@ -393,6 +407,8 @@ function Questionnaire({ onLogin }) {
   const [city, setCity] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [otherType, setOtherType] = useState('');
+  const [monthlySpend, setMonthlySpend] = useState('');
+  const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
 
@@ -445,10 +461,12 @@ function Questionnaire({ onLogin }) {
         companyAddress: companyAddress.trim(),
         deliveryAddress: deliveryAddress.trim(),
         vatNumber: vatNumber.trim() || null,
-        country: country || null,
+        country: null,
         province: province || null,
         city: city.trim() || null,
         businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
+        monthlySpend: monthlySpend || null,
+        website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         customerCode: customerCode.trim() || null,
       });
@@ -667,19 +685,21 @@ function Questionnaire({ onLogin }) {
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
               These details help the team, but they are not required to submit your trade request.
             </p>
-            <div className="lp-quiz-countries">
-              {SADC_COUNTRIES.map((c) => (
+            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
+            <div className="lp-quiz-types">
+              {MONTHLY_SPEND_BANDS.map((band) => (
                 <button
-                  key={c}
+                  key={band}
                   type="button"
-                  className={`lp-quiz-country${country === c ? ' selected' : ''}`}
-                  onClick={() => { setCountry(c); setProvince(''); setCity(''); }}
+                  className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
+                  onClick={() => setMonthlySpend(band)}
                 >
-                  {c}
+                  {band}
                 </button>
               ))}
             </div>
             <div style={{ height: '18px' }} />
+            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category</div>
             <div className="lp-quiz-types">
               {BUSINESS_TYPES.map((t) => (
                 <button
@@ -708,6 +728,15 @@ function Questionnaire({ onLogin }) {
                 />
               </motion.div>
             )}
+            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+              <label>Website or social media <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
+              <input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="e.g. www.yourshop.co.za or @yourshop"
+              />
+            </div>
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
               <label>Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
               <input
@@ -832,7 +861,6 @@ function VideoHero({ onLogin, onApply }) {
         </div>
         <div className="hero-mini-proof">
           <span>Established wholesale supplier</span>
-          <strong>Since 1987</strong>
           <span>Nationwide trade support</span>
         </div>
       </div>
@@ -945,7 +973,6 @@ export default function LandingPage({ onLogin, onApply }) {
         <section className="lp-stats" ref={statsRef}>
           <StatCard value={5000} suffix="+" label="wholesale product lines" active={statsInView} duration={1600} />
           <StatCard value={12} label="core buying departments" active={statsInView} duration={900} />
-          <StatCard value={1987} from={2026} label="established wholesale supplier" active={statsInView} duration={1800} />
           <div className="lp-stat-card lp-stat-text">
             <strong>Nationwide</strong>
             <span>delivery support across South Africa</span>

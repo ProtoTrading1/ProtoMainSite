@@ -126,6 +126,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
   }, [cartItems]);
 
+  // Scope the cart to the logged-in account. If a different user signs in
+  // (e.g. a brand-new account), drop the previous user's cart so it never
+  // carries over between accounts.
+  useEffect(() => {
+    const uid = customer?.id || null;
+    if (!uid) return;
+    let owner = null;
+    try { owner = localStorage.getItem('proto_cart_owner'); } catch { /* ignore */ }
+    if (owner && owner !== uid) {
+      setCartItems([]);
+      try { localStorage.removeItem('proto_cart'); } catch { /* ignore */ }
+    }
+    try { localStorage.setItem('proto_cart_owner', uid); } catch { /* ignore */ }
+  }, [customer?.id]);
+
   useEffect(() => {
     setPage(1);
   }, [searchQuery, sort, activeCollection, path.join('/')]);
