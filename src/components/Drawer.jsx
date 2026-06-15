@@ -32,7 +32,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
   const isReady = cartTotal >= MIN_ORDER;
-  const inclVatEstimate = cartTotal * 1.15;
+  const inclVatEstimate = cartTotal;
 
   const [showCourierPicker, setShowCourierPicker] = useState(false);
   const [courierChoice, setCourierChoice] = useState(null);

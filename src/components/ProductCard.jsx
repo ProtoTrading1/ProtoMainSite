@@ -232,7 +232,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
           {activeProduct.price > 0 && (
             <div className="price-row">
               <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-              <span>excl. VAT</span>
+              <span>incl. VAT</span>
             </div>
           )}
 
@@ -359,7 +359,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 {activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
                     <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-                    <span>excl. VAT</span>
+                    <span>incl. VAT</span>
                   </div>
                 )}
 

@@ -7,7 +7,7 @@ export default function StickyBar({ cartItems, cartTotal, sendOrderEmail }) {
 
   return (
     <div className="sticky-order-bar">
-      <span className="desktop-only">Logged-in trade portal | Prices shown excl. VAT</span>
+      <span className="desktop-only">Logged-in trade portal | Prices incl. VAT</span>
       <strong>
         {isReady ? 'Minimum reached. Quote is ready.' : `Add R${remaining.toFixed(2)} more to submit.`}
       </strong>

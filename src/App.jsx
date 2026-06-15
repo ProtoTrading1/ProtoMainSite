@@ -60,7 +60,7 @@ function buildOrderText(cartItems, cartTotal) {
     divider,
     ...lines,
     divider,
-    `SUBTOTAL (excl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`,
+    `SUBTOTAL (incl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`,
     '',
     'Please confirm availability, pricing, and delivery.',
     '',
