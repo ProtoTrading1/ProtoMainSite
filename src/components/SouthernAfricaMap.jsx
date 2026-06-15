@@ -53,7 +53,7 @@ const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 
 const COLOR_GREY = '#333333';
 const COLOR_RED = '#6e0d0d';  // other African countries — dark red
-const COLOR_SA = '#ff1f1f';   // South Africa — bright red
+const COLOR_SA = '#bb16a3';   // South Africa — PMS 247 C
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -175,30 +175,16 @@ export default function SouthernAfricaMap() {
 
         {pinT > 0.01 && pin && (
           <g transform={`translate(${pin[0]}, ${pin[1]})`}>
-            <g transform={`translate(0, ${-14 + 6 * (1 - pinT)})`} style={{ opacity: pinT }}>
-              <circle r="13" fill="#c0392b" opacity={0.22 * pinT}>
-                <animate attributeName="r" from="6" to="22" dur="1.6s" repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.35" to="0" dur="1.6s" repeatCount="indefinite" />
-              </circle>
-              <path
-                d="M0 0 C -8 -11 -8 -20 0 -27 C 8 -20 8 -11 0 0 Z"
-                fill="#c0392b"
-                stroke="#fff"
-                strokeWidth="1"
-              />
-              <circle cx="0" cy="-18" r="3.6" fill="#fff" />
-            </g>
-
             {/* Proto Trading badge — logo + name where the camera lands */}
             <clipPath id="protoLogoClip">
-              <circle cx="0" cy="22" r="16" />
+              <circle cx="0" cy="0" r="16" />
             </clipPath>
             <g style={{ opacity: pinT }}>
-              <circle cx="0" cy="22" r="18" fill="#fff" />
+              <circle cx="0" cy="0" r="18" fill="#fff" />
               <image
                 href="/proto-logo.png"
                 x={-16}
-                y={6}
+                y={-16}
                 width={32}
                 height={32}
                 clipPath="url(#protoLogoClip)"
@@ -206,7 +192,7 @@ export default function SouthernAfricaMap() {
               />
             </g>
             <text
-              y="56"
+              y="34"
               textAnchor="middle"
               style={{
                 fill: '#fff',
