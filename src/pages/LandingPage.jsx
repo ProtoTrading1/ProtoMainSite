@@ -32,14 +32,18 @@ const SADC_IDS = new Set([24, 72, 426, 454, 508, 516, 710, 748, 894, 716, 834, 1
 const HIGHLIGHT_SEQ = [24, 180, 894, 454, 508, 516, 72, 716, 748, 426, 834, 710];
 
 const departments = [
-  { name: 'Packaging', count: 1840 },
-  { name: 'Stationery', count: 2240 },
-  { name: 'Bags & Wallets', count: 680 },
-  { name: 'Toys', count: 420 },
-  { name: 'Crafts', count: 960 },
-  { name: 'Jewellery', count: 820 },
-  { name: 'Homeware', count: 560 },
-  { name: 'Seasonal', count: 380 },
+  { name: 'Art Supplies and Stationery' },
+  { name: 'Beads, Jewellery & Accessories' },
+  { name: 'Beauty & Personal Care' },
+  { name: 'Events & Parties' },
+  { name: 'Fashion & Accessories' },
+  { name: 'Food & Drinks' },
+  { name: 'Hardware' },
+  { name: 'Homeware & Kitchen' },
+  { name: 'Motarro' },
+  { name: 'Packaging' },
+  { name: 'Textiles' },
+  { name: 'Toys, Games & Kids' },
 ];
 
 // Brand logos shown in the endless marquee under the departments grid
@@ -108,9 +112,9 @@ const BUSINESS_TYPES = [
 const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
   'R5,000 – R10,000',
-  'R10,000 – R500,000',
-  'R500,000 – R1,000,000',
-  'R1,000,000+',
+  'R10,000 – R25,000',
+  'R25,000 – R50,000',
+  'R50,000+',
 ];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
@@ -402,11 +406,23 @@ function Questionnaire({ onLogin }) {
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const [companyAddress, setCompanyAddress] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [sameAddress, setSameAddress] = useState(false);
+  // When "same address" is ticked, keep delivery mirrored to the company address.
+  const handleCompanyAddressChange = (v) => {
+    setCompanyAddress(v);
+    if (sameAddress) setDeliveryAddress(v);
+  };
+  const handleSameAddressToggle = (checked) => {
+    setSameAddress(checked);
+    if (checked) setDeliveryAddress(companyAddress);
+  };
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
-  const [businessType, setBusinessType] = useState('');
+  const [businessType, setBusinessType] = useState([]); // multi-select
   const [otherType, setOtherType] = useState('');
+  const toggleBusinessType = (t) =>
+    setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   const [monthlySpend, setMonthlySpend] = useState('');
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
@@ -431,7 +447,7 @@ function Questionnaire({ onLogin }) {
       const whatsappAnswered = typeof whatsappOptIn === 'boolean';
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
-    if (step === 2) return companyAddress.trim() && deliveryAddress.trim();
+    if (step === 2) return companyAddress.trim() && (sameAddress || deliveryAddress.trim());
     if (step === 3) return true;
     return false;
   };
@@ -464,7 +480,10 @@ function Questionnaire({ onLogin }) {
         country: null,
         province: null,
         city: null,
-        businessType: businessType === 'Other' ? otherType.trim() : businessType || null,
+        businessType: businessType
+          .map((t) => (t === 'Other' ? otherType.trim() : t))
+          .filter(Boolean)
+          .join(', ') || null,
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -661,20 +680,31 @@ function Questionnaire({ onLogin }) {
                 <label>Full company address</label>
                 <AddressAutocomplete
                   value={companyAddress}
-                  onChange={setCompanyAddress}
+                  onChange={handleCompanyAddressChange}
                   onKeyDown={handleKey}
                   placeholder="Start typing your street address…"
                 />
               </div>
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Full delivery address</label>
-                <AddressAutocomplete
-                  value={deliveryAddress}
-                  onChange={setDeliveryAddress}
-                  onKeyDown={handleKey}
-                  placeholder="Start typing delivery address…"
+              <label className="lp-quiz-checkbox" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'rgba(255,255,255,0.82)', fontSize: 14, margin: '2px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={sameAddress}
+                  onChange={(e) => handleSameAddressToggle(e.target.checked)}
+                  style={{ width: 18, height: 18, accentColor: '#dc2626', cursor: 'pointer' }}
                 />
-              </div>
+                Delivery address is the same as my company address
+              </label>
+              {!sameAddress && (
+                <div className="lp-quiz-field lp-quiz-field--full">
+                  <label>Full delivery address</label>
+                  <AddressAutocomplete
+                    value={deliveryAddress}
+                    onChange={setDeliveryAddress}
+                    onKeyDown={handleKey}
+                    placeholder="Start typing delivery address…"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -699,20 +729,20 @@ function Questionnaire({ onLogin }) {
               ))}
             </div>
             <div style={{ height: '18px' }} />
-            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category</div>
+            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category <span style={{ opacity: 0.55, fontWeight: 400 }}>(select all that apply)</span></div>
             <div className="lp-quiz-types">
               {BUSINESS_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
-                  className={`lp-quiz-type-card${businessType === t ? ' selected' : ''}`}
-                  onClick={() => setBusinessType(t)}
+                  className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
+                  onClick={() => toggleBusinessType(t)}
                 >
                   {t}
                 </button>
               ))}
             </div>
-            {businessType === 'Other' && (
+            {businessType.includes('Other') && (
               <motion.div
                 className="lp-quiz-field lp-quiz-other-field"
                 initial={{ opacity: 0, y: 8 }}
@@ -846,7 +876,7 @@ function VideoHero({ onLogin, onApply }) {
       >
         <h1>
           <span style={{ color: '#fff', display: 'block' }}>Proto Trading</span>
-          <span style={{ color: '#dc2626', display: 'block' }}>Online</span>
+          <span style={{ color: '#dc2626', display: 'block' }}>Online.</span>
         </h1>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
@@ -1017,7 +1047,7 @@ export default function LandingPage({ onLogin, onApply }) {
             transition={{ duration: 0.55 }}
           >
             <span className="lp-eyebrow">Catalogue departments</span>
-            <h2>8 buying departments, 5,000+ products.</h2>
+            <h2>12 buying departments, 5,000+ products.</h2>
           </motion.div>
           <div className="lp-dept-tags">
             {departments.map((dept) => (
@@ -1051,12 +1081,6 @@ export default function LandingPage({ onLogin, onApply }) {
           >
             <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
             <h2>Get access to Proto Trading's catalogue.</h2>
-            <p>Answer a few quick questions. Once approved, browse the catalogue, build quote requests and include product images in PDF order sheets.</p>
-            <ul className="lp-apply-list">
-              <li><CheckCircle2 size={17} />Trade-only access for retailers and resellers</li>
-              <li><CheckCircle2 size={17} />Catalogue browsing by department, code and product</li>
-              <li><CheckCircle2 size={17} />Quote requests with product images and quantities</li>
-            </ul>
           </motion.div>
 
           <motion.div
