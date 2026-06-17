@@ -113,7 +113,7 @@ export default function CategoryLanding({
       {/* ── Hero ──────────────────────────────────────────── */}
       <div className="cat-landing-hero" style={{ borderLeftColor: color }}>
         {Icon && (
-          <div className="cat-landing-hero-icon" style={{ background: `${color}1a`, color }}>
+          <div className="cat-landing-hero-icon cat-landing-desktop-only" style={{ background: `${color}1a`, color }}>
             <Icon size={isL1 ? 22 : 18} />
           </div>
         )}
@@ -121,7 +121,7 @@ export default function CategoryLanding({
           <h2 className="cat-landing-title" style={{ fontSize: isL1 ? undefined : '18px' }}>
             {categoryNode.label}
           </h2>
-          <div className="cat-landing-meta">
+          <div className="cat-landing-meta cat-landing-desktop-only">
             <span className="cat-landing-count">{totalCount} products</span>
             {subcats.length > 0 && (
               <span className="cat-landing-cats">· {subcats.length} categories</span>
@@ -130,9 +130,9 @@ export default function CategoryLanding({
         </div>
       </div>
 
-      {/* ── Use-case shortcuts (L1 only) ──────────────────── */}
+      {/* ── Use-case shortcuts (L1 desktop only) ──────────── */}
       {isL1 && useCases.length > 0 && (
-        <div className="cat-landing-usecases">
+        <div className="cat-landing-usecases cat-landing-desktop-only">
           <span className="cat-usecase-label">Shop by type</span>
           <div className="cat-usecase-pills">
             {useCases.map((uc) => (
@@ -150,13 +150,34 @@ export default function CategoryLanding({
         </div>
       )}
 
-      {/* ── Subcategory grid ──────────────────────────────── */}
+      {/* ── Subcategories: compact list on mobile, cards on desktop ─ */}
       {subcats.length > 0 && (
-        <div className="cat-landing-section">
-          <h3 className="cat-section-title">
+        <div className="cat-landing-section cat-landing-section--subcats">
+          <h3 className="cat-section-title cat-landing-mobile-only">
+            {isL1 ? 'Categories' : 'Subcategories'}
+          </h3>
+          <h3 className="cat-section-title cat-landing-desktop-only">
             {isL1 ? 'Browse all categories' : 'Subcategories'}
           </h3>
-          <div className={`cat-subcat-grid${isL1 ? ' cat-subcat-grid--l1' : ' cat-subcat-grid--l2'}`}>
+          <ul className="cat-subcat-list cat-landing-mobile-only" role="list">
+            {subcats.map((sub) => (
+              <li key={sub.id}>
+                <button
+                  type="button"
+                  className="cat-subcat-list-item"
+                  onClick={() => navigate([...path, sub.id])}
+                  style={{ '--dept-color': color }}
+                >
+                  <span className="cat-subcat-list-label">{sub.label}</span>
+                  {sub.children?.length > 0 && (
+                    <span className="cat-subcat-list-meta">{sub.children.length}</span>
+                  )}
+                  <ChevronRight size={14} className="cat-subcat-list-arrow" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className={`cat-subcat-grid cat-landing-desktop-only${isL1 ? ' cat-subcat-grid--l1' : ' cat-subcat-grid--l2'}`}>
             {subcats.map((sub) => (
               <button
                 key={sub.id}
@@ -178,7 +199,8 @@ export default function CategoryLanding({
         </div>
       )}
 
-      {/* ── Hot Sellers strip ─────────────────────────────── */}
+      {/* ── Hot Sellers strip (desktop / deep levels) ─────── */}
+      <div className={isL1 ? 'cat-landing-desktop-only' : undefined}>
       <ProductStrip
         products={hotSellers}
         icon={Flame}
@@ -190,24 +212,27 @@ export default function CategoryLanding({
         onCartQtyChange={onCartQtyChange}
         onProductPreview={onProductPreview}
       />
+      </div>
 
-      {/* ── New Arrivals strip (L1 only — keeps L2 lean) ─── */}
+      {/* ── New Arrivals strip (L1 desktop only) ─────────── */}
       {isL1 && (
-        <ProductStrip
-          products={newArrivals}
-          icon={Sparkles}
-          title="New Arrivals"
-          subtitle={`Recently added to ${categoryNode.label}`}
-          color={color}
-          addToCart={addToCart}
-          cartQtyMap={cartQtyMap}
-          onCartQtyChange={onCartQtyChange}
-          onProductPreview={onProductPreview}
-        />
+        <div className="cat-landing-desktop-only">
+          <ProductStrip
+            products={newArrivals}
+            icon={Sparkles}
+            title="New Arrivals"
+            subtitle={`Recently added to ${categoryNode.label}`}
+            color={color}
+            addToCart={addToCart}
+            cartQtyMap={cartQtyMap}
+            onCartQtyChange={onCartQtyChange}
+            onProductPreview={onProductPreview}
+          />
+        </div>
       )}
 
       {/* ── Divider before full product grid ──────────────── */}
-      <div className="cat-landing-divider">
+      <div className="cat-landing-divider cat-landing-desktop-only">
         <span>All products in {categoryNode.label}</span>
       </div>
 

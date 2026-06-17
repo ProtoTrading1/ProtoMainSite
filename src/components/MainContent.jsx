@@ -105,7 +105,7 @@ export default function MainContent({
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
 
   return (
-    <div className="catalog-page">
+    <div className={`catalog-page${showLanding ? ' catalog-page--category-hub' : ''}`}>
       {isAllProductsPage && !searchQuery && !isCategoryPage && (
         <section className="trade-hero">
           <div className="trade-hero-copy">
@@ -118,7 +118,7 @@ export default function MainContent({
               <span><CheckCircle2 size={15} /> Built for repeat buyers</span>
             </div>
           </div>
-          <div className="trade-hero-image">
+          <div className="trade-hero-image trade-hero-image--banner">
             <BannerHeroImage src={bannerImage} updatedAt={bannerUpdatedAt} alt="Premium wholesale product campaign" />
           </div>
         </section>
