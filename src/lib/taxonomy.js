@@ -98,6 +98,46 @@ export function productCountKey(navPath, categories) {
   return resolveNavPathForProducts(navPath, categories).join('/');
 }
 
+/** All keys that may hold a saved order for this nav path (canonical + legacy). */
+export function sortOrderLookupKeys(navPath, categories) {
+  if (!Array.isArray(navPath) || !navPath.length) return [];
+  const keys = [];
+  const seen = new Set();
+  const add = (key) => {
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+  };
+
+  const resolved = resolveNavPathForProducts(navPath, categories);
+  if (resolved.length) add(resolved.join('/'));
+  add(navPath.join('/'));
+
+  const alias = LEGACY_NAV_ALIASES[navPath[0]];
+  if (alias) {
+    add([alias, ...navPath.slice(1)].join('/'));
+    add([navPath[0], ...navPath.slice(1)].join('/'));
+  }
+
+  return keys;
+}
+
+/** Find skuOrder[] for a category path in a sort-order store. */
+export function lookupSortOrder(sortOrders, navPath, categories) {
+  if (!sortOrders || !navPath?.length) return null;
+  for (const key of sortOrderLookupKeys(navPath, categories)) {
+    const skuOrder = sortOrders[key]?.skuOrder;
+    if (Array.isArray(skuOrder) && skuOrder.length) return skuOrder;
+  }
+  return null;
+}
+
+export function applySkuOrder(products, skuOrder) {
+  if (!skuOrder?.length) return products;
+  const orderMap = new Map(skuOrder.map((id, i) => [id, i]));
+  return [...products].sort((a, b) => (orderMap.get(a.id) ?? 999999) - (orderMap.get(b.id) ?? 999999));
+}
+
 export function lookupProductCount(counts, navPath, categories) {
   if (!counts) return null;
   const key = productCountKey(navPath, categories);

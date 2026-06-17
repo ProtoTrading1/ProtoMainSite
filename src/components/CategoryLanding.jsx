@@ -101,13 +101,10 @@ export default function CategoryLanding({
   const subcats    = categoryNode.children || [];
   const totalCount = lookupProductCount(counts, path, categories) ?? products.length;
 
-  const hotSellers = useMemo(
-    () => [...products].sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0)).slice(0, 14),
-    [products]
-  );
+  const hotSellers = useMemo(() => products.slice(0, 14), [products]);
   const newArrivals = useMemo(
     () => [...products].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 14),
-    [products]
+    [products],
   );
 
   return (
@@ -185,8 +182,8 @@ export default function CategoryLanding({
       <ProductStrip
         products={hotSellers}
         icon={Flame}
-        title="Hot Sellers"
-        subtitle={`Most popular in ${categoryNode.label}`}
+        title="Featured"
+        subtitle={`Top picks in ${categoryNode.label}`}
         color={color}
         addToCart={addToCart}
         cartQtyMap={cartQtyMap}

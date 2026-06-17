@@ -28,7 +28,7 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
     monthly_spend: customer?.monthly_spend || '',
     website: customer?.website || '',
   });
-  const SPEND_BANDS = ['R0 – R5,000', 'R5,000 – R10,000', 'R10,000 – R500,000', 'R500,000 – R1,000,000', 'R1,000,000+'];
+  const SPEND_BANDS = ['R0 – R5,000', 'R5,000 – R10,000', 'R10,000 – R25,000', 'R25,000 – R50,000', 'R50,000+'];
   const [orders, setOrders] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

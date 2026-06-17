@@ -173,9 +173,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No order items supplied' });
   }
 
-  const preparedItems = await prepareItems(items);
-  const pdfBuffer = await buildPdfBuffer({ items: preparedItems, customer, totals });
   const to = process.env.ORDER_TO_EMAIL || DEFAULT_TO;
+
+  // PDF generation must never block the order email. pdfkit can fail on
+  // serverless (e.g. missing AFM font data); if it does, log the real error and
+  // still send the email — without the attachment — so the team is notified.
+  let pdfBuffer = null;
+  try {
+    const preparedItems = await prepareItems(items);
+    pdfBuffer = await buildPdfBuffer({ items: preparedItems, customer, totals });
+  } catch (err) {
+    console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
+  }
+
+  const attachment = pdfBuffer
+    ? [{ name: `proto-order-${Date.now()}.pdf`, content: pdfBuffer.toString('base64') }]
+    : undefined;
 
   try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -193,23 +206,18 @@ export default async function handler(req, res) {
         to: [{ email: to }],
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
         subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: buildEmailHtml({ items: preparedItems, customer, totals }),
-        attachment: [
-          {
-            name: `proto-order-${Date.now()}.pdf`,
-            content: pdfBuffer.toString('base64'),
-          },
-        ],
+        htmlContent: buildEmailHtml({ items, customer, totals }),
+        attachment,
       }),
     });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
       console.error('Brevo API error:', resp.status, JSON.stringify(body));
-      return res.status(502).json({ error: 'Email could not be sent' });
+      return res.status(502).json({ error: body.message || `Email could not be sent (Brevo ${resp.status})` });
     }
   } catch (err) {
-    console.error('Brevo fetch error:', err.message);
-    return res.status(502).json({ error: 'Email could not be sent' });
+    console.error('Brevo fetch error:', err?.stack || err?.message || err);
+    return res.status(502).json({ error: err?.message || 'Email could not be sent' });
   }
 
   const orderId = String(rawOrderId || '').trim();

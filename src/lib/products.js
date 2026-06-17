@@ -1,9 +1,11 @@
 import { fuzzyFilter } from './fuzzySearch';
-import { getActiveTaxonomy, resolveNavPathForProducts } from './taxonomy';
+import { applySkuOrder, getActiveTaxonomy, lookupSortOrder, resolveNavPathForProducts } from './taxonomy';
 
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
 let _cache = null;
+let _sortOrdersPromise = null;
+let _sortOrdersCache = null;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
 const LS_KEY = 'proto_catalog_v10';
@@ -64,7 +66,25 @@ function getAllCached() {
 export function invalidateProductCache() {
   _cache = null;
   _loadPromise = null;
+  _sortOrdersCache = null;
+  _sortOrdersPromise = null;
   try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
+async function getSortOrders() {
+  if (_sortOrdersCache) return _sortOrdersCache;
+  if (!_sortOrdersPromise) {
+    _sortOrdersPromise = fetchJsonWithTimeout('/api/sort-orders', 8000, { cache: 'no-store' })
+      .then((store) => {
+        _sortOrdersCache = store?.orders || {};
+        return _sortOrdersCache;
+      })
+      .catch(() => {
+        _sortOrdersPromise = null;
+        return {};
+      });
+  }
+  return _sortOrdersPromise;
 }
 
 export async function fetchDistinctCategories() {
@@ -92,9 +112,13 @@ function applyPathFilter(products, categoryPath) {
   });
 }
 
-function applySort(products, sort) {
+function applySort(products, sort, categoryPath = [], sortOrders = {}) {
   const arr = [...products];
   if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (sort === 'featured' && categoryPath.length) {
+    const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
+    if (skuOrder?.length) return applySkuOrder(arr, skuOrder);
+  }
   return arr;
 }
 
@@ -114,11 +138,12 @@ export async function fetchProductPage({
   specialIds = null,
 } = {}) {
   let products = await getAllCached();
+  const sortOrders = await getSortOrders();
   products = applyCollection(products, collection, specialIds);
   const hasSearch = Boolean(searchQuery.trim());
   if (!hasSearch) products = applyPathFilter(products, categoryPath);
   products = hasSearch ? fuzzyFilter(products, searchQuery) : products;
-  products = applySort(products, sort);
+  products = applySort(products, sort, categoryPath, sortOrders);
 
   const total = products.length;
   const from = (page - 1) * pageSize;
