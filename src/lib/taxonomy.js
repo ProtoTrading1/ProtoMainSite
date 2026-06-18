@@ -117,6 +117,12 @@ export function sortOrderLookupKeys(navPath, categories) {
     add([navPath[0], ...navPath.slice(1)].join('/'));
   }
 
+  // Fall back to parent-level sort orders so a subcategory page inherits the
+  // parent's saved order when no subcategory-specific order has been saved yet.
+  for (let i = resolved.length - 1; i >= 1; i -= 1) {
+    add(resolved.slice(0, i).join('/'));
+  }
+
   return keys;
 }
 

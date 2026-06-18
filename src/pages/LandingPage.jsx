@@ -1054,6 +1054,13 @@ export default function LandingPage({ onLogin, onApply }) {
               <span className="lp-dept-tag" key={dept.name}>{dept.name}</span>
             ))}
           </div>
+          <ul className="lp-dept-list" role="list">
+            {departments.map((dept) => (
+              <li key={dept.name}>
+                <span className="lp-dept-list-item">{dept.name}</span>
+              </li>
+            ))}
+          </ul>
 
           {/* ── Brands we work with (endless right-moving marquee) ── */}
           <div className="lp-brands">

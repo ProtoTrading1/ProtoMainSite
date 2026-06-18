@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -104,8 +104,24 @@ export default function MainContent({
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
 
+  // Group products by their next subcategory level when landing is shown and sort is featured.
+  // This mirrors the admin ReorderGrid's structure so what you see in the admin matches the site.
+  const productGroups = useMemo(() => {
+    if (!showLanding || sort !== 'featured' || !products.length) return null;
+    const groupKeys = [];
+    const groupMap = new Map();
+    for (const p of products) {
+      const cp = p.categoryPath || [];
+      const key = cp[path.length] || '__other__';
+      if (!groupMap.has(key)) { groupKeys.push(key); groupMap.set(key, []); }
+      groupMap.get(key).push(p);
+    }
+    if (groupKeys.length < 2) return null;
+    return groupKeys.map((key) => ({ key, label: key === '__other__' ? 'Other' : slugToLabel(key), products: groupMap.get(key) }));
+  }, [products, showLanding, sort, path]);
+
   return (
-    <div className={`catalog-page${showLanding ? ' catalog-page--category-hub' : ''}`}>
+    <div className="catalog-page">
       {isAllProductsPage && !searchQuery && !isCategoryPage && (
         <section className="trade-hero">
           <div className="trade-hero-copy">
@@ -238,18 +254,35 @@ export default function MainContent({
       ) : (
         <>
           <div className="product-grid">
-            {products.map((product, idx) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                addToCart={addToCart}
-                cartQty={cartQtyMap[product.id] || 0}
-                onCartQtyChange={onCartQtyChange}
-                special={specialsMap[product.id] || null}
-                priority={idx < 8}
-                onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
-              />
-            ))}
+            {productGroups
+              ? productGroups.flatMap((group) => [
+                  <div key={`hdr-${group.key}`} className="product-grid-section-header">{group.label}</div>,
+                  ...group.products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      addToCart={addToCart}
+                      cartQty={cartQtyMap[product.id] || 0}
+                      onCartQtyChange={onCartQtyChange}
+                      special={specialsMap[product.id] || null}
+                      priority={false}
+                      onSearchEngage={null}
+                    />
+                  )),
+                ])
+              : products.map((product, idx) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    addToCart={addToCart}
+                    cartQty={cartQtyMap[product.id] || 0}
+                    onCartQtyChange={onCartQtyChange}
+                    special={specialsMap[product.id] || null}
+                    priority={idx < 8}
+                    onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
+                  />
+                ))
+            }
           </div>
 
           {totalPages > 1 && (

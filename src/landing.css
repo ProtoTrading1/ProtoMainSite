@@ -1981,6 +1981,56 @@
   letter-spacing: 0.01em;
 }
 
+/* Compact bulleted list — mobile home page departments */
+.lp-dept-list {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lp-dept-list-item {
+  display: block;
+  position: relative;
+  padding: 12px 14px 12px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lp-dept-list-item::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+.lp-dept-list li:last-child .lp-dept-list-item {
+  border-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .lp-dept-tags {
+    display: none;
+  }
+
+  .lp-dept-list {
+    display: flex;
+  }
+}
+
 /* ── Brands marquee (endless right-moving loop) ── */
 .lp-brands {
   margin-top: 60px;
