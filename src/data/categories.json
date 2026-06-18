@@ -1,7 +1,7 @@
 [
   {
     "id": "arts-crafts-stationery",
-    "label": "Art Supplies and Stationery",
+    "label": "Arts",
     "children": [
       {
         "id": "notebooks-paper-board",
@@ -64,6 +64,31 @@
         "label": "Pens, Pencils & Markers",
         "children": [],
         "description": "Pens, clutch pencils, leads, pencil crayons, wax crayons, fibre-tip pens and erasers."
+      },
+      {
+        "id": "seasonal",
+        "label": "Seasonal",
+        "children": []
+      },
+      {
+        "id": "art-supplies",
+        "label": "Art Supplies",
+        "children": []
+      },
+      {
+        "id": "pens",
+        "label": "PENS",
+        "children": []
+      },
+      {
+        "id": "pens-and-paper",
+        "label": "pens and paper",
+        "children": []
+      },
+      {
+        "id": "files",
+        "label": "Files",
+        "children": []
       }
     ],
     "icon": "PenTool",
@@ -168,7 +193,7 @@
             ]
           }
         ],
-        "description": "Beads in glass, wood, acrylic, metal and semi-precious stone — from seed beads and crystal rondelles to alphabet beads and stone chips."
+        "description": "Beads in glass, wood, acrylic, metal and semi-precious stone \u2014 from seed beads and crystal rondelles to alphabet beads and stone chips."
       },
       {
         "id": "chains-cords-wire",
@@ -298,6 +323,16 @@
           }
         ],
         "description": "Clasps, jumprings, earring components, pins and crimps, plus bag-making hardware such as snap hooks, D-rings, sliders, buckles and rivets."
+      },
+      {
+        "id": "jewellery-tools",
+        "label": "Jewellery tools",
+        "children": []
+      },
+      {
+        "id": "jewellery-items",
+        "label": "Jewellery items",
+        "children": []
       }
     ],
     "icon": "Scissors",
@@ -524,7 +559,7 @@
             "children": []
           }
         ],
-        "description": "Conan hand tools — pliers, saws, hammers, tape measures, staple guns — plus craft and retail machines."
+        "description": "Conan hand tools \u2014 pliers, saws, hammers, tape measures, staple guns \u2014 plus craft and retail machines."
       }
     ],
     "icon": "Wrench",
