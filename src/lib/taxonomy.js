@@ -80,14 +80,12 @@ export function resolveNavPathForProducts(navPath, categories) {
     const seg = navPath[i];
     const node = (nodes || []).find((n) => n.id === seg);
     if (!node) {
+      // Node no longer in tree (deleted) — use alias as fallback so old product slugs still match.
       out.push(i === 0 && LEGACY_NAV_ALIASES[seg] ? LEGACY_NAV_ALIASES[seg] : seg);
       break;
     }
-    if (i === 0 && LEGACY_NAV_ALIASES[seg]) {
-      out.push(LEGACY_NAV_ALIASES[seg]);
-    } else {
-      out.push(labelToSlug(node.label));
-    }
+    // Node found: always derive the slug from the live label so renames are reflected immediately.
+    out.push(labelToSlug(node.label));
     nodes = node.children || [];
   }
   return out;

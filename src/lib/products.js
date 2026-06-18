@@ -6,6 +6,8 @@ let _loadPromise = null;
 let _cache = null;
 let _sortOrdersPromise = null;
 let _sortOrdersCache = null;
+let _sortOrdersCachedAt = 0;
+const SORT_ORDERS_TTL = 45_000;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
 const LS_KEY = 'proto_catalog_v10';
@@ -67,16 +69,20 @@ export function invalidateProductCache() {
   _cache = null;
   _loadPromise = null;
   _sortOrdersCache = null;
+  _sortOrdersCachedAt = 0;
   _sortOrdersPromise = null;
   try { localStorage.removeItem(LS_KEY); } catch {}
 }
 
 async function getSortOrders() {
-  if (_sortOrdersCache) return _sortOrdersCache;
+  if (_sortOrdersCache && Date.now() - _sortOrdersCachedAt < SORT_ORDERS_TTL) return _sortOrdersCache;
+  _sortOrdersCache = null;
   if (!_sortOrdersPromise) {
     _sortOrdersPromise = fetchJsonWithTimeout('/api/sort-orders', 8000, { cache: 'no-store' })
       .then((store) => {
         _sortOrdersCache = store?.orders || {};
+        _sortOrdersCachedAt = Date.now();
+        _sortOrdersPromise = null;
         return _sortOrdersCache;
       })
       .catch(() => {
