@@ -31,6 +31,7 @@ export default function OrderConfirmModal({
 
   const isSending = orderStatus === 'sending';
   const isSent = orderStatus === 'sent';
+  const isSaved = orderStatus === 'saved';
   const isError = orderStatus === 'error';
 
   return (
@@ -41,22 +42,23 @@ export default function OrderConfirmModal({
         <button className="ocm-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
 
         {/* Status header */}
-        <div className={`ocm-header ${isSent ? 'ocm-header--sent' : isError ? 'ocm-header--error' : 'ocm-header--sending'}`}>
+        <div className={`ocm-header ${(isSent || isSaved) ? 'ocm-header--sent' : isError ? 'ocm-header--error' : 'ocm-header--sending'}`}>
           <div className="ocm-header-icon">
             {isSending && <Loader2 size={26} className="spin-icon" />}
-            {isSent && <CheckCircle2 size={26} />}
+            {(isSent || isSaved) && <CheckCircle2 size={26} />}
             {isError && <AlertCircle size={26} />}
           </div>
           <div>
             <p className="ocm-eyebrow">Order Request</p>
             <h2 className="ocm-title">
-              {isSent ? 'Order sent!' : isSending ? 'Sending your order…' : isError ? 'Could not send order' : 'Processing order'}
+              {isSent ? 'Order sent!' : isSaved ? 'Order received!' : isSending ? 'Sending your order…' : isError ? 'Could not send order' : 'Processing order'}
             </h2>
             <p className="ocm-subtitle">
               {isSent && 'The Proto Trading team will confirm stock and pricing by reply.'}
+              {isSaved && 'Your order is saved and our team will be in touch. Email notification was delayed — but your request is confirmed.'}
               {isSending && 'Generating the PDF and emailing the Proto Trading team.'}
               {isError && orderError}
-              {!isSent && !isSending && !isError && 'Processing your order request.'}
+              {!isSent && !isSaved && !isSending && !isError && 'Processing your order request.'}
             </p>
           </div>
         </div>
@@ -89,9 +91,10 @@ export default function OrderConfirmModal({
 
         {/* Actions */}
         <div className="ocm-actions">
-          <div className={`ocm-status-pill ${isError ? 'ocm-status-pill--error' : isSent ? 'ocm-status-pill--sent' : ''}`}>
+          <div className={`ocm-status-pill ${isError ? 'ocm-status-pill--error' : (isSent || isSaved) ? 'ocm-status-pill--sent' : ''}`}>
             {isSending && <><Loader2 size={15} className="spin-icon" /> Sending…</>}
             {isSent && <><CheckCircle2 size={15} /> Sent to Proto Trading</>}
+            {isSaved && <><CheckCircle2 size={15} /> Order confirmed</>}
             {isError && <><AlertCircle size={15} /> Send failed</>}
           </div>
           <button className="ocm-copy-btn" onClick={copyOrder} type="button">

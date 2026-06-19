@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ShoppingCart, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -497,9 +497,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         body: JSON.stringify(payload),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Order email could not be sent');
+      if (!response.ok) throw new Error(result.error || 'Order could not be sent');
 
-      setOrderStatus('sent');
+      if (result.emailDeliveryFailed) {
+        setOrderStatus('saved');
+      } else {
+        setOrderStatus('sent');
+      }
 
       if (searchTrackRef.current.rowId) {
         void logSearchOrder({
@@ -589,6 +593,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setSearchQuery={setSearchQuery}
         navigateForSearch={navigateForSearch}
         onMenuClick={() => setMobileMenuOpen(true)}
+        onHome={() => { navigate([]); setActiveCollection('all'); scrollToTop(); }}
         customer={customer}
         onViewProfile={onViewProfile}
         onViewAdmin={onViewAdmin}
@@ -596,7 +601,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         hasLastOrder={!!lastOrder}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
-        onCartClick={() => { setCartDrawerOpen((prev) => !prev); setMobileCartOpen(true); }}
+        onCartClick={() => { if (window.innerWidth > 1200) setCartDrawerOpen(true); else setMobileCartOpen(true); }}
       />
 
       <div className="main-layout" style={{ height: bodyH }}>
@@ -707,23 +712,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onViewProfile={onViewProfile}
         onViewAdmin={onViewAdmin}
         onLogout={onLogout}
+        onHome={() => { navigate([]); setActiveCollection('all'); setMobileMenuOpen(false); scrollToTop(); }}
+        onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
+        onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
       />
 
-      {/* Mobile cart FAB */}
-      <button
-        className="mobile-cart-fab"
-        onClick={() => setMobileCartOpen(true)}
-        type="button"
-        aria-label="Open cart"
-      >
-        <ShoppingCart size={18} />
-        {totalItemCount > 0 && (
-          <span className="mobile-cart-fab-badge">{totalItemCount}</span>
-        )}
-        <span>R{cartTotal.toFixed(2)}</span>
-      </button>
-
-      {/* Mobile cart bottom sheet */}
+      {/* Mobile cart — opened from bottom tab bar */}
       {mobileCartOpen && (
         <div className="mobile-cart-backdrop" onClick={() => setMobileCartOpen(false)}>
           <div className="mobile-cart-sheet" onClick={(e) => e.stopPropagation()}>

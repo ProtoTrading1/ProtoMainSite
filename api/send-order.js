@@ -190,6 +190,8 @@ export default async function handler(req, res) {
     ? [{ name: `proto-order-${Date.now()}.pdf`, content: pdfBuffer.toString('base64') }]
     : undefined;
 
+  let emailDeliveryFailed = false;
+  let emailFailReason = null;
   try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -212,19 +214,22 @@ export default async function handler(req, res) {
     });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
+      const msg = body.message || `Brevo ${resp.status}`;
       console.error('Brevo API error:', resp.status, JSON.stringify(body));
-      return res.status(502).json({ error: body.message || `Email could not be sent (Brevo ${resp.status})` });
+      emailDeliveryFailed = true;
+      emailFailReason = msg;
     }
   } catch (err) {
     console.error('Brevo fetch error:', err?.stack || err?.message || err);
-    return res.status(502).json({ error: err?.message || 'Email could not be sent' });
+    emailDeliveryFailed = true;
+    emailFailReason = err?.message || 'Network error';
   }
 
   const orderId = String(rawOrderId || '').trim();
   let notifyResult = null;
   if (orderId) {
     try {
-      notifyResult = await runOrderTeamNotify(orderId, { emailSent: true });
+      notifyResult = await runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed });
     } catch (err) {
       console.error('send-order: team notify failed:', err.message);
     }
@@ -259,6 +264,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     success: true,
     orderId: orderId || null,
+    emailDeliveryFailed,
+    emailFailReason: emailDeliveryFailed ? emailFailReason : null,
     notify: notifyResult,
     notifyWarning: notifyResult && !notifyResult.ok
       ? notifyResult.statusBlockedReason || 'WhatsApp team notification did not reach everyone'

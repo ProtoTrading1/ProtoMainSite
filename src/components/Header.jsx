@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, MessageCircle, PackageSearch, RotateCcw,
+  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
@@ -42,7 +42,6 @@ function matchCategories(query) {
     .slice(0, 4);
 }
 
-// ─── Modals ──────────────────────────────────────────────────
 function AboutModal({ onClose }) {
   return (
     <div className="topnav-modal-backdrop" onClick={onClose}>
@@ -284,14 +283,19 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
   );
 }
 
+export { AboutModal, FindUsModal };
+
 // ─── Header ──────────────────────────────────────────────────
 export default function Header({
   cartItemCount, cartTotal,
-  onMenuClick, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
+  onMenuClick, onHome, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick,
+  mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileSearchOpenInternal, setMobileSearchOpenInternal] = useState(false);
+  const mobileSearchOpen = mobileSearchOpenProp ?? mobileSearchOpenInternal;
+  const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
   const [showAbout, setShowAbout] = useState(false);
   const [showFindUs, setShowFindUs] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
@@ -404,19 +408,24 @@ export default function Header({
     setSearchOpen(false);
   };
 
-  // Mobile search
+  // Mobile search — mobileInput is the transient typed text, separate from the
+  // committed searchQuery so the input clears after a search without losing results.
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
+  const [mobileInput, setMobileInput] = useState('');
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
+    setMobileInput('');
     void loadProductsOnce();
   };
   const closeMobileSearch = () => {
     setMobileSearchOpen(false);
     setMobileSuggestions([]);
     setMobileCatMatches([]);
+    setMobileInput('');
   };
   const handleMobileInput = (val) => {
+    setMobileInput(val);
     setSearchQuery(val);
     clearTimeout(debounceRef.current);
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
@@ -427,12 +436,17 @@ export default function Header({
       });
     }, 120);
   };
+  const commitMobileSearch = (term) => {
+    commitSearch(term);
+    setMobileInput('');
+    closeMobileSearch();
+  };
 
   return (
     <>
       <header className="app-header">
         {/* Brand */}
-        <div className="brand-block">
+        <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
           <div className="brand-mark brand-logo">
             <img src="/proto-logo.webp" alt="Proto Trading logo" />
           </div>
@@ -549,35 +563,26 @@ export default function Header({
         </>
       )}
 
-      {/* Mobile action bar */}
-      <div className="mobile-action-bar">
-        <button type="button" onClick={onMenuClick} className="mobile-menu-btn">
-          <LayoutGrid size={14} />
-          Categories
+      {/* Mobile bottom tab bar — primary navigation */}
+      <nav className="mobile-tab-bar" aria-label="Mobile navigation">
+        <button type="button" className="mobile-tab-bar-btn" onClick={onHome}>
+          <Home size={20} />
+          <span>Home</span>
         </button>
-        <button type="button" className={mobileSearchOpen ? 'active' : ''} onClick={mobileSearchOpen ? closeMobileSearch : openMobileSearch}>
-          <Search size={14} />
-          Search
+        <button type="button" className={`mobile-tab-bar-btn${mobileSearchOpen ? ' active' : ''}`} onClick={mobileSearchOpen ? closeMobileSearch : openMobileSearch}>
+          <Search size={20} />
+          <span>Search</span>
         </button>
-        {hasLastOrder && (
-          <button type="button" onClick={onReorder}>
-            <RotateCcw size={14} />
-            Reorder
-          </button>
-        )}
-        <button type="button" className="specials-btn" onClick={onSpecials}>
-          <Star size={14} />
-          Specials
+        <button type="button" className="mobile-tab-bar-btn" onClick={onMenuClick}>
+          <Menu size={20} />
+          <span>Categories</span>
         </button>
-        <button type="button" onClick={() => setShowAbout(true)}>
-          <Info size={14} />
-          About Us
+        <button type="button" className="mobile-tab-bar-btn mobile-tab-bar-btn--cart" onClick={onCartClick}>
+          <ShoppingCart size={20} />
+          <span>Cart</span>
+          {cartItemCount > 0 && <em className="mobile-tab-bar-badge">{cartItemCount}</em>}
         </button>
-        <button type="button" onClick={() => setShowFindUs(true)}>
-          <MapPin size={14} />
-          Find Us
-        </button>
-      </div>
+      </nav>
 
       {/* Mobile search */}
       <div className={`mobile-action-search-drop${mobileSearchOpen ? ' open' : ''}`}>
@@ -586,15 +591,15 @@ export default function Header({
           autoFocus={mobileSearchOpen}
           type="search"
           placeholder="Search products, codes…"
-          value={searchQuery}
+          value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') closeMobileSearch();
-            if (e.key === 'Enter' && searchQuery.trim()) { commitSearch(searchQuery.trim()); closeMobileSearch(); }
+            if (e.key === 'Enter' && mobileInput.trim()) commitMobileSearch(mobileInput.trim());
           }}
         />
-        {searchQuery && (
-          <button type="button" onClick={() => { setSearchQuery(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
+        {mobileInput && (
+          <button type="button" onClick={() => { setMobileInput(''); setSearchQuery(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
             <X size={15} />
           </button>
         )}
@@ -602,14 +607,14 @@ export default function Header({
       </div>
 
       {/* Mobile category + product results */}
-      {mobileSearchOpen && searchQuery && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0) && (
+      {mobileSearchOpen && mobileInput && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0) && (
         <div className="mobile-search-results">
           {mobileCatMatches.map((cat) => (
             <button
               key={cat.id}
               type="button"
               className="sp-cat-row sp-cat-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); pickCategory(cat.path); closeMobileSearch(); }}
+              onMouseDown={(e) => { e.preventDefault(); pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
             >
               <span className="sp-cat-label">{cat.label}</span>
               <span className="sp-cat-arrow">→</span>
@@ -620,7 +625,7 @@ export default function Header({
               key={p.id}
               type="button"
               className="sp-product-row sp-product-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); pickProduct(p); closeMobileSearch(); }}
+              onMouseDown={(e) => { e.preventDefault(); setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
             >
               <div className="sp-product-img">
                 {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
