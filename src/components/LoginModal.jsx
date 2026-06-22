@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { resetPassword, signIn, signUp } from '../lib/auth';
 
@@ -11,6 +11,8 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const backdropRef = useRef(null);
+  const mouseDownOrigin = useRef(null);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -52,7 +54,12 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
   const switchMode = () => { setMode(m => m === 'login' ? 'signup' : 'login'); setError(''); setInfo(''); };
 
   return (
-    <div className="lm-backdrop" onClick={onClose}>
+    <div
+      className="lm-backdrop"
+      ref={backdropRef}
+      onMouseDown={(e) => { mouseDownOrigin.current = e.target; }}
+      onClick={(e) => { if (mouseDownOrigin.current === backdropRef.current) onClose(); }}
+    >
       <div className="lm-card" onClick={(e) => e.stopPropagation()}>
           {/* Close */}
           <button className="lm-close" type="button" onClick={onClose}>
