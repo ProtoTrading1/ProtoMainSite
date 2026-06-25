@@ -11,6 +11,7 @@ const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-p
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
 const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://protoportal-main.vercel.app';
 
@@ -21,6 +22,7 @@ export default function Root() {
   const [customerLoading, setCustomerLoading] = useState(false);
   const [view, setView] = useState('landing');
   const [route, setRoute] = useState(window.location.hash);
+  const [pathname, setPathname] = useState(() => window.location.pathname);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const authBootstrapped = useRef(false);
   const loadNonce = useRef(0);
@@ -46,13 +48,23 @@ export default function Root() {
   }, []);
 
   useEffect(() => {
-    const handler = () => {
+    const onHashChange = () => {
       setRoute(window.location.hash);
       scrollToTop();
     };
-    window.addEventListener('hashchange', handler);
-    return () => window.removeEventListener('hashchange', handler);
+    const onPopState = () => {
+      setPathname(window.location.pathname);
+      scrollToTop();
+    };
+    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('popstate', onPopState);
+    };
   }, []);
+
+  const isRegisterRoute = !adminHost && (pathname === '/register' || pathname === '/pre-register');
 
   const setSurface = useCallback((next) => {
     setView(next);
@@ -183,6 +195,28 @@ export default function Root() {
       </div>
     </div>
   );
+
+  if (isRegisterRoute) {
+    if (session === undefined) return authSurfaceFallback;
+    if (!session) {
+      return (
+        <>
+          <Suspense fallback={authSurfaceFallback}>
+            <RegisterPage onLogin={() => setSurface('login')} />
+          </Suspense>
+          {view === 'login' && (
+            <Suspense fallback={null}>
+              <LoginModal
+                onLogin={handleLogin}
+                onClose={() => setSurface('landing')}
+                onApply={() => {}}
+              />
+            </Suspense>
+          )}
+        </>
+      );
+    }
+  }
 
   if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
   if (!adminHost && route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
