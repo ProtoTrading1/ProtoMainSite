@@ -1,902 +1,829 @@
 [
   {
-    "id": "arts-crafts-stationery",
-    "label": "Arts",
+    "id": "jewellery",
+    "label": "Jewellery",
+    "icon": "Gem",
     "children": [
       {
-        "id": "notebooks-paper-board",
-        "label": "Notebooks, Paper & Board",
+        "id": "jewellery-items",
+        "label": "Jewellery",
         "children": [
           {
-            "id": "board-paper-pads",
-            "label": "Board & Paper Pads",
-            "children": []
-          }
-        ],
-        "description": "Exercise and counter books, exam pads, memo books, diaries, copy paper, colouring books and bright board and paper pads."
-      },
-      {
-        "id": "office-filing-labels",
-        "label": "Office, Filing & Labels",
-        "children": [
-          {
-            "id": "envelopes-mailing",
-            "label": "Envelopes & Mailing",
-            "children": []
-          },
-          {
-            "id": "school-essentials",
-            "label": "School Essentials",
-            "children": []
-          },
-          {
-            "id": "stickers-labels",
-            "label": "Stickers & Labels",
-            "children": []
-          }
-        ],
-        "description": "Files, dividers, envelopes, clips, staplers, tape, scissors, labels, stickers, calculators and school essentials."
-      },
-      {
-        "id": "paint-craft-supplies",
-        "label": "Paint & Craft Supplies",
-        "children": [
-          {
-            "id": "canvases",
-            "label": "Canvases",
-            "children": []
-          },
-          {
-            "id": "spray-paint",
-            "label": "Spray Paint",
-            "children": []
-          },
-          {
-            "id": "wooden-craft-blanks",
-            "label": "Wooden Craft Blanks",
-            "children": []
-          }
-        ],
-        "description": "Spray and craft paints, artist canvases, wooden craft blanks (boxes, trays, money boxes), modelling clay, raffia and decorative craft fillers."
-      },
-      {
-        "id": "pens-pencils-markers",
-        "label": "Pens, Pencils & Markers",
-        "children": [],
-        "description": "Pens, clutch pencils, leads, pencil crayons, wax crayons, fibre-tip pens and erasers."
-      },
-      {
-        "id": "seasonal",
-        "label": "Seasonal",
-        "children": []
-      },
-      {
-        "id": "art-supplies",
-        "label": "Art Supplies",
-        "children": []
-      },
-      {
-        "id": "pens",
-        "label": "PENS",
-        "children": []
-      },
-      {
-        "id": "pens-and-paper",
-        "label": "pens and paper",
-        "children": []
-      },
-      {
-        "id": "files",
-        "label": "Files",
-        "children": []
-      }
-    ],
-    "icon": "PenTool",
-    "description": "Everything for the desk, classroom and craft table: paper and board, writing instruments, office and filing supplies, paints, canvases and creative craft materials."
-  },
-  {
-    "id": "beads-jewellery-accessories",
-    "label": "Beads, Jewellery & Accessories",
-    "children": [
-      {
-        "id": "beads-stones",
-        "label": "Beads & Stones",
-        "children": [
-          {
-            "id": "acrylic-plastic-beads",
-            "label": "Acrylic & Plastic Beads",
+            "id": "earrings",
+            "label": "Earrings",
             "children": [
-              {
-                "id": "alphabet-beads",
-                "label": "Alphabet Beads",
-                "children": []
-              },
-              {
-                "id": "novelty-beads",
-                "label": "Novelty Beads",
-                "children": []
-              }
+              { "id": "earrings-stainless-steel", "label": "Stainless steel", "children": [] }
             ]
           },
           {
-            "id": "glass-beads",
-            "label": "Glass Beads",
+            "id": "bracelets",
+            "label": "Bracelets",
+            "children": [
+              { "id": "bracelets-earth-stones", "label": "Earth stones", "children": [] }
+            ]
+          },
+          {
+            "id": "necklaces",
+            "label": "Necklaces",
+            "children": [
+              { "id": "necklaces-earth-stones", "label": "Earth stones", "children": [] }
+            ]
+          },
+          { "id": "jewellery-display-stands", "label": "Jewellery display stands", "children": [] }
+        ]
+      },
+      {
+        "id": "findings",
+        "label": "Findings",
+        "children": [
+          { "id": "clasps", "label": "Clasps", "children": [] },
+          { "id": "crimps", "label": "Crimps", "children": [] },
+          { "id": "earring-hooks", "label": "Earring hooks", "children": [] },
+          { "id": "eye-head-pins", "label": "Eye & Head Pins", "children": [] },
+          { "id": "jumprings-split-rings", "label": "Jumprings & Split rings", "children": [] },
+          { "id": "sunglass-connectors", "label": "Sunglass Connectors", "children": [] },
+          {
+            "id": "stringing-materials",
+            "label": "Stringing materials",
+            "children": [
+              { "id": "chain", "label": "Chain", "children": [] },
+              { "id": "threads", "label": "Threads", "children": [] },
+              { "id": "wire", "label": "Wire", "children": [] },
+              { "id": "elastic", "label": "Elastic", "children": [] },
+              { "id": "cord", "label": "Cord", "children": [] }
+            ]
+          },
+          { "id": "rings", "label": "Rings", "children": [] }
+        ]
+      },
+      {
+        "id": "jewellery-tools-and-equipment",
+        "label": "Jewellery Tools and Equipment",
+        "children": [
+          { "id": "jewellery-pliers", "label": "Pliers", "children": [] }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "beads",
+    "label": "Beads",
+    "icon": "Circle",
+    "children": [
+      {
+        "id": "glass-beads",
+        "label": "Glass",
+        "children": [
+          { "id": "chandelier-crystals-beads", "label": "Chandelier and crystals", "children": [] },
+          {
+            "id": "czech-beads",
+            "label": "Czech",
+            "children": [
+              { "id": "czech-size-3", "label": "SIZE: 3", "children": [] },
+              { "id": "czech-size-5", "label": "SIZE: 5", "children": [] },
+              { "id": "czech-size-6", "label": "SIZE: 6", "children": [] },
+              { "id": "czech-size-8", "label": "SIZE: 8", "children": [] },
+              { "id": "czech-size-11", "label": "SIZE: 11", "children": [] }
+            ]
+          },
+          { "id": "murano-beads", "label": "Murano", "children": [] },
+          {
+            "id": "glass-pearls",
+            "label": "Pearls",
+            "children": [
+              { "id": "glass-pearls-4mm", "label": "SIZE: 4mm", "children": [] },
+              { "id": "glass-pearls-6mm", "label": "SIZE: 6mm", "children": [] },
+              { "id": "glass-pearls-8mm", "label": "SIZE: 8mm", "children": [] }
+            ]
+          },
+          {
+            "id": "glass-plain",
+            "label": "Plain",
+            "children": [
+              { "id": "glass-plain-3mm", "label": "SIZE: 3mm", "children": [] },
+              { "id": "glass-plain-4mm", "label": "SIZE: 4mm", "children": [] },
+              { "id": "glass-plain-6mm", "label": "SIZE: 6mm", "children": [] },
+              { "id": "glass-plain-8mm", "label": "SIZE: 8mm", "children": [] }
+            ]
+          },
+          {
+            "id": "glass-sparkle",
+            "label": "Sparkle",
+            "children": [
+              { "id": "glass-sparkle-6mm", "label": "SIZE: 6mm", "children": [] },
+              { "id": "glass-sparkle-8mm", "label": "SIZE: 8mm", "children": [] }
+            ]
+          },
+          {
+            "id": "seed-beads",
+            "label": "Seed beads",
+            "children": [
+              { "id": "seed-beads-6-0", "label": "SIZE: 6/0", "children": [] },
+              { "id": "seed-beads-8-0", "label": "SIZE: 8/0", "children": [] },
+              { "id": "seed-beads-11-0", "label": "SIZE: 11/0", "children": [] }
+            ]
+          },
+          { "id": "glass-beads-spacers", "label": "Beads & Spacers", "children": [] }
+        ]
+      },
+      {
+        "id": "metal-beads",
+        "label": "Metal",
+        "children": [
+          {
+            "id": "metal-charms",
+            "label": "Charms",
+            "children": [
+              { "id": "metal-charms-gold", "label": "Gold", "children": [] },
+              { "id": "metal-charms-silver", "label": "Silver", "children": [] },
+              { "id": "metal-charms-antique", "label": "Antique", "children": [] }
+            ]
+          },
+          {
+            "id": "metal-hollow-beads",
+            "label": "Hollow Beads",
+            "children": [
+              { "id": "hollow-beads-gold", "label": "Gold", "children": [] },
+              { "id": "hollow-beads-silver", "label": "Silver", "children": [] },
+              { "id": "hollow-beads-antique", "label": "Antique", "children": [] }
+            ]
+          },
+          {
+            "id": "metal-pendants",
+            "label": "Pendants",
+            "children": [
+              { "id": "metal-pendants-gold", "label": "Gold", "children": [] },
+              { "id": "metal-pendants-silver", "label": "Silver", "children": [] },
+              { "id": "metal-pendants-antique", "label": "Antique", "children": [] }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "natural-beads",
+        "label": "Natural",
+        "children": [
+          {
+            "id": "natural-seed",
+            "label": "seed",
+            "children": [
+              { "id": "zulu-beads", "label": "zulu beads", "children": [] }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "plastic-ccb",
+        "label": "Plastic & CCB",
+        "children": [
+          {
+            "id": "letters-numbers",
+            "label": "Letters and numbers",
+            "children": [
+              { "id": "letters-round", "label": "Round", "children": [] },
+              { "id": "letters-cube", "label": "Cube", "children": [] }
+            ]
+          },
+          {
+            "id": "plastic-pearls",
+            "label": "Pearls",
+            "children": [
+              { "id": "plastic-pearls-4mm", "label": "SIZE: 4mm", "children": [] },
+              { "id": "plastic-pearls-6mm", "label": "SIZE: 6mm", "children": [] },
+              { "id": "plastic-pearls-8mm", "label": "SIZE: 8mm", "children": [] }
+            ]
+          },
+          {
+            "id": "ccb",
+            "label": "CCB",
+            "children": [
+              { "id": "ccb-gold", "label": "Gold", "children": [] },
+              { "id": "ccb-silver", "label": "Silver", "children": [] },
+              { "id": "ccb-antique-brass", "label": "Antique Brass", "children": [] }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "semi-precious",
+        "label": "Semi",
+        "children": [
+          { "id": "semi-large", "label": "Large", "children": [] },
+          { "id": "semi-small", "label": "Small", "children": [] },
+          { "id": "semi-round", "label": "Round", "children": [] }
+        ]
+      },
+      {
+        "id": "synthetic-stone",
+        "label": "Synthetic",
+        "children": [
+          { "id": "synthetic-aged", "label": "Aged", "children": [] }
+        ]
+      },
+      {
+        "id": "wood-beads",
+        "label": "Wood",
+        "children": [
+          {
+            "id": "coco-wood",
+            "label": "Coco Wood",
+            "children": [
+              { "id": "coco-wood-4mm", "label": "size: 4mm", "children": [] },
+              { "id": "coco-wood-6mm", "label": "size: 6mm", "children": [] },
+              { "id": "coco-wood-8mm", "label": "size: 8mm", "children": [] },
+              { "id": "coco-wood-10mm", "label": "size: 10mm", "children": [] }
+            ]
+          },
+          {
+            "id": "raw-wood",
+            "label": "Raw Wood",
             "children": [
               {
-                "id": "crystal-rondelle",
-                "label": "Crystal & Rondelle",
-                "children": []
-              },
-              {
-                "id": "czech-beads",
-                "label": "Czech Beads",
-                "children": []
-              },
-              {
-                "id": "glass-pearls",
-                "label": "Glass Pearls",
-                "children": []
-              },
-              {
-                "id": "seed-beads",
-                "label": "Seed Beads",
+                "id": "raw-wood-1kg",
+                "label": "1KG",
                 "children": [
-                  {
-                    "id": "zulu-bead-strings",
-                    "label": "Zulu Bead Strings",
-                    "children": []
-                  }
+                  { "id": "raw-1kg-6mm", "label": "SIZE: 6mm", "children": [] },
+                  { "id": "raw-1kg-8mm", "label": "SIZE: 8mm", "children": [] },
+                  { "id": "raw-1kg-10mm", "label": "SIZE: 10mm", "children": [] },
+                  { "id": "raw-1kg-12mm", "label": "SIZE: 12mm", "children": [] },
+                  { "id": "raw-1kg-14mm", "label": "SIZE: 14mm", "children": [] },
+                  { "id": "raw-1kg-16mm", "label": "SIZE: 16mm", "children": [] },
+                  { "id": "raw-1kg-18mm", "label": "SIZE: 18mm", "children": [] },
+                  { "id": "raw-1kg-20mm", "label": "SIZE: 20mm", "children": [] },
+                  { "id": "raw-1kg-22mm", "label": "SIZE: 22mm", "children": [] },
+                  { "id": "raw-1kg-25mm", "label": "SIZE: 25mm", "children": [] },
+                  { "id": "raw-1kg-30mm", "label": "SIZE: 30mm", "children": [] }
+                ]
+              },
+              {
+                "id": "raw-wood-125g",
+                "label": "125g",
+                "children": [
+                  { "id": "raw-125g-4mm", "label": "SIZE: 4mm", "children": [] },
+                  { "id": "raw-125g-6mm", "label": "SIZE: 6mm", "children": [] },
+                  { "id": "raw-125g-8mm", "label": "SIZE: 8mm", "children": [] },
+                  { "id": "raw-125g-10mm", "label": "SIZE: 10mm", "children": [] },
+                  { "id": "raw-125g-12mm", "label": "SIZE: 12mm", "children": [] },
+                  { "id": "raw-125g-14mm", "label": "SIZE: 14mm", "children": [] },
+                  { "id": "raw-125g-16mm", "label": "SIZE: 16mm", "children": [] },
+                  { "id": "raw-125g-18mm", "label": "SIZE: 18mm", "children": [] },
+                  { "id": "raw-125g-20mm", "label": "SIZE: 20mm", "children": [] },
+                  { "id": "raw-125g-22mm", "label": "SIZE: 22mm", "children": [] },
+                  { "id": "raw-125g-25mm", "label": "SIZE: 25mm", "children": [] },
+                  { "id": "raw-125g-30mm", "label": "SIZE: 30mm", "children": [] }
                 ]
               }
             ]
           },
           {
-            "id": "metal-spacer-beads",
-            "label": "Metal & Spacer Beads",
-            "children": []
-          },
-          {
-            "id": "stone-semi-precious",
-            "label": "Stone & Semi-Precious",
+            "id": "painted-wood",
+            "label": "Painted",
             "children": [
-              {
-                "id": "round-shaped-stones",
-                "label": "Round & Shaped Stones",
-                "children": []
-              },
-              {
-                "id": "stone-chips",
-                "label": "Stone Chips",
-                "children": []
-              }
+              { "id": "painted-6mm", "label": "SIZE: 6mm", "children": [] },
+              { "id": "painted-8mm", "label": "SIZE: 8mm", "children": [] },
+              { "id": "painted-10mm", "label": "SIZE: 10mm", "children": [] },
+              { "id": "painted-12mm", "label": "SIZE: 12mm", "children": [] },
+              { "id": "painted-14mm", "label": "SIZE: 14mm", "children": [] },
+              { "id": "painted-16mm", "label": "SIZE: 16mm", "children": [] },
+              { "id": "painted-18mm", "label": "SIZE: 18mm", "children": [] },
+              { "id": "painted-20mm", "label": "SIZE: 20mm", "children": [] },
+              { "id": "painted-22mm", "label": "SIZE: 22mm", "children": [] },
+              { "id": "painted-25mm", "label": "SIZE: 25mm", "children": [] },
+              { "id": "painted-30mm", "label": "SIZE: 30mm", "children": [] }
             ]
           },
           {
-            "id": "wooden-beads",
-            "label": "Wooden Beads",
+            "id": "washed-wood",
+            "label": "Washed Wood",
             "children": [
-              {
-                "id": "natural-coco",
-                "label": "Natural & Coco",
-                "children": []
-              },
-              {
-                "id": "painted",
-                "label": "Painted",
-                "children": []
-              },
-              {
-                "id": "washed",
-                "label": "Washed",
-                "children": []
-              }
+              { "id": "washed-wood-10mm", "label": "SIZE: 10mm", "children": [] }
             ]
           }
-        ],
-        "description": "Beads in glass, wood, acrylic, metal and semi-precious stone \u2014 from seed beads and crystal rondelles to alphabet beads and stone chips."
-      },
-      {
-        "id": "chains-cords-wire",
-        "label": "Chains, Cords & Wire",
-        "children": [
-          {
-            "id": "chains",
-            "label": "Chains",
-            "children": []
-          },
-          {
-            "id": "cords-thread",
-            "label": "Cords & Thread",
-            "children": []
-          },
-          {
-            "id": "wire",
-            "label": "Wire",
-            "children": []
-          }
-        ],
-        "description": "Jewellery chains by the metre, waxed and nylon cords, elastic threads, suede cords, memory wire, tigertail and craft wire."
-      },
-      {
-        "id": "charms-pendants-jewellery",
-        "label": "Charms, Pendants & Jewellery",
-        "children": [
-          {
-            "id": "chandelier-crystals",
-            "label": "Chandelier Crystals",
-            "children": []
-          },
-          {
-            "id": "charms",
-            "label": "Charms",
-            "children": []
-          },
-          {
-            "id": "finished-jewellery",
-            "label": "Finished Jewellery",
-            "children": [
-              {
-                "id": "bracelets",
-                "label": "Bracelets",
-                "children": []
-              },
-              {
-                "id": "earrings",
-                "label": "Earrings",
-                "children": []
-              },
-              {
-                "id": "necklaces",
-                "label": "Necklaces",
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "pendants",
-            "label": "Pendants",
-            "children": []
-          }
-        ],
-        "description": "Metal charms, glass and metal pendants, chandelier crystals and ready-to-wear necklaces, bracelets and earrings."
-      },
-      {
-        "id": "findings-components",
-        "label": "Findings & Components",
-        "children": [
-          {
-            "id": "bag-leathercraft-hardware",
-            "label": "Bag & Leathercraft Hardware",
-            "children": [
-              {
-                "id": "rings-sliders-buckles",
-                "label": "Rings, Sliders & Buckles",
-                "children": []
-              },
-              {
-                "id": "rivets-eyelets-keyrings",
-                "label": "Rivets, Eyelets & Keyrings",
-                "children": []
-              },
-              {
-                "id": "snap-trigger-hooks",
-                "label": "Snap & Trigger Hooks",
-                "children": []
-              },
-              {
-                "id": "straps-other-hardware",
-                "label": "Straps & Other Hardware",
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "jewellery-findings",
-            "label": "Jewellery Findings",
-            "children": [
-              {
-                "id": "clasps",
-                "label": "Clasps",
-                "children": []
-              },
-              {
-                "id": "earring-components",
-                "label": "Earring Components",
-                "children": []
-              },
-              {
-                "id": "jumprings-split-rings",
-                "label": "Jumprings & Split Rings",
-                "children": []
-              },
-              {
-                "id": "other-findings",
-                "label": "Other Findings",
-                "children": []
-              },
-              {
-                "id": "pins-crimps",
-                "label": "Pins & Crimps",
-                "children": []
-              }
-            ]
-          }
-        ],
-        "description": "Clasps, jumprings, earring components, pins and crimps, plus bag-making hardware such as snap hooks, D-rings, sliders, buckles and rivets."
-      },
-      {
-        "id": "jewellery-tools",
-        "label": "Jewellery tools",
-        "children": []
-      },
-      {
-        "id": "jewellery-items",
-        "label": "Jewellery items",
-        "children": []
+        ]
       }
-    ],
-    "icon": "Scissors",
-    "description": "A complete jewellery-making range covering beads of every material, charms and pendants, chains, cords and wire, plus all the findings and hardware needed to bring designs to life."
+    ]
   },
   {
-    "id": "beauty-personal-care",
-    "label": "Beauty & Personal Care",
+    "id": "bag-belt-components",
+    "label": "Bag & Belt Components",
+    "icon": "ShoppingBag",
     "children": [
       {
-        "id": "bath-body",
-        "label": "Bath & Body",
-        "children": [],
-        "description": "Soaps, bath salts and fizzers, scrubs, lotions, sponges, wipes and pampering body care."
+        "id": "snap-trigger-hooks",
+        "label": "Snap & Trigger Hooks",
+        "children": [
+          { "id": "snap-hooks-silver", "label": "Silver", "children": [] },
+          { "id": "snap-hooks-antique", "label": "Antique", "children": [] },
+          { "id": "snap-hooks-gold", "label": "Gold", "children": [] }
+        ]
       },
       {
-        "id": "cosmetics-nails",
-        "label": "Cosmetics & Nails",
+        "id": "swivel",
+        "label": "Swivel",
         "children": [
-          {
-            "id": "makeup",
-            "label": "Makeup",
-            "children": []
-          },
-          {
-            "id": "nails",
-            "label": "Nails",
-            "children": []
-          }
-        ],
-        "description": "Makeup for eyes, lips and face, plus nail care tools, glues, lamps and manicure accessories."
+          { "id": "swivel-silver", "label": "Silver", "children": [] },
+          { "id": "swivel-antique", "label": "Antique", "children": [] },
+          { "id": "swivel-gold", "label": "Gold", "children": [] }
+        ]
       },
       {
-        "id": "fragrance-deodorant",
-        "label": "Fragrance & Deodorant",
-        "children": [],
-        "description": "Inspired-by perfumes for men and women and 48-hour anti-perspirants."
+        "id": "bag-clasps",
+        "label": "Clasps",
+        "children": [
+          { "id": "bag-clasps-silver", "label": "Silver", "children": [] },
+          { "id": "bag-clasps-antique", "label": "Antique", "children": [] },
+          { "id": "bag-clasps-gold", "label": "Gold", "children": [] }
+        ]
       },
       {
-        "id": "hair-beauty-tools",
-        "label": "Hair & Beauty Tools",
+        "id": "square-d-rings",
+        "label": "Square and D-Rings",
         "children": [
-          {
-            "id": "hair-care",
-            "label": "Hair Care",
-            "children": []
-          }
-        ],
-        "description": "Hair care, combs, hair clips and alice bands, tweezers and grooming accessories."
-      }
-    ],
-    "icon": "Smile",
-    "description": "Cosmetics, bath and body care, fragrances and grooming tools to look and feel great every day."
-  },
-  {
-    "id": "events-parties",
-    "label": "Events & Parties",
-    "children": [
-      {
-        "id": "costume-novelty",
-        "label": "Costume & Novelty",
-        "children": [
-          {
-            "id": "glow-novelty",
-            "label": "Glow Novelty",
-            "children": []
-          }
-        ],
-        "description": "Glow sticks and fun novelty accessories for parties and events."
+          { "id": "square-d-rings-silver", "label": "Silver", "children": [] },
+          { "id": "square-d-rings-antique", "label": "Antique", "children": [] },
+          { "id": "square-d-rings-gold", "label": "Gold", "children": [] }
+        ]
       },
       {
-        "id": "party-decor",
-        "label": "Party Decor",
+        "id": "sliders",
+        "label": "Sliders",
         "children": [
-          {
-            "id": "balloons-garlands",
-            "label": "Balloons & Garlands",
-            "children": []
-          }
-        ],
-        "description": "Balloon garland sets and decorative party pieces."
-      }
-    ],
-    "icon": "Gift",
-    "description": "Party decorations and fun novelty items to make any celebration memorable."
+          { "id": "sliders-silver", "label": "Silver", "children": [] },
+          { "id": "sliders-antique", "label": "Antique", "children": [] },
+          { "id": "sliders-gold", "label": "Gold", "children": [] }
+        ]
+      },
+      {
+        "id": "buckles",
+        "label": "Buckles",
+        "children": [
+          { "id": "buckles-silver", "label": "Silver", "children": [] },
+          { "id": "buckles-antique", "label": "Antique", "children": [] },
+          { "id": "buckles-gold", "label": "Gold", "children": [] }
+        ]
+      },
+      {
+        "id": "press-studs",
+        "label": "Press Studs",
+        "children": [
+          { "id": "press-studs-silver", "label": "Silver", "children": [] },
+          { "id": "press-studs-antique", "label": "Antique", "children": [] },
+          { "id": "press-studs-gold", "label": "Gold", "children": [] }
+        ]
+      },
+      {
+        "id": "eyelets",
+        "label": "Eyelets",
+        "children": [
+          { "id": "eyelets-silver", "label": "Silver", "children": [] },
+          { "id": "eyelets-antique", "label": "Antique", "children": [] },
+          { "id": "eyelets-gold", "label": "Gold", "children": [] }
+        ]
+      },
+      {
+        "id": "rivets",
+        "label": "Rivets",
+        "children": [
+          { "id": "rivets-silver", "label": "Silver", "children": [] },
+          { "id": "rivets-antique", "label": "Antique", "children": [] },
+          { "id": "rivets-gold", "label": "Gold", "children": [] }
+        ]
+      },
+      {
+        "id": "belt-buckles",
+        "label": "Belt Buckles",
+        "children": [
+          { "id": "belt-buckles-silver", "label": "Silver", "children": [] },
+          { "id": "belt-buckles-antique", "label": "Antique", "children": [] }
+        ]
+      },
+      { "id": "bag-belt-tools", "label": "Tools", "children": [] }
+    ]
   },
   {
     "id": "fashion-accessories",
     "label": "Fashion & Accessories",
-    "children": [
-      {
-        "id": "bags",
-        "label": "Bags",
-        "children": [
-          {
-            "id": "casual-utility-bags",
-            "label": "Casual & Utility Bags",
-            "children": [
-              {
-                "id": "pencil-bags",
-                "label": "Pencil Bags",
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "cosmetic-toiletry-bags",
-            "label": "Cosmetic & Toiletry Bags",
-            "children": []
-          },
-          {
-            "id": "kids-bags",
-            "label": "Kids Bags",
-            "children": []
-          },
-          {
-            "id": "ladies-bags",
-            "label": "Ladies Bags",
-            "children": []
-          }
-        ],
-        "description": "Ladies handbags, leather sling bags and backpacks, kids bags, cosmetic bags and everyday utility bags."
-      },
-      {
-        "id": "hats-sunglasses-accessories",
-        "label": "Hats, Sunglasses & Accessories",
-        "children": [
-          {
-            "id": "sunglasses-eyewear",
-            "label": "Sunglasses & Eyewear",
-            "children": []
-          }
-        ],
-        "description": "Fedora, panama and sun hats plus eyewear components and accessories."
-      },
-      {
-        "id": "scarves-wraps",
-        "label": "Scarves & Wraps",
-        "children": [
-          {
-            "id": "silk-scarves",
-            "label": "Silk Scarves",
-            "children": []
-          }
-        ],
-        "description": "Printed, plain and silk scarves in a wide range of colours and designs."
-      },
-      {
-        "id": "wallets-purses",
-        "label": "Wallets & Purses",
-        "children": [],
-        "description": "Leather and fashion wallets, purses and card holders."
-      }
-    ],
     "icon": "Shirt",
-    "description": "Stylish bags, wallets, scarves, hats and accessories for ladies, gents and kids."
-  },
-  {
-    "id": "food-drinks",
-    "label": "Food & Drinks",
     "children": [
       {
-        "id": "drinks",
-        "label": "Drinks",
+        "id": "synthetic-bags",
+        "label": "Synthetic bags / Bags",
         "children": [
-          {
-            "id": "coffee",
-            "label": "Coffee",
-            "children": []
-          },
-          {
-            "id": "soft-drinks",
-            "label": "Soft Drinks",
-            "children": []
-          }
-        ],
-        "description": "Bashew's classic soft drinks and Nespresso-compatible coffee capsules."
+          { "id": "syn-handbags", "label": "Handbags", "children": [] },
+          { "id": "syn-shopper", "label": "Shopper", "children": [] },
+          { "id": "syn-tote", "label": "Tote", "children": [] },
+          { "id": "syn-sling-crossbody", "label": "Sling & crossbody", "children": [] },
+          { "id": "syn-macbook-cover", "label": "MacBook cover", "children": [] },
+          { "id": "syn-luggage-laptop", "label": "Luggage & laptop", "children": [] },
+          { "id": "syn-wristlets-clutches", "label": "Wristlets & clutches", "children": [] },
+          { "id": "syn-backpack-shoulder", "label": "Backpack & shoulder", "children": [] },
+          { "id": "syn-small-accessories", "label": "Small accessories", "children": [] }
+        ]
       },
       {
-        "id": "pantry-spices",
-        "label": "Pantry & Spices",
-        "children": [],
-        "description": "Cador salts, peppers, herb and spice grinders."
+        "id": "leather",
+        "label": "Leather",
+        "children": [
+          { "id": "leather-handbags", "label": "Handbags", "children": [] },
+          { "id": "leather-shopper", "label": "Shopper", "children": [] },
+          { "id": "leather-tote", "label": "Tote", "children": [] },
+          { "id": "leather-mens-sling", "label": "Men's Sling & Crossbody", "children": [] },
+          { "id": "leather-ladies-sling", "label": "Ladies Sling & Crossbody", "children": [] },
+          { "id": "leather-luggage-laptop", "label": "Luggage & laptop", "children": [] },
+          { "id": "leather-wristlets-clutches", "label": "Wristlets & clutches", "children": [] },
+          { "id": "leather-backpack-shoulder", "label": "Backpack & shoulder", "children": [] },
+          { "id": "leather-small-accessories", "label": "Small accessories", "children": [] },
+          { "id": "leather-wallets-purses", "label": "Wallets & purses", "children": [] },
+          { "id": "leather-bag-accessories", "label": "Bag accessories", "children": [] },
+          { "id": "leather-bag-straps", "label": "Bag straps", "children": [] }
+        ]
       },
       {
-        "id": "snacks-biscuits",
-        "label": "Snacks & Biscuits",
-        "children": [],
-        "description": "Biscuits, cookies, crackers and sweet treats."
-      }
-    ],
-    "icon": "Cookie",
-    "description": "A tasty selection of soft drinks, coffee, biscuits, snacks and pantry seasonings."
+        "id": "hats-caps",
+        "label": "Hats & Caps",
+        "children": [
+          { "id": "fedora", "label": "Fedora", "children": [] },
+          { "id": "hair-accessories", "label": "Hair accessories", "children": [] },
+          { "id": "panama", "label": "Panama", "children": [] },
+          { "id": "sunhats", "label": "Sunhats", "children": [] }
+        ]
+      },
+      { "id": "scarves", "label": "Scarves", "children": [] },
+      { "id": "iron-on-patch", "label": "Iron-on Patch", "children": [] }
+    ]
   },
   {
-    "id": "hardware",
-    "label": "Hardware",
+    "id": "beauty-personal-care",
+    "label": "Beauty & Personal Care",
+    "icon": "Smile",
+    "children": [
+      {
+        "id": "skin-care",
+        "label": "Skin Care",
+        "children": [
+          { "id": "face-body-wash", "label": "Face and body wash", "children": [] },
+          { "id": "shaving-gel", "label": "Shaving gel", "children": [] },
+          { "id": "creams-lotions", "label": "Creams and lotions", "children": [] },
+          { "id": "hand-wash-soaps", "label": "Hand wash and soaps", "children": [] },
+          { "id": "scrubs-butters", "label": "Scrubs & butters", "children": [] },
+          { "id": "shower-sachets", "label": "Shower sachets", "children": [] },
+          { "id": "bath-bombs-salts", "label": "Bath bombs & salts", "children": [] },
+          { "id": "cotton-wool", "label": "Cotton wool", "children": [] },
+          { "id": "wet-wipes", "label": "Wet wipes", "children": [] }
+        ]
+      },
+      {
+        "id": "hair-care",
+        "label": "Hair Care",
+        "children": [
+          { "id": "shampoo-conditioners", "label": "Shampoo & conditioners", "children": [] }
+        ]
+      },
+      {
+        "id": "fragrances",
+        "label": "Fragrances",
+        "children": [
+          { "id": "inspired-perfumes", "label": "Inspired perfumes", "children": [] },
+          { "id": "anti-perspirant", "label": "Anti-perspirant", "children": [] },
+          { "id": "body-mist", "label": "Body mist", "children": [] }
+        ]
+      },
+      {
+        "id": "cosmetics",
+        "label": "Cosmetics",
+        "children": [
+          { "id": "face-cheeks", "label": "Face & cheeks", "children": [] },
+          { "id": "eyes-eyebrows", "label": "Eyes and eyebrows", "children": [] },
+          { "id": "lips", "label": "Lips", "children": [] },
+          { "id": "beauty-applicators", "label": "Beauty applicators", "children": [] },
+          { "id": "body-face-spray", "label": "Body & face spray", "children": [] }
+        ]
+      },
+      { "id": "manicure-grooming", "label": "Manicure & Grooming", "children": [] },
+      { "id": "first-aid", "label": "First Aid", "children": [] }
+    ]
+  },
+  {
+    "id": "confectionery",
+    "label": "Confectionery",
+    "icon": "Cookie",
+    "children": [
+      { "id": "biscuits-crackers", "label": "Biscuits & Crackers", "children": [] },
+      { "id": "condiments", "label": "Condiments", "children": [] },
+      { "id": "cooldrinks", "label": "Cooldrinks", "children": [] },
+      { "id": "coffee-pods", "label": "Coffee Pods", "children": [] },
+      { "id": "sweets-hard-candy", "label": "Sweets & Hard Candy", "children": [] }
+    ]
+  },
+  {
+    "id": "electronics-accessories",
+    "label": "Electronics & Accessories",
+    "icon": "Zap",
     "children": [
       {
         "id": "batteries",
         "label": "Batteries",
-        "children": [],
-        "description": "Vinnic alkaline, lithium and zinc-chloride batteries in all common sizes."
+        "children": [
+          { "id": "batteries-aaa", "label": "AAA", "children": [] },
+          { "id": "batteries-aa", "label": "AA", "children": [] },
+          { "id": "batteries-other", "label": "Other", "children": [] }
+        ]
+      },
+      { "id": "charges-cables", "label": "Charges & Cables", "children": [] },
+      { "id": "earphones-headphones", "label": "Earphones & Headphones", "children": [] },
+      {
+        "id": "clocks-watches",
+        "label": "Clocks & Watches",
+        "children": [
+          { "id": "watches", "label": "Watches", "children": [] },
+          { "id": "clocks", "label": "Clocks", "children": [] }
+        ]
       },
       {
-        "id": "electrical-accessories",
-        "label": "Electrical Accessories",
-        "children": [],
-        "description": "Extension leads and electrical essentials."
+        "id": "plugs",
+        "label": "Plugs",
+        "children": [
+          { "id": "extension-leads", "label": "Extension Leads", "children": [] }
+        ]
       },
+      { "id": "media-storage", "label": "Media Storage", "children": [] },
+      { "id": "mobile-accessories", "label": "Mobile Accessories", "children": [] },
+      { "id": "remote-controls", "label": "Remote Controls", "children": [] }
+    ]
+  },
+  {
+    "id": "party-events-seasonals",
+    "label": "Party, Events & Seasonals",
+    "icon": "Gift",
+    "children": [
       {
-        "id": "electronics-phone-accessories",
-        "label": "Electronics & Phone Accessories",
-        "children": [],
-        "description": "Earphones, chargers, cables, phone holders, cameras, memory cards and small electronics."
+        "id": "party-decor",
+        "label": "Party Décor",
+        "children": [
+          { "id": "balloon-garlands", "label": "Balloon Garlands", "children": [] }
+        ]
       },
+      { "id": "parasols", "label": "Parasols", "children": [] },
+      { "id": "handfan", "label": "Handfan", "children": [] }
+    ]
+  },
+  {
+    "id": "hardware",
+    "label": "Hardware",
+    "icon": "Wrench",
+    "children": [
       {
         "id": "tools",
         "label": "Tools",
         "children": [
-          {
-            "id": "craft-retail-machines",
-            "label": "Craft & Retail Machines",
-            "children": []
-          }
-        ],
-        "description": "Conan hand tools \u2014 pliers, saws, hammers, tape measures, staple guns \u2014 plus craft and retail machines."
-      }
-    ],
-    "icon": "Wrench",
-    "description": "Practical essentials including batteries, hand tools, electrical accessories and phone and computer add-ons."
+          { "id": "tools-pliers", "label": "Pliers", "children": [] },
+          { "id": "screwdrivers", "label": "Screwdrivers", "children": [] },
+          { "id": "sockets-bits", "label": "Sockets & bits", "children": [] },
+          { "id": "staple-gun-staples", "label": "Staple gun & staples", "children": [] },
+          { "id": "saws-axe", "label": "Saws & axe", "children": [] },
+          { "id": "hammers-mallet", "label": "Hammers and mallet", "children": [] },
+          { "id": "measuring-tools", "label": "Measuring tools", "children": [] },
+          { "id": "hole-punch", "label": "Hole punch", "children": [] }
+        ]
+      },
+      {
+        "id": "garden",
+        "label": "Garden",
+        "children": [
+          { "id": "garden-tools", "label": "Garden tools", "children": [] },
+          { "id": "spray-gun", "label": "Spray gun", "children": [] }
+        ]
+      },
+      { "id": "spray-paints", "label": "Spray Paints", "children": [] },
+      { "id": "gas-stove-butane", "label": "Gas Stove and Butane", "children": [] }
+    ]
   },
   {
-    "id": "homeware-kitchen",
-    "label": "Homeware & Kitchen",
-    "children": [
-      {
-        "id": "cleaning-household",
-        "label": "Cleaning & Household",
-        "children": [],
-        "description": "Tri-range bulk cleaning chemicals: bleach, detergents, disinfectant and fabric softener."
-      },
-      {
-        "id": "decor-candles",
-        "label": "Decor & Candles",
-        "children": [
-          {
-            "id": "candles-holders",
-            "label": "Candles & Holders",
-            "children": []
-          }
-        ],
-        "description": "Candles and holders, wall clocks, nautical decor and decorative homeware."
-      },
-      {
-        "id": "kitchen-dining",
-        "label": "Kitchen & Dining",
-        "children": [],
-        "description": "Stainless steel utensils, mugs, cake stands, silicone bakeware, oven gloves and aprons."
-      }
-    ],
+    "id": "homeware",
+    "label": "Homeware",
     "icon": "Home",
-    "description": "Kitchen tools, dining accessories, home decor, candles and household cleaning essentials."
-  },
-  {
-    "id": "motarro",
-    "label": "Motarro",
     "children": [
       {
-        "id": "art-supplies",
-        "label": "Art Supplies",
+        "id": "kitchen",
+        "label": "Kitchen",
         "children": [
-          {
-            "id": "brushes-palettes-tools",
-            "label": "Brushes, Palettes & Tools",
-            "children": []
-          },
-          {
-            "id": "canvases-surfaces",
-            "label": "Canvases & Surfaces",
-            "children": []
-          },
-          {
-            "id": "clay-modelling",
-            "label": "Clay & Modelling",
-            "children": []
-          },
-          {
-            "id": "paints-mediums",
-            "label": "Paints & Mediums",
-            "children": [
-              {
-                "id": "paint-markers",
-                "label": "Paint Markers",
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "paper-pads",
-            "label": "Paper & Pads",
-            "children": []
-          },
-          {
-            "id": "pastels-charcoal-crayons",
-            "label": "Pastels, Charcoal & Crayons",
-            "children": []
-          }
-        ],
-        "description": "Acrylic, oil and tempera paints, brushes and palettes, canvases, sketch pads, pastels, charcoal and modelling clay."
+          { "id": "enamel", "label": "Enamel", "children": [] },
+          { "id": "utensils", "label": "Utensils", "children": [] },
+          { "id": "glass-jars", "label": "Glass jars", "children": [] },
+          { "id": "placemats", "label": "Placemats", "children": [] }
+        ]
       },
       {
-        "id": "craft-novelty",
-        "label": "Craft & Novelty",
+        "id": "baking",
+        "label": "Baking",
         "children": [
-          {
-            "id": "craft-accessories",
-            "label": "Craft Accessories",
-            "children": []
-          },
-          {
-            "id": "led-letter-sign-lights",
-            "label": "LED Letter & Sign Lights",
-            "children": []
-          },
-          {
-            "id": "magnets-magnetic-letters",
-            "label": "Magnets & Magnetic Letters",
-            "children": []
-          },
-          {
-            "id": "stickers-labels",
-            "label": "Stickers & Labels",
-            "children": []
-          }
-        ],
-        "description": "Stickers and labels, LED letter and sign lights, magnets, keychains and creative craft accessories."
+          { "id": "silicone-moulds", "label": "Silicone moulds", "children": [] },
+          { "id": "cake-stands", "label": "Cake stands", "children": [] }
+        ]
+      },
+      { "id": "oven-gloves", "label": "Oven Gloves", "children": [] },
+      { "id": "aprons", "label": "Aprons", "children": [] },
+      { "id": "wine-bags", "label": "Wine Bags", "children": [] },
+      {
+        "id": "bathroom",
+        "label": "Bathroom",
+        "children": [
+          { "id": "soaps-hand-wash", "label": "Soaps & hand wash", "children": [] },
+          { "id": "bathroom-bath-bombs-salts", "label": "Bath bombs & salts", "children": [] },
+          { "id": "shower-caps", "label": "Shower caps", "children": [] },
+          { "id": "bodywash", "label": "Bodywash", "children": [] },
+          { "id": "sponges-towels", "label": "Sponges and towels", "children": [] }
+        ]
       },
       {
-        "id": "office-school-supplies",
-        "label": "Office & School Supplies",
+        "id": "bedroom",
+        "label": "Bedroom",
         "children": [
-          {
-            "id": "clips-staplers-fasteners",
-            "label": "Clips, Staplers & Fasteners",
-            "children": []
-          },
-          {
-            "id": "cutting-tools",
-            "label": "Cutting Tools",
-            "children": []
-          },
-          {
-            "id": "filing-desk-accessories",
-            "label": "Filing & Desk Accessories",
-            "children": []
-          },
-          {
-            "id": "glue-tape-adhesives",
-            "label": "Glue, Tape & Adhesives",
-            "children": []
-          },
-          {
-            "id": "school-desk-essentials",
-            "label": "School & Desk Essentials",
-            "children": []
-          }
-        ],
-        "description": "Staplers, clips, glue, tape, filing, desk accessories, cutting tools, rulers and school essentials."
+          { "id": "blankets", "label": "Blankets", "children": [] }
+        ]
       },
       {
-        "id": "stationery-writing",
-        "label": "Stationery & Writing",
+        "id": "scents-aroma",
+        "label": "Scents and Aroma",
         "children": [
-          {
-            "id": "pencils-correction",
-            "label": "Pencils & Correction",
-            "children": []
-          },
-          {
-            "id": "pens-markers-chalk",
-            "label": "Pens, Markers & Chalk",
-            "children": []
-          }
-        ],
-        "description": "Pens, markers, highlighters, chalk, pencils, erasers, sharpeners and correction supplies."
+          { "id": "candles-diffusers", "label": "Candles & Diffusers", "children": [] }
+        ]
+      },
+      {
+        "id": "decor",
+        "label": "Decor",
+        "children": [
+          { "id": "nautical-items", "label": "Nautical items", "children": [] },
+          { "id": "chandelier-crystals", "label": "Chandelier crystals", "children": [] }
+        ]
+      },
+      {
+        "id": "household",
+        "label": "Household",
+        "children": [
+          { "id": "liquid-cleansers", "label": "Liquid cleansers", "children": [] }
+        ]
       }
-    ],
-    "icon": "Gem",
-    "description": "The complete Motarro brand range: quality art materials, stationery, office and school supplies, and creative craft and novelty items at great value."
+    ]
   },
   {
-    "id": "packaging",
-    "label": "Packaging",
+    "id": "kids-toys-games",
+    "label": "Kids Toys & Games",
+    "icon": "ToyBrick",
     "children": [
-      {
-        "id": "gift-bags-pouches",
-        "label": "Gift Bags & Pouches",
-        "children": [],
-        "description": "Organza, paper, hessian and drawstring gift bags and velvet pouches."
-      },
-      {
-        "id": "jars-boxes-containers",
-        "label": "Jars, Boxes & Containers",
-        "children": [
-          {
-            "id": "gift-cake-boxes",
-            "label": "Gift & Cake Boxes",
-            "children": []
-          },
-          {
-            "id": "gift-jewellery-boxes",
-            "label": "Gift & Jewellery Boxes",
-            "children": []
-          },
-          {
-            "id": "glass-jars",
-            "label": "Glass Jars",
-            "children": []
-          }
-        ],
-        "description": "Glass jars, gift and cake boxes, jewellery and trinket boxes."
-      },
-      {
-        "id": "resealable-plastic-packets",
-        "label": "Resealable & Plastic Packets",
-        "children": [
-          {
-            "id": "carrier-bags",
-            "label": "Carrier Bags",
-            "children": []
-          }
-        ],
-        "description": "Ziplock and PVC resealable packets in dozens of sizes, plus carrier bags."
-      },
-      {
-        "id": "retail-display-tagging",
-        "label": "Retail Display & Tagging",
-        "children": [],
-        "description": "Jewellery display tags, cards, stands, trays, display heads and tagging tools."
-      }
-    ],
-    "icon": "Package",
-    "description": "Retail and gift packaging solutions: resealable packets, gift bags, jars, boxes and professional display and tagging supplies."
+      { "id": "kids-toys", "label": "Kids Toys", "children": [] },
+      { "id": "soft-toys", "label": "Soft Toys", "children": [] },
+      { "id": "games", "label": "Games", "children": [] },
+      { "id": "kids-furniture", "label": "Kids Furniture", "children": [] }
+    ]
   },
   {
     "id": "textiles",
     "label": "Textiles",
+    "icon": "Wind",
     "children": [
       {
-        "id": "blankets-throws",
-        "label": "Blankets & Throws",
-        "children": [],
-        "description": "Soft coral fleece blankets in a range of colours and sizes."
-      },
-      {
-        "id": "ribbon-trim",
-        "label": "Ribbon & Trim",
+        "id": "organza",
+        "label": "Organza",
         "children": [
-          {
-            "id": "florist-ribbon",
-            "label": "Florist Ribbon",
-            "children": []
-          },
-          {
-            "id": "general-ribbon-trim",
-            "label": "General Ribbon & Trim",
-            "children": []
-          },
-          {
-            "id": "gift-bows-sets",
-            "label": "Gift Bows & Sets",
-            "children": []
-          },
-          {
-            "id": "jute-ribbon",
-            "label": "Jute Ribbon",
-            "children": []
-          },
-          {
-            "id": "organza-ribbon",
-            "label": "Organza Ribbon",
-            "children": []
-          },
-          {
-            "id": "petersham-ribbon",
-            "label": "Petersham Ribbon",
-            "children": []
-          },
-          {
-            "id": "satin-ribbon",
-            "label": "Satin Ribbon",
-            "children": []
-          }
-        ],
-        "description": "Petersham, organza, satin, jute and florist ribbon, lace, trims and gift bow sets."
+          { "id": "organza-6mm", "label": "6mm", "children": [] },
+          { "id": "organza-9mm", "label": "9mm", "children": [] },
+          { "id": "organza-16mm", "label": "16mm", "children": [] },
+          { "id": "organza-25mm", "label": "25mm", "children": [] }
+        ]
       },
       {
-        "id": "sewing-haberdashery",
-        "label": "Sewing & Haberdashery",
-        "children": [],
-        "description": "Iron-on patches, elastic, press studs, pins, clips and sewing notions."
+        "id": "petersham",
+        "label": "Petersham",
+        "children": [
+          { "id": "petersham-6mm", "label": "6mm", "children": [] },
+          { "id": "petersham-9mm", "label": "9mm", "children": [] },
+          { "id": "petersham-16mm", "label": "16mm", "children": [] },
+          { "id": "petersham-25mm", "label": "25mm", "children": [] }
+        ]
       },
       {
-        "id": "wool-yarn",
-        "label": "Wool & Yarn",
-        "children": [],
-        "description": "Knitting wool and baby yarns in double knit, 4-ply and super chunky weights."
-      }
-    ],
-    "icon": "Wind",
-    "description": "Ribbons, trims, sewing and haberdashery supplies, knitting yarns and cosy blankets for every fabric project."
+        "id": "satin",
+        "label": "Satin",
+        "children": [
+          { "id": "satin-6mm", "label": "6mm", "children": [] },
+          { "id": "satin-9mm", "label": "9mm", "children": [] },
+          { "id": "satin-16mm", "label": "16mm", "children": [] },
+          { "id": "satin-25mm", "label": "25mm", "children": [] }
+        ]
+      },
+      { "id": "acrylic-blends", "label": "Acrylic & Blends", "children": [] },
+      { "id": "natural", "label": "Natural", "children": [] }
+    ]
   },
   {
-    "id": "toys-games-kids",
-    "label": "Toys, Games & Kids",
+    "id": "packaging-storage",
+    "label": "Packaging & Storage",
+    "icon": "Package",
     "children": [
       {
-        "id": "games-puzzles",
-        "label": "Games & Puzzles",
-        "children": [],
-        "description": "Classic games and puzzles: chess, dominoes, Jenga, bingo, marbles and more."
+        "id": "packaging-packets-bags",
+        "label": "Packaging Packets and Bags",
+        "children": [
+          { "id": "resealable-pvc", "label": "Resealable pvc", "children": [] },
+          { "id": "ziplock", "label": "Ziplock", "children": [] },
+          {
+            "id": "paper-bags",
+            "label": "Paper bags",
+            "children": [
+              { "id": "paper-bags-paper", "label": "Paper", "children": [] },
+              { "id": "paper-bags-boutique", "label": "Boutique", "children": [] },
+              { "id": "paper-bags-shopper", "label": "Shopper", "children": [] },
+              { "id": "paper-bags-gift", "label": "Gift", "children": [] }
+            ]
+          }
+        ]
       },
       {
-        "id": "kids-essentials",
-        "label": "Kids Essentials",
+        "id": "jewellery-bags",
+        "label": "Jewellery bags",
         "children": [
-          {
-            "id": "kids-furniture",
-            "label": "Kids Furniture",
-            "children": []
-          }
-        ],
-        "description": "Kids furniture and everyday essentials."
+          { "id": "jewellery-bags-hessian", "label": "Hessian", "children": [] },
+          { "id": "jewellery-bags-cotton", "label": "Cotton", "children": [] },
+          { "id": "jewellery-bags-organza", "label": "Organza", "children": [] },
+          { "id": "jewellery-bags-velvet", "label": "Velvet", "children": [] }
+        ]
       },
       {
-        "id": "toys",
-        "label": "Toys",
+        "id": "gifts-accessories",
+        "label": "Gifts & Accessories",
         "children": [
-          {
-            "id": "die-cast-vehicles",
-            "label": "Die Cast Vehicles",
-            "children": []
-          },
-          {
-            "id": "novelty-toys",
-            "label": "Novelty Toys",
-            "children": []
-          },
-          {
-            "id": "outdoor-active-toys",
-            "label": "Outdoor & Active Toys",
-            "children": []
-          },
-          {
-            "id": "soft-toys",
-            "label": "Soft Toys",
-            "children": []
-          }
-        ],
-        "description": "Soft toys, die cast vehicles, outdoor and active toys and fun novelties."
+          { "id": "gift-bags", "label": "Gift bags", "children": [] },
+          { "id": "bows", "label": "Bows", "children": [] },
+          { "id": "ribbon-string", "label": "Ribbon & string", "children": [] }
+        ]
+      },
+      {
+        "id": "display-boxes",
+        "label": "Display Boxes",
+        "children": [
+          { "id": "jewellery-boxes", "label": "Jewellery boxes", "children": [] }
+        ]
+      },
+      {
+        "id": "tags",
+        "label": "Tags",
+        "children": [
+          { "id": "display-tags", "label": "Display Tags", "children": [] },
+          { "id": "jewellery-tags", "label": "Jewellery Tags", "children": [] }
+        ]
       }
-    ],
-    "icon": "ToyBrick",
-    "description": "Toys, games, puzzles and kids essentials for hours of play and learning."
+    ]
+  },
+  {
+    "id": "stationery",
+    "label": "Stationery",
+    "icon": "PenTool",
+    "children": [
+      {
+        "id": "school-office",
+        "label": "School & Office",
+        "children": [
+          {
+            "id": "writing-correction",
+            "label": "Writing & Correction",
+            "children": [
+              { "id": "pens-pencils", "label": "Pens and Pencils", "children": [] },
+              { "id": "colour-pencils-crayons", "label": "Colour Pencils and Crayons", "children": [] },
+              { "id": "markers-highlighters", "label": "Markers and Highlighters", "children": [] },
+              { "id": "correction-erasing", "label": "Correction and Erasing", "children": [] }
+            ]
+          },
+          {
+            "id": "glues-adhesives",
+            "label": "Glues and Adhesives",
+            "children": [
+              { "id": "adhesives-holders", "label": "Adhesives and Holders", "children": [] },
+              { "id": "glues", "label": "Glues", "children": [] }
+            ]
+          },
+          { "id": "boards-markers", "label": "Boards & Markers", "children": [] },
+          { "id": "cutting-tools", "label": "Cutting Tools", "children": [] },
+          { "id": "stapling", "label": "Stapling", "children": [] },
+          { "id": "pencil-bags-cases", "label": "Pencil Bags & Cases", "children": [] },
+          { "id": "stationery-hole-punch", "label": "Hole Punch", "children": [] },
+          { "id": "stamps-ink", "label": "Stamps & Ink", "children": [] },
+          { "id": "sharpeners", "label": "Sharpeners", "children": [] },
+          { "id": "magnets", "label": "Magnets", "children": [] },
+          { "id": "measuring-viewing", "label": "Measuring & Viewing", "children": [] },
+          { "id": "calculators", "label": "Calculators", "children": [] },
+          { "id": "filing-storage", "label": "Filing & Storage", "children": [] },
+          { "id": "clipboards", "label": "Clipboards", "children": [] },
+          { "id": "books-notebooks", "label": "Books & Notebooks", "children": [] },
+          { "id": "labels-notes", "label": "Labels & Notes", "children": [] },
+          { "id": "colour-paper-boards", "label": "Colour Paper and Boards", "children": [] },
+          { "id": "book-covers-plastic", "label": "Book Covers and Plastic", "children": [] },
+          { "id": "desk-organisers", "label": "Desk Organisers", "children": [] },
+          { "id": "fasteners-clips", "label": "Fasteners & Clips", "children": [] },
+          { "id": "stationery-accessories", "label": "Accessories", "children": [] }
+        ]
+      },
+      { "id": "educational", "label": "Educational", "children": [] }
+    ]
   }
 ]

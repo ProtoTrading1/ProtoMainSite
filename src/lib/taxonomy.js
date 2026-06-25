@@ -60,7 +60,16 @@ export function slugToLabel(slug) {
 
 /** Legacy nav ids whose slug no longer matches labelToSlug(label) after a rename. */
 const LEGACY_NAV_ALIASES = {
-  'arts-crafts-stationery': 'art-supplies-and-stationery',
+  // Pre-restructure aliases — keep old slugs resolving to new top-level ids
+  'arts-crafts-stationery': 'stationery',
+  'art-supplies-and-stationery': 'stationery',
+  'beads-jewellery-accessories': 'beads',
+  'events-parties': 'party-events-seasonals',
+  'food-drinks': 'confectionery',
+  'homeware-kitchen': 'homeware',
+  'motarro': 'stationery',
+  'packaging': 'packaging-storage',
+  'toys-games-kids': 'kids-toys-games',
 };
 
 /**
