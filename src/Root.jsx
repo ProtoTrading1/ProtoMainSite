@@ -196,23 +196,26 @@ export default function Root() {
     </div>
   );
 
-  if (isRegisterRoute && !session) {
-    return (
-      <>
-        <Suspense fallback={authSurfaceFallback}>
-          <RegisterPage onLogin={() => setSurface('login')} />
-        </Suspense>
-        {view === 'login' && (
-          <Suspense fallback={null}>
-            <LoginModal
-              onLogin={handleLogin}
-              onClose={() => setSurface('landing')}
-              onApply={() => {}}
-            />
+  if (isRegisterRoute) {
+    if (session === undefined) return authSurfaceFallback;
+    if (!session) {
+      return (
+        <>
+          <Suspense fallback={authSurfaceFallback}>
+            <RegisterPage onLogin={() => setSurface('login')} />
           </Suspense>
-        )}
-      </>
-    );
+          {view === 'login' && (
+            <Suspense fallback={null}>
+              <LoginModal
+                onLogin={handleLogin}
+                onClose={() => setSurface('landing')}
+                onApply={() => {}}
+              />
+            </Suspense>
+          )}
+        </>
+      );
+    }
   }
 
   if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
