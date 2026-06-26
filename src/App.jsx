@@ -342,7 +342,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
     : path.map((seg, i) => ({ label: seg, path: path.slice(0, i + 1) }));
-  const recommendationProducts = useMemo(() => catalogProducts.slice(0, 4), [catalogProducts]);
+  // Belt-and-suspenders: collapse barcode siblings even if an older cached bundle
+  // skipped grouping inside fetchProductPage (common after deploys — /assets/* is immutable).
+  const displayProducts = useMemo(
+    () => groupProductsByBarcode(catalogProducts),
+    [catalogProducts],
+  );
+  const groupedOnPage = displayProducts.length < catalogProducts.length;
+  const visibleProductCount = groupedOnPage && page === 1 && catalogTotal <= CATALOG_PAGE_SIZE
+    ? catalogTotal - (catalogProducts.length - displayProducts.length)
+    : catalogTotal;
+  const recommendationProducts = useMemo(() => displayProducts.slice(0, 4), [displayProducts]);
 
   // Resolve the category node for the current path (used by CategoryLanding)
   const categoryNode = useMemo(() => {
@@ -591,9 +601,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         <main className="content-area">
           <MainContent
-            products={catalogProducts}
+            products={displayProducts}
             allProductCount={counts[''] || catalogTotal}
-            categoryProductCount={catalogTotal}
+            categoryProductCount={visibleProductCount}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             onCartQtyChange={handleCartQtyChange}

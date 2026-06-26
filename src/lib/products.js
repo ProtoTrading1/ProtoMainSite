@@ -11,7 +11,7 @@ let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 45_000;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
-const LS_KEY = 'proto_catalog_v10';
+const LS_KEY = 'proto_catalog_v11';
 const LS_TTL = 90 * 1000;
 
 function saveToLocalCache(data) {
