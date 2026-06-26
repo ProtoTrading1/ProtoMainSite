@@ -1,0 +1,96 @@
+/** Shared source SKU — multiple website_stock rows share the same barcode. */
+export function variantGroupKey(product) {
+  const key = String(product?.barcode || product?.code || '').trim();
+  return key || null;
+}
+
+function deriveGroupTitle(variants) {
+  const names = variants.map((v) => String(v.name || v.title || '').trim()).filter(Boolean);
+  if (!names.length) return null;
+  if (names.length === 1) return names[0];
+
+  let prefix = names[0];
+  for (const name of names.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && i < name.length && prefix[i] === name[i]) i += 1;
+    prefix = prefix.slice(0, i);
+    if (!prefix.trim()) break;
+  }
+
+  const trimmed = prefix.replace(/[\s\-–|,]+$/, '').trim();
+  if (trimmed.length >= 8) return trimmed;
+  return names[0];
+}
+
+/** Collapse variant rows that share a barcode into one card with a variants[] list. */
+export function groupProductsByBarcode(products) {
+  if (!Array.isArray(products) || !products.length) return [];
+
+  const groups = new Map();
+  const order = [];
+
+  for (const product of products) {
+    const key = variantGroupKey(product);
+    if (!key) {
+      order.push({ type: 'single', product });
+      continue;
+    }
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push({ type: 'group', key });
+    }
+    groups.get(key).push(product);
+  }
+
+  const seenGroups = new Set();
+  const out = [];
+
+  for (const entry of order) {
+    if (entry.type === 'single') {
+      out.push(entry.product);
+      continue;
+    }
+    if (seenGroups.has(entry.key)) continue;
+    seenGroups.add(entry.key);
+
+    const variants = groups.get(entry.key) || [];
+    if (variants.length <= 1) {
+      out.push(variants[0] || { id: entry.key, code: entry.key, barcode: entry.key, name: entry.key });
+      continue;
+    }
+
+    const rep = variants[0];
+    const groupTitle = deriveGroupTitle(variants) || rep.name || rep.title || entry.key;
+
+    out.push({
+      ...rep,
+      id: `group_${entry.key}`,
+      code: entry.key,
+      barcode: entry.key,
+      parentSku: entry.key,
+      name: groupTitle,
+      title: groupTitle,
+      isVariantGroup: true,
+      variantCount: variants.length,
+      variants,
+    });
+  }
+
+  return out;
+}
+
+/** When search matches one variant, keep siblings that share the same barcode. */
+export function expandBarcodeSiblings(pool, matched) {
+  if (!Array.isArray(pool) || !Array.isArray(matched) || !matched.length) return matched || [];
+
+  const keys = new Set(matched.map(variantGroupKey).filter(Boolean));
+  if (!keys.size) return matched;
+
+  const ids = new Set(matched.map((p) => p.id));
+  for (const product of pool) {
+    const key = variantGroupKey(product);
+    if (key && keys.has(key)) ids.add(product.id);
+  }
+
+  return pool.filter((p) => ids.has(p.id));
+}

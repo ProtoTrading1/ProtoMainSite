@@ -1,5 +1,6 @@
 import { fuzzyFilter } from './fuzzySearch';
 import { applySkuOrder, getActiveTaxonomy, lookupSortOrder, resolveNavPathForProducts } from './taxonomy';
+import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -145,11 +146,13 @@ export async function fetchProductPage({
 } = {}) {
   let products = await getAllCached();
   const sortOrders = await getSortOrders();
+  const pool = products;
   products = applyCollection(products, collection, specialIds);
   const hasSearch = Boolean(searchQuery.trim());
   if (!hasSearch) products = applyPathFilter(products, categoryPath);
-  products = hasSearch ? fuzzyFilter(products, searchQuery) : products;
+  if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
   products = applySort(products, sort, categoryPath, sortOrders);
+  products = groupProductsByBarcode(products);
 
   const total = products.length;
   const from = (page - 1) * pageSize;
@@ -165,6 +168,7 @@ export async function fetchProductPage({
 export async function fetchCategoryCounts({ collection = 'all' } = {}) {
   let products = await getAllCached();
   products = applyCollection(products, collection);
+  products = groupProductsByBarcode(products);
   const counts = { '': products.length };
   for (const p of products) {
     const cp = p.categoryPath;

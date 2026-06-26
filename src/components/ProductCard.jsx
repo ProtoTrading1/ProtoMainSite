@@ -136,9 +136,10 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
+  const variantCount = product?.variantCount || variants.length;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
-    ? [{ label: 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
+    ? [{ label: variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
     : baseTags;
   const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
@@ -154,6 +155,11 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     : null;
   const inCart = cartQty > 0;
 
+  useEffect(() => {
+    setSelectedVariant(null);
+    setActiveImageIdx(0);
+  }, [product?.id]);
+
   const openPreview = () => {
     onSearchEngage?.();
     setZoomOpen(true);
@@ -166,9 +172,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const closePreview = () => { setZoomOpen(false); onZoomClose?.(); };
 
   const handleAdd = () => {
+    if (isVariantGroup && !selectedVariant) {
+      openPreview();
+      return;
+    }
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
-    addToCart(product, qty, pos);
+    addToCart(activeProduct, qty, pos);
   };
 
   useEffect(() => {
@@ -213,6 +223,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
         <div className="product-body">
           <div className="product-meta">
             <span>{product.code}</span>
+            {isVariantGroup && variantCount > 1 && (
+              <span className="pc-variant-count">{variantCount} options</span>
+            )}
           </div>
 
           <button className="product-title-button" onClick={openPreview} type="button">
@@ -251,7 +264,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
             <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
               <ShoppingCart size={15} />
-              Add
+              {isVariantGroup ? 'View options' : 'Add'}
             </button>
           </div>
           {inCart && (
@@ -332,7 +345,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <span className="pz-variants-label">Select a variant</span>
                     <div className="pz-variants-list">
                       {variants.map((v) => {
-                        const isSelected = (selectedVariant?.id || product.id) === v.id;
+                        const isSelected = (selectedVariant?.id || variants[0]?.id) === v.id;
                         return (
                           <button
                             key={v.id}
@@ -345,6 +358,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                             )}
                             <div className="pz-variant-info">
                               <span className="pz-variant-name">{v.name}</span>
+                              <span className="pz-variant-code">{v.sku || v.websiteSku || v.code}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
                             </div>
                           </button>
