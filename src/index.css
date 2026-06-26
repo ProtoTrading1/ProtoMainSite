@@ -2082,6 +2082,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-align: left;
 }
 .product-meta strong { color: #15803d; font-weight: 700; }
+.pc-variant-count {
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
 .pc-instock { color: #15803d !important; }
 .pc-confirm { color: #92400e !important; }
 

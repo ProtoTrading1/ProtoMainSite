@@ -15,6 +15,7 @@ const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmM
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
+import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
@@ -281,6 +282,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
         }
         if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
+        rows = groupProductsByBarcode(rows);
         setUsingFallback(true);
         setCatalogTotal(rows.length);
         setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
@@ -552,35 +554,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [searchQuery, page]);
 
-  // Group products sharing the same parentSku into a single card with "Multiple Variants"
-  const displayProducts = useMemo(() => {
-    const groups = new Map();
-    const order = [];
-    for (const p of catalogProducts) {
-      if (p.parentSku) {
-        if (!groups.has(p.parentSku)) {
-          groups.set(p.parentSku, []);
-          order.push({ type: 'group', key: p.parentSku });
-        }
-        groups.get(p.parentSku).push(p);
-      } else {
-        order.push({ type: 'single', product: p });
-      }
-    }
-    return order.map((entry) => {
-      if (entry.type === 'single') return entry.product;
-      const variants = groups.get(entry.key);
-      if (variants.length === 1) return variants[0];
-      const rep = variants[0];
-      return {
-        ...rep,
-        id: `group_${entry.key}`,
-        isVariantGroup: true,
-        variants,
-      };
-    });
-  }, [catalogProducts]);
-
   const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
@@ -618,7 +591,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         <main className="content-area">
           <MainContent
-            products={displayProducts}
+            products={catalogProducts}
             allProductCount={counts[''] || catalogTotal}
             categoryProductCount={catalogTotal}
             addToCart={addToCart}
