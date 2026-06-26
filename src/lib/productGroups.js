@@ -59,8 +59,9 @@ export function groupProductsByBarcode(products) {
       continue;
     }
 
-    const rep = variants[0];
+    const rep = variants.find((v) => v.image || v.localImage) || variants[0];
     const groupTitle = deriveGroupTitle(variants) || rep.name || rep.title || entry.key;
+    const groupImages = variants.flatMap((v) => v.images || (v.image ? [v.image] : [])).filter(Boolean);
 
     out.push({
       ...rep,
@@ -70,6 +71,8 @@ export function groupProductsByBarcode(products) {
       parentSku: entry.key,
       name: groupTitle,
       title: groupTitle,
+      image: rep.image || rep.localImage || groupImages[0] || '',
+      images: groupImages.length ? [...new Set(groupImages)] : rep.images,
       isVariantGroup: true,
       variantCount: variants.length,
       variants,

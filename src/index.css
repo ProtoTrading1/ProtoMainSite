@@ -2029,7 +2029,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   width: auto;
   height: auto;
   object-fit: contain;
-  mix-blend-mode: multiply;
 }
 .product-image img.catalogue-photo {
   width: auto;
@@ -2038,12 +2037,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   max-height: 204px;
   object-fit: contain;
   object-position: center;
-  mix-blend-mode: multiply;
 }
 .product-image img.trimmed-catalogue-photo {
   max-width: 92%;
   max-height: 204px;
-  mix-blend-mode: multiply;
 }
 .tag-row {
   position: absolute;
