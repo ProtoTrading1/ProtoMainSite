@@ -456,11 +456,20 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const sendOrderEmail = async (opts = {}) => {
     if (!cartItems.length) return;
     const courierChoice = opts?.courierChoice || null;
+    const customerNotes = String(opts?.customerNotes || '').trim();
     const deliveryMethod = courierChoice === 'own'
       ? "Customer's own courier"
       : courierChoice === 'proto'
         ? 'Proto Trading delivers'
         : null;
+
+    if (!deliveryMethod) {
+      setOrderError('Please choose a delivery option before submitting.');
+      setOrderStatus('error');
+      setModalOpen(true);
+      return;
+    }
+
     const siteOrigin = window.location.origin;
     const text = buildOrderText(cartItems, cartTotal);
     setOrderText(text);
@@ -471,7 +480,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try {
       let savedOrder = null;
       if (customer?.id) {
-        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, deliveryMethod);
+        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, { deliveryMethod, customerNotes });
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       }
 
@@ -479,6 +488,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         customer: customerDetails,
         totals: { subtotal: cartTotal },
         deliveryMethod,
+        customerNotes,
         orderId: savedOrder?.id || null,
         items: cartItems.map((item) => ({
           qty: item.qty,
@@ -713,7 +723,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 updateQty={updateQty}
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
-                sendOrderEmail={() => { setMobileCartOpen(false); sendOrderEmail(); }}
+                sendOrderEmail={(opts) => { setMobileCartOpen(false); sendOrderEmail(opts); }}
               />
             </div>
           </div>

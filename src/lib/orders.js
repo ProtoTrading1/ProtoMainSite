@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export async function saveOrder(customerId, cartItems, totalExVat, deliveryMethod = null) {
+export async function saveOrder(customerId, cartItems, totalExVat, { deliveryMethod = null, customerNotes = '' } = {}) {
   const items = cartItems.map((i) => ({
     productId: i.product.id,
     code: i.product.code,
@@ -11,29 +11,35 @@ export async function saveOrder(customerId, cartItems, totalExVat, deliveryMetho
     image: i.product.image || '',
   }));
 
+  const notes = String(customerNotes || '').trim();
+  const insertRow = {
+    customer_id: customerId,
+    items,
+    original_items: items,
+    final_items: items,
+    order_match: 'order-match',
+    total_ex_vat: totalExVat,
+    ...(deliveryMethod ? { delivery_method: deliveryMethod } : {}),
+    ...(notes ? { customer_notes: notes } : {}),
+  };
+
   const { data, error } = await supabase
     .from('orders')
-    .insert([{
-      customer_id: customerId,
-      items,
-      original_items: items,
-      final_items: items,
-      order_match: 'order-match',
-      total_ex_vat: totalExVat,
-    }])
+    .insert([insertRow])
     .select()
     .single();
   if (error) throw error;
 
-  // Persist the customer's chosen delivery method so it shows on the order link.
-  // Done as a separate update so a missing column (migration 024 not yet run)
-  // can never break order creation — it just logs and moves on.
-  if (deliveryMethod && data?.id) {
-    const { error: dmErr } = await supabase
+  // Fallback update if insert didn't persist delivery/notes (older schema or RLS).
+  if (data?.id && (deliveryMethod || notes)) {
+    const patch = {};
+    if (deliveryMethod) patch.delivery_method = deliveryMethod;
+    if (notes) patch.customer_notes = notes;
+    const { error: patchErr } = await supabase
       .from('orders')
-      .update({ delivery_method: deliveryMethod })
+      .update(patch)
       .eq('id', data.id);
-    if (dmErr) console.warn('delivery_method not saved (run migration 024):', dmErr.message);
+    if (patchErr) console.warn('order delivery/notes not saved:', patchErr.message);
   }
 
   // Premium tier qualification is decided server-side in /api/send-order.

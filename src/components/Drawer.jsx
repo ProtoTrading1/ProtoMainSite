@@ -36,22 +36,31 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
 
   const [showCourierPicker, setShowCourierPicker] = useState(false);
   const [courierChoice, setCourierChoice] = useState(null);
+  const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmitClick = () => {
     setShowCourierPicker(true);
     setCourierChoice(null);
+    setCustomerNotes('');
   };
 
   const handleConfirmCourier = async () => {
     setSubmitting(true);
     try {
-      await sendOrderEmail({ courierChoice, courierQuote: null });
+      await sendOrderEmail({ courierChoice, customerNotes: customerNotes.trim() });
       setShowCourierPicker(false);
       setCourierChoice(null);
+      setCustomerNotes('');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const closeCourierPicker = () => {
+    setShowCourierPicker(false);
+    setCourierChoice(null);
+    setCustomerNotes('');
   };
 
   return (
@@ -179,6 +188,19 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
               ))}
             </div>
 
+            <label style={{ display: 'block', marginBottom: 20 }}>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 8 }}>
+                Order notes (optional)
+              </span>
+              <textarea
+                value={customerNotes}
+                onChange={(e) => setCustomerNotes(e.target.value)}
+                placeholder="Anything we should know about delivery, timing, or your order…"
+                rows={3}
+                style={{ width: '100%', padding: '12px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
+              />
+            </label>
+
             <button
               type="button"
               onClick={handleConfirmCourier}
@@ -187,7 +209,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
             >
               {submitting ? 'Submitting…' : 'Confirm & Submit Quote'}
             </button>
-            <button type="button" onClick={() => { setShowCourierPicker(false); setCourierChoice(null); }} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+            <button type="button" onClick={closeCourierPicker} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
               Cancel
             </button>
           </div>
