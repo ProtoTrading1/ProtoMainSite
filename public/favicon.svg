@@ -1,15 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" fill="#000000"/>
   <defs>
     <mask id="ring-cut">
       <rect width="512" height="512" fill="#fff"/>
-      <rect x="132" y="312" width="248" height="34" fill="#000"/>
+      <rect x="120" y="310" width="272" height="40" fill="#000"/>
     </mask>
   </defs>
+  <!-- Transparent background: ring only, no fill behind the mark -->
   <g fill="#E53935" mask="url(#ring-cut)">
-    <circle cx="256" cy="248" r="168"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M256 72c97.2 0 176 78.8 176 176s-78.8 176-176 176S80 345.2 80 248 158.8 72 256 72Zm0 50c-69.6 0-126 56.4-126 126s56.4 126 126 126 126-56.4 126-126-56.4-126-126-126Z"/>
   </g>
-  <circle cx="256" cy="248" r="118" fill="#000000"/>
   <ellipse cx="256" cy="236" rx="50" ry="104" fill="#E53935"/>
   <ellipse cx="256" cy="372" rx="86" ry="16" fill="#E53935"/>
 </svg>
