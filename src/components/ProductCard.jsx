@@ -6,6 +6,26 @@ import { trackEvent } from '../lib/trackEvent';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
 const LOW_STOCK_THRESHOLD = 5;
+// Show the limited-stock order disclaimer only below this catalog quantity.
+const STOCK_POLICY_THRESHOLD = 20;
+
+function catalogStockQty(product) {
+  if (!product) return null;
+  const raw = product.stockOnHand ?? product.stockQty;
+  if (raw === undefined || raw === null) return null;
+  return Number(raw) || 0;
+}
+
+function shouldShowStockPolicy(product) {
+  if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length > 1) {
+    return product.variants.some((variant) => {
+      const qty = catalogStockQty(variant);
+      return qty !== null && qty < STOCK_POLICY_THRESHOLD;
+    });
+  }
+  const qty = catalogStockQty(product);
+  return qty !== null && qty < STOCK_POLICY_THRESHOLD;
+}
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
@@ -251,9 +271,11 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
 
-          <p className="product-stock-policy">
-            (Limited stock available. Orders exceeding current stock can still be fulfilled — please allow additional time for delivery.)
-          </p>
+          {shouldShowStockPolicy(product) && (
+            <p className="product-stock-policy">
+              (Limited stock available. Orders exceeding current stock can still be fulfilled — please allow additional time for delivery.)
+            </p>
+          )}
 
           {/* Always the same control: typeable quantity + Add button */}
           <div className="buy-row">
