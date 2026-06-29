@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import { optimizedImageUrl } from '../lib/imageUrl';
 
@@ -38,6 +38,13 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
   const [courierChoice, setCourierChoice] = useState(null);
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const itemsRef = useRef(null);
+
+  useEffect(() => {
+    const el = itemsRef.current;
+    if (!el || !cartItems.length) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [cartItems]);
 
   const handleSubmitClick = () => {
     setShowCourierPicker(true);
@@ -90,7 +97,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
         </div>
       )}
 
-      <div className="drawer-items">
+      <div className="drawer-items" ref={itemsRef}>
         {cartItems.length === 0 && (
           <div className="drawer-empty">
             <div className="drawer-empty-icon"><ShoppingCart size={22} /></div>

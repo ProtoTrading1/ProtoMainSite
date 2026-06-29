@@ -517,6 +517,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setOrderStatus('sent');
       }
 
+      clearCart();
+      setMobileCartOpen(false);
+      setCartDrawerOpen(false);
+
       if (searchTrackRef.current.rowId) {
         void logSearchOrder({
           searchRowId: searchTrackRef.current.rowId,

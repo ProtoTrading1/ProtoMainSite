@@ -251,6 +251,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
 
+          <p className="product-stock-policy">
+            (Limited stock available. Orders exceeding current stock will still be fulfilled — please allow additional time for delivery.)
+          </p>
+
           {/* Always the same control: typeable quantity + Add button */}
           <div className="buy-row">
             <div className="qty-stepper" aria-label="Quantity">

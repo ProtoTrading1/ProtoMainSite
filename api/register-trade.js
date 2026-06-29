@@ -11,6 +11,89 @@ const BREVO_SENDER = {
   email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
 };
 
+const ADMIN_TO = process.env.ORDER_TO_EMAIL || 'orders@prototrading.co.za';
+
+function caps(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function buildAdminSignupHtml({
+  contactName,
+  businessName,
+  email,
+  phone,
+  companyAddress,
+  deliveryAddress,
+  streetName,
+  suburb,
+  postalCode,
+  buildingType,
+  unitNumber,
+  country,
+  province,
+  city,
+  businessType,
+  customerCode,
+}) {
+  const rows = [
+    ['Contact', caps(contactName)],
+    ['Business', caps(businessName)],
+    ['Email', caps(email)],
+    ['Phone', caps(phone)],
+    ['Company address', caps(companyAddress)],
+    ['Delivery address', caps(deliveryAddress)],
+    ['Street', caps(streetName)],
+    ['Suburb', caps(suburb)],
+    ['Postal code', caps(postalCode)],
+    ['Building type', caps(buildingType)],
+    ['Unit number', caps(unitNumber)],
+    ['Country', caps(country)],
+    ['Province', caps(province)],
+    ['City', caps(city)],
+    ['Business type', caps(businessType)],
+    ['Customer code', caps(customerCode)],
+  ].filter(([, value]) => value);
+
+  const body = rows.map(([label, value]) => (
+    `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;width:180px;">${escapeHtml(label)}</td>`
+    + `<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(value)}</td></tr>`
+  )).join('');
+
+  return `
+    <div style="font-family:Arial,sans-serif;color:#111827;">
+      <h2>New trade registration — delivery details</h2>
+      <p>A customer signed up on the trade portal. Delivery details below are stored in CAPS for the admin dashboard.</p>
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">${body}</table>
+    </div>
+  `;
+}
+
+async function sendAdminSignupEmail(payload) {
+  if (!process.env.BREVO_API_KEY) return;
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: BREVO_SENDER,
+        to: [{ email: ADMIN_TO }],
+        subject: `New trade signup — ${caps(payload.businessName || payload.contactName || 'CUSTOMER')}`,
+        htmlContent: buildAdminSignupHtml(payload),
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      console.error('Admin signup email Brevo error:', resp.status, JSON.stringify(body));
+    }
+  } catch (err) {
+    console.error('Admin signup email error:', err.message);
+  }
+}
+
 // Basic RFC-ish format check + common throwaway/dummy domains
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const BLOCKED_EMAIL_DOMAINS = new Set([
@@ -133,6 +216,11 @@ export default async function handler(req, res) {
     customerCode,
     instantApproval,
     company_fax,
+    streetName,
+    suburb,
+    postalCode,
+    buildingType,
+    unitNumber,
   } = req.body || {};
 
   // Honeypot — bots that fill hidden fields get a fake success response.
@@ -175,7 +263,12 @@ export default async function handler(req, res) {
   const normalizedBusinessName = businessName.trim();
   const normalizedPhone = phone.trim();
   const normalizedCompanyAddress = companyAddress.trim();
-  const normalizedDeliveryAddress = deliveryAddress.trim();
+  const normalizedDeliveryAddress = caps(deliveryAddress);
+  const normalizedStreetName = caps(streetName);
+  const normalizedSuburb = caps(suburb);
+  const normalizedPostalCode = caps(postalCode);
+  const normalizedBuildingType = caps(buildingType);
+  const normalizedUnitNumber = caps(unitNumber);
   const normalizedVatNumber = vatNumber?.trim() || null;
 
   let protoActive = null;
@@ -243,6 +336,11 @@ export default async function handler(req, res) {
       business_name: (isProtoActive && protoActive?.name) ? protoActive.name : normalizedBusinessName,
       company_address: normalizedCompanyAddress,
       delivery_address: normalizedDeliveryAddress,
+      street_name: normalizedStreetName || null,
+      suburb: normalizedSuburb || null,
+      postal_code: normalizedPostalCode || null,
+      building_type: normalizedBuildingType || null,
+      unit_number: normalizedUnitNumber || null,
       vat_number: normalizedVatNumber,
       country: country || null,
       province: province || null,
@@ -266,6 +364,11 @@ export default async function handler(req, res) {
       monthly_spend: _ms,
       website: _wb,
       company_address: _ca,
+      street_name: _sn,
+      suburb: _su,
+      postal_code: _pc,
+      building_type: _btp,
+      unit_number: _un,
       vat_number: _vn,
       business_name: _bn,
       country: _co,
@@ -283,8 +386,8 @@ export default async function handler(req, res) {
 
     const upsertAttempts = [
       fullPayload,
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
-      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
       basePayload,
@@ -321,6 +424,25 @@ export default async function handler(req, res) {
     if (savedProfile?.customer_code) {
       allocatedCustomerCode = savedProfile.customer_code;
     }
+
+    await sendAdminSignupEmail({
+      contactName: normalizedContactName,
+      businessName: normalizedBusinessName,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      companyAddress: normalizedCompanyAddress,
+      deliveryAddress: normalizedDeliveryAddress,
+      streetName: normalizedStreetName,
+      suburb: normalizedSuburb,
+      postalCode: normalizedPostalCode,
+      buildingType: normalizedBuildingType,
+      unitNumber: normalizedUnitNumber,
+      country,
+      province,
+      city,
+      businessType,
+      customerCode: allocatedCustomerCode,
+    });
 
     if (fullPayload.accept_whatsapp === true && normalizedPhone && shouldApprove) {
       await sendWelcomeWhatsapp({

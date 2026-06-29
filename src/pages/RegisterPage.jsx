@@ -40,6 +40,8 @@ const BUSINESS_TYPES = [
   'Other',
 ];
 
+const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
+
 const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
   'R5,000 – R10,000',
@@ -81,6 +83,11 @@ export default function RegisterPage({ onLogin }) {
   const [companyAddress, setCompanyAddress] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [sameAddress, setSameAddress] = useState(false);
+  const [streetName, setStreetName] = useState('');
+  const [suburb, setSuburb] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [buildingType, setBuildingType] = useState('');
+  const [unitNumber, setUnitNumber] = useState('');
   const [companyFax, setCompanyFax] = useState('');
 
   const [emailError, setEmailError] = useState('');
@@ -102,10 +109,32 @@ export default function RegisterPage({ onLogin }) {
     if (checked) setDeliveryAddress(companyAddress);
   };
 
+  const buildStructuredDeliveryAddress = () => {
+    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
+    if (buildingType) parts.push(buildingType);
+    if (buildingType === 'Apartments' && unitNumber.trim()) {
+      parts.push(`Unit ${unitNumber.trim()}`);
+    }
+    return parts.filter(Boolean).join(', ').toUpperCase();
+  };
+
+  const resolvedDeliveryAddress = () => (
+    sameAddress ? companyAddress.trim().toUpperCase() : buildStructuredDeliveryAddress()
+  );
+
   const canSubmit = () => {
     const phoneOk = phone.replace(/\D/g, '').length >= 8;
     const whatsappAnswered = typeof whatsappOptIn === 'boolean';
     const passwordsMatch = password === confirmPassword;
+    const deliveryOk = sameAddress
+      ? companyAddress.trim()
+      : (
+        streetName.trim()
+        && suburb.trim()
+        && postalCode.trim()
+        && buildingType
+        && (buildingType !== 'Apartments' || unitNumber.trim())
+      );
     return (
       contactName.trim()
       && businessName.trim()
@@ -117,7 +146,7 @@ export default function RegisterPage({ onLogin }) {
       && passwordsMatch
       && whatsappAnswered
       && companyAddress.trim()
-      && (sameAddress || deliveryAddress.trim())
+      && deliveryOk
       && country.trim()
     );
   };
@@ -139,6 +168,7 @@ export default function RegisterPage({ onLogin }) {
     setSubmitting(true);
     setSubmitError('');
     try {
+      const deliveryLine = resolvedDeliveryAddress();
       const result = await submitTradeApplication({
         email: email.trim(),
         password,
@@ -147,7 +177,12 @@ export default function RegisterPage({ onLogin }) {
         businessName: businessName.trim(),
         phone: phone.trim(),
         companyAddress: companyAddress.trim(),
-        deliveryAddress: (sameAddress ? companyAddress : deliveryAddress).trim(),
+        deliveryAddress: deliveryLine,
+        streetName: streetName.trim(),
+        suburb: suburb.trim(),
+        postalCode: postalCode.trim(),
+        buildingType,
+        unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
         country: country || null,
         province: province || null,
@@ -467,14 +502,64 @@ export default function RegisterPage({ onLogin }) {
                       Delivery address is the same as my company address
                     </label>
                     {!sameAddress && (
-                      <div className="lp-quiz-field lp-quiz-field--full">
-                        <label>Full delivery address</label>
-                        <AddressAutocomplete
-                          value={deliveryAddress}
-                          onChange={setDeliveryAddress}
-                          placeholder="Start typing delivery address…"
-                        />
-                      </div>
+                      <>
+                        <div className="lp-quiz-field">
+                          <label>Street name</label>
+                          <input
+                            value={streetName}
+                            onChange={(e) => setStreetName(e.target.value)}
+                            placeholder="Street name and number"
+                            required
+                          />
+                        </div>
+                        <div className="lp-quiz-field">
+                          <label>Suburb</label>
+                          <input
+                            value={suburb}
+                            onChange={(e) => setSuburb(e.target.value)}
+                            placeholder="Suburb"
+                            required
+                          />
+                        </div>
+                        <div className="lp-quiz-field">
+                          <label>Postal code</label>
+                          <input
+                            value={postalCode}
+                            onChange={(e) => setPostalCode(e.target.value)}
+                            placeholder="Postal code"
+                            required
+                          />
+                        </div>
+                        <div className="lp-quiz-field lp-quiz-field--full">
+                          <div className="lp-register-subhead">Building type</div>
+                          <div className="lp-quiz-types">
+                            {BUILDING_TYPES.map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
+                                onClick={() => {
+                                  setBuildingType(type);
+                                  if (type !== 'Apartments') setUnitNumber('');
+                                }}
+                              >
+                                {type}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {buildingType === 'Apartments' && (
+                          <div className="lp-quiz-field">
+                            <label>Unit / apartment number</label>
+                            <input
+                              value={unitNumber}
+                              onChange={(e) => setUnitNumber(e.target.value)}
+                              placeholder="Unit number"
+                              required
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </section>
