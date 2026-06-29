@@ -1,0 +1,27 @@
+{
+  "move": "Move_4_fashion_accessories",
+  "source": "scripts/data/Move_4_fashion_accessories.xlsx",
+  "sku_count": 1114,
+  "path_counts": {
+    "Fashion & Accessories > Scarves": 260,
+    "Fashion & Accessories > Hats & Caps > Fedora": 9,
+    "Fashion & Accessories > Hats & Caps > Panama": 6,
+    "Fashion & Accessories > Synthetic Bags > Sling & Crossbody": 33,
+    "Fashion & Accessories > Synthetic Bags > Backpack & Shoulder": 24,
+    "Fashion & Accessories > Hats & Caps > Sunhats": 31,
+    "Fashion & Accessories > Synthetic Bags > Luggage & Laptop": 2,
+    "Fashion & Accessories > Synthetic Bags > Small Accessories": 78,
+    "Packaging & Storage > Packaging Packets and Bags > Paper Bags > Boutique": 29,
+    "Fashion & Accessories > Leather > Wallets & Purses": 146,
+    "Fashion & Accessories > Leather > Bag Straps": 100,
+    "Fashion & Accessories > Synthetic Bags > Handbags": 178,
+    "Fashion & Accessories > Hats & Caps > Hair Accessories": 16,
+    "Fashion & Accessories > Iron-On Patch": 70,
+    "Fashion & Accessories > Synthetic Bags > Tote": 12,
+    "Fashion & Accessories > Leather > Handbags": 29,
+    "Fashion & Accessories > Leather > Small Accessories": 10,
+    "Fashion & Accessories > Leather > Men's Sling & Crossbody": 57,
+    "Fashion & Accessories > Leather > Luggage & Laptop": 12,
+    "Fashion & Accessories > Leather > Backpack & Shoulder": 12
+  }
+}

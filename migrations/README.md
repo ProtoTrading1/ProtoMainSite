@@ -27,6 +27,13 @@ for replay history; superseded ones are **not deleted** so the history stays int
 | `007_stock_subcategory.sql` | **superseded by 010** | Added `subcategory` column to the old `website_products` table |
 | `009_leaf_category.sql` | **superseded by 010** | Added `leaf_category` column to the old `website_products` table |
 | `010_website_stock.sql` | **current** | Forward state. Creates `website_stock` + `archived_products`, indexes, RLS, and the transactional `archive_product` / `unarchive_product` functions. Supersedes `website_products` / `products` (wiped after a verified backup). |
+| `027_move_4_fashion_accessories.sql` | **current** | Recategorises 1,114 SKUs from `scripts/data/Move_4_fashion_accessories.xlsx` into the Fashion & Accessories taxonomy (plus 29 boutique paper bags → Packaging & Storage). |
+
+### Category moves (Move N workbooks)
+
+1. Place the workbook under `scripts/data/` (e.g. `Move_4_fashion_accessories.xlsx`).
+2. Generate or apply via `node scripts/apply-move-spreadsheet.mjs scripts/data/Move_4_fashion_accessories.xlsx` (requires stock Supabase env vars), **or** run the matching SQL migration in the stock project SQL editor.
+3. Manifest summary: `migration-backup/moves/move_4_manifest.json`.
 
 ### Catalogue rebuild (010) — operational notes
 
