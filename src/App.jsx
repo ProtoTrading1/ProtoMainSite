@@ -658,13 +658,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         <OrderConfirmModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          cartItems={cartItems}
-          cartTotal={cartTotal}
-          orderText={orderText}
           orderStatus={orderStatus}
           orderError={orderError}
-          customerDetails={customerDetails}
-          setCustomerDetails={setCustomerDetails}
         />
       </Suspense>
 
