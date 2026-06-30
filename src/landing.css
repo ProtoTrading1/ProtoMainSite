@@ -3557,6 +3557,7 @@
 
 .lp-register-page--standalone {
   background: #000;
+  overflow-x: hidden;
 }
 
 .lp-register-main-standalone {
@@ -3655,6 +3656,21 @@
   padding: 14px 12px;
   font-size: 13px;
   border-radius: 12px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.lp-register-page--standalone .lp-quiz-country {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.lp-register-page--standalone .lp-register-whatsapp {
+  padding: 14px 16px;
+}
+
+.lp-register-page--standalone .lp-register-whatsapp-actions button {
+  min-height: 48px;
 }
 
 .lp-register-page--standalone .lp-quiz-countries {
@@ -3679,20 +3695,130 @@
 
 @media (max-width: 720px) {
   .lp-register-main-standalone {
-    padding: 16px 14px 32px;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(28px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+
+  .lp-register-standalone-panel {
+    border-radius: 14px;
   }
 
   .lp-register-standalone-body {
-    padding: 24px 18px 28px;
+    padding: 22px 16px 26px;
+  }
+
+  .lp-register-page--standalone .lp-register-form {
+    gap: 22px;
+  }
+
+  .lp-register-page--standalone .lp-register-section {
+    gap: 14px;
+    padding-bottom: 18px;
+  }
+
+  .lp-register-page--standalone .lp-register-section h2 {
+    font-size: 12px;
   }
 
   .lp-register-page--standalone .lp-register-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .lp-register-page--standalone .lp-quiz-types,
   .lp-register-page--standalone .lp-quiz-types--compact {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .lp-register-page--standalone .lp-quiz-type-card {
+    padding: 12px 10px;
+    font-size: 12.5px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lp-register-page--standalone .lp-quiz-countries {
+    gap: 8px;
+  }
+
+  .lp-register-page--standalone .lp-quiz-country {
+    padding: 9px 12px;
+    font-size: 12.5px;
+  }
+
+  .lp-register-page--standalone .lp-register-subhead {
+    font-size: 13px;
+    margin: 6px 0 2px;
+  }
+
+  .lp-register-page--standalone .lp-register-submit {
+    min-height: 52px;
+  }
+
+  .lp-register-page--standalone .lp-register-footer {
+    padding:
+      16px max(16px, env(safe-area-inset-right))
+      max(22px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .lp-register-main-standalone {
+    padding:
+      0
+      0
+      max(20px, env(safe-area-inset-bottom))
+      0;
+  }
+
+  .lp-register-standalone-panel {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  .lp-register-standalone-body {
+    padding: 20px 16px 24px;
+  }
+
+  .lp-register-page--standalone .lp-quiz-field input,
+  .lp-register-page--standalone .lp-quiz-field select,
+  .lp-register-page--standalone .lp-quiz-field textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .lp-register-page--standalone .lp-register-whatsapp-head {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .lp-register-page--standalone .lp-register-whatsapp-head strong {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .lp-register-page--standalone .lp-register-whatsapp-head span {
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .lp-register-page--standalone .lp-quiz-pw-eye {
+    width: 44px;
+    height: 44px;
+    right: 6px;
+    justify-content: center;
   }
 }
 
