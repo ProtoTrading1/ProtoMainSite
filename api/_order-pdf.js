@@ -141,6 +141,14 @@ export function buildOrderPdfBuffer({ order, customer, items, categoryMap = {} }
     doc.text(`Email: ${email}`, PAGE.margin, y); y += 14;
     doc.text(`Phone: ${phone}`, PAGE.margin, y); y += 14;
     if (location) { doc.text(`Location: ${location}`, PAGE.margin, y); y += 14; }
+    const deliveryMethod = cleanText(order.delivery_method, '');
+    if (deliveryMethod) { doc.text(`Delivery: ${deliveryMethod}`, PAGE.margin, y); y += 14; }
+    const customerNotes = cleanText(order.customer_notes, '');
+    if (customerNotes) {
+      doc.font('Helvetica-Bold').text('Customer notes:', PAGE.margin, y); y += 14;
+      doc.font('Helvetica').text(customerNotes, PAGE.margin, y, { width: contentWidth }); 
+      y += doc.heightOfString(customerNotes, { width: contentWidth }) + 8;
+    }
     doc.text(`Placed: ${placedAt}`, PAGE.margin, y); y += 22;
 
     // ── Items table ──────────────────────────────────────────────

@@ -34,7 +34,7 @@ function adapt(row) {
     barcode: row.barcode,
     websiteSku: row.sku,
     sku: row.sku,
-    parentSku: null,
+    parentSku: row.barcode || null,
     name: row.title,
     title: row.title,
     description: row.original_description || '',

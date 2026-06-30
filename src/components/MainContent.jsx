@@ -22,6 +22,13 @@ export function catLabel(slug) {
   return slugToLabel(slug);
 }
 
+function cartQtyForProduct(product, cartQtyMap) {
+  if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length) {
+    return product.variants.reduce((sum, variant) => sum + (cartQtyMap[variant.id] || 0), 0);
+  }
+  return cartQtyMap[product.id] || 0;
+}
+
 function BannerHeroImage({ src, updatedAt, alt }) {
   const busted = updatedAt
     ? `${src}${src.includes('?') ? '&' : '?'}v=${encodeURIComponent(updatedAt)}`
@@ -262,7 +269,7 @@ export default function MainContent({
                       key={product.id}
                       product={product}
                       addToCart={addToCart}
-                      cartQty={cartQtyMap[product.id] || 0}
+                      cartQty={cartQtyForProduct(product, cartQtyMap)}
                       onCartQtyChange={onCartQtyChange}
                       special={specialsMap[product.id] || null}
                       priority={false}
@@ -275,7 +282,7 @@ export default function MainContent({
                     key={product.id}
                     product={product}
                     addToCart={addToCart}
-                    cartQty={cartQtyMap[product.id] || 0}
+                    cartQty={cartQtyForProduct(product, cartQtyMap)}
                     onCartQtyChange={onCartQtyChange}
                     special={specialsMap[product.id] || null}
                     priority={idx < 8}

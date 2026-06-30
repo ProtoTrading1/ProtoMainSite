@@ -15,6 +15,7 @@ const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmM
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
+import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
@@ -281,6 +282,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
         }
         if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
+        rows = groupProductsByBarcode(rows);
         setUsingFallback(true);
         setCatalogTotal(rows.length);
         setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
@@ -454,11 +456,20 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const sendOrderEmail = async (opts = {}) => {
     if (!cartItems.length) return;
     const courierChoice = opts?.courierChoice || null;
+    const customerNotes = String(opts?.customerNotes || '').trim();
     const deliveryMethod = courierChoice === 'own'
       ? "Customer's own courier"
       : courierChoice === 'proto'
         ? 'Proto Trading delivers'
         : null;
+
+    if (!deliveryMethod) {
+      setOrderError('Please choose a delivery option before submitting.');
+      setOrderStatus('error');
+      setModalOpen(true);
+      return;
+    }
+
     const siteOrigin = window.location.origin;
     const text = buildOrderText(cartItems, cartTotal);
     setOrderText(text);
@@ -469,7 +480,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try {
       let savedOrder = null;
       if (customer?.id) {
-        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, deliveryMethod);
+        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, { deliveryMethod, customerNotes });
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       }
 
@@ -477,6 +488,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         customer: customerDetails,
         totals: { subtotal: cartTotal },
         deliveryMethod,
+        customerNotes,
         orderId: savedOrder?.id || null,
         items: cartItems.map((item) => ({
           qty: item.qty,
@@ -504,6 +516,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       } else {
         setOrderStatus('sent');
       }
+
+      clearCart();
+      setMobileCartOpen(false);
+      setCartDrawerOpen(false);
 
       if (searchTrackRef.current.rowId) {
         void logSearchOrder({
@@ -552,35 +568,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [searchQuery, page]);
 
-  // Group products sharing the same parentSku into a single card with "Multiple Variants"
-  const displayProducts = useMemo(() => {
-    const groups = new Map();
-    const order = [];
-    for (const p of catalogProducts) {
-      if (p.parentSku) {
-        if (!groups.has(p.parentSku)) {
-          groups.set(p.parentSku, []);
-          order.push({ type: 'group', key: p.parentSku });
-        }
-        groups.get(p.parentSku).push(p);
-      } else {
-        order.push({ type: 'single', product: p });
-      }
-    }
-    return order.map((entry) => {
-      if (entry.type === 'single') return entry.product;
-      const variants = groups.get(entry.key);
-      if (variants.length === 1) return variants[0];
-      const rep = variants[0];
-      return {
-        ...rep,
-        id: `group_${entry.key}`,
-        isVariantGroup: true,
-        variants,
-      };
-    });
-  }, [catalogProducts]);
-
   const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
@@ -618,7 +605,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         <main className="content-area">
           <MainContent
-            products={displayProducts}
+            products={catalogProducts}
             allProductCount={counts[''] || catalogTotal}
             categoryProductCount={catalogTotal}
             addToCart={addToCart}
@@ -671,13 +658,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         <OrderConfirmModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          cartItems={cartItems}
-          cartTotal={cartTotal}
-          orderText={orderText}
           orderStatus={orderStatus}
           orderError={orderError}
-          customerDetails={customerDetails}
-          setCustomerDetails={setCustomerDetails}
         />
       </Suspense>
 
@@ -740,7 +722,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 updateQty={updateQty}
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
-                sendOrderEmail={() => { setMobileCartOpen(false); sendOrderEmail(); }}
+                sendOrderEmail={(opts) => { setMobileCartOpen(false); sendOrderEmail(opts); }}
               />
             </div>
           </div>

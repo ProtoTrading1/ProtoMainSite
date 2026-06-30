@@ -52,7 +52,7 @@ async function prepareItems(items) {
   }));
 }
 
-function buildPdfBuffer({ items, customer, totals }) {
+function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42 });
     const chunks = [];
@@ -76,6 +76,8 @@ function buildPdfBuffer({ items, customer, totals }) {
     doc.text(`Email: ${cleanText(customer?.email, 'Not provided')}`);
     doc.text(`Phone: ${cleanText(customer?.phone, 'Not provided')}`);
     doc.text(`Delivery region: ${cleanText(customer?.region, 'To confirm')}`);
+    if (deliveryMethod) doc.text(`Delivery method: ${cleanText(deliveryMethod)}`);
+    if (customerNotes) doc.text(`Customer notes: ${cleanText(customerNotes)}`);
     doc.moveDown(1);
 
     doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Order items');
@@ -116,7 +118,7 @@ function buildPdfBuffer({ items, customer, totals }) {
   });
 }
 
-function buildEmailHtml({ items, customer, totals }) {
+function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes }) {
   const rows = items.map((item) => {
     const product = item.product || {};
     const qty = Number(item.qty || 0);
@@ -131,6 +133,13 @@ function buildEmailHtml({ items, customer, totals }) {
     `;
   }).join('');
 
+  const deliveryLine = deliveryMethod
+    ? `<strong>Delivery method:</strong> ${escapeHtml(cleanText(deliveryMethod))}<br/>`
+    : '';
+  const notesLine = customerNotes
+    ? `<strong>Customer notes:</strong> ${escapeHtml(cleanText(customerNotes))}<br/>`
+    : '';
+
   return `
     <div style="font-family:Arial,sans-serif;color:#111827;">
       <h2>Proto Trading wholesale order request</h2>
@@ -138,7 +147,8 @@ function buildEmailHtml({ items, customer, totals }) {
       <p><strong>Customer:</strong> ${escapeHtml(cleanText(customer?.name, 'Not provided'))}<br/>
       <strong>Email:</strong> ${escapeHtml(cleanText(customer?.email, 'Not provided'))}<br/>
       <strong>Phone:</strong> ${escapeHtml(cleanText(customer?.phone, 'Not provided'))}<br/>
-      <strong>Delivery region:</strong> ${escapeHtml(cleanText(customer?.region, 'To confirm'))}</p>
+      <strong>Delivery region:</strong> ${escapeHtml(cleanText(customer?.region, 'To confirm'))}<br/>
+      ${deliveryLine}${notesLine}</p>
       <table style="border-collapse:collapse;width:100%;font-size:13px;">
         <thead>
           <tr>
@@ -168,9 +178,22 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Brevo API key not configured' });
   }
 
-  const { items = [], customer = {}, totals = {}, orderId: rawOrderId } = req.body || {};
+  const {
+    items = [],
+    customer = {},
+    totals = {},
+    orderId: rawOrderId,
+    deliveryMethod: rawDeliveryMethod,
+    customerNotes: rawCustomerNotes,
+  } = req.body || {};
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'No order items supplied' });
+  }
+
+  const deliveryMethod = cleanText(rawDeliveryMethod);
+  const customerNotes = cleanText(rawCustomerNotes);
+  if (!deliveryMethod) {
+    return res.status(400).json({ error: 'Delivery method is required' });
   }
 
   const to = process.env.ORDER_TO_EMAIL || DEFAULT_TO;
@@ -181,7 +204,13 @@ export default async function handler(req, res) {
   let pdfBuffer = null;
   try {
     const preparedItems = await prepareItems(items);
-    pdfBuffer = await buildPdfBuffer({ items: preparedItems, customer, totals });
+    pdfBuffer = await buildPdfBuffer({
+      items: preparedItems,
+      customer,
+      totals,
+      deliveryMethod,
+      customerNotes,
+    });
   } catch (err) {
     console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
   }
@@ -208,7 +237,7 @@ export default async function handler(req, res) {
         to: [{ email: to }],
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
         subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: buildEmailHtml({ items, customer, totals }),
+        htmlContent: buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes }),
         attachment,
       }),
     });
@@ -228,6 +257,18 @@ export default async function handler(req, res) {
   const orderId = String(rawOrderId || '').trim();
   let notifyResult = null;
   if (orderId) {
+    try {
+      const supabase = getPortalAdminClient();
+      const patch = {
+        delivery_method: deliveryMethod,
+        ...(customerNotes ? { customer_notes: customerNotes } : {}),
+      };
+      const { error: patchErr } = await supabase.from('orders').update(patch).eq('id', orderId);
+      if (patchErr) console.error('send-order: delivery/notes update failed:', patchErr.message);
+    } catch (err) {
+      console.error('send-order: delivery/notes update failed:', err.message);
+    }
+
     try {
       notifyResult = await runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed });
     } catch (err) {

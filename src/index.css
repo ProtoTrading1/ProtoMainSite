@@ -2082,6 +2082,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-align: left;
 }
 .product-meta strong { color: #15803d; font-weight: 700; }
+.pc-variant-count {
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
 .pc-instock { color: #15803d !important; }
 .pc-confirm { color: #92400e !important; }
 
@@ -2277,6 +2284,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
   min-height: 34px;
   margin-top: 10px;
+}
+
+.product-stock-policy {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #64748b;
 }
 /* Stock check inside the product zoom modal */
 .pz-stock-check {
@@ -3215,6 +3229,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   transition: border-color 0.15s, background 0.15s;
 }
 .ocm-copy-btn:hover { border-color: #0f172a; background: #f8fafc; }
+.order-modal-v2--simple { max-width: 420px; }
+.ocm-actions--simple { padding: 0 24px 24px; border-top: none; }
+.ocm-done-btn { width: 100%; justify-content: center; background: #16a34a; color: #fff; border-color: #16a34a; font-weight: 800; }
+.ocm-done-btn:hover { background: #15803d; border-color: #15803d; color: #fff; }
 
 /* ── About Modal — dark theme (matches PoliciesPage) ── */
 .about-modal-dark {
