@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "node scripts/generate-catalog.js && vite build",
+  "buildCommand": "node scripts/ensure-preregister-banner.mjs && node scripts/generate-catalog.js && vite build",
   "outputDirectory": "dist",
   "redirects": [
     {

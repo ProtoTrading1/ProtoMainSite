@@ -3555,6 +3555,25 @@
   flex-direction: column;
 }
 
+.lp-pre-register-banner {
+  width: 100%;
+  background: #050505;
+  line-height: 0;
+}
+
+.lp-pre-register-banner img {
+  display: block;
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.lp-register-shell-standalone {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+
 .lp-register-header {
   display: flex;
   align-items: center;
