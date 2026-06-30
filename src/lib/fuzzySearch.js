@@ -197,7 +197,30 @@ export function fuzzyFilter(products, query) {
   return scored.map((item) => item.product);
 }
 
+function quickMatch(index, tokens) {
+  return tokens.some((token) => {
+    const tokenCompact = compact(token);
+    if (!tokenCompact) return false;
+    return index.textCompact.includes(tokenCompact)
+      || index.codeCompact.includes(tokenCompact)
+      || index.nameCompact.includes(tokenCompact);
+  });
+}
+
 export function getSuggestions(products, query, limit = 8) {
   if (!query || !query.trim()) return [];
-  return fuzzyFilter(products, query).slice(0, limit);
+  const q = normalize(query);
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+
+  const pool = products.length > 400
+    ? products.filter((product) => quickMatch(getSearchIndex(product), tokens))
+    : products;
+
+  const scored = pool
+    .map((product) => ({ product, score: scoreProduct(product, tokens) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, limit).map((item) => item.product);
 }

@@ -157,6 +157,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const variantCount = product?.variantCount || variants.length;
+  const defaultVariant = isVariantGroup && variants.length ? variants[0] : null;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
     ? [{ label: variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
@@ -164,21 +165,21 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(defaultVariant);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const addButtonRef = useRef(null);
 
-  const activeProduct = selectedVariant || product;
+  const activeProduct = selectedVariant || defaultVariant || product;
   const galleryImages = Array.isArray(activeProduct.images) && activeProduct.images.length > 1
     ? activeProduct.images
     : null;
   const inCart = cartQty > 0;
 
   useEffect(() => {
-    setSelectedVariant(null);
+    setSelectedVariant(isVariantGroup && variants.length ? variants[0] : null);
     setActiveImageIdx(0);
-  }, [product?.id]);
+  }, [product?.id, isVariantGroup, variants.length]);
 
   const openPreview = () => {
     onSearchEngage?.();
@@ -192,10 +193,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const closePreview = () => { setZoomOpen(false); onZoomClose?.(); };
 
   const handleAdd = () => {
-    if (isVariantGroup && !selectedVariant) {
-      openPreview();
-      return;
-    }
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
     addToCart(activeProduct, qty, pos);
@@ -290,7 +287,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
             <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
               <ShoppingCart size={15} />
-              {isVariantGroup ? 'View options' : 'Add'}
+              Add
             </button>
           </div>
           {inCart && (
@@ -371,7 +368,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <span className="pz-variants-label">Select a variant</span>
                     <div className="pz-variants-list">
                       {variants.map((v) => {
-                        const isSelected = (selectedVariant?.id || variants[0]?.id) === v.id;
+                        const isSelected = (selectedVariant?.id || defaultVariant?.id) === v.id;
                         return (
                           <button
                             key={v.id}
@@ -421,24 +418,18 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     </button>
                   </div>
                 </div>
-                {isVariantGroup && !selectedVariant ? (
-                  <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', margin: 0 }}>
-                    Select a variant above to add to order
-                  </p>
-                ) : (
-                  <button
-                    className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
-                    onClick={() => {
-                      addToCart(activeProduct, qty, null, true);
-                      setJustAdded(true);
-                      setTimeout(() => setJustAdded(false), 1800);
-                    }}
-                    type="button"
-                  >
-                    <ShoppingCart size={16} />
-                    {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
-                  </button>
-                )}
+                <button
+                  className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
+                  onClick={() => {
+                    addToCart(activeProduct, qty, null, true);
+                    setJustAdded(true);
+                    setTimeout(() => setJustAdded(false), 1800);
+                  }}
+                  type="button"
+                >
+                  <ShoppingCart size={16} />
+                  {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
+                </button>
               </div>
             </div>
 
