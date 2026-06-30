@@ -3,10 +3,8 @@ import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
-import { isRegisterHost } from './lib/isRegisterHost';
+import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
-
-const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -14,28 +12,39 @@ const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-p
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
-const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://protoportal-main.vercel.app';
+const PORTAL_URL = getPortalUrl();
 
 export default function Root() {
   const adminHost = isAdminHost();
-  const registerHost = isRegisterHost();
+  const preRegisterHost = isPreRegisterHost();
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [view, setView] = useState(() => {
-    if (typeof window === 'undefined') return 'landing';
-    const saved = window.sessionStorage.getItem('proto-surface');
-    return saved === 'portal' || saved === 'profile' ? saved : 'landing';
-  });
+  const [view, setView] = useState('landing');
   const [route, setRoute] = useState(window.location.hash);
+  const [pathname, setPathname] = useState(() => window.location.pathname);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const authBootstrapped = useRef(false);
   const loadNonce = useRef(0);
 
   useEffect(() => {
     if (adminHost) document.title = 'Proto Admin';
-  }, [adminHost]);
+    else if (preRegisterHost) document.title = 'Proto Trading — Trade Registration';
+  }, [adminHost, preRegisterHost]);
+
+  useEffect(() => {
+    if (!preRegisterHost) return;
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setRoute('');
+    }
+    if (pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+      setPathname('/');
+    }
+  }, [preRegisterHost, pathname]);
 
   // Browsers (esp. Chrome) try to "restore" the previous scroll position
   // when the user navigates back, forward, or — combined with our hash
@@ -54,13 +63,27 @@ export default function Root() {
   }, []);
 
   useEffect(() => {
-    const handler = () => {
+    const onHashChange = () => {
+      if (preRegisterHost && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        return;
+      }
       setRoute(window.location.hash);
       scrollToTop();
     };
-    window.addEventListener('hashchange', handler);
-    return () => window.removeEventListener('hashchange', handler);
-  }, []);
+    const onPopState = () => {
+      setPathname(window.location.pathname);
+      scrollToTop();
+    };
+    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [preRegisterHost]);
+
+  const isRegisterRoute = !adminHost && !preRegisterHost && (pathname === '/register' || pathname === '/pre-register');
 
   const setSurface = useCallback((next) => {
     setView(next);
@@ -68,18 +91,10 @@ export default function Root() {
       window.sessionStorage.removeItem('proto-surface');
       return;
     }
-    if (['profile', 'admin', 'portal'].includes(next)) {
+    if (['profile', 'admin'].includes(next)) {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
-
-  useEffect(() => {
-    if (session !== null || !authBootstrapped.current) return;
-    if (view === 'portal' || view === 'profile') {
-      setView('landing');
-      window.sessionStorage.removeItem('proto-surface');
-    }
-  }, [session, view]);
 
   useEffect(() => {
     scrollToTop();
@@ -101,6 +116,11 @@ export default function Root() {
         return;
       }
 
+      if (preRegisterHost) {
+        if (!profile.is_approved && profile.role !== 'admin') setView('pending');
+        return;
+      }
+
       if (profile.is_approved || profile.role === 'admin') {
         setSurface('portal');
         return;
@@ -111,7 +131,7 @@ export default function Root() {
         setCustomerLoading(false);
       }
     }
-  }, [adminHost, setSurface]);
+  }, [adminHost, preRegisterHost, setSurface]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,11 +149,9 @@ export default function Root() {
 
     const bootstrapTimer = window.setTimeout(() => {
       if (!authBootstrapped.current) {
-        authBootstrapped.current = true;
         setSession(null);
-        setCustomerLoading(false);
       }
-    }, 8000);
+    }, 3500);
 
     (async () => {
       try {
@@ -201,6 +219,79 @@ export default function Root() {
       </div>
     </div>
   );
+
+  if (preRegisterHost) {
+    if (session === undefined) return authSurfaceFallback;
+
+    if (session && customerLoading && !customer) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Signing you in…</div>
+            <div style={{ color: '#94a3b8', fontSize: '13px' }}>Checking your account.</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (session && customer && (customer.is_approved || customer.role === 'admin')) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px', padding: '24px' }}>
+          <div style={{ fontSize: '48px' }}>✓</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
+          <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
+            Your trade account is approved. You will receive confirmation by email with next steps.
+          </p>
+          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            Log out
+          </button>
+        </div>
+      );
+    }
+
+    if (session && customer && !customer.is_approved && customer.role !== 'admin') {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
+          <div style={{ fontSize: '48px' }}>⏳</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
+          <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
+            Your trade account is pending admin approval. You will be notified once approved.
+          </p>
+          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            Log Out
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <Suspense fallback={authSurfaceFallback}>
+        <RegisterPage standalone />
+      </Suspense>
+    );
+  }
+
+  if (isRegisterRoute) {
+    if (session === undefined) return authSurfaceFallback;
+    if (!session) {
+      return (
+        <>
+          <Suspense fallback={authSurfaceFallback}>
+            <RegisterPage onLogin={() => setSurface('login')} />
+          </Suspense>
+          {view === 'login' && (
+            <Suspense fallback={null}>
+              <LoginModal
+                onLogin={handleLogin}
+                onClose={() => setSurface('landing')}
+                onApply={() => {}}
+              />
+            </Suspense>
+          )}
+        </>
+      );
+    }
+  }
 
   if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
   if (!adminHost && route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
@@ -357,25 +448,6 @@ export default function Root() {
               onLogin={handleLogin}
               onClose={() => {}}
               onApply={() => {}}
-            />
-          </Suspense>
-        )}
-      </>
-    );
-  }
-
-  if (registerHost) {
-    return (
-      <>
-        <Suspense fallback={authSurfaceFallback}>
-          <RegisterPage onLogin={() => setSurface('login')} />
-        </Suspense>
-        {view === 'login' && (
-          <Suspense fallback={null}>
-            <LoginModal
-              onLogin={handleLogin}
-              onClose={() => setSurface('landing')}
-              onApply={() => setSurface('landing')}
             />
           </Suspense>
         )}

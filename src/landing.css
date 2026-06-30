@@ -3545,3 +3545,351 @@
     padding: 18px 16px;
   }
 }
+/* ── Register page (/register, /pre-register) ── */
+.lp-register-page {
+  min-height: 100vh;
+  background: #050505;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-pre-register-banner {
+  width: 100%;
+  background: #000;
+  padding: 28px clamp(16px, 4vw, 60px) 0;
+}
+
+.lp-pre-register-banner img {
+  display: block;
+  width: 100%;
+  max-width: 1100px;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 32px 80px rgba(0, 0, 0, 0.75),
+    0 0 60px rgba(180, 20, 20, 0.12);
+}
+
+.lp-register-shell-standalone {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+
+.lp-register-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.lp-register-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.lp-register-brand img {
+  height: 34px;
+  width: auto;
+}
+
+.lp-register-brand strong {
+  display: block;
+  font-family: Outfit, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+}
+
+.lp-register-brand strong span {
+  color: #c40000;
+}
+
+.lp-register-brand small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.lp-register-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lp-register-main {
+  flex: 1;
+  padding: 36px 20px 48px;
+}
+
+.lp-register-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.lp-register-intro h1 {
+  font-family: Outfit, sans-serif;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.08;
+  font-weight: 900;
+  margin: 10px 0 14px;
+}
+
+.lp-register-intro p {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 34rem;
+  margin: 0 0 18px;
+}
+
+.lp-register-card {
+  background: #070707;
+  border: 1.5px solid rgba(139, 26, 26, 0.6);
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 40px rgba(139, 26, 26, 0.08);
+}
+
+.lp-register-form {
+  display: grid;
+  gap: 24px;
+}
+
+.lp-register-section {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lp-register-section:last-of-type {
+  border-bottom: none;
+}
+
+.lp-register-section h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.lp-register-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lp-register-subhead {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.lp-register-optional {
+  opacity: 0.55;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.lp-register-field-error {
+  color: #f87171;
+  font-size: 12.5px;
+  margin-top: 6px;
+  display: block;
+  font-weight: 600;
+}
+
+.lp-register-whatsapp {
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.lp-register-whatsapp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #4ade80;
+}
+
+.lp-register-whatsapp-head strong {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+}
+
+.lp-register-whatsapp-head span {
+  display: block;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.lp-register-whatsapp-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.lp-register-whatsapp-actions button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  transition: all 0.15s;
+}
+
+.lp-register-whatsapp-actions button.selected.yes {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.lp-register-whatsapp-actions button.selected.no {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.lp-register-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  grid-column: 1 / -1;
+}
+
+.lp-register-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #dc2626;
+  cursor: pointer;
+}
+
+.lp-register-sa-fields {
+  margin-top: 8px;
+}
+
+.lp-register-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.lp-register-submit {
+  width: 100%;
+  min-height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: #c40000;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.lp-register-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lp-register-footnote {
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+
+.lp-register-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #ff6b6b;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: none;
+}
+
+a.lp-register-link:hover { text-decoration: underline; }
+
+a.lp-register-login { text-decoration: none; }
+
+.lp-register-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lp-register-footer {
+  padding: 18px 24px 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lp-register-footer a {
+  color: #94a3b8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 960px) {
+  .lp-register-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-register-grid {
+    grid-template-columns: 1fr;
+  }
+}
