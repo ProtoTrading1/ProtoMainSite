@@ -90,6 +90,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [companyFax, setCompanyFax] = useState('');
 
   const [emailError, setEmailError] = useState('');
+  const [validationIssues, setValidationIssues] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState(false);
@@ -118,46 +119,78 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
 
-  const canSubmit = () => {
-    const phoneOk = phone.replace(/\D/g, '').length >= 8;
-    const whatsappAnswered = typeof whatsappOptIn === 'boolean';
-    const passwordsMatch = password === confirmPassword;
-    const deliveryOk = streetName.trim()
-      && suburb.trim()
-      && postalCode.trim()
-      && buildingType
-      && (buildingType !== 'Other' || otherBuildingType.trim())
-      && (buildingType !== 'Apartments' || unitNumber.trim());
-    return (
-      contactName.trim()
-      && businessName.trim()
-      && email.trim()
-      && !validateEmailField(email)
-      && phoneOk
-      && password.trim().length >= 8
-      && confirmPassword.trim().length >= 8
-      && passwordsMatch
-      && whatsappAnswered
-      && companyAddress.trim()
-      && deliveryOk
-      && country.trim()
-    );
+  const collectValidationIssues = () => {
+    const issues = [];
+    if (!contactName.trim()) {
+      issues.push({ key: 'contactName', message: 'Contact person name and surname', section: 'contact' });
+    }
+    if (!email.trim()) {
+      issues.push({ key: 'email', message: 'Email address', section: 'contact' });
+    } else {
+      const emailErr = validateEmailField(email);
+      if (emailErr) issues.push({ key: 'email', message: emailErr, section: 'contact' });
+    }
+    if (phone.replace(/\D/g, '').length < 8) {
+      issues.push({ key: 'phone', message: 'Phone number (at least 8 digits)', section: 'contact' });
+    }
+    if (password.trim().length < 8) {
+      issues.push({ key: 'password', message: 'Password (minimum 8 characters)', section: 'contact' });
+    }
+    if (confirmPassword.trim().length < 8) {
+      issues.push({ key: 'confirmPassword', message: 'Confirm password', section: 'contact' });
+    }
+    if (password.trim() && confirmPassword.trim() && password !== confirmPassword) {
+      issues.push({ key: 'confirmPassword', message: 'Passwords must match', section: 'contact' });
+    }
+    if (typeof whatsappOptIn !== 'boolean') {
+      issues.push({ key: 'whatsapp', message: 'WhatsApp question — choose Yes or No', section: 'contact' });
+    }
+    if (!businessName.trim()) {
+      issues.push({ key: 'businessName', message: 'Company / trading name', section: 'business' });
+    }
+    if (!country.trim()) {
+      issues.push({ key: 'country', message: 'Country', section: 'location' });
+    }
+    if (!companyAddress.trim()) {
+      issues.push({ key: 'companyAddress', message: 'Full company address', section: 'addresses' });
+    }
+    if (!streetName.trim()) {
+      issues.push({ key: 'streetName', message: 'Delivery street name', section: 'addresses' });
+    }
+    if (!suburb.trim()) {
+      issues.push({ key: 'suburb', message: 'Delivery suburb', section: 'addresses' });
+    }
+    if (!postalCode.trim()) {
+      issues.push({ key: 'postalCode', message: 'Delivery postal code', section: 'addresses' });
+    }
+    if (!buildingType) {
+      issues.push({ key: 'buildingType', message: 'Building type', section: 'addresses' });
+    }
+    if (buildingType === 'Other' && !otherBuildingType.trim()) {
+      issues.push({ key: 'otherBuildingType', message: 'Describe building type', section: 'addresses' });
+    }
+    if (buildingType === 'Apartments' && !unitNumber.trim()) {
+      issues.push({ key: 'unitNumber', message: 'Unit / apartment number', section: 'addresses' });
+    }
+    return issues;
   };
+
+  const sectionHasIssue = (section) => validationIssues.some((issue) => issue.section === section);
+  const fieldHasIssue = (key) => validationIssues.some((issue) => issue.key === key);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const err = validateEmailField(email);
-    setEmailError(err);
-    if (err) return;
-    if (password !== confirmPassword) {
-      setSubmitError('Passwords do not match.');
-      return;
-    }
-    if (!canSubmit()) {
-      setSubmitError('Please complete all required fields.');
+    const issues = collectValidationIssues();
+    if (issues.length > 0) {
+      setValidationIssues(issues);
+      setSubmitError('');
+      const firstSection = document.getElementById(`register-section-${issues[0].section}`);
+      firstSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
+    setValidationIssues([]);
+    setEmailError('');
     setSubmitting(true);
     setSubmitError('');
     try {
@@ -231,10 +264,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   className="lp-register-honeypot"
                 />
 
-                <section className="lp-register-section">
+                <section
+                  id="register-section-contact"
+                  className={`lp-register-section${sectionHasIssue('contact') ? ' lp-register-section--missing' : ''}`}
+                >
                   <h2>Contact details</h2>
                   <div className="lp-register-grid">
-                    <div className="lp-quiz-field lp-quiz-field--full">
+                    <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('contactName') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Contact person name and surname</label>
                       <input
                         value={contactName}
@@ -243,7 +279,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         required
                       />
                     </div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('email') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Email address</label>
                       <input
                         type="email"
@@ -256,7 +292,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       />
                       {emailError && <span className="lp-register-field-error">{emailError}</span>}
                     </div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('phone') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Phone number</label>
                       <input
                         type="tel"
@@ -267,7 +303,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       />
                     </div>
                     {phone.replace(/\D/g, '').length >= 8 && (
-                      <div className="lp-quiz-field lp-quiz-field--full">
+                      <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('whatsapp') ? ' lp-quiz-field--error' : ''}`}>
                         <div className="lp-register-whatsapp">
                           <div className="lp-register-whatsapp-head">
                             <MessageCircle size={18} />
@@ -295,7 +331,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         </div>
                       </div>
                     )}
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('password') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Password <span className="lp-register-optional">(min. 8 characters)</span></label>
                       <div className="lp-quiz-pw-wrap">
                         <input
@@ -311,7 +347,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         </button>
                       </div>
                     </div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('confirmPassword') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Confirm password</label>
                       <div className="lp-quiz-pw-wrap">
                         <input
@@ -330,10 +366,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   </div>
                 </section>
 
-                <section className="lp-register-section">
+                <section
+                  id="register-section-business"
+                  className={`lp-register-section${sectionHasIssue('business') ? ' lp-register-section--missing' : ''}`}
+                >
                   <h2>Business details</h2>
                   <div className="lp-register-grid">
-                    <div className="lp-quiz-field lp-quiz-field--full">
+                    <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('businessName') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Company / trading name</label>
                       <input
                         value={businessName}
@@ -399,10 +438,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   )}
                 </section>
 
-                <section className="lp-register-section">
+                <section
+                  id="register-section-location"
+                  className={`lp-register-section${sectionHasIssue('location') ? ' lp-register-section--missing' : ''}`}
+                >
                   <h2>Location</h2>
                   <div className="lp-register-subhead">Country</div>
-                  <div className="lp-quiz-countries">
+                  <div className={`lp-quiz-countries${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
                     {SADC_COUNTRIES.map((c) => (
                       <button
                         key={c}
@@ -421,7 +463,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     <div className="lp-register-grid lp-register-sa-fields">
                       <div className="lp-quiz-field">
                         <label>Province</label>
-                        <select value={province} onChange={(e) => setProvince(e.target.value)}>
+                        <select
+                          value={province}
+                          onChange={(e) => {
+                            setProvince(e.target.value);
+                            if (e.target.value) setCountry('South Africa');
+                          }}
+                        >
                           <option value="">Select province</option>
                           {SA_PROVINCES.map((p) => (
                             <option key={p} value={p}>{p}</option>
@@ -450,10 +498,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   )}
                 </section>
 
-                <section className="lp-register-section">
+                <section
+                  id="register-section-addresses"
+                  className={`lp-register-section${sectionHasIssue('addresses') ? ' lp-register-section--missing' : ''}`}
+                >
                   <h2>Addresses</h2>
                   <div className="lp-register-grid">
-                    <div className="lp-quiz-field lp-quiz-field--full">
+                    <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('companyAddress') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Full company address</label>
                       <AddressAutocomplete
                         value={companyAddress}
@@ -462,7 +513,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       />
                     </div>
                     <div className="lp-register-subhead">Delivery address</div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('streetName') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Street name</label>
                       <input
                         value={streetName}
@@ -471,7 +522,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         required
                       />
                     </div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('suburb') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Suburb</label>
                       <input
                         value={suburb}
@@ -480,7 +531,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         required
                       />
                     </div>
-                    <div className="lp-quiz-field">
+                    <div className={`lp-quiz-field${fieldHasIssue('postalCode') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Postal code</label>
                       <input
                         value={postalCode}
@@ -491,7 +542,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </div>
                     <div className="lp-quiz-field lp-quiz-field--full">
                       <div className="lp-register-subhead">Building type</div>
-                      <div className="lp-quiz-types lp-quiz-types--compact">
+                      <div className={`lp-quiz-types lp-quiz-types--compact${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`}>
                         {BUILDING_TYPES.map((type) => (
                           <button
                             key={type}
@@ -519,7 +570,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
                     </div>
                     {buildingType === 'Other' && (
-                      <div className="lp-quiz-field">
+                      <div className={`lp-quiz-field${fieldHasIssue('otherBuildingType') ? ' lp-quiz-field--error' : ''}`}>
                         <label>Describe building type</label>
                         <input
                           value={otherBuildingType}
@@ -530,7 +581,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
                     )}
                     {buildingType === 'Apartments' && (
-                      <div className="lp-quiz-field">
+                      <div className={`lp-quiz-field${fieldHasIssue('unitNumber') ? ' lp-quiz-field--error' : ''}`}>
                         <label>Unit / apartment number</label>
                         <input
                           value={unitNumber}
@@ -543,10 +594,21 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   </div>
                 </section>
 
+                {validationIssues.length > 0 && (
+                  <div className="lp-register-validation-summary" role="alert" aria-live="polite">
+                    <strong>Please complete the following before submitting:</strong>
+                    <ul>
+                      {validationIssues.map((issue) => (
+                        <li key={issue.key}>{issue.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {submitError && <div className="lp-quiz-error">{submitError}</div>}
 
                 <div className="lp-register-actions">
-                  <button type="submit" className="lp-register-submit" disabled={submitting || !canSubmit()}>
+                  <button type="submit" className="lp-register-submit" disabled={submitting}>
                     {submitting ? 'Creating your account…' : 'Create trade account'}
                   </button>
                   {!standalone && (
