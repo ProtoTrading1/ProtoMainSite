@@ -195,10 +195,11 @@ export default function MainContent({
           <label className="sort-control">
             <span>Sort</span>
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="featured">Most Popular</option>
-              <option value="latest">Sort by Latest</option>
+              <option value="featured">Recommended</option>
+              <option value="best-selling">Best Selling</option>
+              <option value="new-arrivals">New Arrivals</option>
+              <option value="price-high">High to Low</option>
               <option value="price-low">Low to High</option>
-              <option value="stock">Stock Status</option>
             </select>
           </label>
         </div>

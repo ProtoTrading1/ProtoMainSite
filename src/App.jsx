@@ -97,6 +97,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     scrollToTop();
+    setActiveCollection('all');
     hashNavigate(newPath, newRefinements);
   }, [hashNavigate]);
   const [sort, setSort] = useState('featured');

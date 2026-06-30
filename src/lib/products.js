@@ -121,11 +121,28 @@ function applyPathFilter(products, categoryPath) {
 
 function applySort(products, sort, categoryPath = [], sortOrders = {}) {
   const arr = [...products];
-  if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (sort === 'new-arrivals' || sort === 'latest') {
+    arr.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return arr;
+  }
+  if (sort === 'best-selling') {
+    arr.sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0));
+    return arr;
+  }
+  if (sort === 'price-high') {
+    arr.sort((a, b) => (b.price || 0) - (a.price || 0));
+    return arr;
+  }
+  if (sort === 'price-low') {
+    arr.sort((a, b) => (a.price || 0) - (b.price || 0));
+    return arr;
+  }
   if (sort === 'featured' && categoryPath.length) {
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
     if (skuOrder?.length) return applySkuOrder(arr, skuOrder);
   }
+  // Recommended default: admin order in categories, otherwise best sellers
+  arr.sort((a, b) => (b.yearlySales || 0) - (a.yearlySales || 0));
   return arr;
 }
 

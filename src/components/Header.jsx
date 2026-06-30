@@ -4,6 +4,7 @@ import {
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
+import { fetchProducts } from '../lib/products';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 
@@ -189,7 +190,7 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory }) {
+function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory, onCommitSearch }) {
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty">
@@ -303,29 +304,13 @@ export default function Header({
   const [catMatches, setCatMatches] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
   const productsCache = useRef(null);
-  const productsLoading = useRef(null);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
   const loadProductsOnce = useCallback(async () => {
     if (productsCache.current) return productsCache.current;
-    if (productsLoading.current) return productsLoading.current;
-    productsLoading.current = (async () => {
-      try {
-        const res = await fetch('/api/products');
-        productsCache.current = res.ok ? await res.json() : [];
-      } catch {
-        try {
-          const res = await fetch('/products.json');
-          productsCache.current = res.ok ? await res.json() : [];
-        } catch {
-          productsCache.current = [];
-        }
-      }
-      productsLoading.current = null;
-      return productsCache.current;
-    })();
-    return productsLoading.current;
+    productsCache.current = await fetchProducts();
+    return productsCache.current;
   }, []);
 
   const updateSuggestions = useCallback((query, products) => {
@@ -382,8 +367,9 @@ export default function Header({
   };
 
   const pickProduct = (p) => {
-    saveRecent(p.name);
-    setSearchQuery(p.name);
+    const term = String(p.code || p.websiteSku || p.name || '').trim();
+    saveRecent(term);
+    setSearchQuery(term);
     navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
@@ -558,6 +544,7 @@ export default function Header({
               activeIdx={activeIdx}
               onPickProduct={pickProduct}
               onPickCategory={pickCategory}
+              onCommitSearch={commitSearch}
             />
           </div>
         </>

@@ -966,11 +966,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   padding: 9px 18px;
   font-size: 14px;
   font-weight: 700;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: #8B1A1A;
+  border: 1px solid #a02020;
   border-radius: 9px;
+  color: #fff;
 }
-.header-nav-btn--search:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.header-nav-btn--search:hover { background: #a02020; color: #fff; }
+.header-nav-btn--search.header-nav-btn--active { background: #c40000; border-color: #d42020; color: #fff; }
 .header-nav-specials { color: #fbbf24; }
 .header-nav-specials:hover { background: rgba(251,191,36,0.12); color: #fbbf24; }
 
