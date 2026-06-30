@@ -3555,16 +3555,21 @@
   flex-direction: column;
 }
 
+.lp-register-page:has(.lp-pre-register-banner) {
+  --lp-register-standalone-max: 1100px;
+  --lp-register-standalone-pad: clamp(16px, 4vw, 60px);
+}
+
 .lp-pre-register-banner {
   width: 100%;
   background: #000;
-  padding: 28px clamp(16px, 4vw, 60px) 0;
+  padding: 28px var(--lp-register-standalone-pad, clamp(16px, 4vw, 60px)) 0;
 }
 
 .lp-pre-register-banner img {
   display: block;
   width: 100%;
-  max-width: 1100px;
+  max-width: var(--lp-register-standalone-max, 1100px);
   height: auto;
   margin: 0 auto;
   border-radius: 16px;
@@ -3576,22 +3581,23 @@
 
 .lp-register-shell-standalone {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 980px;
+  max-width: var(--lp-register-standalone-max, 1100px);
   margin: 0 auto;
   width: 100%;
 }
 
 .lp-register-shell-standalone .lp-register-card {
-  padding: clamp(24px, 3vw, 36px);
+  padding: clamp(28px, 3.5vw, 40px);
+  border-radius: 16px;
 }
 
 .lp-register-shell-standalone .lp-register-form {
-  gap: 18px;
+  gap: 22px;
 }
 
 .lp-register-shell-standalone .lp-register-section {
-  gap: 12px;
-  padding-bottom: 0;
+  gap: 16px;
+  padding-bottom: 4px;
   margin-bottom: 0;
 }
 
@@ -3600,9 +3606,51 @@
   border-bottom: none;
 }
 
+.lp-register-shell-standalone .lp-register-grid {
+  gap: 18px;
+}
+
+.lp-register-shell-standalone .lp-quiz-field {
+  gap: 8px;
+}
+
+.lp-register-shell-standalone .lp-quiz-field input,
+.lp-register-shell-standalone .lp-quiz-field select,
+.lp-register-shell-standalone .lp-quiz-field textarea {
+  min-height: 50px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+
+.lp-register-shell-standalone .lp-quiz-types {
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.lp-register-shell-standalone .lp-quiz-type-card {
+  padding: 13px 10px;
+  font-size: 13px;
+}
+
+.lp-register-shell-standalone .lp-register-subhead {
+  margin: 8px 0 2px;
+}
+
 .lp-register-shell-standalone .lp-register-actions {
-  margin-top: 4px;
-  padding-top: 8px;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.lp-register-shell-standalone .lp-quiz-types:not(.lp-quiz-types--compact) {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+
+.lp-register-shell-standalone .lp-quiz-types--compact {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.lp-register-shell-standalone .lp-quiz-countries {
+  gap: 10px;
 }
 
 .lp-quiz-types--compact {
@@ -3676,9 +3724,11 @@
 }
 
 .lp-register-page:has(.lp-pre-register-banner) .lp-register-main {
-  padding-top: 24px;
+  padding: 20px var(--lp-register-standalone-pad, clamp(16px, 4vw, 60px)) 48px;
   display: flex;
   justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .lp-register-shell {
