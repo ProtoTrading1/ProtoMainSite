@@ -3,7 +3,10 @@ import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
+import { isRegisterHost } from './lib/isRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
+
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -16,10 +19,15 @@ const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://protoportal-main.
 
 export default function Root() {
   const adminHost = isAdminHost();
+  const registerHost = isRegisterHost();
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [view, setView] = useState('landing');
+  const [view, setView] = useState(() => {
+    if (typeof window === 'undefined') return 'landing';
+    const saved = window.sessionStorage.getItem('proto-surface');
+    return saved === 'portal' || saved === 'profile' ? saved : 'landing';
+  });
   const [route, setRoute] = useState(window.location.hash);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const authBootstrapped = useRef(false);
@@ -60,10 +68,18 @@ export default function Root() {
       window.sessionStorage.removeItem('proto-surface');
       return;
     }
-    if (['profile', 'admin'].includes(next)) {
+    if (['profile', 'admin', 'portal'].includes(next)) {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
+
+  useEffect(() => {
+    if (session !== null || !authBootstrapped.current) return;
+    if (view === 'portal' || view === 'profile') {
+      setView('landing');
+      window.sessionStorage.removeItem('proto-surface');
+    }
+  }, [session, view]);
 
   useEffect(() => {
     scrollToTop();
@@ -113,9 +129,11 @@ export default function Root() {
 
     const bootstrapTimer = window.setTimeout(() => {
       if (!authBootstrapped.current) {
+        authBootstrapped.current = true;
         setSession(null);
+        setCustomerLoading(false);
       }
-    }, 3500);
+    }, 8000);
 
     (async () => {
       try {
@@ -339,6 +357,25 @@ export default function Root() {
               onLogin={handleLogin}
               onClose={() => {}}
               onApply={() => {}}
+            />
+          </Suspense>
+        )}
+      </>
+    );
+  }
+
+  if (registerHost) {
+    return (
+      <>
+        <Suspense fallback={authSurfaceFallback}>
+          <RegisterPage onLogin={() => setSurface('login')} />
+        </Suspense>
+        {view === 'login' && (
+          <Suspense fallback={null}>
+            <LoginModal
+              onLogin={handleLogin}
+              onClose={() => setSurface('landing')}
+              onApply={() => setSurface('landing')}
             />
           </Suspense>
         )}

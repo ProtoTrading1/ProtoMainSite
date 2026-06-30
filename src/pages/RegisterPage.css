@@ -1,0 +1,313 @@
+/* ── Register Page ─────────────────────────────────────────── */
+
+.reg-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #050505;
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.reg-header {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(20px, 4vw, 48px);
+  background: #000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.reg-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reg-header-brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.reg-header-brand strong {
+  display: block;
+  font-family: Outfit, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.reg-header-brand strong span {
+  color: #dc2626;
+}
+
+.reg-header-brand small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.reg-header-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.reg-header-login:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Main split layout ───────────────────────────────────────── */
+.reg-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: calc(100vh - 68px - 56px);
+}
+
+/* ── LEFT panel ──────────────────────────────────────────────── */
+.reg-left {
+  background: #000;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: flex-start;
+  padding: clamp(36px, 5vh, 72px) clamp(28px, 4vw, 64px);
+  overflow: hidden;
+}
+
+.reg-left-inner {
+  width: 100%;
+  max-width: 520px;
+}
+
+.reg-invite-tag {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.reg-headline {
+  font-family: Outfit, sans-serif;
+  font-size: clamp(34px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.reg-headline span {
+  color: #dc2626;
+}
+
+.reg-subline {
+  font-size: 15px;
+  color: #94a3b8;
+  line-height: 1.65;
+  max-width: 440px;
+  margin-bottom: 32px;
+  font-weight: 500;
+}
+
+/* Email banner card */
+.reg-banner-card {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 0 80px rgba(220, 38, 38, 0.08);
+  margin-bottom: 28px;
+  background: #111;
+}
+
+.reg-banner-img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.reg-banner-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  pointer-events: none;
+}
+
+/* Benefits list */
+.reg-benefits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.reg-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: #94a3b8;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.reg-benefit-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.reg-trust {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+}
+
+.reg-trust svg {
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+/* ── RIGHT panel ─────────────────────────────────────────────── */
+.reg-right {
+  background: #050505;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(36px, 5vh, 72px) clamp(20px, 3vw, 48px);
+  overflow-y: auto;
+}
+
+.reg-form-card {
+  width: 100%;
+  max-width: 520px;
+}
+
+.reg-form-header {
+  margin-bottom: 28px;
+}
+
+.reg-form-header h2 {
+  font-family: Outfit, sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+
+.reg-form-header p {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.reg-footer {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(20px, 4vw, 48px);
+  background: #000;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .reg-main {
+    grid-template-columns: 1fr;
+  }
+
+  .reg-left {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 32px 20px 28px;
+    align-items: flex-start;
+  }
+
+  .reg-left-inner {
+    max-width: 100%;
+  }
+
+  .reg-headline {
+    font-size: 32px;
+    letter-spacing: -1px;
+  }
+
+  .reg-banner-card {
+    margin-bottom: 20px;
+  }
+
+  .reg-right {
+    padding: 28px 20px 40px;
+  }
+
+  .reg-footer {
+    flex-direction: column;
+    height: auto;
+    padding: 14px 20px;
+    gap: 6px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .reg-headline { font-size: 28px; }
+  .reg-header-login span { display: none; }
+}
