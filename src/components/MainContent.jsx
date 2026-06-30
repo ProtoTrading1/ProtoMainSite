@@ -1,18 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ArrowLeft,
-  CheckCircle2,
   Flame,
   Loader2,
   PackageCheck,
   Search,
   Sparkles,
   Tag,
-  TimerReset,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
-import { buildImageCandidates } from '../lib/imageUrl';
-import Breadcrumb from './Breadcrumb';
 import CategoryLanding from './CategoryLanding';
 import { slugToLabel } from '../lib/taxonomy';
 
@@ -27,32 +23,6 @@ function cartQtyForProduct(product, cartQtyMap) {
     return product.variants.reduce((sum, variant) => sum + (cartQtyMap[variant.id] || 0), 0);
   }
   return cartQtyMap[product.id] || 0;
-}
-
-function BannerHeroImage({ src, updatedAt, alt }) {
-  const busted = updatedAt
-    ? `${src}${src.includes('?') ? '&' : '?'}v=${encodeURIComponent(updatedAt)}`
-    : src;
-  const candidates = buildImageCandidates(busted);
-  const [idx, setIdx] = useState(0);
-
-  useEffect(() => {
-    setIdx(0);
-  }, [busted]);
-
-  if (!candidates.length || !candidates[idx]) return null;
-
-  return (
-    <img
-      key={busted}
-      src={candidates[idx]}
-      alt={alt}
-      loading="eager"
-      fetchpriority="high"
-      decoding="async"
-      onError={() => setIdx((i) => i + 1)}
-    />
-  );
 }
 
 const shortcuts = [
@@ -95,10 +65,6 @@ export default function MainContent({
   searchActive = false,
   onSearchProductClick = null,
 }) {
-  const bannerTitle = bannerConfig?.title || 'Built for retailers who need stock that moves.';
-  const bannerBody = bannerConfig?.body || 'Browse core wholesale lines, build a quote-ready basket, and send a clean request to the Proto Trading sales team for stock, VAT, and delivery confirmation.';
-  const bannerImage = bannerConfig?.imageUrl || '/campaign-hero-v2.png?v=2';
-  const bannerUpdatedAt = bannerConfig?.updatedAt || null;
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -130,21 +96,15 @@ export default function MainContent({
   return (
     <div className="catalog-page">
       {isAllProductsPage && !searchQuery && !isCategoryPage && (
-        <section className="trade-hero">
-          <div className="trade-hero-copy">
-            <span className="eyebrow">Established 1987 | Wholesale supply</span>
-            <h1>{bannerTitle}</h1>
-            <p>{bannerBody}</p>
-            <div className="hero-proof">
-              <span><CheckCircle2 size={15} /> Trade-only ordering</span>
-              <span><CheckCircle2 size={15} /> Quote confirmed by reply</span>
-              <span><CheckCircle2 size={15} /> Built for repeat buyers</span>
-            </div>
-          </div>
-          <div className="trade-hero-image trade-hero-image--banner">
-            <BannerHeroImage src={bannerImage} updatedAt={bannerUpdatedAt} alt="Premium wholesale product campaign" />
-          </div>
-        </section>
+        <div className="site-hero-banner">
+          <img
+            src="/main-site-banner.jpg"
+            alt="Thank you for registering — Welcome to Proto Trading Online"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+          />
+        </div>
       )}
 
 
