@@ -3555,102 +3555,168 @@
   flex-direction: column;
 }
 
-.lp-register-page:has(.lp-pre-register-banner) {
-  --lp-register-standalone-max: 1100px;
-  --lp-register-standalone-pad: clamp(16px, 4vw, 60px);
+.lp-register-page--standalone {
+  background: #000;
 }
 
+.lp-register-main-standalone {
+  flex: 1;
+  width: 100%;
+  padding: 28px clamp(16px, 4vw, 60px) 48px;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.lp-register-standalone-panel {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #070707;
+  border: 1.5px solid rgba(139, 26, 26, 0.6);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 40px rgba(139, 26, 26, 0.08);
+}
+
+.lp-register-standalone-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.lp-register-standalone-body {
+  padding: clamp(32px, 4vw, 48px);
+}
+
+.lp-register-page--standalone .lp-register-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.lp-register-page--standalone .lp-register-form {
+  gap: 28px;
+}
+
+.lp-register-page--standalone .lp-register-section {
+  gap: 18px;
+  padding-bottom: 24px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lp-register-page--standalone .lp-register-section:last-of-type {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.lp-register-page--standalone .lp-register-grid {
+  gap: 20px;
+}
+
+.lp-register-page--standalone .lp-quiz-field {
+  gap: 8px;
+}
+
+.lp-register-page--standalone .lp-quiz-field label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.lp-register-page--standalone .lp-quiz-field input,
+.lp-register-page--standalone .lp-quiz-field select,
+.lp-register-page--standalone .lp-quiz-field textarea {
+  min-height: 52px;
+  padding: 0 16px;
+  font-size: 16px;
+  border-radius: 12px;
+}
+
+.lp-register-page--standalone .lp-quiz-types {
+  gap: 12px;
+  margin-bottom: 0;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.lp-register-page--standalone .lp-quiz-types--compact {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.lp-register-page--standalone .lp-quiz-type-card {
+  padding: 14px 12px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+.lp-register-page--standalone .lp-quiz-countries {
+  gap: 10px;
+}
+
+.lp-register-page--standalone .lp-register-subhead {
+  margin: 10px 0 4px;
+  font-size: 14px;
+}
+
+.lp-register-page--standalone .lp-register-actions {
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.lp-register-page--standalone .lp-register-submit {
+  min-height: 56px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+  .lp-register-main-standalone {
+    padding: 16px 14px 32px;
+  }
+
+  .lp-register-standalone-body {
+    padding: 24px 18px 28px;
+  }
+
+  .lp-register-page--standalone .lp-register-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-register-page--standalone .lp-quiz-types,
+  .lp-register-page--standalone .lp-quiz-types--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Legacy banner class (unused on standalone; kept for reference) */
 .lp-pre-register-banner {
   width: 100%;
   background: #000;
-  padding: 28px var(--lp-register-standalone-pad, clamp(16px, 4vw, 60px)) 0;
+  padding: 28px clamp(16px, 4vw, 60px) 0;
 }
 
 .lp-pre-register-banner img {
   display: block;
   width: 100%;
-  max-width: var(--lp-register-standalone-max, 1100px);
+  max-width: 1100px;
   height: auto;
   margin: 0 auto;
   border-radius: 16px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 32px 80px rgba(0, 0, 0, 0.75),
-    0 0 60px rgba(180, 20, 20, 0.12);
 }
 
 .lp-register-shell-standalone {
   grid-template-columns: minmax(0, 1fr);
-  max-width: var(--lp-register-standalone-max, 1100px);
+  max-width: 1100px;
   margin: 0 auto;
   width: 100%;
-}
-
-.lp-register-shell-standalone .lp-register-card {
-  padding: clamp(28px, 3.5vw, 40px);
-  border-radius: 16px;
-}
-
-.lp-register-shell-standalone .lp-register-form {
-  gap: 22px;
-}
-
-.lp-register-shell-standalone .lp-register-section {
-  gap: 16px;
-  padding-bottom: 4px;
-  margin-bottom: 0;
-}
-
-.lp-register-shell-standalone .lp-register-section:last-of-type {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.lp-register-shell-standalone .lp-register-grid {
-  gap: 18px;
-}
-
-.lp-register-shell-standalone .lp-quiz-field {
-  gap: 8px;
-}
-
-.lp-register-shell-standalone .lp-quiz-field input,
-.lp-register-shell-standalone .lp-quiz-field select,
-.lp-register-shell-standalone .lp-quiz-field textarea {
-  min-height: 50px;
-  padding: 0 16px;
-  font-size: 15px;
-}
-
-.lp-register-shell-standalone .lp-quiz-types {
-  gap: 10px;
-  margin-bottom: 0;
-}
-
-.lp-register-shell-standalone .lp-quiz-type-card {
-  padding: 13px 10px;
-  font-size: 13px;
-}
-
-.lp-register-shell-standalone .lp-register-subhead {
-  margin: 8px 0 2px;
-}
-
-.lp-register-shell-standalone .lp-register-actions {
-  margin-top: 8px;
-  padding-top: 4px;
-}
-
-.lp-register-shell-standalone .lp-quiz-types:not(.lp-quiz-types--compact) {
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-}
-
-.lp-register-shell-standalone .lp-quiz-types--compact {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-}
-
-.lp-register-shell-standalone .lp-quiz-countries {
-  gap: 10px;
 }
 
 .lp-quiz-types--compact {
@@ -3721,14 +3787,6 @@
 .lp-register-main {
   flex: 1;
   padding: 36px 20px 48px;
-}
-
-.lp-register-page:has(.lp-pre-register-banner) .lp-register-main {
-  padding: 20px var(--lp-register-standalone-pad, clamp(16px, 4vw, 60px)) 48px;
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .lp-register-shell {

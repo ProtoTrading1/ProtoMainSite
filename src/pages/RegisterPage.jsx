@@ -199,53 +199,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     }
   };
 
-  return (
-    <div className="lp-register-page">
-      {standalone && (
-        <div className="lp-pre-register-banner">
-          <img
-            src="/pre-register-banner.jpg"
-            alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
-            fetchPriority="high"
-            decoding="async"
-          />
-        </div>
-      )}
-      {!standalone && (
-        <header className="lp-register-header">
-          <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-            <img src="/proto-logo.webp" alt="" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale trade portal</small>
-            </div>
-          </a>
-          <button type="button" className="lp-register-login" onClick={onLogin}>
-            <Lock size={15} />
-            Log in
-          </button>
-        </header>
-      )}
-
-      <main className="lp-register-main">
-        <div className={`lp-register-shell${standalone ? ' lp-register-shell-standalone' : ''}`}>
-          {!standalone && (
-            <div className="lp-register-intro">
-              <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
-              <h1>Open your wholesale trade account</h1>
-              <p>
-                Register once to access live stock, trade pricing, and our full catalogue.
-                Approved accounts can log in immediately after signup.
-              </p>
-              <ul className="lp-apply-list">
-                <li>Instant approval for new trade customers</li>
-                <li>Live stock checks on every product</li>
-                <li>Order builder with PDF quote requests</li>
-              </ul>
-            </div>
-          )}
-
-          <div className="lp-register-card">
+  const registerCard = (
+    <div className="lp-register-card">
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
@@ -603,8 +558,60 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 </div>
               </form>
             )}
+    </div>
+  );
+
+  return (
+    <div className={`lp-register-page${standalone ? ' lp-register-page--standalone' : ''}`}>
+      {!standalone && (
+        <header className="lp-register-header">
+          <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
+            <img src="/proto-logo.webp" alt="" />
+            <div>
+              <strong>PROTO <span>TRADING</span></strong>
+              <small>Wholesale trade portal</small>
+            </div>
+          </a>
+          <button type="button" className="lp-register-login" onClick={onLogin}>
+            <Lock size={15} />
+            Log in
+          </button>
+        </header>
+      )}
+
+      <main className={`lp-register-main${standalone ? ' lp-register-main-standalone' : ''}`}>
+        {standalone ? (
+          <div className="lp-register-standalone-panel">
+            <div className="lp-register-standalone-banner">
+              <img
+                src="/pre-register-banner.jpg"
+                alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
+            <div className="lp-register-standalone-body">
+              {registerCard}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="lp-register-shell">
+            <div className="lp-register-intro">
+              <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
+              <h1>Open your wholesale trade account</h1>
+              <p>
+                Register once to access live stock, trade pricing, and our full catalogue.
+                Approved accounts can log in immediately after signup.
+              </p>
+              <ul className="lp-apply-list">
+                <li>Instant approval for new trade customers</li>
+                <li>Live stock checks on every product</li>
+                <li>Order builder with PDF quote requests</li>
+              </ul>
+            </div>
+            {registerCard}
+          </div>
+        )}
       </main>
 
       <footer className="lp-register-footer">
