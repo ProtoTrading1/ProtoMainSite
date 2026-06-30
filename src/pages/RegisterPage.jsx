@@ -75,7 +75,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
-  const [otherMonthlySpend, setOtherMonthlySpend] = useState('');
+  const [otherBuildingType, setOtherBuildingType] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
   const [country, setCountry] = useState('');
@@ -102,13 +102,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     setCompanyAddress(v);
   };
 
-  const resolvedMonthlySpend = () => (
-    monthlySpend === 'Other' ? otherMonthlySpend.trim() : monthlySpend
+  const resolvedBuildingType = () => (
+    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
   );
 
   const buildStructuredDeliveryAddress = () => {
     const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
-    if (buildingType) parts.push(buildingType);
+    const bt = resolvedBuildingType();
+    if (bt) parts.push(bt);
     if (buildingType === 'Apartments' && unitNumber.trim()) {
       parts.push(`Unit ${unitNumber.trim()}`);
     }
@@ -125,6 +126,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       && suburb.trim()
       && postalCode.trim()
       && buildingType
+      && (buildingType !== 'Other' || otherBuildingType.trim())
       && (buildingType !== 'Apartments' || unitNumber.trim());
     return (
       contactName.trim()
@@ -172,7 +174,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         streetName: streetName.trim(),
         suburb: suburb.trim(),
         postalCode: postalCode.trim(),
-        buildingType,
+        buildingType: resolvedBuildingType(),
         unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
         country: country || null,
@@ -182,7 +184,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
           .join(', ') || null,
-        monthlySpend: resolvedMonthlySpend() || null,
+        monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         instantApproval: true,
@@ -415,24 +417,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         {band}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      className={`lp-quiz-type-card${monthlySpend === 'Other' ? ' selected' : ''}`}
-                      onClick={() => setMonthlySpend('Other')}
-                    >
-                      Other
-                    </button>
                   </div>
-                  {monthlySpend === 'Other' && (
-                    <div className="lp-quiz-field lp-quiz-other-field">
-                      <label>Your estimated monthly spend</label>
-                      <input
-                        value={otherMonthlySpend}
-                        onChange={(e) => setOtherMonthlySpend(e.target.value)}
-                        placeholder="e.g. R75,000"
-                      />
-                    </div>
-                  )}
 
                   <div className="lp-register-subhead">Business category <span className="lp-register-optional">(select all that apply)</span></div>
                   <div className="lp-quiz-types">
@@ -560,13 +545,35 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                             onClick={() => {
                               setBuildingType(type);
                               if (type !== 'Apartments') setUnitNumber('');
+                              if (type !== 'Other') setOtherBuildingType('');
                             }}
                           >
                             {type}
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
+                          onClick={() => {
+                            setBuildingType('Other');
+                            setUnitNumber('');
+                          }}
+                        >
+                          Other
+                        </button>
                       </div>
                     </div>
+                    {buildingType === 'Other' && (
+                      <div className="lp-quiz-field">
+                        <label>Describe building type</label>
+                        <input
+                          value={otherBuildingType}
+                          onChange={(e) => setOtherBuildingType(e.target.value)}
+                          placeholder="e.g. Warehouse, Industrial unit"
+                          required
+                        />
+                      </div>
+                    )}
                     {buildingType === 'Apartments' && (
                       <div className="lp-quiz-field">
                         <label>Unit / apartment number</label>
