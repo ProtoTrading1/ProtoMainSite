@@ -62,7 +62,7 @@ function validateEmailField(value) {
   return '';
 }
 
-export default function RegisterPage({ onLogin, preRegisterOnly = false, portalUrl = 'https://protoportal-main.vercel.app' }) {
+export default function RegisterPage({ onLogin, standalone = false }) {
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -209,7 +209,7 @@ export default function RegisterPage({ onLogin, preRegisterOnly = false, portalU
   return (
     <div className="lp-register-page">
       <header className="lp-register-header">
-        {preRegisterOnly ? (
+        {standalone ? (
           <div className="lp-register-brand" aria-label="Proto Trading">
             <img src="/proto-logo.webp" alt="" />
             <div>
@@ -218,24 +218,19 @@ export default function RegisterPage({ onLogin, preRegisterOnly = false, portalU
             </div>
           </div>
         ) : (
-          <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-            <img src="/proto-logo.webp" alt="" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale trade portal</small>
-            </div>
-          </a>
-        )}
-        {preRegisterOnly ? (
-          <a href={portalUrl} className="lp-register-login">
-            <Lock size={15} />
-            Trade portal login
-          </a>
-        ) : (
-          <button type="button" className="lp-register-login" onClick={onLogin}>
-            <Lock size={15} />
-            Log in
-          </button>
+          <>
+            <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
+              <img src="/proto-logo.webp" alt="" />
+              <div>
+                <strong>PROTO <span>TRADING</span></strong>
+                <small>Wholesale trade portal</small>
+              </div>
+            </a>
+            <button type="button" className="lp-register-login" onClick={onLogin}>
+              <Lock size={15} />
+              Log in
+            </button>
+          </>
         )}
       </header>
 
@@ -263,11 +258,15 @@ export default function RegisterPage({ onLogin, preRegisterOnly = false, portalU
                 <p>
                   Welcome, {contactName.trim()}. Your trade account is live
                   {customerCode ? ` (customer code ${customerCode})` : ''}.
-                  Log in with {email.trim()} to start ordering.
+                  {standalone
+                    ? ' You can sign in on the main Proto website when you are ready to order.'
+                    : ` Log in with ${email.trim()} to start ordering.`}
                 </p>
-                <button type="button" onClick={preRegisterOnly ? () => { window.location.href = portalUrl; } : onLogin}>
-                  {preRegisterOnly ? 'Go to trade portal' : 'Log in now'}
-                </button>
+                {!standalone && (
+                  <button type="button" onClick={onLogin}>
+                    Log in now
+                  </button>
+                )}
               </div>
             ) : (
               <form className="lp-register-form" onSubmit={handleSubmit} noValidate>
@@ -589,14 +588,12 @@ export default function RegisterPage({ onLogin, preRegisterOnly = false, portalU
                   <button type="submit" className="lp-register-submit" disabled={submitting || !canSubmit()}>
                     {submitting ? 'Creating your account…' : 'Create trade account'}
                   </button>
-                  <p className="lp-register-footnote">
-                    Already have an account?{' '}
-                    {preRegisterOnly ? (
-                      <a href={portalUrl} className="lp-register-link">Sign in on the trade portal</a>
-                    ) : (
+                  {!standalone && (
+                    <p className="lp-register-footnote">
+                      Already have an account?{' '}
                       <button type="button" className="lp-register-link" onClick={onLogin}>Log in</button>
-                    )}
-                  </p>
+                    </p>
+                  )}
                 </div>
               </form>
             )}
@@ -606,7 +603,7 @@ export default function RegisterPage({ onLogin, preRegisterOnly = false, portalU
 
       <footer className="lp-register-footer">
         <p>Trade access only. Not open to the general public.</p>
-        {!preRegisterOnly && <a href="/">Back to homepage</a>}
+        {!standalone && <a href="/">Back to homepage</a>}
       </footer>
     </div>
   );

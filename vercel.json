@@ -3,6 +3,32 @@
   "framework": null,
   "buildCommand": "node scripts/generate-catalog.js && vite build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "site.proto.co.za" }],
+      "destination": "/pre-register",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.site.proto.co.za" }],
+      "destination": "/pre-register",
+      "permanent": false
+    },
+    {
+      "source": "/register",
+      "has": [{ "type": "host", "value": "site.proto.co.za" }],
+      "destination": "/pre-register",
+      "permanent": false
+    },
+    {
+      "source": "/register",
+      "has": [{ "type": "host", "value": "www.site.proto.co.za" }],
+      "destination": "/pre-register",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
