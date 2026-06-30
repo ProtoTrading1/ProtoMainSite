@@ -3824,7 +3824,12 @@
   font-weight: 700;
   cursor: pointer;
   font-size: inherit;
+  text-decoration: none;
 }
+
+a.lp-register-link:hover { text-decoration: underline; }
+
+a.lp-register-login { text-decoration: none; }
 
 .lp-register-honeypot {
   position: absolute;
