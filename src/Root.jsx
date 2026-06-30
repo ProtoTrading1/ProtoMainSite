@@ -34,6 +34,18 @@ export default function Root() {
     else if (preRegisterHost) document.title = 'Proto Trading — Trade Registration';
   }, [adminHost, preRegisterHost]);
 
+  useEffect(() => {
+    if (!preRegisterHost) return;
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setRoute('');
+    }
+    if (pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+      setPathname('/');
+    }
+  }, [preRegisterHost, pathname]);
+
   // Browsers (esp. Chrome) try to "restore" the previous scroll position
   // when the user navigates back, forward, or — combined with our hash
   // routing — sometimes when arriving at a new page. That manifests as
@@ -52,6 +64,10 @@ export default function Root() {
 
   useEffect(() => {
     const onHashChange = () => {
+      if (preRegisterHost && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        return;
+      }
       setRoute(window.location.hash);
       scrollToTop();
     };
@@ -65,7 +81,7 @@ export default function Root() {
       window.removeEventListener('hashchange', onHashChange);
       window.removeEventListener('popstate', onPopState);
     };
-  }, []);
+  }, [preRegisterHost]);
 
   const isRegisterRoute = !adminHost && !preRegisterHost && (pathname === '/register' || pathname === '/pre-register');
 
@@ -100,6 +116,11 @@ export default function Root() {
         return;
       }
 
+      if (preRegisterHost) {
+        if (!profile.is_approved && profile.role !== 'admin') setView('pending');
+        return;
+      }
+
       if (profile.is_approved || profile.role === 'admin') {
         setSurface('portal');
         return;
@@ -110,7 +131,7 @@ export default function Root() {
         setCustomerLoading(false);
       }
     }
-  }, [adminHost, setSurface]);
+  }, [adminHost, preRegisterHost, setSurface]);
 
   useEffect(() => {
     let cancelled = false;
@@ -219,11 +240,8 @@ export default function Root() {
           <div style={{ fontSize: '48px' }}>✓</div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
           <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
-            Trade registration is only available on this site. Sign in on the trade portal to browse and order.
+            Your trade account is approved. You will receive confirmation by email with next steps.
           </p>
-          <a href={PORTAL_URL} style={{ padding: '12px 28px', background: '#8B1A1A', color: '#fff', borderRadius: '8px', fontWeight: '700', textDecoration: 'none' }}>
-            Go to trade portal
-          </a>
           <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
             Log out
           </button>
@@ -248,7 +266,7 @@ export default function Root() {
 
     return (
       <Suspense fallback={authSurfaceFallback}>
-        <RegisterPage preRegisterOnly portalUrl={PORTAL_URL} onLogin={() => { window.location.href = PORTAL_URL; }} />
+        <RegisterPage standalone />
       </Suspense>
     );
   }
