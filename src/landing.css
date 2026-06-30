@@ -3576,7 +3576,37 @@
 
 .lp-register-shell-standalone {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 760px;
+  max-width: 980px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.lp-register-shell-standalone .lp-register-card {
+  padding: clamp(24px, 3vw, 36px);
+}
+
+.lp-register-shell-standalone .lp-register-form {
+  gap: 18px;
+}
+
+.lp-register-shell-standalone .lp-register-section {
+  gap: 12px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.lp-register-shell-standalone .lp-register-section:last-of-type {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.lp-register-shell-standalone .lp-register-actions {
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.lp-quiz-types--compact {
+  margin-bottom: 0;
 }
 
 .lp-register-header {
@@ -3645,6 +3675,12 @@
   padding: 36px 20px 48px;
 }
 
+.lp-register-page:has(.lp-pre-register-banner) .lp-register-main {
+  padding-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
 .lp-register-shell {
   max-width: 1180px;
   margin: 0 auto;
@@ -3710,13 +3746,15 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 .lp-register-subhead {
   color: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 700;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
+  grid-column: 1 / -1;
 }
 
 .lp-register-optional {
@@ -3816,6 +3854,7 @@
 .lp-register-actions {
   display: grid;
   gap: 12px;
+  margin-top: 0;
 }
 
 .lp-register-submit {

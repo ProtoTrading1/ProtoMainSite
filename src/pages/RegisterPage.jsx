@@ -75,14 +75,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
+  const [otherMonthlySpend, setOtherMonthlySpend] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [sameAddress, setSameAddress] = useState(false);
   const [streetName, setStreetName] = useState('');
   const [suburb, setSuburb] = useState('');
   const [postalCode, setPostalCode] = useState('');
@@ -101,13 +100,11 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const handleCompanyAddressChange = (v) => {
     setCompanyAddress(v);
-    if (sameAddress) setDeliveryAddress(v);
   };
 
-  const handleSameAddressToggle = (checked) => {
-    setSameAddress(checked);
-    if (checked) setDeliveryAddress(companyAddress);
-  };
+  const resolvedMonthlySpend = () => (
+    monthlySpend === 'Other' ? otherMonthlySpend.trim() : monthlySpend
+  );
 
   const buildStructuredDeliveryAddress = () => {
     const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
@@ -118,23 +115,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     return parts.filter(Boolean).join(', ').toUpperCase();
   };
 
-  const resolvedDeliveryAddress = () => (
-    sameAddress ? companyAddress.trim().toUpperCase() : buildStructuredDeliveryAddress()
-  );
+  const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
 
   const canSubmit = () => {
     const phoneOk = phone.replace(/\D/g, '').length >= 8;
     const whatsappAnswered = typeof whatsappOptIn === 'boolean';
     const passwordsMatch = password === confirmPassword;
-    const deliveryOk = sameAddress
-      ? companyAddress.trim()
-      : (
-        streetName.trim()
-        && suburb.trim()
-        && postalCode.trim()
-        && buildingType
-        && (buildingType !== 'Apartments' || unitNumber.trim())
-      );
+    const deliveryOk = streetName.trim()
+      && suburb.trim()
+      && postalCode.trim()
+      && buildingType
+      && (buildingType !== 'Apartments' || unitNumber.trim());
     return (
       contactName.trim()
       && businessName.trim()
@@ -191,7 +182,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
           .join(', ') || null,
-        monthlySpend: monthlySpend || null,
+        monthlySpend: resolvedMonthlySpend() || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         instantApproval: true,
@@ -390,7 +381,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       <input
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
-                        placeholder="Registered company name"
+                        placeholder="name"
                         required
                       />
                     </div>
@@ -424,7 +415,24 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         {band}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className={`lp-quiz-type-card${monthlySpend === 'Other' ? ' selected' : ''}`}
+                      onClick={() => setMonthlySpend('Other')}
+                    >
+                      Other
+                    </button>
                   </div>
+                  {monthlySpend === 'Other' && (
+                    <div className="lp-quiz-field lp-quiz-other-field">
+                      <label>Your estimated monthly spend</label>
+                      <input
+                        value={otherMonthlySpend}
+                        onChange={(e) => setOtherMonthlySpend(e.target.value)}
+                        placeholder="e.g. R75,000"
+                      />
+                    </div>
+                  )}
 
                   <div className="lp-register-subhead">Business category <span className="lp-register-optional">(select all that apply)</span></div>
                   <div className="lp-quiz-types">
@@ -513,73 +521,62 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         placeholder="Start typing your street address…"
                       />
                     </div>
-                    <label className="lp-quiz-checkbox lp-register-checkbox">
+                    <div className="lp-register-subhead">Delivery address</div>
+                    <div className="lp-quiz-field">
+                      <label>Street name</label>
                       <input
-                        type="checkbox"
-                        checked={sameAddress}
-                        onChange={(e) => handleSameAddressToggle(e.target.checked)}
+                        value={streetName}
+                        onChange={(e) => setStreetName(e.target.value)}
+                        placeholder="Street name and number"
+                        required
                       />
-                      Delivery address is the same as my company address
-                    </label>
-                    {!sameAddress && (
-                      <>
-                        <div className="lp-quiz-field">
-                          <label>Street name</label>
-                          <input
-                            value={streetName}
-                            onChange={(e) => setStreetName(e.target.value)}
-                            placeholder="Street name and number"
-                            required
-                          />
-                        </div>
-                        <div className="lp-quiz-field">
-                          <label>Suburb</label>
-                          <input
-                            value={suburb}
-                            onChange={(e) => setSuburb(e.target.value)}
-                            placeholder="Suburb"
-                            required
-                          />
-                        </div>
-                        <div className="lp-quiz-field">
-                          <label>Postal code</label>
-                          <input
-                            value={postalCode}
-                            onChange={(e) => setPostalCode(e.target.value)}
-                            placeholder="Postal code"
-                            required
-                          />
-                        </div>
-                        <div className="lp-quiz-field lp-quiz-field--full">
-                          <div className="lp-register-subhead">Building type</div>
-                          <div className="lp-quiz-types">
-                            {BUILDING_TYPES.map((type) => (
-                              <button
-                                key={type}
-                                type="button"
-                                className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                                onClick={() => {
-                                  setBuildingType(type);
-                                  if (type !== 'Apartments') setUnitNumber('');
-                                }}
-                              >
-                                {type}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {buildingType === 'Apartments' && (
-                          <div className="lp-quiz-field">
-                            <label>Unit / apartment number</label>
-                            <input
-                              value={unitNumber}
-                              onChange={(e) => setUnitNumber(e.target.value)}
-                              placeholder="Unit number"
-                              required
-                            />
-                          </div>
-                        )}
-                      </>
+                    </div>
+                    <div className="lp-quiz-field">
+                      <label>Suburb</label>
+                      <input
+                        value={suburb}
+                        onChange={(e) => setSuburb(e.target.value)}
+                        placeholder="Suburb"
+                        required
+                      />
+                    </div>
+                    <div className="lp-quiz-field">
+                      <label>Postal code</label>
+                      <input
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        placeholder="Postal code"
+                        required
+                      />
+                    </div>
+                    <div className="lp-quiz-field lp-quiz-field--full">
+                      <div className="lp-register-subhead">Building type</div>
+                      <div className="lp-quiz-types lp-quiz-types--compact">
+                        {BUILDING_TYPES.map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
+                            onClick={() => {
+                              setBuildingType(type);
+                              if (type !== 'Apartments') setUnitNumber('');
+                            }}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {buildingType === 'Apartments' && (
+                      <div className="lp-quiz-field">
+                        <label>Unit / apartment number</label>
+                        <input
+                          value={unitNumber}
+                          onChange={(e) => setUnitNumber(e.target.value)}
+                          placeholder="Unit number"
+                          required
+                        />
+                      </div>
                     )}
                   </div>
                 </section>

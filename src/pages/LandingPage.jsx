@@ -407,21 +407,13 @@ function Questionnaire({ onLogin }) {
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const [companyAddress, setCompanyAddress] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [sameAddress, setSameAddress] = useState(false);
   const [streetName, setStreetName] = useState('');
   const [suburb, setSuburb] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [buildingType, setBuildingType] = useState('');
   const [unitNumber, setUnitNumber] = useState('');
-  // When "same address" is ticked, keep delivery mirrored to the company address.
   const handleCompanyAddressChange = (v) => {
     setCompanyAddress(v);
-    if (sameAddress) setDeliveryAddress(v);
-  };
-  const handleSameAddressToggle = (checked) => {
-    setSameAddress(checked);
-    if (checked) setDeliveryAddress(companyAddress);
   };
 
   const buildStructuredDeliveryAddress = () => {
@@ -433,9 +425,7 @@ function Questionnaire({ onLogin }) {
     return parts.filter(Boolean).join(', ').toUpperCase();
   };
 
-  const resolvedDeliveryAddress = () => (
-    sameAddress ? companyAddress.trim().toUpperCase() : buildStructuredDeliveryAddress()
-  );
+  const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
@@ -444,6 +434,7 @@ function Questionnaire({ onLogin }) {
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   const [monthlySpend, setMonthlySpend] = useState('');
+  const [otherMonthlySpend, setOtherMonthlySpend] = useState('');
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -468,15 +459,11 @@ function Questionnaire({ onLogin }) {
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
     if (step === 2) {
-      const deliveryOk = sameAddress
-        ? companyAddress.trim()
-        : (
-          streetName.trim()
-          && suburb.trim()
-          && postalCode.trim()
-          && buildingType
-          && (buildingType !== 'Apartments' || unitNumber.trim())
-        );
+      const deliveryOk = streetName.trim()
+        && suburb.trim()
+        && postalCode.trim()
+        && buildingType
+        && (buildingType !== 'Apartments' || unitNumber.trim());
       return companyAddress.trim() && deliveryOk;
     }
     if (step === 3) return true;
@@ -521,7 +508,7 @@ function Questionnaire({ onLogin }) {
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
           .join(', ') || null,
-        monthlySpend: monthlySpend || null,
+        monthlySpend: (monthlySpend === 'Other' ? otherMonthlySpend.trim() : monthlySpend) || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         customerCode: customerCode.trim() || null,
@@ -579,7 +566,7 @@ function Questionnaire({ onLogin }) {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Registered company name"
+                  placeholder="name"
                 />
               </div>
               <div className="lp-quiz-field">
@@ -722,74 +709,62 @@ function Questionnaire({ onLogin }) {
                   placeholder="Start typing your street address…"
                 />
               </div>
-              <label className="lp-quiz-checkbox" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'rgba(255,255,255,0.82)', fontSize: 14, margin: '2px 0' }}>
+              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '8px 0 10px' }}>Delivery address</div>
+              <div className="lp-quiz-field">
+                <label>Street name</label>
                 <input
-                  type="checkbox"
-                  checked={sameAddress}
-                  onChange={(e) => handleSameAddressToggle(e.target.checked)}
-                  style={{ width: 18, height: 18, accentColor: '#dc2626', cursor: 'pointer' }}
+                  value={streetName}
+                  onChange={(e) => setStreetName(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Street name and number"
                 />
-                Delivery address is the same as my company address
-              </label>
-              {!sameAddress && (
-                <>
-                  <div className="lp-quiz-field">
-                    <label>Street name</label>
-                    <input
-                      value={streetName}
-                      onChange={(e) => setStreetName(e.target.value)}
-                      onKeyDown={handleKey}
-                      placeholder="Street name and number"
-                    />
-                  </div>
-                  <div className="lp-quiz-field">
-                    <label>Suburb</label>
-                    <input
-                      value={suburb}
-                      onChange={(e) => setSuburb(e.target.value)}
-                      onKeyDown={handleKey}
-                      placeholder="Suburb"
-                    />
-                  </div>
-                  <div className="lp-quiz-field">
-                    <label>Postal code</label>
-                    <input
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      onKeyDown={handleKey}
-                      placeholder="Postal code"
-                    />
-                  </div>
-                  <div className="lp-quiz-field lp-quiz-field--full">
-                    <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Building type</div>
-                    <div className="lp-quiz-types">
-                      {BUILDING_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                          onClick={() => {
-                            setBuildingType(type);
-                            if (type !== 'Apartments') setUnitNumber('');
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {buildingType === 'Apartments' && (
-                    <div className="lp-quiz-field">
-                      <label>Unit / apartment number</label>
-                      <input
-                        value={unitNumber}
-                        onChange={(e) => setUnitNumber(e.target.value)}
-                        onKeyDown={handleKey}
-                        placeholder="Unit number"
-                      />
-                    </div>
-                  )}
-                </>
+              </div>
+              <div className="lp-quiz-field">
+                <label>Suburb</label>
+                <input
+                  value={suburb}
+                  onChange={(e) => setSuburb(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Suburb"
+                />
+              </div>
+              <div className="lp-quiz-field">
+                <label>Postal code</label>
+                <input
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Postal code"
+                />
+              </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Building type</div>
+                <div className="lp-quiz-types">
+                  {BUILDING_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
+                      onClick={() => {
+                        setBuildingType(type);
+                        if (type !== 'Apartments') setUnitNumber('');
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {buildingType === 'Apartments' && (
+                <div className="lp-quiz-field">
+                  <label>Unit / apartment number</label>
+                  <input
+                    value={unitNumber}
+                    onChange={(e) => setUnitNumber(e.target.value)}
+                    onKeyDown={handleKey}
+                    placeholder="Unit number"
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -813,7 +788,25 @@ function Questionnaire({ onLogin }) {
                   {band}
                 </button>
               ))}
+              <button
+                type="button"
+                className={`lp-quiz-type-card${monthlySpend === 'Other' ? ' selected' : ''}`}
+                onClick={() => setMonthlySpend('Other')}
+              >
+                Other
+              </button>
             </div>
+            {monthlySpend === 'Other' && (
+              <div className="lp-quiz-field lp-quiz-other-field">
+                <label>Your estimated monthly spend</label>
+                <input
+                  value={otherMonthlySpend}
+                  onChange={(e) => setOtherMonthlySpend(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="e.g. R75,000"
+                />
+              </div>
+            )}
             <div style={{ height: '18px' }} />
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category <span style={{ opacity: 0.55, fontWeight: 400 }}>(select all that apply)</span></div>
             <div className="lp-quiz-types">
