@@ -9,7 +9,9 @@ function isChunkLoadError(error) {
     message.includes('Importing a module script failed') ||
     message.includes('error loading dynamically imported module') ||
     message.includes('Unable to preload CSS') ||
-    message.includes('Failed to load module script')
+    message.includes('Failed to load module script') ||
+    message.includes('is not a valid JavaScript MIME type') ||
+    message.includes('MIME type')
   );
 }
 
