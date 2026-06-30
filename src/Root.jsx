@@ -3,6 +3,7 @@ import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
+import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
@@ -13,10 +14,11 @@ const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
-const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://protoportal-main.vercel.app';
+const PORTAL_URL = getPortalUrl();
 
 export default function Root() {
   const adminHost = isAdminHost();
+  const preRegisterHost = isPreRegisterHost();
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
@@ -29,7 +31,8 @@ export default function Root() {
 
   useEffect(() => {
     if (adminHost) document.title = 'Proto Admin';
-  }, [adminHost]);
+    else if (preRegisterHost) document.title = 'Proto Trading — Trade Registration';
+  }, [adminHost, preRegisterHost]);
 
   // Browsers (esp. Chrome) try to "restore" the previous scroll position
   // when the user navigates back, forward, or — combined with our hash
@@ -64,7 +67,7 @@ export default function Root() {
     };
   }, []);
 
-  const isRegisterRoute = !adminHost && (pathname === '/register' || pathname === '/pre-register');
+  const isRegisterRoute = !adminHost && !preRegisterHost && (pathname === '/register' || pathname === '/pre-register');
 
   const setSurface = useCallback((next) => {
     setView(next);
@@ -195,6 +198,60 @@ export default function Root() {
       </div>
     </div>
   );
+
+  if (preRegisterHost) {
+    if (session === undefined) return authSurfaceFallback;
+
+    if (session && customerLoading && !customer) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: '#e11d48', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Signing you in…</div>
+            <div style={{ color: '#94a3b8', fontSize: '13px' }}>Checking your account.</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (session && customer && (customer.is_approved || customer.role === 'admin')) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px', padding: '24px' }}>
+          <div style={{ fontSize: '48px' }}>✓</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
+          <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
+            Trade registration is only available on this site. Sign in on the trade portal to browse and order.
+          </p>
+          <a href={PORTAL_URL} style={{ padding: '12px 28px', background: '#8B1A1A', color: '#fff', borderRadius: '8px', fontWeight: '700', textDecoration: 'none' }}>
+            Go to trade portal
+          </a>
+          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            Log out
+          </button>
+        </div>
+      );
+    }
+
+    if (session && customer && !customer.is_approved && customer.role !== 'admin') {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
+          <div style={{ fontSize: '48px' }}>⏳</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
+          <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
+            Your trade account is pending admin approval. You will be notified once approved.
+          </p>
+          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            Log Out
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <Suspense fallback={authSurfaceFallback}>
+        <RegisterPage preRegisterOnly portalUrl={PORTAL_URL} onLogin={() => { window.location.href = PORTAL_URL; }} />
+      </Suspense>
+    );
+  }
 
   if (isRegisterRoute) {
     if (session === undefined) return authSurfaceFallback;

@@ -62,7 +62,7 @@ function validateEmailField(value) {
   return '';
 }
 
-export default function RegisterPage({ onLogin }) {
+export default function RegisterPage({ onLogin, preRegisterOnly = false, portalUrl = 'https://protoportal-main.vercel.app' }) {
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -209,17 +209,34 @@ export default function RegisterPage({ onLogin }) {
   return (
     <div className="lp-register-page">
       <header className="lp-register-header">
-        <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-          <img src="/proto-logo.webp" alt="" />
-          <div>
-            <strong>PROTO <span>TRADING</span></strong>
-            <small>Wholesale trade portal</small>
+        {preRegisterOnly ? (
+          <div className="lp-register-brand" aria-label="Proto Trading">
+            <img src="/proto-logo.webp" alt="" />
+            <div>
+              <strong>PROTO <span>TRADING</span></strong>
+              <small>Trade registration</small>
+            </div>
           </div>
-        </a>
-        <button type="button" className="lp-register-login" onClick={onLogin}>
-          <Lock size={15} />
-          Log in
-        </button>
+        ) : (
+          <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
+            <img src="/proto-logo.webp" alt="" />
+            <div>
+              <strong>PROTO <span>TRADING</span></strong>
+              <small>Wholesale trade portal</small>
+            </div>
+          </a>
+        )}
+        {preRegisterOnly ? (
+          <a href={portalUrl} className="lp-register-login">
+            <Lock size={15} />
+            Trade portal login
+          </a>
+        ) : (
+          <button type="button" className="lp-register-login" onClick={onLogin}>
+            <Lock size={15} />
+            Log in
+          </button>
+        )}
       </header>
 
       <main className="lp-register-main">
@@ -248,7 +265,9 @@ export default function RegisterPage({ onLogin }) {
                   {customerCode ? ` (customer code ${customerCode})` : ''}.
                   Log in with {email.trim()} to start ordering.
                 </p>
-                <button type="button" onClick={onLogin}>Log in now</button>
+                <button type="button" onClick={preRegisterOnly ? () => { window.location.href = portalUrl; } : onLogin}>
+                  {preRegisterOnly ? 'Go to trade portal' : 'Log in now'}
+                </button>
               </div>
             ) : (
               <form className="lp-register-form" onSubmit={handleSubmit} noValidate>
@@ -572,7 +591,11 @@ export default function RegisterPage({ onLogin }) {
                   </button>
                   <p className="lp-register-footnote">
                     Already have an account?{' '}
-                    <button type="button" className="lp-register-link" onClick={onLogin}>Log in</button>
+                    {preRegisterOnly ? (
+                      <a href={portalUrl} className="lp-register-link">Sign in on the trade portal</a>
+                    ) : (
+                      <button type="button" className="lp-register-link" onClick={onLogin}>Log in</button>
+                    )}
                   </p>
                 </div>
               </form>
@@ -583,7 +606,7 @@ export default function RegisterPage({ onLogin }) {
 
       <footer className="lp-register-footer">
         <p>Trade access only. Not open to the general public.</p>
-        <a href="/">Back to homepage</a>
+        {!preRegisterOnly && <a href="/">Back to homepage</a>}
       </footer>
     </div>
   );
