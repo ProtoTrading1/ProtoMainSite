@@ -3,7 +3,7 @@ import PortalErrorBoundary from './components/PortalErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
-import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
+import { getPortalUrl, isRegistrationRedirectHost, isStandaloneRegisterPath } from './lib/registrationRoutes';
 import { scrollToTop } from './lib/scrollToTop';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
@@ -18,7 +18,8 @@ const PORTAL_URL = getPortalUrl();
 
 export default function Root() {
   const adminHost = isAdminHost();
-  const preRegisterHost = isPreRegisterHost();
+  const preRegisterHost = isRegistrationRedirectHost();
+  const standaloneRegister = !adminHost && isStandaloneRegisterPath(pathname);
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
@@ -31,8 +32,13 @@ export default function Root() {
 
   useEffect(() => {
     if (adminHost) document.title = 'Proto Admin';
-    else if (preRegisterHost) document.title = 'Proto Trading — Trade Registration';
-  }, [adminHost, preRegisterHost]);
+    else if (standaloneRegister) document.title = 'Proto Trading — Trade Registration';
+  }, [adminHost, standaloneRegister]);
+
+  useEffect(() => {
+    if (!preRegisterHost || pathname === '/pre-register') return;
+    window.location.replace('/pre-register');
+  }, [preRegisterHost, pathname]);
 
   // Browsers (esp. Chrome) try to "restore" the previous scroll position
   // when the user navigates back, forward, or — combined with our hash
@@ -67,7 +73,7 @@ export default function Root() {
     };
   }, []);
 
-  const isRegisterRoute = !adminHost && !preRegisterHost && (pathname === '/register' || pathname === '/pre-register');
+  const isRegisterRoute = !adminHost && !standaloneRegister && pathname === '/register';
 
   const setSurface = useCallback((next) => {
     setView(next);
@@ -199,7 +205,7 @@ export default function Root() {
     </div>
   );
 
-  if (preRegisterHost) {
+  if (standaloneRegister) {
     if (session === undefined) return authSurfaceFallback;
 
     if (session && customerLoading && !customer) {
@@ -219,11 +225,8 @@ export default function Root() {
           <div style={{ fontSize: '48px' }}>✓</div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
           <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
-            Trade registration is only available on this site. Sign in on the trade portal to browse and order.
+            Your trade account is approved. Use the main Proto website to sign in and place orders.
           </p>
-          <a href={PORTAL_URL} style={{ padding: '12px 28px', background: '#8B1A1A', color: '#fff', borderRadius: '8px', fontWeight: '700', textDecoration: 'none' }}>
-            Go to trade portal
-          </a>
           <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
             Log out
           </button>
@@ -248,9 +251,13 @@ export default function Root() {
 
     return (
       <Suspense fallback={authSurfaceFallback}>
-        <RegisterPage preRegisterOnly portalUrl={PORTAL_URL} onLogin={() => { window.location.href = PORTAL_URL; }} />
+        <RegisterPage standalone />
       </Suspense>
     );
+  }
+
+  if (preRegisterHost) {
+    return authSurfaceFallback;
   }
 
   if (isRegisterRoute) {
