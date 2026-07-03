@@ -71,6 +71,17 @@ export const BUSINESS_TYPE_ICONS = {
   Other: Pencil,
 };
 
+/** Labels for register.proto.co.za only (standalone register host). */
+export const REGISTER_BUSINESS_TYPES = BUSINESS_TYPES.map((type) => {
+  if (type === 'Dollar / variety store') return 'General Dealer';
+  if (type === 'Religious / church store') return 'Religious institution';
+  return type;
+});
+
+export const REGISTER_BUSINESS_TYPE_ICONS = Object.fromEntries(
+  REGISTER_BUSINESS_TYPES.map((type, index) => [type, BUSINESS_TYPE_ICONS[BUSINESS_TYPES[index]]]),
+);
+
 export const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
   'R5,000 – R10,000',
