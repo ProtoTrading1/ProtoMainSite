@@ -28,15 +28,30 @@
 }
 
 .access-brand {
-  gap: 12px;
+  gap: 0;
 }
 
-.access-brand img {
+/* Legacy icon-only img rules — do not apply to full wordmark SVG/img */
+.access-brand img:not(.proto-logo__image--full) {
   width: 42px;
   height: 42px;
   border-radius: 10px;
   object-fit: cover;
   background: #050505;
+}
+
+.access-brand .proto-logo__svg,
+.access-brand .proto-logo__image--full {
+  display: block;
+  width: auto;
+  height: 44px;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+.access-brand .proto-logo--full-fallback {
+  gap: 12px;
 }
 
 .access-brand strong {
@@ -2582,14 +2597,23 @@
 .lp-footer-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0;
 }
 
-.lp-footer-brand img {
+.lp-footer-brand img:not(.proto-logo__image--full) {
   width: 36px;
   height: 36px;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.lp-footer-brand .proto-logo__svg,
+.lp-footer-brand .proto-logo__image--full {
+  display: block;
+  width: auto;
+  height: 36px;
+  border-radius: 0;
+  object-fit: contain;
 }
 
 .lp-footer-brand strong {
@@ -3164,8 +3188,13 @@
     font-size: 17px;
   }
 
-  .access-brand img {
+  .access-brand img:not(.proto-logo__image--full) {
     width: 36px;
+    height: 36px;
+  }
+
+  .access-brand .proto-logo__svg,
+  .access-brand .proto-logo__image--full {
     height: 36px;
   }
 

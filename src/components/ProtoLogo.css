@@ -9,6 +9,11 @@
   max-width: 100%;
 }
 
+.proto-logo__svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .proto-logo__image--full {
   width: auto;
   height: 36px;

@@ -1070,7 +1070,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <ProtoLogo variant="full" size="lg" tagline="Wholesale supplier since 1987" />
+          <ProtoLogo variant="full" size="lg" tagline={false} />
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
@@ -1190,7 +1190,7 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
-            <ProtoLogo variant="full" size="md" tagline="Wholesale supplier since 1987" />
+            <ProtoLogo variant="full" size="md" tagline={false} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
             <p style={{ margin: 0 }}>Trade access only. Not open to the general public.</p>

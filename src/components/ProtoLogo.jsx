@@ -5,6 +5,7 @@ import {
   PROTO_LOGO_SOURCES,
   PROTO_TAGLINE,
 } from '../lib/brandAssets';
+import ProtoLogoWordmark from './ProtoLogoWordmark';
 import './ProtoLogo.css';
 
 const SIZE_HEIGHT = {
@@ -79,6 +80,7 @@ export default function ProtoLogo({
   onClick,
   role,
   tabIndex,
+  preferImage = false,
 }) {
   const sourceList = useMemo(() => {
     if (sources) return sources;
@@ -87,6 +89,7 @@ export default function ProtoLogo({
   }, [sources, variant]);
   const [sourceIndex, setSourceIndex] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [imageReady, setImageReady] = useState(false);
 
   const height = typeof size === 'number' ? size : (SIZE_HEIGHT[size] ?? SIZE_HEIGHT.md);
   const showTagline = tagline !== false && variant !== 'icon';
@@ -95,10 +98,26 @@ export default function ProtoLogo({
     const next = nextSource(sourceList, sourceIndex);
     if (next >= 0) {
       setSourceIndex(next);
+      setImageReady(false);
       return;
     }
     setFailed(true);
+    setImageReady(false);
   }, [sourceIndex, sourceList]);
+
+  if (variant === 'full' && !preferImage) {
+    return (
+      <span
+        className={`proto-logo proto-logo--full ${className}`.trim()}
+        style={style}
+        onClick={onClick}
+        role={role}
+        tabIndex={tabIndex}
+      >
+        <ProtoLogoWordmark height={height} className="proto-logo__svg" />
+      </span>
+    );
+  }
 
   if (failed) {
     return (
@@ -124,16 +143,32 @@ export default function ProtoLogo({
         role={role}
         tabIndex={tabIndex}
       >
-        <img
-          src={src}
-          alt={PROTO_BRAND_NAME}
-          className={`proto-logo__image proto-logo__image--full ${imgClassName}`.trim()}
-          style={{ height, ...imgStyle }}
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          onError={handleError}
-        />
+        {imageReady ? (
+          <img
+            src={src}
+            alt={PROTO_BRAND_NAME}
+            className={`proto-logo__image proto-logo__image--full ${imgClassName}`.trim()}
+            style={{ height, ...imgStyle }}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+          />
+        ) : (
+          <>
+            <ProtoLogoWordmark height={height} className="proto-logo__svg" />
+            <img
+              src={src}
+              alt=""
+              aria-hidden="true"
+              className={`proto-logo__image proto-logo__image--full proto-logo__image--probe ${imgClassName}`.trim()}
+              style={{ display: 'none', ...imgStyle }}
+              loading="eager"
+              decoding="async"
+              onLoad={() => setImageReady(true)}
+              onError={handleError}
+            />
+          </>
+        )}
       </span>
     );
   }
