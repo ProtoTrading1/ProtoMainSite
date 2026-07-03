@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import AddressAutocomplete from '../components/AddressAutocomplete';
+import BusinessCategoryPicker from '../components/register/BusinessCategoryPicker';
+import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
+import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
 import '../landing.css';
@@ -15,40 +18,7 @@ const SA_PROVINCES = [
   'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
 ];
 
-const BUSINESS_TYPES = [
-  'Retail store',
-  'Online shop / e-commerce',
-  'Wholesaler',
-  'Importer / distributor',
-  'Craft & hobby shop',
-  'Gift & novelty store',
-  'Pharmacy / health & beauty',
-  'Hardware & home store',
-  'Stationery & office supply',
-  "Baby & children's store",
-  'Fashion & clothing boutique',
-  'Dollar / variety store',
-  'Market trader / spaza shop',
-  'School or institution',
-  'Events, parties & décor',
-  'Craft & bead shop',
-  'Packaging supplier',
-  'Gift shop',
-  'Educational supplier',
-  'Religious / church store',
-  'Promotional products',
-  'Other',
-];
-
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
-
-const MONTHLY_SPEND_BANDS = [
-  'R0 – R5,000',
-  'R5,000 – R10,000',
-  'R10,000 – R25,000',
-  'R25,000 – R50,000',
-  'R50,000+',
-];
 
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
@@ -399,42 +369,56 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </div>
                   </div>
 
-                  <div className="lp-register-subhead">Estimated monthly spend</div>
-                  <div className="lp-quiz-types">
-                    {MONTHLY_SPEND_BANDS.map((band) => (
-                      <button
-                        key={band}
-                        type="button"
-                        className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
-                        onClick={() => setMonthlySpend(band)}
-                      >
-                        {band}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="lp-register-subhead">Business category <span className="lp-register-optional">(select all that apply)</span></div>
-                  <div className="lp-quiz-types">
-                    {BUSINESS_TYPES.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
-                        onClick={() => toggleBusinessType(t)}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                  {businessType.includes('Other') && (
-                    <div className="lp-quiz-field lp-quiz-other-field">
-                      <label>Describe your business</label>
-                      <input
-                        value={otherType}
-                        onChange={(e) => setOtherType(e.target.value)}
-                        placeholder="Tell us what type of business you run"
+                  {standalone ? (
+                    <>
+                      <BusinessCategoryPicker
+                        selected={businessType}
+                        onToggle={toggleBusinessType}
+                        otherValue={otherType}
+                        onOtherChange={setOtherType}
                       />
-                    </div>
+                      <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
+                    </>
+                  ) : (
+                    <>
+                      <div className="lp-register-subhead">Estimated monthly spend</div>
+                      <div className="lp-quiz-types">
+                        {MONTHLY_SPEND_BANDS.map((band) => (
+                          <button
+                            key={band}
+                            type="button"
+                            className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
+                            onClick={() => setMonthlySpend(band)}
+                          >
+                            {band}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="lp-register-subhead">Business category <span className="lp-register-optional">(select all that apply)</span></div>
+                      <div className="lp-quiz-types">
+                        {BUSINESS_TYPES.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
+                            onClick={() => toggleBusinessType(t)}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      {businessType.includes('Other') && (
+                        <div className="lp-quiz-field lp-quiz-other-field">
+                          <label>Describe your business</label>
+                          <input
+                            value={otherType}
+                            onChange={(e) => setOtherType(e.target.value)}
+                            placeholder="Tell us what type of business you run"
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </section>
 
