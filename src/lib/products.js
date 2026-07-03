@@ -1,5 +1,16 @@
 import { fuzzyFilter } from './fuzzySearch';
-import { applySkuOrder, getActiveTaxonomy, lookupSortOrder, resolveNavPathForProducts } from './taxonomy';
+import {
+  applySkuOrder,
+  getActiveTaxonomy,
+  lookupSortOrder,
+  resolveNavPathForProducts,
+} from './taxonomy';
+import {
+  inferMotarroPathFromRow,
+  isMotarroBrowsePath,
+  isMotarroProduct,
+  motarroPathMatchesFilter,
+} from './mottaroCategory';
 import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 
 // Promise singleton — prevents parallel fetches when multiple components mount at once
@@ -8,7 +19,7 @@ let _cache = null;
 let _sortOrdersPromise = null;
 let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
-const SORT_ORDERS_TTL = 45_000;
+const SORT_ORDERS_TTL = 15_000;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
 const LS_KEY = 'proto_catalog_v10';
@@ -109,14 +120,49 @@ function applyCollection(products, collection, specialIds = null) {
   return products;
 }
 
-function applyPathFilter(products, categoryPath) {
-  if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
-  const resolved = resolveNavPathForProducts(categoryPath, getActiveTaxonomy());
-  return products.filter((p) => {
-    const cp = p.categoryPath || [];
+function productPaths(product) {
+  if (product.categoryPaths?.length) return product.categoryPaths;
+  if (product.categoryPath?.length) return [product.categoryPath];
+  return [];
+}
+
+function productMatchesNavPath(product, tree, navPath) {
+  if (!Array.isArray(navPath) || !navPath.length) return true;
+
+  if (isMotarroBrowsePath(navPath)) {
+    if (!isMotarroProduct(product)) return false;
+    const row = {
+      title: product.title || product.name || '',
+      category: product.categoryLabel || '',
+      subcategory_one: product.subcategoryLabels?.[0] ?? null,
+      subcategory_two: product.subcategoryLabels?.[1] ?? null,
+      subcategory_three: product.subcategoryLabels?.[2] ?? null,
+      subcategory_four: product.subcategoryLabels?.[3] ?? null,
+    };
+    const mottaroPath = product.alternateCategoryPath?.length
+      ? product.alternateCategoryPath
+      : inferMotarroPathFromRow(row, tree);
+    return motarroPathMatchesFilter(mottaroPath, navPath);
+  }
+
+  const resolved = resolveNavPathForProducts(navPath, tree);
+  return productPaths(product).some((cp) => {
     const depth = Math.min(cp.length, resolved.length);
     return depth > 0 && resolved.slice(0, depth).every((seg, i) => cp[i] === seg);
   });
+}
+
+function applyPathFilter(products, categoryPath) {
+  if (!Array.isArray(categoryPath) || !categoryPath.length) return products;
+  const tree = getActiveTaxonomy();
+  if (tree.length) {
+    return products.filter((p) => productMatchesNavPath(p, tree, categoryPath));
+  }
+  const resolved = resolveNavPathForProducts(categoryPath, tree);
+  return products.filter((p) => productPaths(p).some((cp) => {
+    const depth = Math.min(cp.length, resolved.length);
+    return depth > 0 && resolved.slice(0, depth).every((seg, i) => cp[i] === seg);
+  }));
 }
 
 function applySort(products, sort, categoryPath = [], sortOrders = {}) {
@@ -169,13 +215,18 @@ export async function fetchCategoryCounts({ collection = 'all' } = {}) {
   let products = await getAllCached();
   products = applyCollection(products, collection);
   products = groupProductsByBarcode(products);
+  const tree = getActiveTaxonomy();
   const counts = { '': products.length };
   for (const p of products) {
-    const cp = p.categoryPath;
-    if (!cp?.length) continue;
-    for (let i = 1; i <= cp.length; i++) {
-      const key = cp.slice(0, i).join('/');
-      counts[key] = (counts[key] || 0) + 1;
+    for (const path of productPaths(p)) {
+      const countPath = path[0] === 'mottaro'
+        ? resolveNavPathForProducts(path, tree)
+        : path;
+      if (!countPath.length) continue;
+      for (let i = 1; i <= countPath.length; i++) {
+        const key = countPath.slice(0, i).join('/');
+        counts[key] = (counts[key] || 0) + 1;
+      }
     }
   }
   return counts;

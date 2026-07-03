@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { readSiteConfigJson } from './_site-config.js';
+import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
 
 const PAGE_SIZE = 1000;
+const TAXONOMY_FILE = 'taxonomy/categories.json';
+const BUNDLED_PATH = join(process.cwd(), 'src/data/categories.json');
 
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
   const rows = [];
@@ -17,18 +23,39 @@ async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
   return rows;
 }
 
+function loadBundledTaxonomy() {
+  try {
+    return JSON.parse(readFileSync(BUNDLED_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+async function loadTaxonomyTree() {
+  try {
+    const stored = await readSiteConfigJson(TAXONOMY_FILE, null);
+    let categories = null;
+    if (Array.isArray(stored)) categories = stored;
+    else if (stored?.categories && Array.isArray(stored.categories)) categories = stored.categories;
+    if (categories?.length) return injectMotarroIntoTree(categories);
+  } catch {
+    // fall through to bundled
+  }
+  return injectMotarroIntoTree(loadBundledTaxonomy());
+}
+
 // Must match labelToSlug in src/lib/taxonomy.js and scripts/lib/master.mjs.
 function labelToSlug(label) {
   if (label === null || label === undefined) return '';
   return String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-function adapt(row) {
+function adapt(row, tree) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
-  return {
+  const base = {
     id: row.sku,
     code: row.barcode,
     barcode: row.barcode,
@@ -66,6 +93,7 @@ function adapt(row) {
     yearlySales: 0,
     supplier: '',
   };
+  return enrichMotarroCategoryFields(base, row, tree, categoryPath);
 }
 
 export default async function handler(req, res) {
@@ -79,8 +107,11 @@ export default async function handler(req, res) {
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
-    const rows = await fetchAllRows(supabase, 'website_stock', '*');
-    const products = rows.map(adapt).filter((p) => p.category);
+    const [rows, tree] = await Promise.all([
+      fetchAllRows(supabase, 'website_stock', '*'),
+      loadTaxonomyTree(),
+    ]);
+    const products = rows.map((row) => adapt(row, tree)).filter((p) => p.category);
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
     res.setHeader('Content-Type', 'application/json');

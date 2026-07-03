@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
+import { injectMotarroIntoTree } from './_mottaro-category.js';
 
 const TAXONOMY_FILE = 'taxonomy/categories.json';
 const BUNDLED_PATH = join(process.cwd(), 'src/data/categories.json');
@@ -45,6 +46,8 @@ export default async function handler(req, res) {
     }
 
     if (!categories || !categories.length) categories = loadBundled();
+
+    categories = injectMotarroIntoTree(categories);
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
     res.setHeader('Content-Type', 'application/json');
