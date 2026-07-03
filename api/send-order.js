@@ -4,7 +4,15 @@ import { runOrderTeamNotify } from './_order-notify-core.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 
-const DEFAULT_TO = 'orders@prototrading.co.za';
+const DEFAULT_NOTIFY_EMAILS = ['online@proto.co.za', 'danieljoffeinfo@gmail.com'];
+
+function resolveOrderNotifyRecipients() {
+  const raw = process.env.ORDER_NOTIFY_EMAILS || process.env.ORDER_TO_EMAIL || '';
+  const emails = raw
+    ? raw.split(',').map((part) => part.trim()).filter(Boolean)
+    : DEFAULT_NOTIFY_EMAILS;
+  return [...new Set(emails)];
+}
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -196,7 +204,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Delivery method is required' });
   }
 
-  const to = process.env.ORDER_TO_EMAIL || DEFAULT_TO;
+  const notifyEmails = resolveOrderNotifyRecipients();
 
   // PDF generation must never block the order email. pdfkit can fail on
   // serverless (e.g. missing AFM font data); if it does, log the real error and
@@ -234,7 +242,7 @@ export default async function handler(req, res) {
           name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
           email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
         },
-        to: [{ email: to }],
+        to: notifyEmails.map((email) => ({ email })),
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
         subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
         htmlContent: buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes }),
