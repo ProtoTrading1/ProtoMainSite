@@ -55,7 +55,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
   const {
-    companyAddress,
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
     deliverySameAsBilling,
     streetName,
     suburb,
@@ -71,10 +78,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     setBuildingType,
     setUnitNumber,
     setOtherBuildingType,
-    handleCompanyAddressChange,
     onBillingPlaceSelect,
     handleDeliverySameAsBillingChange,
     resolvedBuildingType,
+    buildStructuredBillingAddress,
     buildStructuredDeliveryAddress,
     deliveryFieldsLocked,
   } = addresses;
@@ -124,8 +131,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (!country.trim()) {
       issues.push({ key: 'country', message: 'Country', section: 'location' });
     }
-    if (!companyAddress.trim()) {
-      issues.push({ key: 'companyAddress', message: 'Billing address', section: 'addresses' });
+    if (!billingStreet.trim()) {
+      issues.push({ key: 'billingStreet', message: 'Billing street name', section: 'addresses' });
+    }
+    if (!billingSuburb.trim()) {
+      issues.push({ key: 'billingSuburb', message: 'Billing suburb', section: 'addresses' });
+    }
+    if (!billingPostalCode.trim()) {
+      issues.push({ key: 'billingPostalCode', message: 'Billing postal code', section: 'addresses' });
+    }
+    if (!billingCity.trim()) {
+      issues.push({ key: 'billingCity', message: 'Billing city', section: 'addresses' });
     }
     if (!streetName.trim()) {
       issues.push({ key: 'streetName', message: 'Delivery street name', section: 'addresses' });
@@ -244,7 +260,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         contactName: contactName.trim(),
         businessName: businessName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: deliveryLine,
         streetName: streetName.trim(),
         suburb: suburb.trim(),
@@ -254,7 +270,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         vatNumber: vatNumber.trim() || null,
         country: country || null,
         province: province || null,
-        city: city.trim() || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -582,8 +598,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       <div className="lp-quiz-field">
                         <label>City / town</label>
                         <input
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
+                          value={billingCity}
+                          onChange={(e) => setBillingCity(e.target.value)}
                           placeholder="City or town"
                         />
                       </div>
@@ -593,8 +609,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     <div className="lp-quiz-field">
                       <label>City / town</label>
                       <input
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        value={billingCity}
+                        onChange={(e) => setBillingCity(e.target.value)}
                         placeholder="City or town"
                       />
                     </div>
@@ -616,8 +632,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     <h2>Addresses</h2>
                   )}
                   <BillingDeliveryFields
-                    companyAddress={companyAddress}
-                    onCompanyAddressChange={handleCompanyAddressChange}
+                    billingStreet={billingStreet}
+                    setBillingStreet={setBillingStreet}
+                    billingSuburb={billingSuburb}
+                    setBillingSuburb={setBillingSuburb}
+                    billingPostalCode={billingPostalCode}
+                    setBillingPostalCode={setBillingPostalCode}
+                    billingCity={billingCity}
+                    setBillingCity={setBillingCity}
                     onBillingPlaceSelect={onBillingPlaceSelect}
                     deliverySameAsBilling={deliverySameAsBilling}
                     onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}

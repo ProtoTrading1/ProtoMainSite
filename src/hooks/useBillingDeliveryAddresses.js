@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react';
-import { EMPTY_BILLING_PARTS, buildDeliveryAddressLine } from '../lib/addressUtils';
+import { useCallback, useEffect, useState } from 'react';
+import { buildAddressLine, buildDeliveryAddressLine } from '../lib/addressUtils';
 
 export function useBillingDeliveryAddresses({ setProvince, setCountry } = {}) {
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [billingParts, setBillingParts] = useState(EMPTY_BILLING_PARTS);
+  const [billingStreet, setBillingStreet] = useState('');
+  const [billingSuburb, setBillingSuburb] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingPostalCode, setBillingPostalCode] = useState('');
   const [deliverySameAsBilling, setDeliverySameAsBilling] = useState(false);
   const [streetName, setStreetName] = useState('');
   const [suburb, setSuburb] = useState('');
@@ -14,30 +16,47 @@ export function useBillingDeliveryAddresses({ setProvince, setCountry } = {}) {
   const [otherBuildingType, setOtherBuildingType] = useState('');
 
   const applyBillingToDelivery = useCallback((parts) => {
-    if (!parts) return;
     setStreetName(parts.street || '');
     setSuburb(parts.suburb || '');
     setCity(parts.city || '');
     setPostalCode(parts.postalCode || '');
   }, []);
 
-  const handleCompanyAddressChange = useCallback((value) => {
-    setCompanyAddress(value);
-  }, []);
+  const getBillingParts = useCallback(() => ({
+    street: billingStreet,
+    suburb: billingSuburb,
+    city: billingCity,
+    postalCode: billingPostalCode,
+  }), [billingStreet, billingSuburb, billingCity, billingPostalCode]);
 
   const onBillingPlaceSelect = useCallback((parts) => {
-    setBillingParts(parts);
-    setCompanyAddress(parts.formatted || '');
+    setBillingStreet(parts.street || '');
+    setBillingSuburb(parts.suburb || '');
+    setBillingCity(parts.city || '');
+    setBillingPostalCode(parts.postalCode || '');
     if (setProvince && parts.province) setProvince(parts.province);
     if (setCountry && parts.province) setCountry('South Africa');
-    if (parts.city) setCity((prev) => prev || parts.city);
     if (deliverySameAsBilling) applyBillingToDelivery(parts);
   }, [applyBillingToDelivery, deliverySameAsBilling, setCountry, setProvince]);
 
   const handleDeliverySameAsBillingChange = useCallback((checked) => {
     setDeliverySameAsBilling(checked);
-    if (checked) applyBillingToDelivery(billingParts);
-  }, [applyBillingToDelivery, billingParts]);
+    if (checked) applyBillingToDelivery(getBillingParts());
+  }, [applyBillingToDelivery, getBillingParts]);
+
+  useEffect(() => {
+    if (!deliverySameAsBilling) return;
+    applyBillingToDelivery(getBillingParts());
+  }, [applyBillingToDelivery, deliverySameAsBilling, getBillingParts]);
+
+  const buildStructuredBillingAddress = useCallback(() => (
+    buildAddressLine({
+      streetName: billingStreet,
+      suburb: billingSuburb,
+      city: billingCity,
+      postalCode: billingPostalCode,
+    })
+  ), [billingStreet, billingSuburb, billingCity, billingPostalCode]);
 
   const resolvedBuildingType = useCallback(() => (
     buildingType === 'Other' ? otherBuildingType.trim() : buildingType
@@ -58,8 +77,14 @@ export function useBillingDeliveryAddresses({ setProvince, setCountry } = {}) {
   ), [streetName, suburb, city, postalCode, buildingType, otherBuildingType, unitNumber]);
 
   return {
-    companyAddress,
-    billingParts,
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
     deliverySameAsBilling,
     streetName,
     suburb,
@@ -75,10 +100,10 @@ export function useBillingDeliveryAddresses({ setProvince, setCountry } = {}) {
     setBuildingType,
     setUnitNumber,
     setOtherBuildingType,
-    handleCompanyAddressChange,
     onBillingPlaceSelect,
     handleDeliverySameAsBillingChange,
     resolvedBuildingType,
+    buildStructuredBillingAddress,
     buildStructuredDeliveryAddress,
     deliveryFieldsLocked: deliverySameAsBilling,
   };

@@ -55,7 +55,14 @@ export default function Questionnaire({ onLogin }) {
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const addresses = useBillingDeliveryAddresses();
   const {
-    companyAddress,
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
     deliverySameAsBilling,
     streetName,
     suburb,
@@ -71,10 +78,10 @@ export default function Questionnaire({ onLogin }) {
     setBuildingType,
     setUnitNumber,
     setOtherBuildingType,
-    handleCompanyAddressChange,
     onBillingPlaceSelect,
     handleDeliverySameAsBillingChange,
     resolvedBuildingType,
+    buildStructuredBillingAddress,
     buildStructuredDeliveryAddress,
     deliveryFieldsLocked,
   } = addresses;
@@ -108,7 +115,11 @@ export default function Questionnaire({ onLogin }) {
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
     if (step === 2) {
-      return companyAddress.trim()
+      const billingOk = billingStreet.trim()
+        && billingSuburb.trim()
+        && billingCity.trim()
+        && billingPostalCode.trim();
+      return billingOk
         && streetName.trim()
         && suburb.trim()
         && city.trim()
@@ -142,7 +153,7 @@ export default function Questionnaire({ onLogin }) {
         contactName: contactName.trim(),
         businessName: companyName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: buildStructuredDeliveryAddress(),
         streetName: streetName.trim(),
         suburb: suburb.trim(),
@@ -152,7 +163,7 @@ export default function Questionnaire({ onLogin }) {
         vatNumber: vatNumber.trim() || null,
         country: null,
         province: null,
-        city: city.trim() || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -348,8 +359,14 @@ export default function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Billing and delivery addresses</h3>
             <BillingDeliveryFields
-              companyAddress={companyAddress}
-              onCompanyAddressChange={handleCompanyAddressChange}
+              billingStreet={billingStreet}
+              setBillingStreet={setBillingStreet}
+              billingSuburb={billingSuburb}
+              setBillingSuburb={setBillingSuburb}
+              billingPostalCode={billingPostalCode}
+              setBillingPostalCode={setBillingPostalCode}
+              billingCity={billingCity}
+              setBillingCity={setBillingCity}
               onBillingPlaceSelect={onBillingPlaceSelect}
               deliverySameAsBilling={deliverySameAsBilling}
               onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}

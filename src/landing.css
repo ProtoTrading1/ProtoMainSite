@@ -4461,6 +4461,11 @@
   font-weight: 500;
 }
 
+.lp-register-field-hint--block {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+}
+
 .lp-register-same-address {
   grid-column: 1 / -1;
   display: flex;

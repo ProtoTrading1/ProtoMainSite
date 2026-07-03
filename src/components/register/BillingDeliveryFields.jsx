@@ -2,9 +2,96 @@ import AddressAutocomplete from '../AddressAutocomplete';
 
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
+function StructuredAddressFields({
+  street,
+  setStreet,
+  suburb,
+  setSuburb,
+  postalCode,
+  setPostalCode,
+  city,
+  setCity,
+  fieldKeys,
+  fieldHasIssue,
+  onKeyDown,
+  locked = false,
+  streetUsesAutocomplete = false,
+  onPlaceSelect,
+}) {
+  const lockProps = locked ? { readOnly: true, 'aria-readonly': true } : {};
+  const fieldClass = (key) => (
+    `lp-quiz-field${fieldHasIssue(key) ? ' lp-quiz-field--error' : ''}${locked ? ' lp-quiz-field--locked' : ''}`
+  );
+
+  return (
+    <>
+      <div className={fieldClass(fieldKeys.street)}>
+        <label>Street name</label>
+        {streetUsesAutocomplete ? (
+          <AddressAutocomplete
+            value={street}
+            onChange={setStreet}
+            onPlaceSelect={onPlaceSelect}
+            onKeyDown={onKeyDown}
+            placeholder="Street name and number"
+          />
+        ) : (
+          <input
+            value={street}
+            onChange={(e) => setStreet(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Street name and number"
+            required
+            {...lockProps}
+          />
+        )}
+      </div>
+      <div className={fieldClass(fieldKeys.suburb)}>
+        <label>Suburb</label>
+        <input
+          value={suburb}
+          onChange={(e) => setSuburb(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Suburb"
+          required
+          {...lockProps}
+        />
+      </div>
+      <div className={fieldClass(fieldKeys.postalCode)}>
+        <label>Postal code</label>
+        <input
+          value={postalCode}
+          onChange={(e) => setPostalCode(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Postal code"
+          required
+          {...lockProps}
+        />
+      </div>
+      <div className={fieldClass(fieldKeys.city)}>
+        <label>City</label>
+        <input
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="City"
+          required
+          {...lockProps}
+        />
+      </div>
+    </>
+  );
+}
+
 export default function BillingDeliveryFields({
-  companyAddress,
-  onCompanyAddressChange,
+  billingStreet,
+  setBillingStreet,
+  billingSuburb,
+  setBillingSuburb,
+  billingPostalCode,
+  setBillingPostalCode,
+  billingCity,
+  setBillingCity,
   onBillingPlaceSelect,
   deliverySameAsBilling,
   onDeliverySameAsBillingChange,
@@ -29,23 +116,33 @@ export default function BillingDeliveryFields({
   subheadClassName = 'lp-register-subhead',
   buildingTypesClassName = 'lp-quiz-types lp-quiz-types--compact',
 }) {
-  const lockProps = deliveryFieldsLocked
-    ? { readOnly: true, 'aria-readonly': true }
-    : {};
-
   return (
     <div className={gridClassName}>
-      <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('companyAddress') ? ' lp-quiz-field--error' : ''}`}>
-        <label>Billing address</label>
-        <AddressAutocomplete
-          value={companyAddress}
-          onChange={onCompanyAddressChange}
-          onPlaceSelect={onBillingPlaceSelect}
-          onKeyDown={onKeyDown}
-          placeholder="Start typing your billing address…"
-        />
-        <span className="lp-register-field-hint">Registered address for invoices and account records.</span>
-      </div>
+      <div className={subheadClassName}>Billing address</div>
+      <p className="lp-register-field-hint lp-register-field-hint--block">
+        Registered address for invoices and account records.
+      </p>
+
+      <StructuredAddressFields
+        street={billingStreet}
+        setStreet={setBillingStreet}
+        suburb={billingSuburb}
+        setSuburb={setBillingSuburb}
+        postalCode={billingPostalCode}
+        setPostalCode={setBillingPostalCode}
+        city={billingCity}
+        setCity={setBillingCity}
+        fieldKeys={{
+          street: 'billingStreet',
+          suburb: 'billingSuburb',
+          postalCode: 'billingPostalCode',
+          city: 'billingCity',
+        }}
+        fieldHasIssue={fieldHasIssue}
+        onKeyDown={onKeyDown}
+        streetUsesAutocomplete
+        onPlaceSelect={onBillingPlaceSelect}
+      />
 
       <div className={subheadClassName}>Delivery address</div>
 
@@ -58,50 +155,25 @@ export default function BillingDeliveryFields({
         <span>Same as billing address</span>
       </label>
 
-      <div className={`lp-quiz-field${fieldHasIssue('streetName') ? ' lp-quiz-field--error' : ''}${deliveryFieldsLocked ? ' lp-quiz-field--locked' : ''}`}>
-        <label>Street name</label>
-        <input
-          value={streetName}
-          onChange={(e) => setStreetName(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Street name and number"
-          required
-          {...lockProps}
-        />
-      </div>
-      <div className={`lp-quiz-field${fieldHasIssue('suburb') ? ' lp-quiz-field--error' : ''}${deliveryFieldsLocked ? ' lp-quiz-field--locked' : ''}`}>
-        <label>Suburb</label>
-        <input
-          value={suburb}
-          onChange={(e) => setSuburb(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Suburb"
-          required
-          {...lockProps}
-        />
-      </div>
-      <div className={`lp-quiz-field${fieldHasIssue('postalCode') ? ' lp-quiz-field--error' : ''}${deliveryFieldsLocked ? ' lp-quiz-field--locked' : ''}`}>
-        <label>Postal code</label>
-        <input
-          value={postalCode}
-          onChange={(e) => setPostalCode(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Postal code"
-          required
-          {...lockProps}
-        />
-      </div>
-      <div className={`lp-quiz-field${fieldHasIssue('city') ? ' lp-quiz-field--error' : ''}${deliveryFieldsLocked ? ' lp-quiz-field--locked' : ''}`}>
-        <label>City</label>
-        <input
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="City"
-          required
-          {...lockProps}
-        />
-      </div>
+      <StructuredAddressFields
+        street={streetName}
+        setStreet={setStreetName}
+        suburb={suburb}
+        setSuburb={setSuburb}
+        postalCode={postalCode}
+        setPostalCode={setPostalCode}
+        city={city}
+        setCity={setCity}
+        fieldKeys={{
+          street: 'streetName',
+          suburb: 'suburb',
+          postalCode: 'postalCode',
+          city: 'city',
+        }}
+        fieldHasIssue={fieldHasIssue}
+        onKeyDown={onKeyDown}
+        locked={deliveryFieldsLocked}
+      />
 
       <div className="lp-quiz-field lp-quiz-field--full">
         <div className={subheadClassName}>Building type</div>

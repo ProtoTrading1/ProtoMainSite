@@ -31,6 +31,12 @@ export function parseGooglePlaceComponents(addressComponents) {
   };
 }
 
+export function buildAddressLine({ streetName, suburb, city, postalCode, uppercase = false }) {
+  const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()].filter(Boolean);
+  const line = parts.join(', ');
+  return uppercase ? line.toUpperCase() : line;
+}
+
 export function buildDeliveryAddressLine({
   streetName,
   suburb,

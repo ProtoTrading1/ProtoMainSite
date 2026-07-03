@@ -410,7 +410,14 @@ function Questionnaire({ onLogin }) {
   const [province, setProvince] = useState('');
   const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
   const {
-    companyAddress,
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
     deliverySameAsBilling,
     streetName,
     suburb,
@@ -426,10 +433,10 @@ function Questionnaire({ onLogin }) {
     setBuildingType,
     setUnitNumber,
     setOtherBuildingType,
-    handleCompanyAddressChange,
     onBillingPlaceSelect,
     handleDeliverySameAsBillingChange,
     resolvedBuildingType,
+    buildStructuredBillingAddress,
     buildStructuredDeliveryAddress,
     deliveryFieldsLocked,
   } = addresses;
@@ -462,6 +469,10 @@ function Questionnaire({ onLogin }) {
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
     if (step === 2) {
+      const billingOk = billingStreet.trim()
+        && billingSuburb.trim()
+        && billingCity.trim()
+        && billingPostalCode.trim();
       const deliveryOk = streetName.trim()
         && suburb.trim()
         && city.trim()
@@ -469,7 +480,7 @@ function Questionnaire({ onLogin }) {
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
         && (buildingType !== 'Apartments' || unitNumber.trim());
-      return companyAddress.trim() && deliveryOk;
+      return billingOk && deliveryOk;
     }
     if (step === 3) return true;
     return false;
@@ -498,7 +509,7 @@ function Questionnaire({ onLogin }) {
         contactName: contactName.trim(),
         businessName: companyName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: deliveryLine,
         streetName: streetName.trim(),
         suburb: suburb.trim(),
@@ -508,7 +519,7 @@ function Questionnaire({ onLogin }) {
         vatNumber: vatNumber.trim() || null,
         country: null,
         province: null,
-        city: city.trim() || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -705,8 +716,14 @@ function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Billing and delivery addresses</h3>
             <BillingDeliveryFields
-              companyAddress={companyAddress}
-              onCompanyAddressChange={handleCompanyAddressChange}
+              billingStreet={billingStreet}
+              setBillingStreet={setBillingStreet}
+              billingSuburb={billingSuburb}
+              setBillingSuburb={setBillingSuburb}
+              billingPostalCode={billingPostalCode}
+              setBillingPostalCode={setBillingPostalCode}
+              billingCity={billingCity}
+              setBillingCity={setBillingCity}
               onBillingPlaceSelect={onBillingPlaceSelect}
               deliverySameAsBilling={deliverySameAsBilling}
               onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
