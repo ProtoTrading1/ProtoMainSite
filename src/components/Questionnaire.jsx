@@ -53,7 +53,9 @@ export default function Questionnaire({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
-  const addresses = useBillingDeliveryAddresses();
+  const [country, setCountry] = useState('South Africa');
+  const [province, setProvince] = useState('');
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
   const {
     billingStreet,
     billingSuburb,
@@ -119,7 +121,8 @@ export default function Questionnaire({ onLogin }) {
         && billingSuburb.trim()
         && billingCity.trim()
         && billingPostalCode.trim();
-      return billingOk
+      return country.trim()
+        && billingOk
         && streetName.trim()
         && suburb.trim()
         && city.trim()
@@ -161,8 +164,8 @@ export default function Questionnaire({ onLogin }) {
         buildingType: resolvedBuildingType(),
         unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
-        country: null,
-        province: null,
+        country: country || null,
+        province: province || null,
         city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
@@ -359,6 +362,10 @@ export default function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Billing and delivery addresses</h3>
             <BillingDeliveryFields
+              country={country}
+              setCountry={setCountry}
+              province={province}
+              setProvince={setProvince}
               billingStreet={billingStreet}
               setBillingStreet={setBillingStreet}
               billingSuburb={billingSuburb}

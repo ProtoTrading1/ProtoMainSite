@@ -75,17 +75,6 @@ const showcaseProducts = [
   { code: 'MB001-3', name: 'Bead replenishment', dept: 'Jewellery', image: '/product-images/MB001-3.webp' },
 ];
 
-const SADC_COUNTRIES = [
-  'South Africa', 'Angola', 'Botswana', 'DRC', 'Eswatini',
-  'Lesotho', 'Malawi', 'Mozambique', 'Namibia', 'Tanzania',
-  'Zambia', 'Zimbabwe',
-];
-
-const SA_PROVINCES = [
-  'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
-  'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
-];
-
 const BUSINESS_TYPES = [
   'Retail store',
   'Online shop / e-commerce',
@@ -406,7 +395,7 @@ function Questionnaire({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('South Africa');
   const [province, setProvince] = useState('');
   const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
   const {
@@ -480,7 +469,7 @@ function Questionnaire({ onLogin }) {
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
         && (buildingType !== 'Apartments' || unitNumber.trim());
-      return billingOk && deliveryOk;
+      return country.trim() && billingOk && deliveryOk;
     }
     if (step === 3) return true;
     return false;
@@ -517,8 +506,8 @@ function Questionnaire({ onLogin }) {
         buildingType: resolvedBuildingType(),
         unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
-        country: null,
-        province: null,
+        country: country || null,
+        province: province || null,
         city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
@@ -716,6 +705,10 @@ function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Billing and delivery addresses</h3>
             <BillingDeliveryFields
+              country={country}
+              setCountry={setCountry}
+              province={province}
+              setProvince={setProvince}
               billingStreet={billingStreet}
               setBillingStreet={setBillingStreet}
               billingSuburb={billingSuburb}

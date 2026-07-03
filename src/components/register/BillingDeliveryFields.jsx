@@ -1,4 +1,5 @@
 import AddressAutocomplete from '../AddressAutocomplete';
+import { SADC_COUNTRIES, SA_PROVINCES } from '../../lib/sadcCountries';
 
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
@@ -84,6 +85,10 @@ function StructuredAddressFields({
 }
 
 export default function BillingDeliveryFields({
+  country,
+  setCountry,
+  province,
+  setProvince,
   billingStreet,
   setBillingStreet,
   billingSuburb,
@@ -115,9 +120,47 @@ export default function BillingDeliveryFields({
   gridClassName = 'lp-register-grid',
   subheadClassName = 'lp-register-subhead',
   buildingTypesClassName = 'lp-quiz-types lp-quiz-types--compact',
+  countriesClassName = 'lp-quiz-countries',
 }) {
+  const billingUsesAutocomplete = !country || country === 'South Africa';
+
   return (
     <div className={gridClassName}>
+      <div className={subheadClassName}>Country</div>
+      <div className={`${countriesClassName}${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
+        {SADC_COUNTRIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={`lp-quiz-country${country === c ? ' selected' : ''}`}
+            onClick={() => {
+              setCountry(c);
+              if (c !== 'South Africa') setProvince('');
+            }}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {country === 'South Africa' && (
+        <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('province') ? ' lp-quiz-field--error' : ''}`}>
+          <label>Province <span className="lp-register-optional">(optional — filled from address search)</span></label>
+          <select
+            value={province}
+            onChange={(e) => {
+              setProvince(e.target.value);
+              if (e.target.value) setCountry('South Africa');
+            }}
+          >
+            <option value="">Select province</option>
+            {SA_PROVINCES.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className={subheadClassName}>Billing address</div>
       <p className="lp-register-field-hint lp-register-field-hint--block">
         Registered address for invoices and account records.
@@ -140,7 +183,7 @@ export default function BillingDeliveryFields({
         }}
         fieldHasIssue={fieldHasIssue}
         onKeyDown={onKeyDown}
-        streetUsesAutocomplete
+        streetUsesAutocomplete={billingUsesAutocomplete}
         onPlaceSelect={onBillingPlaceSelect}
       />
 
