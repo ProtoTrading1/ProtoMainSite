@@ -103,7 +103,7 @@ export default function ProtoLogo({
         role={role}
         tabIndex={tabIndex}
       >
-        <ProtoLogoWordmark height={height} className="proto-logo__svg" />
+        <ProtoLogoWordmark height={height} className={`proto-logo__svg ${className}`.trim()} />
       </span>
     );
   }

@@ -7,6 +7,7 @@ import { getSuggestions } from '../lib/fuzzySearch';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
+import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
 const RS_KEY = 'proto_recent_searches';
@@ -190,7 +191,7 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory }) {
+function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory, onCommitSearch }) {
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty">
@@ -306,6 +307,7 @@ export default function Header({
   const productsCache = useRef(null);
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
+  const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
 
   const loadProductsOnce = useCallback(async () => {
@@ -335,7 +337,25 @@ export default function Header({
     setCatMatches(matchCategories(query));
   }, []);
 
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSuggestions([]);
+    setCatMatches([]);
+    setActiveIdx(-1);
+  }, []);
+
   useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
+        closeSearch();
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [searchOpen, closeSearch]);
 
   const scheduleSuggestions = useCallback((query) => {
     clearTimeout(debounceRef.current);
@@ -349,18 +369,14 @@ export default function Header({
     }, 120);
   }, [loadProductsOnce, updateSuggestions]);
 
-  const openSearch = () => {
+  const openSearch = useCallback(() => {
     setSearchOpen(true);
     void loadProductsOnce();
-    setTimeout(() => inputRef.current?.focus(), 30);
-  };
+  }, [loadProductsOnce]);
 
-  const closeSearch = () => {
-    setSearchOpen(false);
-    setSuggestions([]);
-    setCatMatches([]);
-    setActiveIdx(-1);
-  };
+  const focusSearch = useCallback(() => {
+    openSearch();
+  }, [openSearch]);
 
   const handleInput = (val) => {
     setSearchQuery(val);
@@ -445,23 +461,45 @@ export default function Header({
 
   return (
     <>
-      <header className="app-header">
+      <header className="app-header app-header--premium">
         {/* Brand */}
         <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <ProtoLogo variant="full" size="md" tagline={false} />
+          <ProtoLogo variant="full" size={46} tagline={false} className="proto-logo-wordmark--enter" />
+        </div>
+
+        {/* Signature search */}
+        <div className="header-search-premium-wrap desktop-only" ref={searchWrapRef}>
+          <div className="header-search-premium">
+            <Search size={18} className="header-search-premium__icon" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="header-search-premium__input"
+              placeholder="Search products, SKU or barcode..."
+              value={searchQuery}
+              onFocus={focusSearch}
+              onChange={(e) => handleInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              aria-label="Search products, SKU or barcode"
+            />
+          </div>
+          {searchOpen && (
+            <div className="header-search-dropdown">
+              <SearchPanel
+                query={searchQuery}
+                suggestions={suggestions}
+                catMatches={catMatches}
+                activeIdx={activeIdx}
+                onPickProduct={pickProduct}
+                onPickCategory={pickCategory}
+                onCommitSearch={commitSearch}
+              />
+            </div>
+          )}
         </div>
 
         {/* Centre navigation */}
         <nav className="header-nav desktop-only">
-          <button
-            className={`header-nav-btn header-nav-btn--search${searchOpen ? ' header-nav-btn--active' : ''}`}
-            type="button"
-            onClick={searchOpen ? closeSearch : openSearch}
-          >
-            <Search size={15} />
-            Search
-          </button>
-
           {hasLastOrder && (
             <button className="header-nav-btn" type="button" onClick={onReorder}>
               <RotateCcw size={14} />
@@ -525,39 +563,6 @@ export default function Header({
         </div>
       </header>
 
-      {/* Desktop search overlay */}
-      {searchOpen && (
-        <>
-          <div className="search-overlay-backdrop" onClick={closeSearch} />
-          <div className="search-overlay-wrap">
-            <div className="search-overlay-bar">
-              <Search size={16} color="#64748b" />
-              <input
-                ref={inputRef}
-                autoFocus
-                type="text"
-                placeholder="Search products, categories, codes…"
-                value={searchQuery}
-                onChange={(e) => handleInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="search-overlay-input"
-              />
-              <button type="button" onClick={closeSearch} className="search-overlay-close-red" aria-label="Close search">
-                <X size={16} />
-              </button>
-            </div>
-            <SearchPanel
-              query={searchQuery}
-              suggestions={suggestions}
-              catMatches={catMatches}
-              activeIdx={activeIdx}
-              onPickProduct={pickProduct}
-              onPickCategory={pickCategory}
-            />
-          </div>
-        </>
-      )}
-
       {/* Mobile bottom tab bar — primary navigation */}
       <nav className="mobile-tab-bar" aria-label="Mobile navigation">
         <button type="button" className="mobile-tab-bar-btn" onClick={onHome}>
@@ -585,7 +590,7 @@ export default function Header({
         <input
           autoFocus={mobileSearchOpen}
           type="search"
-          placeholder="Search products, codes…"
+          placeholder="Search products, SKU or barcode..."
           value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {

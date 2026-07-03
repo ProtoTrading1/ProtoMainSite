@@ -31,7 +31,6 @@
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
-  gap: calc(var(--logo-height, 44px) * 0.05);
   max-width: none;
   overflow: visible;
 }
@@ -40,13 +39,20 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: calc(var(--logo-height, 44px) * 0.27);
+  gap: 4px;
+}
+
+.proto-logo-wordmark__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
 }
 
 .proto-logo-wordmark__icon {
   width: var(--logo-height, 44px);
   height: var(--logo-height, 44px);
-  border-radius: calc(var(--logo-height, 44px) * 0.22);
+  border-radius: calc(var(--logo-height, 44px) * 0.2);
   object-fit: cover;
   flex-shrink: 0;
   background: #050505;
@@ -55,7 +61,7 @@
 .proto-logo-wordmark__icon--fallback {
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+  background: #E02020;
   color: #050505;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: calc(var(--logo-height, 44px) * 0.62);
@@ -65,43 +71,49 @@
 
 .proto-logo-wordmark__title {
   font-family: Outfit, sans-serif;
-  font-size: calc(var(--logo-height, 44px) * 0.48);
+  font-size: calc(var(--logo-height, 44px) * 0.5);
   font-weight: 800;
-  letter-spacing: 0;
+  letter-spacing: 0.01em;
   line-height: 1.05;
-  color: #fff;
+  color: #FFFFFF;
   white-space: nowrap;
 }
 
 .proto-logo-wordmark__title span,
 .proto-logo__text strong span {
-  color: #dc2626;
+  color: #E02020;
 }
 
 .proto-logo-wordmark__online {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: calc(var(--logo-height, 44px) * 0.14);
-  margin-left: calc(var(--logo-height, 44px) * 1.27);
+  gap: 10px;
+  width: 100%;
 }
 
 .proto-logo-wordmark__online small {
   flex: 0 0 auto;
   font-family: Outfit, sans-serif;
-  font-size: calc(var(--logo-height, 44px) * 0.2);
-  letter-spacing: 0.22em;
+  font-size: calc(var(--logo-height, 44px) * 0.39);
+  letter-spacing: 0.4em;
   text-transform: uppercase;
-  color: #c9a227;
-  font-weight: 700;
+  color: #C89A3C;
+  font-weight: 500;
   line-height: 1;
 }
 
 .proto-logo-wordmark__line {
-  flex: 1 1 0;
-  min-width: calc(var(--logo-height, 44px) * 0.35);
-  height: 1px;
-  background: #c9a227;
+  flex: 0 0 60px;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #C89A3C 18%,
+    #C89A3C 82%,
+    transparent 100%
+  );
 }
 
 .proto-logo__image--full {
@@ -220,7 +232,17 @@
 
 .app-header .proto-logo-wordmark,
 .app-header .proto-logo__image--full {
-  --logo-height: 34px;
+  --logo-height: 46px;
+}
+
+.proto-logo--full.proto-logo-wordmark--enter,
+.proto-logo-wordmark.proto-logo-wordmark--enter {
+  animation: protoLogoFadeIn 250ms ease forwards;
+}
+
+@keyframes protoLogoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .app-header .proto-logo--compact .proto-logo__text strong,

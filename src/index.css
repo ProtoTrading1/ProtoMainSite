@@ -27,7 +27,7 @@
   --border-dark: #1E293B;
   
   /* Layout */
-  --header-height: 80px;
+  --header-height: 84px;
   --sidebar-width: 248px;
   --drawer-width: clamp(300px, calc(33.33vw - 78px), 600px);
   --sticky-bar-height: 56px;
@@ -881,12 +881,6 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .brand-block { gap: 0; min-width: 0; flex-shrink: 0; overflow: visible; }
-.brand-block .proto-logo-wordmark,
-.brand-block .proto-logo__svg,
-.brand-block .proto-logo__image--full {
-  width: auto;
-  --logo-height: 36px;
-}
 .icon-button {
   width: 38px;
   height: 38px;

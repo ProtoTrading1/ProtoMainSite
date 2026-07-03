@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { PROTO_ICON_SOURCES } from '../lib/brandAssets';
 
-/** Original icon + PROTO TRADING text + centred ONLINE row (matches brand reference). */
+/** Original icon + PROTO TRADING text + centred ONLINE row. */
 export default function ProtoLogoWordmark({ height = 44, className = '' }) {
   const [iconIndex, setIconIndex] = useState(0);
   const [iconFailed, setIconFailed] = useState(false);
@@ -39,14 +39,16 @@ export default function ProtoLogoWordmark({ height = 44, className = '' }) {
     >
       <span className="proto-logo-wordmark__top">
         {icon}
-        <strong className="proto-logo-wordmark__title">
-          PROTO <span>TRADING</span>
-        </strong>
-      </span>
-      <span className="proto-logo-wordmark__online">
-        <span className="proto-logo-wordmark__line" aria-hidden="true" />
-        <small>ONLINE</small>
-        <span className="proto-logo-wordmark__line" aria-hidden="true" />
+        <span className="proto-logo-wordmark__copy">
+          <strong className="proto-logo-wordmark__title">
+            PROTO <span>TRADING</span>
+          </strong>
+          <span className="proto-logo-wordmark__online">
+            <span className="proto-logo-wordmark__line" aria-hidden="true" />
+            <small>ONLINE</small>
+            <span className="proto-logo-wordmark__line" aria-hidden="true" />
+          </span>
+        </span>
       </span>
     </span>
   );
