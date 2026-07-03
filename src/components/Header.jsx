@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, Menu, MessageCircle, PackageSearch, RotateCcw,
+  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
