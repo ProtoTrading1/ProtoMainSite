@@ -880,7 +880,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
 }
 
-.brand-block { gap: 0; min-width: 250px; }
+.brand-block { gap: 0; min-width: 0; flex-shrink: 0; overflow: visible; }
 .brand-block .proto-logo-wordmark,
 .brand-block .proto-logo__svg,
 .brand-block .proto-logo__image--full {
