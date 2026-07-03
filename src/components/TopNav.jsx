@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MapPin, Info, Search, Star, X } from 'lucide-react';
+import { PROTO_OFFICE_ADDRESS } from '../lib/brandAssets';
 
 function AboutModal({ onClose }) {
   return (
@@ -43,8 +44,14 @@ function FindUsModal({ onClose }) {
         <div className="topnav-find-block">
           <MapPin size={18} />
           <div>
-            <strong>Head Office & Warehouse</strong>
-            <p>Proto Trading (Pty) Ltd<br />Johannesburg, South Africa</p>
+            <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
+            <p>
+              {PROTO_OFFICE_ADDRESS.company}
+              <br />
+              {PROTO_OFFICE_ADDRESS.street}
+              <br />
+              {PROTO_OFFICE_ADDRESS.area}
+            </p>
           </div>
         </div>
         <div className="topnav-find-block">

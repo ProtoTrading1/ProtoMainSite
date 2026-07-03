@@ -3388,7 +3388,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .about-modal-visit-address strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: #0f172a;
   font-weight: 700;
 }

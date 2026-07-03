@@ -19,3 +19,11 @@ export const PROTO_TAGLINE = 'ONLINE';
 export const PROTO_LOGO_PROTO_WHITE = '#FFFFFF';
 export const PROTO_LOGO_TRADING_RED = '#E02020';
 export const PROTO_LOGO_ONLINE_GOLD = '#C89A3C';
+
+export const PROTO_OFFICE_ADDRESS = {
+  label: 'Head Office & Warehouse',
+  company: 'Proto Trading (Pty) Ltd',
+  street: 'De Roos Street, off Sir Lowry Road',
+  area: 'District Six, Cape Town, South Africa',
+  mapsUrl: 'https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7',
+};

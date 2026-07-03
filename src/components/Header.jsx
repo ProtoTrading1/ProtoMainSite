@@ -7,6 +7,7 @@ import { getSuggestions } from '../lib/fuzzySearch';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
+import { PROTO_OFFICE_ADDRESS } from '../lib/brandAssets';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -78,12 +79,16 @@ function AboutModal({ onClose }) {
           <div className="about-modal-visit">
             <h3 className="about-modal-section-title">Visit us</h3>
             <p className="about-modal-visit-address">
-              <strong>Head Office &amp; Warehouse</strong>
-              Proto Trading (Pty) Ltd · Johannesburg, South Africa
+              <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
+              {PROTO_OFFICE_ADDRESS.company}
+              <br />
+              {PROTO_OFFICE_ADDRESS.street}
+              <br />
+              {PROTO_OFFICE_ADDRESS.area}
             </p>
             <a
               className="about-modal-map-link"
-              href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7"
+              href={PROTO_OFFICE_ADDRESS.mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
