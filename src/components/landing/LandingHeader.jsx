@@ -1,3 +1,4 @@
+import ProtoLogo from '../ProtoLogo';
 
 export default function LandingHeader({ onLogin, onApply }) {
   const scrollTo = (id) => {
@@ -9,20 +10,7 @@ export default function LandingHeader({ onLogin, onApply }) {
     <header className="landing-header">
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div style={{ 
-            width: '40px', height: '40px', borderRadius: '10px', 
-            background: 'linear-gradient(135deg, var(--proto-red) 0%, var(--proto-red-dark) 100%)', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            fontWeight: '900', fontSize: '20px', color: '#fff', 
-            boxShadow: '0 4px 12px rgba(225, 29, 72, 0.3)'
-          }}>P</div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '20px', fontWeight: '800', color: '#fff', letterSpacing: '-0.5px', fontFamily: 'Outfit' }}>PROTO</span>
-              <span style={{ fontSize: '20px', fontWeight: '800', color: 'var(--proto-red)', letterSpacing: '-0.5px', marginLeft: '4px', fontFamily: 'Outfit' }}>TRADING</span>
-            </div>
-            <div style={{ fontSize: '9px', color: 'var(--text-white-muted)', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase' }}>Wholesale Supplier · Est. 1987</div>
-          </div>
+          <ProtoLogo variant="full" size="lg" />
         </div>
 
         <nav className="nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
@@ -51,4 +39,3 @@ export default function LandingHeader({ onLogin, onApply }) {
     </header>
   );
 }
-

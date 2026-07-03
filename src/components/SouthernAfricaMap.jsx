@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PROTO_ICON_SOURCES } from '../lib/brandAssets';
 import { geoMercator, geoPath } from 'd3-geo';
 import africaGeo from '../data/africa.geo.json';
 
@@ -85,6 +86,7 @@ function frameAt(t) {
 }
 
 export default function SouthernAfricaMap() {
+  const [logoIndex, setLogoIndex] = useState(0);
   const ref = useRef(null);
   const rafRef = useRef(null);
   const [inView, setInView] = useState(false);
@@ -182,13 +184,16 @@ export default function SouthernAfricaMap() {
             <g style={{ opacity: pinT }}>
               <circle cx="0" cy="0" r="18" fill="#fff" />
               <image
-                href="/proto-logo.png"
+                href={PROTO_ICON_SOURCES[logoIndex]}
                 x={-16}
                 y={-16}
                 width={32}
                 height={32}
                 clipPath="url(#protoLogoClip)"
                 preserveAspectRatio="xMidYMid slice"
+                onError={() => {
+                  setLogoIndex((index) => Math.min(index + 1, PROTO_ICON_SOURCES.length - 1));
+                }}
               />
             </g>
             <text
@@ -206,7 +211,7 @@ export default function SouthernAfricaMap() {
                 strokeWidth: '3px',
               }}
             >
-              Proto Trading
+              Proto Trading Online
             </text>
           </g>
         )}

@@ -6,6 +6,7 @@ import {
 import { getSuggestions } from '../lib/fuzzySearch';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
+import ProtoLogo from './ProtoLogo';
 
 // ─── Recent searches (localStorage) ─────────────────────────
 const RS_KEY = 'proto_recent_searches';
@@ -447,13 +448,7 @@ export default function Header({
       <header className="app-header">
         {/* Brand */}
         <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <div className="brand-mark brand-logo">
-            <img src="/proto-logo.webp" alt="Proto Trading logo" />
-          </div>
-          <div className="brand-copy">
-            <strong>PROTO</strong>
-            <span>TRADING</span>
-          </div>
+          <ProtoLogo variant="full" size="md" />
         </div>
 
         {/* Centre navigation */}

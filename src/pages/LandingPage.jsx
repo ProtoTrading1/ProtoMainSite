@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import AboutModal from '../components/AboutModal';
+import ProtoLogo from '../components/ProtoLogo';
 import { motion, useInView } from 'motion/react';
 import {
   ArrowRight,
@@ -1069,11 +1070,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
-          <div>
-            <strong>PROTO <span>TRADING</span></strong>
-            <small>Wholesale supplier since 1987</small>
-          </div>
+          <ProtoLogo variant="full" size="lg" tagline="Wholesale supplier since 1987" />
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
@@ -1193,11 +1190,7 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
-            <img src="/proto-logo.webp" alt="Proto Trading" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale supplier since 1987</small>
-            </div>
+            <ProtoLogo variant="full" size="md" tagline="Wholesale supplier since 1987" />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
             <p style={{ margin: 0 }}>Trade access only. Not open to the general public.</p>

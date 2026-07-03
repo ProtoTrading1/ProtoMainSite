@@ -5,6 +5,7 @@ import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
 import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
+import ProtoLogo from '../components/ProtoLogo';
 import '../landing.css';
 
 const SADC_COUNTRIES = [
@@ -764,11 +765,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       {!standalone && (
         <header className="lp-register-header">
           <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-            <img src="/proto-logo.webp" alt="" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale trade portal</small>
-            </div>
+            <ProtoLogo variant="full" size="lg" tagline="Wholesale trade portal" />
           </a>
           <button type="button" className="lp-register-login" onClick={onLogin}>
             <Lock size={15} />
