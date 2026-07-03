@@ -31,9 +31,3 @@ export const PROTO_OFFICE_ADDRESS = {
   lat: -33.928,
   lng: 18.423,
 };
-
-/** OpenStreetMap embed — reliable preview without a Google Maps API key. */
-export function getOfficeMapEmbedUrl({ lat, lng } = PROTO_OFFICE_ADDRESS, delta = 0.0045) {
-  const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].join(',');
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-}

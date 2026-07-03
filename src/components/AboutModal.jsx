@@ -1,5 +1,6 @@
 import { MapPin, Phone, X } from 'lucide-react';
-import { PROTO_OFFICE_ADDRESS, getOfficeMapEmbedUrl } from '../lib/brandAssets';
+import { PROTO_OFFICE_ADDRESS } from '../lib/brandAssets';
+import OfficeMapPreview from './OfficeMapPreview';
 
 export default function AboutModal({ onClose }) {
   return (
@@ -34,16 +35,7 @@ export default function AboutModal({ onClose }) {
 
           <div className="about-modal-visit">
             <h3 className="about-modal-section-title">Find us</h3>
-            <div className="about-modal-map-frame">
-              <iframe
-                className="about-modal-map-embed"
-                title="PROTO TRADING CC office location"
-                src={getOfficeMapEmbedUrl()}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-              />
-            </div>
+            <OfficeMapPreview />
             <p className="about-modal-visit-address">
               <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
               {PROTO_OFFICE_ADDRESS.company}
