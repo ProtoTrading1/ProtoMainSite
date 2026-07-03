@@ -26,4 +26,5 @@ export const PROTO_OFFICE_ADDRESS = {
   street: 'De Roos Street, off Sir Lowry Road',
   area: 'District Six, Cape Town, South Africa',
   mapsUrl: 'https://maps.app.goo.gl/jJXqv3TveqACkbyr9',
+  mapsEmbedUrl: 'https://maps.google.com/maps?q=De+Roos+Street,+District+Six,+Cape+Town,+South+Africa&hl=en&z=16&output=embed',
 };
