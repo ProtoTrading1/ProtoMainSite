@@ -16,17 +16,21 @@
 
 /* Composite wordmark: icon beside PROTO, ONLINE centred below text */
 .proto-logo-wordmark {
-  display: inline-grid;
-  grid-template-columns: auto 1fr;
-  column-gap: calc(var(--logo-height, 44px) * 0.27);
-  row-gap: calc(var(--logo-height, 44px) * 0.05);
-  align-items: center;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--logo-height, 44px) * 0.05);
   max-width: 100%;
 }
 
+.proto-logo-wordmark__top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--logo-height, 44px) * 0.27);
+}
+
 .proto-logo-wordmark__icon {
-  grid-column: 1;
-  grid-row: 1;
   width: var(--logo-height, 44px);
   height: var(--logo-height, 44px);
   border-radius: calc(var(--logo-height, 44px) * 0.22);
@@ -47,8 +51,6 @@
 }
 
 .proto-logo-wordmark__title {
-  grid-column: 2;
-  grid-row: 1;
   font-family: Outfit, sans-serif;
   font-size: calc(var(--logo-height, 44px) * 0.48);
   font-weight: 800;
@@ -63,13 +65,11 @@
 }
 
 .proto-logo-wordmark__online {
-  grid-column: 2;
-  grid-row: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: calc(var(--logo-height, 44px) * 0.14);
-  width: 100%;
+  margin-left: calc(var(--logo-height, 44px) * 1.27);
 }
 
 .proto-logo-wordmark__online small {
@@ -246,6 +246,22 @@
 .reset-password-logo {
   display: flex;
   margin-bottom: 32px;
+}
+
+/* Keep wordmark layout intact in header/footer contexts */
+.access-brand .proto-logo-wordmark,
+.brand-block .proto-logo-wordmark,
+.lp-footer-brand .proto-logo-wordmark {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.access-brand .proto-logo-wordmark__top,
+.brand-block .proto-logo-wordmark__top,
+.lp-footer-brand .proto-logo-wordmark__top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
 @media (max-width: 768px) {

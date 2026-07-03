@@ -884,7 +884,6 @@ input, select, textarea { font-family: inherit; outline: none; }
 .brand-block .proto-logo-wordmark,
 .brand-block .proto-logo__svg,
 .brand-block .proto-logo__image--full {
-  display: block;
   width: auto;
   --logo-height: 36px;
 }

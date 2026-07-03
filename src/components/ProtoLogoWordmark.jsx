@@ -15,6 +15,21 @@ export default function ProtoLogoWordmark({ height = 44, className = '' }) {
     setIconFailed(true);
   }, [iconIndex]);
 
+  const icon = iconFailed ? (
+    <span className="proto-logo-wordmark__icon proto-logo-wordmark__icon--fallback" aria-hidden="true">
+      &#937;
+    </span>
+  ) : (
+    <img
+      src={PROTO_ICON_SOURCES[iconIndex]}
+      alt=""
+      aria-hidden="true"
+      className="proto-logo-wordmark__icon"
+      decoding="async"
+      onError={handleIconError}
+    />
+  );
+
   return (
     <span
       className={`proto-logo-wordmark ${className}`.trim()}
@@ -22,23 +37,12 @@ export default function ProtoLogoWordmark({ height = 44, className = '' }) {
       role="img"
       aria-label="Proto Trading Online"
     >
-      {iconFailed ? (
-        <span className="proto-logo-wordmark__icon proto-logo-wordmark__icon--fallback" aria-hidden="true">
-          &#937;
-        </span>
-      ) : (
-        <img
-          src={PROTO_ICON_SOURCES[iconIndex]}
-          alt=""
-          aria-hidden="true"
-          className="proto-logo-wordmark__icon"
-          decoding="async"
-          onError={handleIconError}
-        />
-      )}
-      <strong className="proto-logo-wordmark__title">
-        PROTO <span>TRADING</span>
-      </strong>
+      <span className="proto-logo-wordmark__top">
+        {icon}
+        <strong className="proto-logo-wordmark__title">
+          PROTO <span>TRADING</span>
+        </strong>
+      </span>
       <span className="proto-logo-wordmark__online">
         <span className="proto-logo-wordmark__line" aria-hidden="true" />
         <small>ONLINE</small>
