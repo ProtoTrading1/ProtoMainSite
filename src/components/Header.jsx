@@ -453,7 +453,7 @@ export default function Header({
 
             <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
               <Info size={14} />
-              About
+              About Us
             </button>
 
             <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>

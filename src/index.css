@@ -3373,20 +3373,24 @@ input, select, textarea { font-family: inherit; outline: none; }
   margin-bottom: 16px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   line-height: 0;
-  background: #1a1a1a;
-  transition: border-color 180ms ease, opacity 180ms ease;
+  background: #0f0f0f;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 .about-modal-map-frame:hover {
-  border-color: rgba(200, 154, 60, 0.45);
-  opacity: 0.96;
+  border-color: rgba(200, 154, 60, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
 }
 .about-modal-map-image {
   width: 100%;
-  height: 220px;
+  height: 240px;
   object-fit: cover;
+  object-position: center 42%;
   display: block;
+  filter: saturate(1.04) contrast(1.03);
 }
 .about-modal-visit-address {
   margin: 0 0 14px;
