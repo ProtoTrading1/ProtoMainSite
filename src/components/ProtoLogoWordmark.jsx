@@ -36,15 +36,13 @@ export default function ProtoLogoWordmark({ height = 44, className = '' }) {
           onError={handleIconError}
         />
       )}
-      <span className="proto-logo-wordmark__text">
-        <strong>
-          PROTO <span>TRADING</span>
-        </strong>
-        <span className="proto-logo-wordmark__online">
-          <span className="proto-logo-wordmark__line" aria-hidden="true" />
-          <small>ONLINE</small>
-          <span className="proto-logo-wordmark__line" aria-hidden="true" />
-        </span>
+      <strong className="proto-logo-wordmark__title">
+        PROTO <span>TRADING</span>
+      </strong>
+      <span className="proto-logo-wordmark__online">
+        <span className="proto-logo-wordmark__line" aria-hidden="true" />
+        <small>ONLINE</small>
+        <span className="proto-logo-wordmark__line" aria-hidden="true" />
       </span>
     </span>
   );

@@ -14,15 +14,19 @@
   flex-shrink: 0;
 }
 
-/* Composite wordmark: original icon + PROTO TRADING + centred ONLINE */
+/* Composite wordmark: icon beside PROTO, ONLINE centred below text */
 .proto-logo-wordmark {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  column-gap: calc(var(--logo-height, 44px) * 0.27);
+  row-gap: calc(var(--logo-height, 44px) * 0.05);
   align-items: center;
-  gap: calc(var(--logo-height, 44px) * 0.27);
   max-width: 100%;
 }
 
 .proto-logo-wordmark__icon {
+  grid-column: 1;
+  grid-row: 1;
   width: var(--logo-height, 44px);
   height: var(--logo-height, 44px);
   border-radius: calc(var(--logo-height, 44px) * 0.22);
@@ -42,16 +46,9 @@
   line-height: 1;
 }
 
-.proto-logo-wordmark__text {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: calc(var(--logo-height, 44px) * 0.05);
-  min-width: 0;
-}
-
-.proto-logo-wordmark__text strong {
-  display: block;
+.proto-logo-wordmark__title {
+  grid-column: 2;
+  grid-row: 1;
   font-family: Outfit, sans-serif;
   font-size: calc(var(--logo-height, 44px) * 0.48);
   font-weight: 800;
@@ -61,11 +58,13 @@
   white-space: nowrap;
 }
 
-.proto-logo-wordmark__text strong span {
+.proto-logo-wordmark__title span {
   color: var(--proto-red, #dc2626);
 }
 
 .proto-logo-wordmark__online {
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   align-items: center;
   justify-content: center;
