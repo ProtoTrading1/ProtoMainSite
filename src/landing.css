@@ -3822,6 +3822,294 @@
   }
 }
 
+/* Standalone register — icon business categories + optional spend card */
+.lp-register-page--standalone .lp-biz-category {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lp-register-page--standalone .lp-biz-category-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lp-register-page--standalone .lp-biz-category-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-biz-category-required {
+  color: #dc2626;
+}
+
+.lp-register-page--standalone .lp-biz-category-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.lp-register-page--standalone .lp-biz-category-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lp-register-page--standalone .lp-biz-category-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+
+.lp-register-page--standalone .lp-biz-category-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-biz-category-card.selected {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.45);
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-biz-category-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.72);
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+
+.lp-register-page--standalone .lp-biz-category-card.selected .lp-biz-category-icon {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.16);
+  color: #f87171;
+}
+
+.lp-register-page--standalone .lp-biz-category-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.lp-register-page--standalone .lp-biz-category-or {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2px 0;
+}
+
+.lp-register-page--standalone .lp-biz-category-or::before {
+  content: '';
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lp-register-page--standalone .lp-biz-category-or span {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #050505;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: lowercase;
+}
+
+.lp-register-page--standalone .lp-biz-category-card--other {
+  width: 100%;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-card,
+.lp-register-page--standalone .lp-monthly-spend-expanded {
+  margin-top: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lp-register-page--standalone .lp-monthly-spend-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-expanded {
+  padding: 16px 18px 18px;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-expanded-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.16);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #f87171;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-copy strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-copy span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-later {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-later:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-bands {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-band {
+  padding: 12px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-band:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.lp-register-page--standalone .lp-monthly-spend-band.selected {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.45);
+  color: #fff;
+}
+
+@media (max-width: 1100px) {
+  .lp-register-page--standalone .lp-biz-category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .lp-register-page--standalone .lp-biz-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .lp-register-page--standalone .lp-biz-category-card {
+    min-height: 48px;
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+  .lp-register-page--standalone .lp-biz-category-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .lp-register-page--standalone .lp-monthly-spend-card,
+  .lp-register-page--standalone .lp-monthly-spend-expanded-head {
+    grid-template-columns: auto 1fr;
+  }
+
+  .lp-register-page--standalone .lp-monthly-spend-later {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .lp-register-page--standalone .lp-monthly-spend-bands {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .lp-register-page--standalone .lp-biz-category-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Legacy banner class (unused on standalone; kept for reference) */
 .lp-pre-register-banner {
   width: 100%;
