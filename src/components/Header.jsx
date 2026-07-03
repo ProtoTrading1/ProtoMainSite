@@ -74,6 +74,16 @@ function AboutModal({ onClose }) {
             <div><strong>SA-wide</strong><span>Delivery</span></div>
             <div><strong>40 yrs</strong><span>Experience</span></div>
           </div>
+
+          <a
+            className="about-modal-map-link"
+            href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MapPin size={15} />
+            Find us on Google Maps
+          </a>
         </div>
       </div>
     </div>
@@ -503,14 +513,9 @@ export default function Header({
             {hasLastOrder && (
               <button className="header-nav-btn" type="button" onClick={onReorder}>
                 <RotateCcw size={14} />
-                Returning Buyer
+                Reorder
               </button>
             )}
-
-            <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
-              <MapPin size={14} />
-              Find Us
-            </a>
 
             <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
               <Info size={14} />
@@ -521,11 +526,6 @@ export default function Header({
               <Star size={14} className="spinning-star" />
               Specials
             </button>
-
-            <button className="header-nav-btn" type="button" onClick={onViewProfile}>
-              <User size={14} />
-              My Profile
-            </button>
           </nav>
 
           <div className="header-actions">
@@ -535,6 +535,11 @@ export default function Header({
               <span><small>Admin</small>Dashboard</span>
             </a>
           )}
+
+          <button className="header-action desktop-only" type="button" onClick={onViewProfile}>
+            <User size={19} />
+            <span>My Profile</span>
+          </button>
 
           {onLogout && (
             <button className="header-action desktop-only" type="button" onClick={onLogout} title="Log out" style={{ opacity: 0.75 }}>

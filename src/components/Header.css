@@ -3,7 +3,7 @@
 .app-header--premium {
   --header-premium-height: 84px;
   --header-premium-pad-x: clamp(28px, 4vw, 48px);
-  --search-width: 420px;
+  --search-width: clamp(300px, 28vw, 380px);
   --search-height: 46px;
   --search-radius: 14px;
   --search-bg: #161616;
@@ -35,7 +35,7 @@
   margin-left: var(--header-gap-logo-search);
   position: relative;
   width: var(--search-width);
-  max-width: 420px;
+  max-width: 380px;
   flex-shrink: 0;
 }
 
@@ -45,6 +45,7 @@
   align-items: center;
   gap: var(--header-gap-nav-cart);
   min-width: 0;
+  flex: 1;
 }
 
 .app-header--premium .header-nav {
@@ -70,6 +71,7 @@
 }
 
 .app-header--premium .header-actions {
+  margin-left: auto;
   padding-left: 0;
   border-left: none;
   gap: 14px;
@@ -81,8 +83,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 420px;
-  max-width: 420px;
+  width: var(--search-width);
+  max-width: 380px;
   height: var(--search-height);
   padding: 0 16px;
   border-radius: var(--search-radius);
@@ -240,6 +242,25 @@
 
 .app-header--premium .header-icon-mobile {
   transition: opacity 180ms ease;
+}
+
+.app-header--premium .header-action span {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Medium desktop: prevent nav overlap ── */
+@media (max-width: 1440px) and (min-width: 1101px) {
+  .app-header--premium {
+    --search-width: clamp(280px, 24vw, 340px);
+    --header-nav-gap: 20px;
+  }
+
+  .app-header--premium .header-search-premium-wrap,
+  .header-search-premium {
+    max-width: 340px;
+  }
 }
 
 /* ── Tablet / mobile ── */

@@ -3363,6 +3363,19 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.about-modal-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8B1A1A;
+  text-decoration: none;
+}
+.about-modal-map-link:hover {
+  text-decoration: underline;
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
