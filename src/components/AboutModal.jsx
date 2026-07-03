@@ -1,5 +1,5 @@
-import { MapPin, X } from 'lucide-react';
-import { PROTO_OFFICE_ADDRESS } from '../lib/brandAssets';
+import { MapPin, Phone, X } from 'lucide-react';
+import { PROTO_OFFICE_ADDRESS, getOfficeMapEmbedUrl } from '../lib/brandAssets';
 
 export default function AboutModal({ onClose }) {
   return (
@@ -34,22 +34,16 @@ export default function AboutModal({ onClose }) {
 
           <div className="about-modal-visit">
             <h3 className="about-modal-section-title">Find us</h3>
-            <a
-              className="about-modal-map-frame"
-              href={PROTO_OFFICE_ADDRESS.mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open Proto Trading location in Google Maps"
-            >
+            <div className="about-modal-map-frame">
               <iframe
                 className="about-modal-map-embed"
-                title="Proto Trading office location"
-                src={PROTO_OFFICE_ADDRESS.mapsEmbedUrl}
+                title="PROTO TRADING CC office location"
+                src={getOfficeMapEmbedUrl()}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 allowFullScreen
               />
-            </a>
+            </div>
             <p className="about-modal-visit-address">
               <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
               {PROTO_OFFICE_ADDRESS.company}
@@ -58,6 +52,10 @@ export default function AboutModal({ onClose }) {
               <br />
               {PROTO_OFFICE_ADDRESS.area}
             </p>
+            <a className="about-modal-phone-link" href={`tel:${PROTO_OFFICE_ADDRESS.phoneTel}`}>
+              <Phone size={15} />
+              {PROTO_OFFICE_ADDRESS.phone}
+            </a>
             <a
               className="about-modal-map-link"
               href={PROTO_OFFICE_ADDRESS.mapsUrl}

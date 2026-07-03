@@ -3375,21 +3375,16 @@ input, select, textarea { font-family: inherit; outline: none; }
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   line-height: 0;
-  transition: border-color 180ms ease, opacity 180ms ease;
-}
-.about-modal-map-frame:hover {
-  border-color: rgba(200, 154, 60, 0.45);
-  opacity: 0.95;
+  background: #1a1a1a;
 }
 .about-modal-map-embed {
   width: 100%;
   height: 220px;
   border: 0;
   display: block;
-  pointer-events: none;
 }
 .about-modal-visit-address {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   font-size: 14px;
   line-height: 1.6;
   color: #94a3b8;
@@ -3400,15 +3395,18 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: #f1f5f9;
   font-weight: 700;
 }
+.about-modal-phone-link,
 .about-modal-map-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin-right: 18px;
   font-size: 13px;
   font-weight: 600;
   color: #C89A3C;
   text-decoration: none;
 }
+.about-modal-phone-link:hover,
 .about-modal-map-link:hover {
   color: #D4AD56;
   text-decoration: underline;

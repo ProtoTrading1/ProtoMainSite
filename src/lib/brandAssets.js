@@ -22,9 +22,18 @@ export const PROTO_LOGO_ONLINE_GOLD = '#C89A3C';
 
 export const PROTO_OFFICE_ADDRESS = {
   label: 'Head Office & Warehouse',
-  company: 'Proto Trading (Pty) Ltd',
+  company: 'PROTO TRADING CC',
   street: 'De Roos Street, off Sir Lowry Road',
   area: 'District Six, Cape Town, South Africa',
+  phone: '021 4615883',
+  phoneTel: '+27214615883',
   mapsUrl: 'https://maps.app.goo.gl/jJXqv3TveqACkbyr9',
-  mapsEmbedUrl: 'https://maps.google.com/maps?q=De+Roos+Street,+District+Six,+Cape+Town,+South+Africa&hl=en&z=16&output=embed',
+  lat: -33.928,
+  lng: 18.423,
 };
+
+/** OpenStreetMap embed — reliable preview without a Google Maps API key. */
+export function getOfficeMapEmbedUrl({ lat, lng } = PROTO_OFFICE_ADDRESS, delta = 0.0045) {
+  const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+}
