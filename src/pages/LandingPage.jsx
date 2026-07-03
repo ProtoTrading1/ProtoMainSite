@@ -423,7 +423,7 @@ function Questionnaire({ onLogin }) {
   );
 
   const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
+    const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()];
     const bt = resolvedBuildingType();
     if (bt) parts.push(bt);
     if (buildingType === 'Apartments' && unitNumber.trim()) {
@@ -467,6 +467,7 @@ function Questionnaire({ onLogin }) {
     if (step === 2) {
       const deliveryOk = streetName.trim()
         && suburb.trim()
+        && city.trim()
         && postalCode.trim()
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
@@ -510,7 +511,7 @@ function Questionnaire({ onLogin }) {
         vatNumber: vatNumber.trim() || null,
         country: null,
         province: null,
-        city: null,
+        city: city.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -742,6 +743,15 @@ function Questionnaire({ onLogin }) {
                   onChange={(e) => setPostalCode(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Postal code"
+                />
+              </div>
+              <div className="lp-quiz-field">
+                <label>City</label>
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="City"
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">

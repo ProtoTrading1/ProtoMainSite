@@ -58,6 +58,7 @@ export default function Questionnaire({ onLogin }) {
   const [streetName, setStreetName] = useState('');
   const [suburb, setSuburb] = useState('');
   const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
   const [buildingType, setBuildingType] = useState('');
   const [unitNumber, setUnitNumber] = useState('');
   const [otherBuildingType, setOtherBuildingType] = useState('');
@@ -79,7 +80,7 @@ export default function Questionnaire({ onLogin }) {
   );
 
   const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
+    const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()];
     const bt = resolvedBuildingType();
     if (bt) parts.push(bt);
     if (buildingType === 'Apartments' && unitNumber.trim()) {
@@ -111,6 +112,7 @@ export default function Questionnaire({ onLogin }) {
       return companyAddress.trim()
         && streetName.trim()
         && suburb.trim()
+        && city.trim()
         && postalCode.trim()
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
@@ -146,7 +148,7 @@ export default function Questionnaire({ onLogin }) {
         vatNumber: vatNumber.trim() || null,
         country: null,
         province: null,
-        city: null,
+        city: city.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -377,6 +379,15 @@ export default function Questionnaire({ onLogin }) {
                   onChange={(e) => setPostalCode(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Postal code"
+                />
+              </div>
+              <div className="lp-quiz-field">
+                <label>City</label>
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="City"
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">

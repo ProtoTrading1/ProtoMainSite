@@ -82,7 +82,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   );
 
   const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
+    const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()];
     const bt = resolvedBuildingType();
     if (bt) parts.push(bt);
     if (buildingType === 'Apartments' && unitNumber.trim()) {
@@ -136,6 +136,9 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     }
     if (!postalCode.trim()) {
       issues.push({ key: 'postalCode', message: 'Delivery postal code', section: 'addresses' });
+    }
+    if (!city.trim()) {
+      issues.push({ key: 'city', message: 'Delivery city', section: 'addresses' });
     }
     if (!buildingType) {
       issues.push({ key: 'buildingType', message: 'Building type', section: 'addresses' });
@@ -647,6 +650,15 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         value={postalCode}
                         onChange={(e) => setPostalCode(e.target.value)}
                         placeholder="Postal code"
+                        required
+                      />
+                    </div>
+                    <div className={`lp-quiz-field${fieldHasIssue('city') ? ' lp-quiz-field--error' : ''}`}>
+                      <label>City</label>
+                      <input
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="City"
                         required
                       />
                     </div>
