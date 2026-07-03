@@ -27,7 +27,9 @@ export const PROTO_OFFICE_ADDRESS = {
   area: 'District Six, Cape Town, South Africa',
   phone: '021 4615883',
   phoneTel: '+27214615883',
+  email: 'online@proto.co.za',
   mapsUrl: 'https://maps.app.goo.gl/jJXqv3TveqACkbyr9',
-  lat: -33.928,
-  lng: 18.423,
+  mapImage: '/proto-office-map.jpg',
+  lat: -33.9280367,
+  lng: 18.4286137,
 };
