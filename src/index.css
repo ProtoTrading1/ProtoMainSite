@@ -881,12 +881,12 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .brand-block { gap: 0; min-width: 250px; }
+.brand-block .proto-logo-wordmark,
 .brand-block .proto-logo__svg,
 .brand-block .proto-logo__image--full {
   display: block;
   width: auto;
-  height: 36px;
-  object-fit: contain;
+  --logo-height: 36px;
 }
 .icon-button {
   width: 38px;
@@ -3383,9 +3383,10 @@ input, select, textarea { font-family: inherit; outline: none; }
   /* Header: show brand name, hide verbose actions */
   .app-header { padding: 0 14px; gap: 12px; height: 58px; }
   .brand-block { min-width: auto; gap: 0; }
+  .brand-block .proto-logo-wordmark,
   .brand-block .proto-logo__svg,
   .brand-block .proto-logo__image--full {
-    height: 30px;
+    --logo-height: 30px;
   }
   .trade-pill, .header-action { display: none !important; }
   .header-icon-mobile { display: flex !important; }

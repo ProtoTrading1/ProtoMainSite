@@ -52,18 +52,7 @@ function ProtoLogoFallback({ variant, size, tagline, className, style }) {
 
   return (
     <span className={`proto-logo proto-logo--full-fallback ${className ?? ''}`.trim()} style={style}>
-      <span className="proto-logo__mark" aria-hidden="true">&#937;</span>
-      <span className="proto-logo__text">
-        <strong>PROTO <span>TRADING</span></strong>
-        {showTagline && isOnlineTagline && (
-          <span className="proto-logo__online">
-            <span className="proto-logo__online-line" aria-hidden="true" />
-            <small>{taglineText}</small>
-            <span className="proto-logo__online-line" aria-hidden="true" />
-          </span>
-        )}
-        {showTagline && !isOnlineTagline && <small>{taglineText}</small>}
-      </span>
+      <ProtoLogoWordmark height={height} />
     </span>
   );
 }

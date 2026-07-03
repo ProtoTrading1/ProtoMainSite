@@ -1,70 +1,51 @@
-/** Inline Proto Trading Online wordmark — no network request, never crops. */
+import { useCallback, useState } from 'react';
+import { PROTO_ICON_SOURCES } from '../lib/brandAssets';
+
+/** Original icon + PROTO TRADING text + centred ONLINE row (matches brand reference). */
 export default function ProtoLogoWordmark({ height = 44, className = '' }) {
-  const width = Math.round(height * (320 / 56));
+  const [iconIndex, setIconIndex] = useState(0);
+  const [iconFailed, setIconFailed] = useState(false);
+
+  const handleIconError = useCallback(() => {
+    const next = iconIndex + 1;
+    if (next < PROTO_ICON_SOURCES.length) {
+      setIconIndex(next);
+      return;
+    }
+    setIconFailed(true);
+  }, [iconIndex]);
 
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 320 56"
-      width={width}
-      height={height}
+    <span
+      className={`proto-logo-wordmark ${className}`.trim()}
+      style={{ '--logo-height': `${height}px` }}
       role="img"
       aria-label="Proto Trading Online"
-      className={className}
     >
-      <defs>
-        <linearGradient id="protoLogoRed" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444" />
-          <stop offset="100%" stopColor="#b91c1c" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="4" width="48" height="48" rx="10" fill="url(#protoLogoRed)" />
-      <text
-        x="24"
-        y="36"
-        textAnchor="middle"
-        fill="#050505"
-        fontFamily="Georgia, 'Times New Roman', serif"
-        fontSize="28"
-        fontWeight="700"
-      >
-        &#937;
-      </text>
-      <text
-        x="62"
-        y="24"
-        fill="#ffffff"
-        fontFamily="Outfit, Arial, sans-serif"
-        fontSize="22"
-        fontWeight="800"
-        letterSpacing="0.5"
-      >
-        PROTO
-      </text>
-      <text
-        x="138"
-        y="24"
-        fill="#ef4444"
-        fontFamily="Outfit, Arial, sans-serif"
-        fontSize="22"
-        fontWeight="800"
-        letterSpacing="0.5"
-      >
-        TRADING
-      </text>
-      <line x1="62" y1="38" x2="92" y2="38" stroke="#c9a227" strokeWidth="1" />
-      <text
-        x="152"
-        y="38"
-        fill="#c9a227"
-        fontFamily="Outfit, Arial, sans-serif"
-        fontSize="10"
-        fontWeight="700"
-        letterSpacing="2.4"
-      >
-        ONLINE
-      </text>
-      <line x1="212" y1="38" x2="242" y2="38" stroke="#c9a227" strokeWidth="1" />
-    </svg>
+      {iconFailed ? (
+        <span className="proto-logo-wordmark__icon proto-logo-wordmark__icon--fallback" aria-hidden="true">
+          &#937;
+        </span>
+      ) : (
+        <img
+          src={PROTO_ICON_SOURCES[iconIndex]}
+          alt=""
+          aria-hidden="true"
+          className="proto-logo-wordmark__icon"
+          decoding="async"
+          onError={handleIconError}
+        />
+      )}
+      <span className="proto-logo-wordmark__text">
+        <strong>
+          PROTO <span>TRADING</span>
+        </strong>
+        <span className="proto-logo-wordmark__online">
+          <span className="proto-logo-wordmark__line" aria-hidden="true" />
+          <small>ONLINE</small>
+          <span className="proto-logo-wordmark__line" aria-hidden="true" />
+        </span>
+      </span>
+    </span>
   );
 }

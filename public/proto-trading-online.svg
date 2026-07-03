@@ -1,15 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 56" role="img" aria-label="Proto Trading Online">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 52" role="img" aria-label="Proto Trading Online">
   <defs>
     <linearGradient id="protoRed" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#ef4444"/>
       <stop offset="100%" stop-color="#b91c1c"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="4" width="48" height="48" rx="10" fill="url(#protoRed)"/>
-  <text x="24" y="36" text-anchor="middle" fill="#050505" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="700">&#937;</text>
-  <text x="62" y="24" fill="#ffffff" font-family="Outfit, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="0.5">PROTO</text>
-  <text x="138" y="24" fill="#ef4444" font-family="Outfit, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="0.5">TRADING</text>
-  <line x1="62" y1="38" x2="92" y2="38" stroke="#c9a227" stroke-width="1"/>
-  <text x="152" y="38" fill="#c9a227" font-family="Outfit, Arial, sans-serif" font-size="10" font-weight="700" letter-spacing="2.4">ONLINE</text>
-  <line x1="212" y1="38" x2="242" y2="38" stroke="#c9a227" stroke-width="1"/>
+  <rect x="0" y="2" width="48" height="48" rx="10" fill="url(#protoRed)"/>
+  <text x="24" y="34" text-anchor="middle" fill="#050505" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="700">&#937;</text>
+  <text x="58" y="22" font-family="Outfit, Arial, sans-serif" font-size="20" font-weight="800">
+    <tspan fill="#ffffff">PROTO</tspan><tspan fill="#ef4444"> TRADING</tspan>
+  </text>
+  <line x1="58" y1="36" x2="98" y2="36" stroke="#c9a227" stroke-width="1"/>
+  <text x="128" y="36" text-anchor="middle" fill="#c9a227" font-family="Outfit, Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="2.2">ONLINE</text>
+  <line x1="158" y1="36" x2="198" y2="36" stroke="#c9a227" stroke-width="1"/>
 </svg>

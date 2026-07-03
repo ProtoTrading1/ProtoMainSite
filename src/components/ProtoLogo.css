@@ -14,6 +14,83 @@
   flex-shrink: 0;
 }
 
+/* Composite wordmark: original icon + PROTO TRADING + centred ONLINE */
+.proto-logo-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--logo-height, 44px) * 0.27);
+  max-width: 100%;
+}
+
+.proto-logo-wordmark__icon {
+  width: var(--logo-height, 44px);
+  height: var(--logo-height, 44px);
+  border-radius: calc(var(--logo-height, 44px) * 0.22);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #050505;
+}
+
+.proto-logo-wordmark__icon--fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+  color: #050505;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: calc(var(--logo-height, 44px) * 0.62);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.proto-logo-wordmark__text {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--logo-height, 44px) * 0.05);
+  min-width: 0;
+}
+
+.proto-logo-wordmark__text strong {
+  display: block;
+  font-family: Outfit, sans-serif;
+  font-size: calc(var(--logo-height, 44px) * 0.48);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.05;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.proto-logo-wordmark__text strong span {
+  color: var(--proto-red, #dc2626);
+}
+
+.proto-logo-wordmark__online {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--logo-height, 44px) * 0.14);
+  width: 100%;
+}
+
+.proto-logo-wordmark__online small {
+  flex: 0 0 auto;
+  font-family: Outfit, sans-serif;
+  font-size: calc(var(--logo-height, 44px) * 0.2);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c9a227;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.proto-logo-wordmark__line {
+  flex: 1 1 0;
+  min-width: calc(var(--logo-height, 44px) * 0.35);
+  height: 1px;
+  background: #c9a227;
+}
+
 .proto-logo__image--full {
   width: auto;
   height: 36px;
@@ -132,8 +209,9 @@
   background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
 }
 
+.app-header .proto-logo-wordmark,
 .app-header .proto-logo__image--full {
-  height: 34px;
+  --logo-height: 34px;
 }
 
 .app-header .proto-logo--compact .proto-logo__text strong,
@@ -141,24 +219,29 @@
   font-size: 16px;
 }
 
+.access-brand .proto-logo-wordmark,
 .access-brand .proto-logo__image--full {
-  height: 42px;
+  --logo-height: 42px;
 }
 
+.lp-footer-brand .proto-logo-wordmark,
 .lp-footer-brand .proto-logo__image--full {
-  height: 36px;
+  --logo-height: 36px;
 }
 
+.lm-brand .proto-logo-wordmark,
 .lm-brand .proto-logo__image--full {
-  height: 38px;
+  --logo-height: 38px;
 }
 
+.lp-register-brand .proto-logo-wordmark,
 .lp-register-brand .proto-logo__image--full {
-  height: 38px;
+  --logo-height: 38px;
 }
 
+.wc-brand .proto-logo-wordmark,
 .wc-brand .proto-logo__image--full {
-  height: 34px;
+  --logo-height: 34px;
 }
 
 .reset-password-logo {
@@ -167,11 +250,13 @@
 }
 
 @media (max-width: 768px) {
+  .app-header .proto-logo-wordmark,
   .app-header .proto-logo__image--full {
-    height: 30px;
+    --logo-height: 30px;
   }
 
+  .access-brand .proto-logo-wordmark,
   .access-brand .proto-logo__image--full {
-    height: 34px;
+    --logo-height: 34px;
   }
 }

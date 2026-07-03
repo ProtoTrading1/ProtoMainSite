@@ -40,11 +40,12 @@
   background: #050505;
 }
 
+.access-brand .proto-logo-wordmark,
 .access-brand .proto-logo__svg,
 .access-brand .proto-logo__image--full {
   display: block;
   width: auto;
-  height: 44px;
+  --logo-height: 44px;
   border-radius: 0;
   object-fit: contain;
   background: transparent;
@@ -2607,11 +2608,12 @@
   object-fit: cover;
 }
 
+.lp-footer-brand .proto-logo-wordmark,
 .lp-footer-brand .proto-logo__svg,
 .lp-footer-brand .proto-logo__image--full {
   display: block;
   width: auto;
-  height: 36px;
+  --logo-height: 36px;
   border-radius: 0;
   object-fit: contain;
 }
@@ -3193,9 +3195,10 @@
     height: 36px;
   }
 
+  .access-brand .proto-logo-wordmark,
   .access-brand .proto-logo__svg,
   .access-brand .proto-logo__image--full {
-    height: 36px;
+    --logo-height: 36px;
   }
 
   .access-apply {
