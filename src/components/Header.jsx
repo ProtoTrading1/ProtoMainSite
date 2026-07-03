@@ -498,33 +498,32 @@ export default function Header({
           )}
         </div>
 
-        {/* Centre navigation */}
-        <nav className="header-nav desktop-only">
-          {hasLastOrder && (
-            <button className="header-nav-btn" type="button" onClick={onReorder}>
-              <RotateCcw size={14} />
-              Returning Buyer
+        <div className="header-utilities">
+          <nav className="header-nav desktop-only">
+            {hasLastOrder && (
+              <button className="header-nav-btn" type="button" onClick={onReorder}>
+                <RotateCcw size={14} />
+                Returning Buyer
+              </button>
+            )}
+
+            <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
+              <MapPin size={14} />
+              Find Us
+            </a>
+
+            <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
+              <Info size={14} />
+              About
             </button>
-          )}
 
-          <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
-            <MapPin size={14} />
-            Find Us
-          </a>
+            <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
+              <Star size={14} className="spinning-star" />
+              Specials
+            </button>
+          </nav>
 
-          <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
-            <Info size={14} />
-            About
-          </button>
-
-          <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
-            <Star size={14} className="spinning-star" />
-            Specials
-          </button>
-        </nav>
-
-        {/* Right actions */}
-        <div className="header-actions">
+          <div className="header-actions">
           {customer?.role === 'admin' && (
             <a className="header-action desktop-only" href="https://protoportal-admin.vercel.app" target="_blank" rel="noreferrer">
               <LayoutDashboard size={19} />
@@ -559,6 +558,7 @@ export default function Header({
           <div className="cart-summary" onClick={onCartClick} style={onCartClick ? { cursor: 'pointer' } : undefined}>
             <CartProgressIcon cartTotal={cartTotal} size={22} />
             <span><small>Order</small>R{cartTotal.toFixed(2)}</span>
+          </div>
           </div>
         </div>
       </header>

@@ -15,17 +15,18 @@
 
   height: var(--header-premium-height);
   padding: 0 var(--header-premium-pad-x);
-  gap: clamp(18px, 2.2vw, 28px);
+  gap: clamp(20px, 2.4vw, 32px);
   background: #000000;
   border-bottom: 1px solid #1A1A1A;
   display: grid;
-  grid-template-columns: auto var(--search-width) 1fr auto;
+  grid-template-columns: auto var(--search-width) 1fr;
   align-items: center;
 }
 
 .app-header--premium .brand-block {
   grid-column: 1;
   flex-shrink: 0;
+  margin-right: 4px;
 }
 
 .app-header--premium .header-search-premium-wrap {
@@ -36,18 +37,27 @@
   justify-self: start;
 }
 
-.app-header--premium .header-nav {
+.app-header--premium .header-utilities {
   grid-column: 3;
-  justify-content: flex-start;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(20px, 2.5vw, 32px);
+  min-width: 0;
+}
+
+.app-header--premium .header-nav {
+  justify-content: flex-end;
+  gap: clamp(12px, 1.2vw, 16px);
   flex: unset;
   min-width: 0;
   overflow: visible;
-  flex-shrink: 1;
+  flex-shrink: 0;
 }
 
 .app-header--premium .header-nav-btn {
-  padding: 8px 10px;
+  padding: 8px 12px;
+  gap: 7px;
   white-space: nowrap;
   flex-shrink: 0;
   border-radius: 8px;
@@ -59,9 +69,11 @@
 }
 
 .app-header--premium .header-actions {
-  grid-column: 4;
   margin-left: 0;
-  gap: clamp(12px, 2vw, 20px);
+  padding-left: clamp(16px, 2vw, 24px);
+  border-left: 1px solid #2A2A2A;
+  gap: clamp(14px, 1.5vw, 20px);
+  flex-shrink: 0;
 }
 
 /* ── Signature search bar ── */
@@ -244,6 +256,15 @@
   .app-header--premium .header-nav {
     display: none;
   }
+
+  .app-header--premium .header-utilities {
+    gap: 0;
+  }
+
+  .app-header--premium .header-actions {
+    padding-left: 0;
+    border-left: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -251,6 +272,11 @@
     --header-premium-height: 64px;
     padding: 0 16px;
     grid-template-columns: 1fr auto;
+    gap: 12px;
+  }
+
+  .app-header--premium .header-utilities {
+    grid-column: 2;
   }
 
   .app-header--premium .brand-block .proto-logo-wordmark {
