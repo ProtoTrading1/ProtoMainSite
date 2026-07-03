@@ -75,36 +75,23 @@ function AboutModal({ onClose }) {
             <div><strong>40 yrs</strong><span>Experience</span></div>
           </div>
 
-          <a
-            className="about-modal-map-link"
-            href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <MapPin size={15} />
-            Find us on Google Maps
-          </a>
+          <div className="about-modal-visit">
+            <h3 className="about-modal-section-title">Visit us</h3>
+            <p className="about-modal-visit-address">
+              <strong>Head Office &amp; Warehouse</strong>
+              Proto Trading (Pty) Ltd · Johannesburg, South Africa
+            </p>
+            <a
+              className="about-modal-map-link"
+              href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MapPin size={15} />
+              Open in Google Maps
+            </a>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function FindUsModal({ onClose }) {
-  return (
-    <div className="topnav-modal-backdrop" onClick={onClose}>
-      <div className="topnav-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="topnav-modal-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-        <h2>Where to Find Us</h2>
-        <div className="topnav-find-block">
-          <MapPin size={18} />
-          <div><strong>Head Office & Warehouse</strong><p>Proto Trading (Pty) Ltd<br />Johannesburg, South Africa</p></div>
-        </div>
-        <div className="topnav-find-block">
-          <Info size={18} />
-          <div><strong>Trade enquiries</strong><p>Send a quote request via the order basket<br />and our team will confirm by reply.</p></div>
-        </div>
-        <p className="topnav-find-note">Trade accounts, delivery areas, and MOQ details are confirmed with your first order.</p>
       </div>
     </div>
   );
@@ -295,7 +282,7 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
   );
 }
 
-export { AboutModal, FindUsModal };
+export { AboutModal };
 
 // ─── Header ──────────────────────────────────────────────────
 export default function Header({
@@ -309,7 +296,6 @@ export default function Header({
   const mobileSearchOpen = mobileSearchOpenProp ?? mobileSearchOpenInternal;
   const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
   const [showAbout, setShowAbout] = useState(false);
-  const [showFindUs, setShowFindUs] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
@@ -643,7 +629,6 @@ export default function Header({
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-      {showFindUs && <FindUsModal onClose={() => setShowFindUs(false)} />}
       {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
     </>
   );

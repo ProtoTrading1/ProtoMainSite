@@ -3367,7 +3367,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 20px;
   font-size: 13px;
   font-weight: 600;
   color: #8B1A1A;
@@ -3375,6 +3374,23 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .about-modal-map-link:hover {
   text-decoration: underline;
+}
+.about-modal-visit {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+.about-modal-visit-address {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #475569;
+}
+.about-modal-visit-address strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+  font-weight: 700;
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
