@@ -464,7 +464,7 @@ export default function Header({
       <header className="app-header app-header--premium">
         {/* Brand */}
         <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <ProtoLogo variant="full" size={46} tagline={false} className="proto-logo-wordmark--enter" />
+          <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
         </div>
 
         {/* Signature search */}

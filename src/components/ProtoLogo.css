@@ -104,8 +104,8 @@
 }
 
 .proto-logo-wordmark__line {
-  flex: 0 0 60px;
-  width: 60px;
+  flex: 0 0 42px;
+  width: 42px;
   height: 2px;
   background: linear-gradient(
     90deg,
@@ -114,6 +114,23 @@
     #C89A3C 82%,
     transparent 100%
   );
+}
+
+@media (max-width: 1100px) and (min-width: 769px) {
+  .proto-logo-wordmark__line {
+    flex-basis: 30px;
+    width: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .proto-logo-wordmark__line {
+    display: none;
+  }
+
+  .proto-logo-wordmark__online {
+    gap: 0;
+  }
 }
 
 .proto-logo__image--full {
@@ -232,7 +249,7 @@
 
 .app-header .proto-logo-wordmark,
 .app-header .proto-logo__image--full {
-  --logo-height: 46px;
+  --logo-height: 44px;
 }
 
 .proto-logo--full.proto-logo-wordmark--enter,
