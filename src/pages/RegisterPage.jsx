@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import AddressAutocomplete from '../components/AddressAutocomplete';
 import BusinessCategoryPicker from '../components/register/BusinessCategoryPicker';
+import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
+import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
@@ -18,8 +19,6 @@ const SA_PROVINCES = [
   'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
   'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
 ];
-
-const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
 const STANDALONE_STEPS = ['Contact', 'Company', 'Business', 'Location', 'Addresses'];
 
@@ -48,19 +47,37 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
-  const [otherBuildingType, setOtherBuildingType] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [suburb, setSuburb] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [buildingType, setBuildingType] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
   const [companyFax, setCompanyFax] = useState('');
+
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
+  const {
+    companyAddress,
+    deliverySameAsBilling,
+    streetName,
+    suburb,
+    postalCode,
+    city,
+    buildingType,
+    unitNumber,
+    otherBuildingType,
+    setStreetName,
+    setSuburb,
+    setPostalCode,
+    setCity,
+    setBuildingType,
+    setUnitNumber,
+    setOtherBuildingType,
+    handleCompanyAddressChange,
+    onBillingPlaceSelect,
+    handleDeliverySameAsBillingChange,
+    resolvedBuildingType,
+    buildStructuredDeliveryAddress,
+    deliveryFieldsLocked,
+  } = addresses;
 
   const [emailError, setEmailError] = useState('');
   const [validationIssues, setValidationIssues] = useState([]);
@@ -72,24 +89,6 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
-
-  const handleCompanyAddressChange = (v) => {
-    setCompanyAddress(v);
-  };
-
-  const resolvedBuildingType = () => (
-    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
-  );
-
-  const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()];
-    const bt = resolvedBuildingType();
-    if (bt) parts.push(bt);
-    if (buildingType === 'Apartments' && unitNumber.trim()) {
-      parts.push(`Unit ${unitNumber.trim()}`);
-    }
-    return parts.filter(Boolean).join(', ').toUpperCase();
-  };
 
   const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
 
@@ -126,7 +125,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       issues.push({ key: 'country', message: 'Country', section: 'location' });
     }
     if (!companyAddress.trim()) {
-      issues.push({ key: 'companyAddress', message: 'Full company address', section: 'addresses' });
+      issues.push({ key: 'companyAddress', message: 'Billing address', section: 'addresses' });
     }
     if (!streetName.trim()) {
       issues.push({ key: 'streetName', message: 'Delivery street name', section: 'addresses' });
@@ -611,109 +610,34 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   {standalone ? (
                     <div className="lp-register-step-intro">
                       <h2>Your addresses</h2>
-                      <p>Company and delivery details for orders.</p>
+                      <p>Billing and delivery details for orders.</p>
                     </div>
                   ) : (
                     <h2>Addresses</h2>
                   )}
-                  <div className="lp-register-grid">
-                    <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('companyAddress') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Full company address</label>
-                      <AddressAutocomplete
-                        value={companyAddress}
-                        onChange={handleCompanyAddressChange}
-                        placeholder="Start typing your street address…"
-                      />
-                    </div>
-                    <div className="lp-register-subhead">Delivery address</div>
-                    <div className={`lp-quiz-field${fieldHasIssue('streetName') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Street name</label>
-                      <input
-                        value={streetName}
-                        onChange={(e) => setStreetName(e.target.value)}
-                        placeholder="Street name and number"
-                        required
-                      />
-                    </div>
-                    <div className={`lp-quiz-field${fieldHasIssue('suburb') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Suburb</label>
-                      <input
-                        value={suburb}
-                        onChange={(e) => setSuburb(e.target.value)}
-                        placeholder="Suburb"
-                        required
-                      />
-                    </div>
-                    <div className={`lp-quiz-field${fieldHasIssue('postalCode') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Postal code</label>
-                      <input
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        placeholder="Postal code"
-                        required
-                      />
-                    </div>
-                    <div className={`lp-quiz-field${fieldHasIssue('city') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>City</label>
-                      <input
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        placeholder="City"
-                        required
-                      />
-                    </div>
-                    <div className="lp-quiz-field lp-quiz-field--full">
-                      <div className="lp-register-subhead">Building type</div>
-                      <div className={`lp-quiz-types lp-quiz-types--compact${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`}>
-                        {BUILDING_TYPES.map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                            onClick={() => {
-                              setBuildingType(type);
-                              if (type !== 'Apartments') setUnitNumber('');
-                              if (type !== 'Other') setOtherBuildingType('');
-                            }}
-                          >
-                            {type}
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-                          onClick={() => {
-                            setBuildingType('Other');
-                            setUnitNumber('');
-                          }}
-                        >
-                          Other
-                        </button>
-                      </div>
-                    </div>
-                    {buildingType === 'Other' && (
-                      <div className={`lp-quiz-field${fieldHasIssue('otherBuildingType') ? ' lp-quiz-field--error' : ''}`}>
-                        <label>Describe building type</label>
-                        <input
-                          value={otherBuildingType}
-                          onChange={(e) => setOtherBuildingType(e.target.value)}
-                          placeholder="e.g. Warehouse, Industrial unit"
-                          required
-                        />
-                      </div>
-                    )}
-                    {buildingType === 'Apartments' && (
-                      <div className={`lp-quiz-field${fieldHasIssue('unitNumber') ? ' lp-quiz-field--error' : ''}`}>
-                        <label>Unit / apartment number</label>
-                        <input
-                          value={unitNumber}
-                          onChange={(e) => setUnitNumber(e.target.value)}
-                          placeholder="Unit number"
-                          required
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <BillingDeliveryFields
+                    companyAddress={companyAddress}
+                    onCompanyAddressChange={handleCompanyAddressChange}
+                    onBillingPlaceSelect={onBillingPlaceSelect}
+                    deliverySameAsBilling={deliverySameAsBilling}
+                    onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
+                    streetName={streetName}
+                    setStreetName={setStreetName}
+                    suburb={suburb}
+                    setSuburb={setSuburb}
+                    postalCode={postalCode}
+                    setPostalCode={setPostalCode}
+                    city={city}
+                    setCity={setCity}
+                    buildingType={buildingType}
+                    setBuildingType={setBuildingType}
+                    unitNumber={unitNumber}
+                    setUnitNumber={setUnitNumber}
+                    otherBuildingType={otherBuildingType}
+                    setOtherBuildingType={setOtherBuildingType}
+                    deliveryFieldsLocked={deliveryFieldsLocked}
+                    fieldHasIssue={fieldHasIssue}
+                  />
                 </section>
                 )}
 

@@ -19,7 +19,9 @@ function loadScript() {
   return scriptPromise;
 }
 
-export default function AddressAutocomplete({ value, onChange, className, placeholder, required, style, onKeyDown }) {
+import { parseGooglePlaceComponents } from '../lib/addressUtils';
+
+export default function AddressAutocomplete({ value, onChange, onPlaceSelect, className, placeholder, required, style, onKeyDown }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
@@ -37,20 +39,9 @@ export default function AddressAutocomplete({ value, onChange, className, placeh
         const place = ac.getPlace();
         if (!place?.address_components) return;
 
-        // Build a clean address string from components
-        const get = (type) =>
-          place.address_components.find((c) => c.types.includes(type))?.long_name || '';
-
-        const streetNumber = get('street_number');
-        const route = get('route');
-        const suburb = get('sublocality_level_1') || get('locality');
-        const city = get('administrative_area_level_2') || get('locality');
-        const province = get('administrative_area_level_1');
-        const postcode = get('postal_code');
-
-        const street = [streetNumber, route].filter(Boolean).join(' ');
-        const parts = [street, suburb, city !== suburb ? city : '', province, postcode].filter(Boolean);
-        onChange([...new Set(parts)].join(', '));
+        const parts = parseGooglePlaceComponents(place.address_components);
+        onChange(parts.formatted);
+        onPlaceSelect?.(parts);
       });
 
       acRef.current = ac;
@@ -62,7 +53,7 @@ export default function AddressAutocomplete({ value, onChange, className, placeh
         acRef.current = null;
       }
     };
-  }, []);
+  }, [onChange, onPlaceSelect]);
 
   return (
     <input

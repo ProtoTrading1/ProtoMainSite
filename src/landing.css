@@ -4452,6 +4452,41 @@
   grid-column: 1 / -1;
 }
 
+.lp-register-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.42);
+  font-weight: 500;
+}
+
+.lp-register-same-address {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  user-select: none;
+}
+
+.lp-register-same-address input {
+  width: 16px;
+  height: 16px;
+  accent-color: #C89A3C;
+  cursor: pointer;
+}
+
+.lp-quiz-field--locked input {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .lp-register-optional {
   opacity: 0.55;
   font-weight: 500;

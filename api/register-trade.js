@@ -40,7 +40,7 @@ function buildAdminSignupHtml({
     ['Business', caps(businessName)],
     ['Email', caps(email)],
     ['Phone', caps(phone)],
-    ['Company address', caps(companyAddress)],
+    ['Billing address', caps(companyAddress)],
     ['Delivery address', caps(deliveryAddress)],
     ['Street', caps(streetName)],
     ['Suburb', caps(suburb)],

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
-import AddressAutocomplete from '../components/AddressAutocomplete';
+import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
+import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
 import ProtoLogo from '../components/ProtoLogo';
 import { motion, useInView } from 'motion/react';
@@ -117,8 +118,6 @@ const MONTHLY_SPEND_BANDS = [
   'R25,000 – R50,000',
   'R50,000+',
 ];
-
-const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
@@ -407,35 +406,33 @@ function Questionnaire({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [suburb, setSuburb] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [buildingType, setBuildingType] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
-  const [otherBuildingType, setOtherBuildingType] = useState('');
-  const handleCompanyAddressChange = (v) => {
-    setCompanyAddress(v);
-  };
-
-  const resolvedBuildingType = () => (
-    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
-  );
-
-  const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), city.trim(), postalCode.trim()];
-    const bt = resolvedBuildingType();
-    if (bt) parts.push(bt);
-    if (buildingType === 'Apartments' && unitNumber.trim()) {
-      parts.push(`Unit ${unitNumber.trim()}`);
-    }
-    return parts.filter(Boolean).join(', ').toUpperCase();
-  };
-
-  const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
+  const {
+    companyAddress,
+    deliverySameAsBilling,
+    streetName,
+    suburb,
+    postalCode,
+    city,
+    buildingType,
+    unitNumber,
+    otherBuildingType,
+    setStreetName,
+    setSuburb,
+    setPostalCode,
+    setCity,
+    setBuildingType,
+    setUnitNumber,
+    setOtherBuildingType,
+    handleCompanyAddressChange,
+    onBillingPlaceSelect,
+    handleDeliverySameAsBillingChange,
+    resolvedBuildingType,
+    buildStructuredDeliveryAddress,
+    deliveryFieldsLocked,
+  } = addresses;
   const [businessType, setBusinessType] = useState([]); // multi-select
   const [otherType, setOtherType] = useState('');
   const toggleBusinessType = (t) =>
@@ -494,7 +491,7 @@ function Questionnaire({ onLogin }) {
     setSubmitError('');
     try {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
-      const deliveryLine = resolvedDeliveryAddress();
+      const deliveryLine = buildStructuredDeliveryAddress();
       const result = await submitTradeApplication({
         email: email.trim(),
         password,
@@ -706,106 +703,31 @@ function Questionnaire({ onLogin }) {
 
         {step === 2 && (
           <div className="lp-quiz-step">
-            <h3>Enter the two addresses we need.</h3>
-            <div className="lp-quiz-fields">
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Full company address</label>
-                <AddressAutocomplete
-                  value={companyAddress}
-                  onChange={handleCompanyAddressChange}
-                  onKeyDown={handleKey}
-                  placeholder="Start typing your street address…"
-                />
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '8px 0 10px' }}>Delivery address</div>
-              <div className="lp-quiz-field">
-                <label>Street name</label>
-                <input
-                  value={streetName}
-                  onChange={(e) => setStreetName(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Street name and number"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Suburb</label>
-                <input
-                  value={suburb}
-                  onChange={(e) => setSuburb(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Suburb"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Postal code</label>
-                <input
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Postal code"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>City</label>
-                <input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="City"
-                />
-              </div>
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Building type</div>
-                <div className="lp-quiz-types">
-                  {BUILDING_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                      onClick={() => {
-                        setBuildingType(type);
-                        if (type !== 'Apartments') setUnitNumber('');
-                        if (type !== 'Other') setOtherBuildingType('');
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-                    onClick={() => {
-                      setBuildingType('Other');
-                      setUnitNumber('');
-                    }}
-                  >
-                    Other
-                  </button>
-                </div>
-              </div>
-              {buildingType === 'Other' && (
-                <div className="lp-quiz-field">
-                  <label>Describe building type</label>
-                  <input
-                    value={otherBuildingType}
-                    onChange={(e) => setOtherBuildingType(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="e.g. Warehouse, Industrial unit"
-                  />
-                </div>
-              )}
-              {buildingType === 'Apartments' && (
-                <div className="lp-quiz-field">
-                  <label>Unit / apartment number</label>
-                  <input
-                    value={unitNumber}
-                    onChange={(e) => setUnitNumber(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Unit number"
-                  />
-                </div>
-              )}
-            </div>
+            <h3>Billing and delivery addresses</h3>
+            <BillingDeliveryFields
+              companyAddress={companyAddress}
+              onCompanyAddressChange={handleCompanyAddressChange}
+              onBillingPlaceSelect={onBillingPlaceSelect}
+              deliverySameAsBilling={deliverySameAsBilling}
+              onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
+              streetName={streetName}
+              setStreetName={setStreetName}
+              suburb={suburb}
+              setSuburb={setSuburb}
+              postalCode={postalCode}
+              setPostalCode={setPostalCode}
+              city={city}
+              setCity={setCity}
+              buildingType={buildingType}
+              setBuildingType={setBuildingType}
+              unitNumber={unitNumber}
+              setUnitNumber={setUnitNumber}
+              otherBuildingType={otherBuildingType}
+              setOtherBuildingType={setOtherBuildingType}
+              deliveryFieldsLocked={deliveryFieldsLocked}
+              onKeyDown={handleKey}
+              buildingTypesClassName="lp-quiz-types"
+            />
           </div>
         )}
 
