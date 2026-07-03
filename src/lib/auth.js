@@ -26,8 +26,10 @@ export async function resetPassword(email) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: trimmed }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to send reset email');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to send reset email');
+  }
 }
 
 export async function signOut() {
