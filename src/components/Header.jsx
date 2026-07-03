@@ -509,17 +509,17 @@ export default function Header({
 
           <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
             <MapPin size={14} />
-            Where to Find Us
+            Find Us
           </a>
 
           <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
             <Info size={14} />
-            About Us
+            About
           </button>
 
           <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
             <Star size={14} className="spinning-star" />
-            This Week's Specials
+            Specials
           </button>
         </nav>
 
