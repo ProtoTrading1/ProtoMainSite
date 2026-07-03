@@ -67,7 +67,6 @@ const LEGACY_NAV_ALIASES = {
   'events-parties': 'party-events-seasonals',
   'food-drinks': 'confectionery',
   'homeware-kitchen': 'homeware',
-  'motarro': 'stationery',
   'packaging': 'packaging-storage',
   'toys-games-kids': 'kids-toys-games',
 };
