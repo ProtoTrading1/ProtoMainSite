@@ -4110,6 +4110,139 @@
   }
 }
 
+/* Standalone stepped register flow */
+.lp-register-page--standalone .lp-register-stepper {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lp-register-page--standalone .lp-register-stepper-seg {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.lp-register-page--standalone .lp-register-stepper-seg.active {
+  background: rgba(220, 38, 38, 0.45);
+}
+
+.lp-register-page--standalone .lp-register-stepper-seg.current {
+  background: #dc2626;
+}
+
+.lp-register-page--standalone .lp-register-step-intro {
+  margin-bottom: 18px;
+}
+
+.lp-register-page--standalone .lp-register-step-intro h2 {
+  font-family: Outfit, sans-serif;
+  font-size: clamp(28px, 4vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+.lp-register-page--standalone .lp-register-step-intro p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.lp-register-page--standalone .lp-register-section--business-step {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.lp-register-page--standalone .lp-register-section--business-step .lp-biz-category-label {
+  display: none;
+}
+
+.lp-register-page--standalone .lp-register-section--business-step .lp-biz-category-hint {
+  display: none;
+}
+
+.lp-register-page--standalone .lp-register-step-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.lp-register-page--standalone .lp-register-step-back {
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.lp-register-page--standalone .lp-register-step-back:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lp-register-page--standalone .lp-register-step-continue {
+  flex: 1;
+  min-height: 56px;
+  border: none;
+  border-radius: 14px;
+  background: #dc2626;
+  color: #fff;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s, opacity 0.2s;
+}
+
+.lp-register-page--standalone .lp-register-step-continue:not(:disabled):hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.lp-register-page--standalone .lp-register-step-continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lp-register-page--standalone .lp-register-step-footnote {
+  margin: 12px 0 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lp-register-page--standalone .lp-register-form > .lp-register-section {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.lp-register-page--standalone .lp-biz-category-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
 /* Legacy banner class (unused on standalone; kept for reference) */
 .lp-pre-register-banner {
   width: 100%;

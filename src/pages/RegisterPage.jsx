@@ -3,7 +3,7 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 import BusinessCategoryPicker from '../components/register/BusinessCategoryPicker';
 import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
 import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
-import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
 import '../landing.css';
 
@@ -19,6 +19,8 @@ const SA_PROVINCES = [
 ];
 
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
+
+const STANDALONE_STEPS = ['Contact', 'Company', 'Business', 'Location', 'Addresses'];
 
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
@@ -65,6 +67,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
+  const [standaloneStep, setStandaloneStep] = useState(0);
 
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -148,14 +151,80 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const sectionHasIssue = (section) => validationIssues.some((issue) => issue.section === section);
   const fieldHasIssue = (key) => validationIssues.some((issue) => issue.key === key);
 
+  const standaloneStepIssues = (step) => {
+    const issues = collectValidationIssues();
+    if (step === 0) return issues.filter((issue) => issue.section === 'contact');
+    if (step === 1) return issues.filter((issue) => issue.key === 'businessName');
+    if (step === 2) {
+      const businessIssues = [];
+      if (businessType.length === 0) {
+        businessIssues.push({ key: 'businessType', message: 'Business category', section: 'business' });
+      }
+      if (businessType.includes('Other') && !otherType.trim()) {
+        businessIssues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
+      }
+      return businessIssues;
+    }
+    if (step === 3) return issues.filter((issue) => issue.section === 'location');
+    if (step === 4) return issues.filter((issue) => issue.section === 'addresses');
+    return issues;
+  };
+
+  const canAdvanceStandalone = () => standaloneStepIssues(standaloneStep).length === 0;
+
+  const advanceStandalone = () => {
+    if (standaloneStep === 0) {
+      const err = validateEmailField(email);
+      setEmailError(err);
+      if (err) return;
+    }
+
+    const issues = standaloneStepIssues(standaloneStep);
+    if (issues.length > 0) {
+      setValidationIssues(issues);
+      setSubmitError('');
+      return;
+    }
+    setValidationIssues([]);
+    setSubmitError('');
+    if (standaloneStep < STANDALONE_STEPS.length - 1) {
+      setStandaloneStep((s) => s + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goBackStandalone = () => {
+    setValidationIssues([]);
+    setSubmitError('');
+    setStandaloneStep((s) => Math.max(0, s - 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (standalone && standaloneStep < STANDALONE_STEPS.length - 1) {
+      advanceStandalone();
+      return;
+    }
+
     const issues = collectValidationIssues();
     if (issues.length > 0) {
       setValidationIssues(issues);
       setSubmitError('');
-      const firstSection = document.getElementById(`register-section-${issues[0].section}`);
-      firstSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (standalone) {
+        const stepForSection = {
+          contact: 0,
+          businessName: 1,
+          businessType: 2,
+          otherType: 2,
+          location: 3,
+          addresses: 4,
+        };
+        setStandaloneStep(stepForSection[issues[0].key] ?? stepForSection[issues[0].section] ?? 0);
+      } else {
+        const firstSection = document.getElementById(`register-section-${issues[0].section}`);
+        firstSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -234,11 +303,29 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   className="lp-register-honeypot"
                 />
 
+                {standalone && (
+                  <div className="lp-register-stepper" aria-label="Registration progress">
+                    {STANDALONE_STEPS.map((label, index) => (
+                      <div
+                        key={label}
+                        className={`lp-register-stepper-seg${index <= standaloneStep ? ' active' : ''}${index === standaloneStep ? ' current' : ''}`}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {(!standalone || standaloneStep === 0) && (
                 <section
                   id="register-section-contact"
                   className={`lp-register-section${sectionHasIssue('contact') ? ' lp-register-section--missing' : ''}`}
                 >
-                  <h2>Contact details</h2>
+                  {standalone && (
+                    <div className="lp-register-step-intro">
+                      <h2>Your contact details</h2>
+                      <p>Start with the person we&apos;ll reach on this account.</p>
+                    </div>
+                  )}
+                  {!standalone && <h2>Contact details</h2>}
                   <div className="lp-register-grid">
                     <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('contactName') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Contact person name and surname</label>
@@ -335,12 +422,23 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </div>
                   </div>
                 </section>
+                )}
 
+                {(!standalone || standaloneStep === 1) && (
                 <section
-                  id="register-section-business"
+                  id="register-section-company"
                   className={`lp-register-section${sectionHasIssue('business') ? ' lp-register-section--missing' : ''}`}
                 >
-                  <h2>Business details</h2>
+                  {standalone ? (
+                    <div className="lp-register-step-intro">
+                      <h2>Your company</h2>
+                      <p>Tell us the trading name you order under.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h2>Business details</h2>
+                    </>
+                  )}
                   <div className="lp-register-grid">
                     <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('businessName') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Company / trading name</label>
@@ -369,17 +467,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </div>
                   </div>
 
-                  {standalone ? (
-                    <>
-                      <BusinessCategoryPicker
-                        selected={businessType}
-                        onToggle={toggleBusinessType}
-                        otherValue={otherType}
-                        onOtherChange={setOtherType}
-                      />
-                      <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
-                    </>
-                  ) : (
+                  {!standalone && (
                     <>
                       <div className="lp-register-subhead">Estimated monthly spend</div>
                       <div className="lp-quiz-types">
@@ -421,12 +509,40 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </>
                   )}
                 </section>
+                )}
 
+                {standalone && standaloneStep === 2 && (
+                <section
+                  id="register-section-business"
+                  className={`lp-register-section lp-register-section--business-step${fieldHasIssue('businessType') || fieldHasIssue('otherType') ? ' lp-register-section--missing' : ''}`}
+                >
+                  <div className="lp-register-step-intro">
+                    <h2>Tell us about your business</h2>
+                    <p>This helps us give you the best wholesale experience.</p>
+                  </div>
+                  <BusinessCategoryPicker
+                    selected={businessType}
+                    onToggle={toggleBusinessType}
+                    otherValue={otherType}
+                    onOtherChange={setOtherType}
+                  />
+                  <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
+                </section>
+                )}
+
+                {(!standalone || standaloneStep === 3) && (
                 <section
                   id="register-section-location"
                   className={`lp-register-section${sectionHasIssue('location') ? ' lp-register-section--missing' : ''}`}
                 >
-                  <h2>Location</h2>
+                  {standalone ? (
+                    <div className="lp-register-step-intro">
+                      <h2>Where are you based?</h2>
+                      <p>Select your country and region.</p>
+                    </div>
+                  ) : (
+                    <h2>Location</h2>
+                  )}
                   <div className="lp-register-subhead">Country</div>
                   <div className={`lp-quiz-countries${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
                     {SADC_COUNTRIES.map((c) => (
@@ -481,12 +597,21 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </div>
                   )}
                 </section>
+                )}
 
+                {(!standalone || standaloneStep === 4) && (
                 <section
                   id="register-section-addresses"
                   className={`lp-register-section${sectionHasIssue('addresses') ? ' lp-register-section--missing' : ''}`}
                 >
-                  <h2>Addresses</h2>
+                  {standalone ? (
+                    <div className="lp-register-step-intro">
+                      <h2>Your addresses</h2>
+                      <p>Company and delivery details for orders.</p>
+                    </div>
+                  ) : (
+                    <h2>Addresses</h2>
+                  )}
                   <div className="lp-register-grid">
                     <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('companyAddress') ? ' lp-quiz-field--error' : ''}`}>
                       <label>Full company address</label>
@@ -577,6 +702,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     )}
                   </div>
                 </section>
+                )}
 
                 {validationIssues.length > 0 && (
                   <div className="lp-register-validation-summary" role="alert" aria-live="polite">
@@ -591,6 +717,28 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
                 {submitError && <div className="lp-quiz-error">{submitError}</div>}
 
+                {standalone ? (
+                  <div className="lp-register-step-actions">
+                    {standaloneStep > 0 ? (
+                      <button type="button" className="lp-register-step-back" onClick={goBackStandalone} disabled={submitting}>
+                        <ArrowLeft size={16} />
+                        Back
+                      </button>
+                    ) : <span />}
+                    <button
+                      type="submit"
+                      className="lp-register-step-continue"
+                      disabled={submitting || !canAdvanceStandalone()}
+                    >
+                      {submitting
+                        ? 'Creating your account…'
+                        : standaloneStep < STANDALONE_STEPS.length - 1
+                          ? 'Continue'
+                          : 'Create trade account'}
+                      {!submitting && standaloneStep < STANDALONE_STEPS.length - 1 && <ArrowRight size={16} />}
+                    </button>
+                  </div>
+                ) : (
                 <div className="lp-register-actions">
                   <button type="submit" className="lp-register-submit" disabled={submitting}>
                     {submitting ? 'Creating your account…' : 'Create trade account'}
@@ -602,6 +750,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     </p>
                   )}
                 </div>
+                )}
+                {standalone && (
+                  <p className="lp-register-step-footnote">You can update your details anytime</p>
+                )}
               </form>
             )}
     </div>
@@ -628,14 +780,16 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       <main className={`lp-register-main${standalone ? ' lp-register-main-standalone' : ''}`}>
         {standalone ? (
           <div className="lp-register-standalone-panel">
-            <div className="lp-register-standalone-banner">
-              <img
-                src="/pre-register-banner.jpg"
-                alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
-                fetchPriority="high"
-                decoding="async"
-              />
-            </div>
+            {standaloneStep === 0 && (
+              <div className="lp-register-standalone-banner">
+                <img
+                  src="/pre-register-banner.jpg?v=2"
+                  alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+              </div>
+            )}
             <div className="lp-register-standalone-body">
               {registerCard}
             </div>
