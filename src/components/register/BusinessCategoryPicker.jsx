@@ -1,6 +1,6 @@
-import { BUSINESS_TYPE_ICONS, BUSINESS_TYPES } from '../../lib/businessTypes';
+import { REGISTER_BUSINESS_TYPE_ICONS, REGISTER_BUSINESS_TYPES } from '../../lib/businessTypes';
 
-const MAIN_TYPES = BUSINESS_TYPES.filter((type) => type !== 'Other');
+const MAIN_TYPES = REGISTER_BUSINESS_TYPES.filter((type) => type !== 'Other');
 
 export default function BusinessCategoryPicker({
   selected = [],
@@ -19,7 +19,7 @@ export default function BusinessCategoryPicker({
 
       <div className="lp-biz-category-grid">
         {MAIN_TYPES.map((type) => {
-          const Icon = BUSINESS_TYPE_ICONS[type];
+          const Icon = REGISTER_BUSINESS_TYPE_ICONS[type];
           const isSelected = selected.includes(type);
           return (
             <button
@@ -49,7 +49,7 @@ export default function BusinessCategoryPicker({
         aria-pressed={selected.includes('Other')}
       >
         <span className="lp-biz-category-icon" aria-hidden="true">
-          <BUSINESS_TYPE_ICONS.Other size={22} strokeWidth={1.65} />
+          <REGISTER_BUSINESS_TYPE_ICONS.Other size={22} strokeWidth={1.65} />
         </span>
         <span className="lp-biz-category-text">Other (please specify)</span>
       </button>
