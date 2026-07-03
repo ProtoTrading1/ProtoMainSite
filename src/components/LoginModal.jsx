@@ -69,7 +69,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Brand */}
           <div className="lm-brand">
-            <ProtoLogo variant="full" size="lg" tagline="Trade portal" />
+            <ProtoLogo variant="full" size="lg" tagline={false} />
           </div>
 
           {/* Heading */}

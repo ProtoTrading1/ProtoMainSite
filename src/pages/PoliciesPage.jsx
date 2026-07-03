@@ -289,7 +289,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Header */}
       <header className="access-header">
         <div className="access-brand">
-          <ProtoLogo variant="full" size="lg" tagline="Wholesale supplier since 1987" />
+          <ProtoLogo variant="full" size="lg" tagline={false} />
         </div>
         <nav className="access-nav" aria-label="Policies navigation">
           <a
@@ -448,7 +448,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Footer */}
       <footer className="lp-footer">
         <div className="lp-footer-brand">
-          <ProtoLogo variant="full" size="md" tagline="Wholesale supplier since 1987" />
+          <ProtoLogo variant="full" size="md" tagline={false} />
         </div>
         <p>Trade access only. Not open to the general public.</p>
         <a

@@ -37,7 +37,7 @@ export default function ResetPasswordPage({ token, onDone }) {
       <div style={{ width: '100%', maxWidth: '420px', background: '#111', border: '1px solid #2a2a2a', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
         <div style={{ height: '6px', background: '#c40000' }} />
         <div style={{ padding: '40px 36px' }}>
-          <ProtoLogo variant="full" size="md" tagline="Trade portal" className="reset-password-logo" />
+          <ProtoLogo variant="full" size="md" tagline={false} className="reset-password-logo" />
 
           {done ? (
             <div style={{ textAlign: 'center' }}>

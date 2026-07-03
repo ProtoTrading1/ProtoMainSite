@@ -765,7 +765,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       {!standalone && (
         <header className="lp-register-header">
           <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-            <ProtoLogo variant="full" size="lg" tagline="Wholesale trade portal" />
+            <ProtoLogo variant="full" size="lg" tagline={false} />
           </a>
           <button type="button" className="lp-register-login" onClick={onLogin}>
             <Lock size={15} />

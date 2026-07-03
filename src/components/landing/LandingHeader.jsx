@@ -10,7 +10,7 @@ export default function LandingHeader({ onLogin, onApply }) {
     <header className="landing-header">
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <ProtoLogo variant="full" size="lg" />
+          <ProtoLogo variant="full" size="lg" tagline={false} />
         </div>
 
         <nav className="nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>

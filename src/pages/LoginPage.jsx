@@ -40,7 +40,7 @@ export default function LoginPage({ onLogin, onBack }) {
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-white-muted)', fontSize: '14px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer' }}>
             <ArrowLeft size={18} /> Back
           </button>
-          <ProtoLogo variant="full" size="md" />
+          <ProtoLogo variant="full" size="md" tagline={false} />
         </div>
       </header>
 

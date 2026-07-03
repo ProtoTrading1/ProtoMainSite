@@ -448,7 +448,7 @@ export default function Header({
       <header className="app-header">
         {/* Brand */}
         <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <ProtoLogo variant="full" size="md" />
+          <ProtoLogo variant="full" size="md" tagline={false} />
         </div>
 
         {/* Centre navigation */}
