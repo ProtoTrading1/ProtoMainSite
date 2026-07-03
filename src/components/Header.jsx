@@ -521,6 +521,11 @@ export default function Header({
               <Star size={14} className="spinning-star" />
               Specials
             </button>
+
+            <button className="header-nav-btn" type="button" onClick={onViewProfile}>
+              <User size={14} />
+              My Profile
+            </button>
           </nav>
 
           <div className="header-actions">
@@ -530,14 +535,6 @@ export default function Header({
               <span><small>Admin</small>Dashboard</span>
             </a>
           )}
-
-          <button className="header-action desktop-only" type="button" onClick={onViewProfile}>
-            <User size={19} />
-            <span>
-              <small>Trade</small>
-              My Profile
-            </span>
-          </button>
 
           {onLogout && (
             <button className="header-action desktop-only" type="button" onClick={onLogout} title="Log out" style={{ opacity: 0.75 }}>

@@ -15,40 +15,41 @@
 
   height: var(--header-premium-height);
   padding: 0 var(--header-premium-pad-x);
-  gap: clamp(20px, 2.4vw, 32px);
+  --header-gap-logo-search: 32px;
+  --header-gap-search-nav: 36px;
+  --header-gap-nav-cart: 28px;
+  --header-gap-divider-cart: 24px;
+  --header-nav-gap: 24px;
   background: #000000;
   border-bottom: 1px solid #1A1A1A;
-  display: grid;
-  grid-template-columns: auto var(--search-width) 1fr;
+  display: flex;
   align-items: center;
+  gap: 0;
 }
 
 .app-header--premium .brand-block {
-  grid-column: 1;
   flex-shrink: 0;
-  margin-right: 4px;
 }
 
 .app-header--premium .header-search-premium-wrap {
-  grid-column: 2;
+  margin-left: var(--header-gap-logo-search);
   position: relative;
   width: var(--search-width);
   max-width: 420px;
-  justify-self: start;
+  flex-shrink: 0;
 }
 
 .app-header--premium .header-utilities {
-  grid-column: 3;
+  margin-left: var(--header-gap-search-nav);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: clamp(20px, 2.5vw, 32px);
+  gap: var(--header-gap-nav-cart);
   min-width: 0;
 }
 
 .app-header--premium .header-nav {
-  justify-content: flex-end;
-  gap: clamp(12px, 1.2vw, 16px);
+  justify-content: flex-start;
+  gap: var(--header-nav-gap);
   flex: unset;
   min-width: 0;
   overflow: visible;
@@ -56,7 +57,7 @@
 }
 
 .app-header--premium .header-nav-btn {
-  padding: 8px 12px;
+  padding: 8px 10px;
   gap: 7px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -69,10 +70,9 @@
 }
 
 .app-header--premium .header-actions {
-  margin-left: 0;
-  padding-left: clamp(16px, 2vw, 24px);
-  border-left: 1px solid #2A2A2A;
-  gap: clamp(14px, 1.5vw, 20px);
+  padding-left: 0;
+  border-left: none;
+  gap: 14px;
   flex-shrink: 0;
 }
 
@@ -227,7 +227,7 @@
 }
 
 .app-header--premium .cart-summary {
-  padding-left: clamp(12px, 2vw, 18px);
+  padding-left: var(--header-gap-divider-cart);
   border-left: 1px solid #2A2A2A;
   font-weight: 600;
   font-size: 14px;
@@ -244,11 +244,6 @@
 
 /* ── Tablet / mobile ── */
 @media (max-width: 1100px) {
-  .app-header--premium {
-    grid-template-columns: auto 1fr auto;
-    gap: 16px;
-  }
-
   .app-header--premium .header-search-premium-wrap {
     display: none;
   }
@@ -258,10 +253,15 @@
   }
 
   .app-header--premium .header-utilities {
+    margin-left: auto;
     gap: 0;
   }
 
   .app-header--premium .header-actions {
+    margin-left: 0;
+  }
+
+  .app-header--premium .cart-summary {
     padding-left: 0;
     border-left: none;
   }
@@ -271,12 +271,6 @@
   .app-header--premium {
     --header-premium-height: 64px;
     padding: 0 16px;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-  }
-
-  .app-header--premium .header-utilities {
-    grid-column: 2;
   }
 
   .app-header--premium .brand-block .proto-logo-wordmark {
