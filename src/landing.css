@@ -4152,13 +4152,13 @@
 
 /* Standalone stepped register flow */
 .lp-register-page--standalone .lp-register-stepper {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
   gap: 8px;
   margin-bottom: 8px;
 }
 
 .lp-register-page--standalone .lp-register-stepper-seg {
+  flex: 1;
   height: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
@@ -4270,6 +4270,26 @@
   color: rgba(255, 255, 255, 0.35);
   font-size: 12px;
   font-weight: 500;
+}
+
+.lp-register-country-block {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lp-register-country-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lp-register-country-summary .lp-register-link {
+  flex-shrink: 0;
 }
 
 .lp-register-page--standalone .lp-register-form > .lp-register-section {

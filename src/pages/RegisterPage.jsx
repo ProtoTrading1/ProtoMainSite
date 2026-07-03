@@ -556,7 +556,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   {standalone ? (
                     <div className="lp-register-step-intro">
                       <h2>Your addresses</h2>
-                      <p>Country, billing and delivery details for orders.</p>
+                      <p>Billing and delivery details for orders.</p>
                     </div>
                   ) : (
                     <h2>Addresses</h2>
