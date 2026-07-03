@@ -30,7 +30,7 @@ export default function BusinessCategoryPicker({
               aria-pressed={isSelected}
             >
               <span className="lp-biz-category-icon" aria-hidden="true">
-                <Icon size={18} strokeWidth={1.75} />
+                <Icon size={22} strokeWidth={1.65} />
               </span>
               <span className="lp-biz-category-text">{type}</span>
             </button>
@@ -49,7 +49,7 @@ export default function BusinessCategoryPicker({
         aria-pressed={selected.includes('Other')}
       >
         <span className="lp-biz-category-icon" aria-hidden="true">
-          <BUSINESS_TYPE_ICONS.Other size={18} strokeWidth={1.75} />
+          <BUSINESS_TYPE_ICONS.Other size={22} strokeWidth={1.65} />
         </span>
         <span className="lp-biz-category-text">Other (please specify)</span>
       </button>
