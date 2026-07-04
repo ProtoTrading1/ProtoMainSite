@@ -1333,6 +1333,29 @@ input, select, textarea { font-family: inherit; outline: none; }
 .mobile-search-results .sp-pill { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.12); }
 .mobile-search-results .sp-pill:hover { background: rgba(255,255,255,0.14); }
 
+.mobile-search-results .sp-empty--mobile {
+  padding: 28px 20px 32px;
+  text-align: center;
+  color: rgba(255,255,255,0.55);
+}
+.mobile-search-results .sp-empty--mobile svg {
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 10px;
+}
+.mobile-search-results .sp-empty--mobile p {
+  color: rgba(255,255,255,0.88);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.mobile-search-results .sp-empty--mobile strong {
+  color: #fff;
+}
+.mobile-search-results .sp-empty--mobile span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* Mobile-only icon buttons in header (hidden on desktop, shown via @media rule above) */
 .header-icon-mobile {
   display: none;
