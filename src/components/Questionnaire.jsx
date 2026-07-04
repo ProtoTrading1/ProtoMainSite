@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, ArrowLeft, CheckCircle2, Eye, EyeOff, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
-import AddressAutocomplete from './AddressAutocomplete';
+import BillingDeliveryFields from './register/BillingDeliveryFields';
+import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 
@@ -30,8 +31,6 @@ const BUSINESS_TYPES = [
   'Other',
 ];
 
-const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
-
 const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
   'R5,000 – R10,000',
@@ -54,13 +53,40 @@ export default function Questionnaire({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [suburb, setSuburb] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [buildingType, setBuildingType] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
-  const [otherBuildingType, setOtherBuildingType] = useState('');
+  const [country, setCountry] = useState('South Africa');
+  const [province, setProvince] = useState('');
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
+  const {
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
+    deliverySameAsBilling,
+    streetName,
+    suburb,
+    postalCode,
+    city,
+    buildingType,
+    unitNumber,
+    otherBuildingType,
+    setStreetName,
+    setSuburb,
+    setPostalCode,
+    setCity,
+    setBuildingType,
+    setUnitNumber,
+    setOtherBuildingType,
+    onBillingPlaceSelect,
+    handleDeliverySameAsBillingChange,
+    resolvedBuildingType,
+    buildStructuredBillingAddress,
+    buildStructuredDeliveryAddress,
+    deliveryFieldsLocked,
+  } = addresses;
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
@@ -68,25 +94,8 @@ export default function Questionnaire({ onLogin }) {
   const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  const handleCompanyAddressChange = (v) => {
-    setCompanyAddress(v);
-  };
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
-
-  const resolvedBuildingType = () => (
-    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
-  );
-
-  const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
-    const bt = resolvedBuildingType();
-    if (bt) parts.push(bt);
-    if (buildingType === 'Apartments' && unitNumber.trim()) {
-      parts.push(`Unit ${unitNumber.trim()}`);
-    }
-    return parts.filter(Boolean).join(', ').toUpperCase();
-  };
 
   const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
   const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
@@ -108,9 +117,15 @@ export default function Questionnaire({ onLogin }) {
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
     if (step === 2) {
-      return companyAddress.trim()
+      const billingOk = billingStreet.trim()
+        && billingSuburb.trim()
+        && billingCity.trim()
+        && billingPostalCode.trim();
+      return country.trim()
+        && billingOk
         && streetName.trim()
         && suburb.trim()
+        && city.trim()
         && postalCode.trim()
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
@@ -141,12 +156,17 @@ export default function Questionnaire({ onLogin }) {
         contactName: contactName.trim(),
         businessName: companyName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: buildStructuredDeliveryAddress(),
+        streetName: streetName.trim(),
+        suburb: suburb.trim(),
+        postalCode: postalCode.trim(),
+        buildingType: resolvedBuildingType(),
+        unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
-        country: null,
-        province: null,
-        city: null,
+        country: country || null,
+        province: province || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -340,97 +360,41 @@ export default function Questionnaire({ onLogin }) {
 
         {step === 2 && (
           <div className="lp-quiz-step">
-            <h3>Enter the two addresses we need.</h3>
-            <div className="lp-quiz-fields">
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Full company address</label>
-                <AddressAutocomplete
-                  value={companyAddress}
-                  onChange={handleCompanyAddressChange}
-                  onKeyDown={handleKey}
-                  placeholder="Start typing your street address…"
-                />
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '8px 0 10px' }}>Delivery address</div>
-              <div className="lp-quiz-field">
-                <label>Street name</label>
-                <input
-                  value={streetName}
-                  onChange={(e) => setStreetName(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Street name and number"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Suburb</label>
-                <input
-                  value={suburb}
-                  onChange={(e) => setSuburb(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Suburb"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Postal code</label>
-                <input
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Postal code"
-                />
-              </div>
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Building type</div>
-                <div className="lp-quiz-types">
-                  {BUILDING_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                      onClick={() => {
-                        setBuildingType(type);
-                        if (type !== 'Apartments') setUnitNumber('');
-                        if (type !== 'Other') setOtherBuildingType('');
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-                    onClick={() => {
-                      setBuildingType('Other');
-                      setUnitNumber('');
-                    }}
-                  >
-                    Other
-                  </button>
-                </div>
-              </div>
-              {buildingType === 'Other' && (
-                <div className="lp-quiz-field">
-                  <label>Describe building type</label>
-                  <input
-                    value={otherBuildingType}
-                    onChange={(e) => setOtherBuildingType(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="e.g. Warehouse, Industrial unit"
-                  />
-                </div>
-              )}
-              {buildingType === 'Apartments' && (
-                <div className="lp-quiz-field">
-                  <label>Unit / apartment number</label>
-                  <input
-                    value={unitNumber}
-                    onChange={(e) => setUnitNumber(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Unit number"
-                  />
-                </div>
-              )}
-            </div>
+            <h3>Billing and delivery addresses</h3>
+            <BillingDeliveryFields
+              country={country}
+              setCountry={setCountry}
+              province={province}
+              setProvince={setProvince}
+              billingStreet={billingStreet}
+              setBillingStreet={setBillingStreet}
+              billingSuburb={billingSuburb}
+              setBillingSuburb={setBillingSuburb}
+              billingPostalCode={billingPostalCode}
+              setBillingPostalCode={setBillingPostalCode}
+              billingCity={billingCity}
+              setBillingCity={setBillingCity}
+              onBillingPlaceSelect={onBillingPlaceSelect}
+              deliverySameAsBilling={deliverySameAsBilling}
+              onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
+              streetName={streetName}
+              setStreetName={setStreetName}
+              suburb={suburb}
+              setSuburb={setSuburb}
+              postalCode={postalCode}
+              setPostalCode={setPostalCode}
+              city={city}
+              setCity={setCity}
+              buildingType={buildingType}
+              setBuildingType={setBuildingType}
+              unitNumber={unitNumber}
+              setUnitNumber={setUnitNumber}
+              otherBuildingType={otherBuildingType}
+              setOtherBuildingType={setOtherBuildingType}
+              deliveryFieldsLocked={deliveryFieldsLocked}
+              onKeyDown={handleKey}
+              buildingTypesClassName="lp-quiz-types"
+            />
           </div>
         )}
 

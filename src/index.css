@@ -27,7 +27,7 @@
   --border-dark: #1E293B;
   
   /* Layout */
-  --header-height: 80px;
+  --header-height: 84px;
   --sidebar-width: 248px;
   --drawer-width: clamp(300px, calc(33.33vw - 78px), 600px);
   --sticky-bar-height: 56px;
@@ -880,7 +880,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
 }
 
-.brand-block { gap: 14px; min-width: 230px; }
+.brand-block { gap: 0; min-width: 0; flex-shrink: 0; overflow: visible; }
 .icon-button {
   width: 38px;
   height: 38px;
@@ -3363,6 +3363,65 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.about-modal-visit {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.about-modal-map-frame {
+  display: block;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  line-height: 0;
+  background: #0f0f0f;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.about-modal-map-frame:hover {
+  border-color: rgba(200, 154, 60, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+}
+.about-modal-map-image {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  object-position: center 42%;
+  display: block;
+  filter: saturate(1.04) contrast(1.03);
+}
+.about-modal-visit-address {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+.about-modal-visit-address strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #f1f5f9;
+  font-weight: 700;
+}
+.about-modal-contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.about-modal-contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #C89A3C;
+  text-decoration: none;
+}
+.about-modal-contact-link:hover {
+  color: #D4AD56;
+  text-decoration: underline;
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -3375,10 +3434,12 @@ input, select, textarea { font-family: inherit; outline: none; }
 @media (max-width: 900px) {
   /* Header: show brand name, hide verbose actions */
   .app-header { padding: 0 14px; gap: 12px; height: 58px; }
-  .brand-block { min-width: auto; gap: 10px; }
-  .brand-mark { width: 30px; height: 30px; border-radius: 7px; }
-  .brand-logo img { transform: scale(1.18); }
-  .brand-copy { font-size: 13px; letter-spacing: 0.03em; gap: 4px; }
+  .brand-block { min-width: auto; gap: 0; }
+  .brand-block .proto-logo-wordmark,
+  .brand-block .proto-logo__svg,
+  .brand-block .proto-logo__image--full {
+    --logo-height: 30px;
+  }
   .trade-pill, .header-action { display: none !important; }
   .header-icon-mobile { display: flex !important; }
   .cart-summary { display: none; }

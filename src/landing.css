@@ -28,10 +28,11 @@
 }
 
 .access-brand {
-  gap: 12px;
+  gap: 0;
 }
 
-.access-brand img {
+/* Legacy icon-only img rules — do not apply to full wordmark SVG/img */
+.access-brand img:not(.proto-logo__image--full):not(.proto-logo-wordmark__icon) {
   width: 42px;
   height: 42px;
   border-radius: 10px;
@@ -39,15 +40,39 @@
   background: #050505;
 }
 
-.access-brand strong {
+.access-brand .proto-logo-wordmark,
+.access-brand .proto-logo__svg,
+.access-brand .proto-logo__image--full {
+  width: auto;
+  --logo-height: 44px;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+.access-brand .proto-logo--full-fallback {
+  gap: 12px;
+}
+
+.access-brand strong:not(.proto-logo-wordmark__title) {
   display: block;
   font-family: Outfit, sans-serif;
   font-size: 20px;
   letter-spacing: 0;
 }
 
-.access-brand strong span {
+.access-brand strong:not(.proto-logo-wordmark__title) span {
   color: #dc2626;
+}
+
+.access-brand .proto-logo-wordmark__online small {
+  display: inline;
+  margin-top: 0;
+  font-size: calc(var(--logo-height, 44px) * 0.2);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c9a227;
+  font-weight: 700;
 }
 
 .access-brand small {
@@ -2582,14 +2607,23 @@
 .lp-footer-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0;
 }
 
-.lp-footer-brand img {
+.lp-footer-brand img:not(.proto-logo__image--full) {
   width: 36px;
   height: 36px;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.lp-footer-brand .proto-logo-wordmark,
+.lp-footer-brand .proto-logo__svg,
+.lp-footer-brand .proto-logo__image--full {
+  width: auto;
+  --logo-height: 36px;
+  border-radius: 0;
+  object-fit: contain;
 }
 
 .lp-footer-brand strong {
@@ -3164,9 +3198,15 @@
     font-size: 17px;
   }
 
-  .access-brand img {
+  .access-brand img:not(.proto-logo__image--full):not(.proto-logo-wordmark__icon) {
     width: 36px;
     height: 36px;
+  }
+
+  .access-brand .proto-logo-wordmark,
+  .access-brand .proto-logo__svg,
+  .access-brand .proto-logo__image--full {
+    --logo-height: 36px;
   }
 
   .access-apply {
@@ -4112,13 +4152,13 @@
 
 /* Standalone stepped register flow */
 .lp-register-page--standalone .lp-register-stepper {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
   gap: 8px;
   margin-bottom: 8px;
 }
 
 .lp-register-page--standalone .lp-register-stepper-seg {
+  flex: 1;
   height: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
@@ -4230,6 +4270,26 @@
   color: rgba(255, 255, 255, 0.35);
   font-size: 12px;
   font-weight: 500;
+}
+
+.lp-register-country-block {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lp-register-country-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lp-register-country-summary .lp-register-link {
+  flex-shrink: 0;
 }
 
 .lp-register-page--standalone .lp-register-form > .lp-register-section {
@@ -4410,6 +4470,46 @@
   font-weight: 700;
   margin: 4px 0 0;
   grid-column: 1 / -1;
+}
+
+.lp-register-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.42);
+  font-weight: 500;
+}
+
+.lp-register-field-hint--block {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+}
+
+.lp-register-same-address {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  user-select: none;
+}
+
+.lp-register-same-address input {
+  width: 16px;
+  height: 16px;
+  accent-color: #C89A3C;
+  cursor: pointer;
+}
+
+.lp-quiz-field--locked input {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .lp-register-optional {

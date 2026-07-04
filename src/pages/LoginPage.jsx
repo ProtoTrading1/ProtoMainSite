@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { signIn, signUp } from '../lib/auth';
+import ProtoLogo from '../components/ProtoLogo';
 
 export default function LoginPage({ onLogin, onBack }) {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
@@ -39,13 +40,7 @@ export default function LoginPage({ onLogin, onBack }) {
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-white-muted)', fontSize: '14px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer' }}>
             <ArrowLeft size={18} /> Back
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--proto-red) 0%, var(--proto-red-dark) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '16px', color: '#fff' }}>P</div>
-            <div>
-              <span style={{ fontSize: '16px', fontWeight: '800', color: '#fff', fontFamily: 'Outfit' }}>PROTO </span>
-              <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--proto-red)', fontFamily: 'Outfit' }}>TRADING</span>
-            </div>
-          </div>
+          <ProtoLogo variant="full" size="md" tagline={false} />
         </div>
       </header>
 

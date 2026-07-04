@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react';
 import './worldclass.css';
+import ProtoLogo from '../components/ProtoLogo';
 
 const categories = [
   'All Products',
@@ -190,7 +191,7 @@ export default function WorldClassPortal() {
     <div className="wc-shell">
       <header className="wc-header">
         <button className="wc-icon-button" onClick={() => setMobileNav(true)}><Menu size={21} /></button>
-        <div className="wc-brand"><span>P</span><strong>PROTO</strong><b>TRADING</b></div>
+        <ProtoLogo variant="full" size="md" tagline={false} className="wc-brand" />
         <label className="wc-search"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products, SKU codes or trade lines" /></label>
         <div className="wc-header-cart"><ShoppingCart size={21} /><span>{units}</span><strong>R{total.toFixed(2)}</strong></div>
       </header>

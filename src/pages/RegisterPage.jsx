@@ -1,26 +1,15 @@
 import { useState } from 'react';
-import AddressAutocomplete from '../components/AddressAutocomplete';
 import BusinessCategoryPicker from '../components/register/BusinessCategoryPicker';
+import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
+import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
+import ProtoLogo from '../components/ProtoLogo';
 import '../landing.css';
 
-const SADC_COUNTRIES = [
-  'South Africa', 'Angola', 'Botswana', 'DRC', 'Eswatini',
-  'Lesotho', 'Malawi', 'Mozambique', 'Namibia', 'Tanzania',
-  'Zambia', 'Zimbabwe',
-];
-
-const SA_PROVINCES = [
-  'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
-  'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
-];
-
-const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
-
-const STANDALONE_STEPS = ['Contact', 'Company', 'Business', 'Location', 'Addresses'];
+const STANDALONE_STEPS = ['Contact', 'Company', 'Business', 'Addresses'];
 
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
@@ -47,19 +36,44 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
-  const [otherBuildingType, setOtherBuildingType] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('South Africa');
   const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [suburb, setSuburb] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [buildingType, setBuildingType] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
   const [companyFax, setCompanyFax] = useState('');
+
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
+  const {
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
+    deliverySameAsBilling,
+    streetName,
+    suburb,
+    postalCode,
+    city,
+    buildingType,
+    unitNumber,
+    otherBuildingType,
+    setStreetName,
+    setSuburb,
+    setPostalCode,
+    setCity,
+    setBuildingType,
+    setUnitNumber,
+    setOtherBuildingType,
+    onBillingPlaceSelect,
+    handleDeliverySameAsBillingChange,
+    resolvedBuildingType,
+    buildStructuredBillingAddress,
+    buildStructuredDeliveryAddress,
+    deliveryFieldsLocked,
+  } = addresses;
 
   const [emailError, setEmailError] = useState('');
   const [validationIssues, setValidationIssues] = useState([]);
@@ -71,24 +85,6 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
-
-  const handleCompanyAddressChange = (v) => {
-    setCompanyAddress(v);
-  };
-
-  const resolvedBuildingType = () => (
-    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
-  );
-
-  const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
-    const bt = resolvedBuildingType();
-    if (bt) parts.push(bt);
-    if (buildingType === 'Apartments' && unitNumber.trim()) {
-      parts.push(`Unit ${unitNumber.trim()}`);
-    }
-    return parts.filter(Boolean).join(', ').toUpperCase();
-  };
 
   const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
 
@@ -122,10 +118,19 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       issues.push({ key: 'businessName', message: 'Company / trading name', section: 'business' });
     }
     if (!country.trim()) {
-      issues.push({ key: 'country', message: 'Country', section: 'location' });
+      issues.push({ key: 'country', message: 'Country', section: 'addresses' });
     }
-    if (!companyAddress.trim()) {
-      issues.push({ key: 'companyAddress', message: 'Full company address', section: 'addresses' });
+    if (!billingStreet.trim()) {
+      issues.push({ key: 'billingStreet', message: 'Billing street name', section: 'addresses' });
+    }
+    if (!billingSuburb.trim()) {
+      issues.push({ key: 'billingSuburb', message: 'Billing suburb', section: 'addresses' });
+    }
+    if (!billingPostalCode.trim()) {
+      issues.push({ key: 'billingPostalCode', message: 'Billing postal code', section: 'addresses' });
+    }
+    if (!billingCity.trim()) {
+      issues.push({ key: 'billingCity', message: 'Billing city', section: 'addresses' });
     }
     if (!streetName.trim()) {
       issues.push({ key: 'streetName', message: 'Delivery street name', section: 'addresses' });
@@ -135,6 +140,9 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     }
     if (!postalCode.trim()) {
       issues.push({ key: 'postalCode', message: 'Delivery postal code', section: 'addresses' });
+    }
+    if (!city.trim()) {
+      issues.push({ key: 'city', message: 'Delivery city', section: 'addresses' });
     }
     if (!buildingType) {
       issues.push({ key: 'buildingType', message: 'Building type', section: 'addresses' });
@@ -165,8 +173,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       }
       return businessIssues;
     }
-    if (step === 3) return issues.filter((issue) => issue.section === 'location');
-    if (step === 4) return issues.filter((issue) => issue.section === 'addresses');
+    if (step === 3) return issues.filter((issue) => issue.section === 'addresses');
     return issues;
   };
 
@@ -217,8 +224,19 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           businessName: 1,
           businessType: 2,
           otherType: 2,
-          location: 3,
-          addresses: 4,
+          addresses: 3,
+          country: 3,
+          billingStreet: 3,
+          billingSuburb: 3,
+          billingPostalCode: 3,
+          billingCity: 3,
+          streetName: 3,
+          suburb: 3,
+          postalCode: 3,
+          city: 3,
+          buildingType: 3,
+          otherBuildingType: 3,
+          unitNumber: 3,
         };
         setStandaloneStep(stepForSection[issues[0].key] ?? stepForSection[issues[0].section] ?? 0);
       } else {
@@ -241,7 +259,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         contactName: contactName.trim(),
         businessName: businessName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: deliveryLine,
         streetName: streetName.trim(),
         suburb: suburb.trim(),
@@ -251,7 +269,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         vatNumber: vatNumber.trim() || null,
         country: country || null,
         province: province || null,
-        city: city.trim() || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -532,175 +550,50 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
                 {(!standalone || standaloneStep === 3) && (
                 <section
-                  id="register-section-location"
-                  className={`lp-register-section${sectionHasIssue('location') ? ' lp-register-section--missing' : ''}`}
-                >
-                  {standalone ? (
-                    <div className="lp-register-step-intro">
-                      <h2>Where are you based?</h2>
-                      <p>Select your country and region.</p>
-                    </div>
-                  ) : (
-                    <h2>Location</h2>
-                  )}
-                  <div className="lp-register-subhead">Country</div>
-                  <div className={`lp-quiz-countries${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
-                    {SADC_COUNTRIES.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`lp-quiz-country${country === c ? ' selected' : ''}`}
-                        onClick={() => {
-                          setCountry(c);
-                          if (c !== 'South Africa') setProvince('');
-                        }}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                  {country === 'South Africa' && (
-                    <div className="lp-register-grid lp-register-sa-fields">
-                      <div className="lp-quiz-field">
-                        <label>Province</label>
-                        <select
-                          value={province}
-                          onChange={(e) => {
-                            setProvince(e.target.value);
-                            if (e.target.value) setCountry('South Africa');
-                          }}
-                        >
-                          <option value="">Select province</option>
-                          {SA_PROVINCES.map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="lp-quiz-field">
-                        <label>City / town</label>
-                        <input
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          placeholder="City or town"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {country && country !== 'South Africa' && (
-                    <div className="lp-quiz-field">
-                      <label>City / town</label>
-                      <input
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        placeholder="City or town"
-                      />
-                    </div>
-                  )}
-                </section>
-                )}
-
-                {(!standalone || standaloneStep === 4) && (
-                <section
                   id="register-section-addresses"
                   className={`lp-register-section${sectionHasIssue('addresses') ? ' lp-register-section--missing' : ''}`}
                 >
                   {standalone ? (
                     <div className="lp-register-step-intro">
                       <h2>Your addresses</h2>
-                      <p>Company and delivery details for orders.</p>
+                      <p>Billing and delivery details for orders.</p>
                     </div>
                   ) : (
                     <h2>Addresses</h2>
                   )}
-                  <div className="lp-register-grid">
-                    <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('companyAddress') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Full company address</label>
-                      <AddressAutocomplete
-                        value={companyAddress}
-                        onChange={handleCompanyAddressChange}
-                        placeholder="Start typing your street address…"
-                      />
-                    </div>
-                    <div className="lp-register-subhead">Delivery address</div>
-                    <div className={`lp-quiz-field${fieldHasIssue('streetName') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Street name</label>
-                      <input
-                        value={streetName}
-                        onChange={(e) => setStreetName(e.target.value)}
-                        placeholder="Street name and number"
-                        required
-                      />
-                    </div>
-                    <div className={`lp-quiz-field${fieldHasIssue('suburb') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Suburb</label>
-                      <input
-                        value={suburb}
-                        onChange={(e) => setSuburb(e.target.value)}
-                        placeholder="Suburb"
-                        required
-                      />
-                    </div>
-                    <div className={`lp-quiz-field${fieldHasIssue('postalCode') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Postal code</label>
-                      <input
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        placeholder="Postal code"
-                        required
-                      />
-                    </div>
-                    <div className="lp-quiz-field lp-quiz-field--full">
-                      <div className="lp-register-subhead">Building type</div>
-                      <div className={`lp-quiz-types lp-quiz-types--compact${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`}>
-                        {BUILDING_TYPES.map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                            onClick={() => {
-                              setBuildingType(type);
-                              if (type !== 'Apartments') setUnitNumber('');
-                              if (type !== 'Other') setOtherBuildingType('');
-                            }}
-                          >
-                            {type}
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-                          onClick={() => {
-                            setBuildingType('Other');
-                            setUnitNumber('');
-                          }}
-                        >
-                          Other
-                        </button>
-                      </div>
-                    </div>
-                    {buildingType === 'Other' && (
-                      <div className={`lp-quiz-field${fieldHasIssue('otherBuildingType') ? ' lp-quiz-field--error' : ''}`}>
-                        <label>Describe building type</label>
-                        <input
-                          value={otherBuildingType}
-                          onChange={(e) => setOtherBuildingType(e.target.value)}
-                          placeholder="e.g. Warehouse, Industrial unit"
-                          required
-                        />
-                      </div>
-                    )}
-                    {buildingType === 'Apartments' && (
-                      <div className={`lp-quiz-field${fieldHasIssue('unitNumber') ? ' lp-quiz-field--error' : ''}`}>
-                        <label>Unit / apartment number</label>
-                        <input
-                          value={unitNumber}
-                          onChange={(e) => setUnitNumber(e.target.value)}
-                          placeholder="Unit number"
-                          required
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <BillingDeliveryFields
+                    country={country}
+                    setCountry={setCountry}
+                    province={province}
+                    setProvince={setProvince}
+                    billingStreet={billingStreet}
+                    setBillingStreet={setBillingStreet}
+                    billingSuburb={billingSuburb}
+                    setBillingSuburb={setBillingSuburb}
+                    billingPostalCode={billingPostalCode}
+                    setBillingPostalCode={setBillingPostalCode}
+                    billingCity={billingCity}
+                    setBillingCity={setBillingCity}
+                    onBillingPlaceSelect={onBillingPlaceSelect}
+                    deliverySameAsBilling={deliverySameAsBilling}
+                    onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
+                    streetName={streetName}
+                    setStreetName={setStreetName}
+                    suburb={suburb}
+                    setSuburb={setSuburb}
+                    postalCode={postalCode}
+                    setPostalCode={setPostalCode}
+                    city={city}
+                    setCity={setCity}
+                    buildingType={buildingType}
+                    setBuildingType={setBuildingType}
+                    unitNumber={unitNumber}
+                    setUnitNumber={setUnitNumber}
+                    otherBuildingType={otherBuildingType}
+                    setOtherBuildingType={setOtherBuildingType}
+                    deliveryFieldsLocked={deliveryFieldsLocked}
+                    fieldHasIssue={fieldHasIssue}
+                  />
                 </section>
                 )}
 
@@ -764,11 +657,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       {!standalone && (
         <header className="lp-register-header">
           <a href="/" className="lp-register-brand" aria-label="Proto Trading home">
-            <img src="/proto-logo.webp" alt="" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale trade portal</small>
-            </div>
+            <ProtoLogo variant="full" size="lg" tagline={false} />
           </a>
           <button type="button" className="lp-register-login" onClick={onLogin}>
             <Lock size={15} />

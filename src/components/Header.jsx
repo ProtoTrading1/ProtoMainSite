@@ -1,11 +1,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, MapPin, Menu, MessageCircle, PackageSearch, RotateCcw,
+  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
+import ProtoLogo from './ProtoLogo';
+import AboutModal from './AboutModal';
+import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
 const RS_KEY = 'proto_recent_searches';
@@ -40,62 +43,6 @@ function matchCategories(query) {
   return FLAT_CATS
     .filter((c) => c.label.toLowerCase().includes(q) || q.split(' ').some((w) => w.length > 2 && c.label.toLowerCase().includes(w)))
     .slice(0, 4);
-}
-
-function AboutModal({ onClose }) {
-  return (
-    <div className="topnav-modal-backdrop" onClick={onClose}>
-      <div className="about-modal-dark" onClick={(e) => e.stopPropagation()}>
-        <button className="about-modal-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-
-        <div className="about-modal-header">
-          <span className="about-modal-eyebrow">Since 1987</span>
-          <h2 className="about-modal-title">About Proto Trading</h2>
-          <p className="about-modal-sub">Serving South African businesses for nearly four decades</p>
-        </div>
-
-        <div className="about-modal-body">
-          <p>For nearly four decades, Proto Trading has been a trusted partner to retailers, resellers, schools, manufacturers, online sellers, event companies, and businesses across South Africa.</p>
-          <p>Established in 1987, Proto Trading has grown from a small wholesale operation into one of South Africa's most diverse importers and distributors, supplying thousands of products across multiple categories from a single source.</p>
-          <p>Our success has been built on a simple principle: provide customers with quality products, competitive pricing, reliable service, and long-term value.</p>
-
-          <h3 className="about-modal-section-title">Why customers choose Proto</h3>
-          <ul className="about-modal-list">
-            {['Extensive product selection', 'Competitive wholesale pricing', 'Consistent stock availability', 'Nationwide supply capability', 'Reliable customer service', 'Long-standing industry experience', 'Commitment to quality and value'].map((item) => (
-              <li key={item}><span>✓</span>{item}</li>
-            ))}
-          </ul>
-
-          <div className="about-modal-stats">
-            <div><strong>1987</strong><span>Established</span></div>
-            <div><strong>5,000+</strong><span>Product lines</span></div>
-            <div><strong>SA-wide</strong><span>Delivery</span></div>
-            <div><strong>40 yrs</strong><span>Experience</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FindUsModal({ onClose }) {
-  return (
-    <div className="topnav-modal-backdrop" onClick={onClose}>
-      <div className="topnav-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="topnav-modal-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-        <h2>Where to Find Us</h2>
-        <div className="topnav-find-block">
-          <MapPin size={18} />
-          <div><strong>Head Office & Warehouse</strong><p>Proto Trading (Pty) Ltd<br />Johannesburg, South Africa</p></div>
-        </div>
-        <div className="topnav-find-block">
-          <Info size={18} />
-          <div><strong>Trade enquiries</strong><p>Send a quote request via the order basket<br />and our team will confirm by reply.</p></div>
-        </div>
-        <p className="topnav-find-note">Trade accounts, delivery areas, and MOQ details are confirmed with your first order.</p>
-      </div>
-    </div>
-  );
 }
 
 function ProductRequestModal({ onClose, customer }) {
@@ -189,7 +136,7 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory }) {
+function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory, onCommitSearch }) {
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty">
@@ -283,7 +230,7 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
   );
 }
 
-export { AboutModal, FindUsModal };
+export { AboutModal };
 
 // ─── Header ──────────────────────────────────────────────────
 export default function Header({
@@ -297,7 +244,6 @@ export default function Header({
   const mobileSearchOpen = mobileSearchOpenProp ?? mobileSearchOpenInternal;
   const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
   const [showAbout, setShowAbout] = useState(false);
-  const [showFindUs, setShowFindUs] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
@@ -305,6 +251,7 @@ export default function Header({
   const productsCache = useRef(null);
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
+  const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
 
   const loadProductsOnce = useCallback(async () => {
@@ -334,7 +281,25 @@ export default function Header({
     setCatMatches(matchCategories(query));
   }, []);
 
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSuggestions([]);
+    setCatMatches([]);
+    setActiveIdx(-1);
+  }, []);
+
   useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
+        closeSearch();
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [searchOpen, closeSearch]);
 
   const scheduleSuggestions = useCallback((query) => {
     clearTimeout(debounceRef.current);
@@ -348,18 +313,14 @@ export default function Header({
     }, 120);
   }, [loadProductsOnce, updateSuggestions]);
 
-  const openSearch = () => {
+  const openSearch = useCallback(() => {
     setSearchOpen(true);
     void loadProductsOnce();
-    setTimeout(() => inputRef.current?.focus(), 30);
-  };
+  }, [loadProductsOnce]);
 
-  const closeSearch = () => {
-    setSearchOpen(false);
-    setSuggestions([]);
-    setCatMatches([]);
-    setActiveIdx(-1);
-  };
+  const focusSearch = useCallback(() => {
+    openSearch();
+  }, [openSearch]);
 
   const handleInput = (val) => {
     setSearchQuery(val);
@@ -444,54 +405,64 @@ export default function Header({
 
   return (
     <>
-      <header className="app-header">
+      <header className="app-header app-header--premium">
         {/* Brand */}
         <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <div className="brand-mark brand-logo">
-            <img src="/proto-logo.webp" alt="Proto Trading logo" />
-          </div>
-          <div className="brand-copy">
-            <strong>PROTO</strong>
-            <span>TRADING</span>
-          </div>
+          <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
         </div>
 
-        {/* Centre navigation */}
-        <nav className="header-nav desktop-only">
-          <button
-            className={`header-nav-btn header-nav-btn--search${searchOpen ? ' header-nav-btn--active' : ''}`}
-            type="button"
-            onClick={searchOpen ? closeSearch : openSearch}
-          >
-            <Search size={15} />
-            Search
-          </button>
-
-          {hasLastOrder && (
-            <button className="header-nav-btn" type="button" onClick={onReorder}>
-              <RotateCcw size={14} />
-              Returning Buyer
-            </button>
+        {/* Signature search */}
+        <div className="header-search-premium-wrap desktop-only" ref={searchWrapRef}>
+          <div className="header-search-premium">
+            <Search size={18} className="header-search-premium__icon" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="header-search-premium__input"
+              placeholder="Search products, SKU or barcode..."
+              value={searchQuery}
+              onFocus={focusSearch}
+              onChange={(e) => handleInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              aria-label="Search products, SKU or barcode"
+            />
+          </div>
+          {searchOpen && (
+            <div className="header-search-dropdown">
+              <SearchPanel
+                query={searchQuery}
+                suggestions={suggestions}
+                catMatches={catMatches}
+                activeIdx={activeIdx}
+                onPickProduct={pickProduct}
+                onPickCategory={pickCategory}
+                onCommitSearch={commitSearch}
+              />
+            </div>
           )}
+        </div>
 
-          <a className="header-nav-btn" href="https://maps.app.goo.gl/uJcRdyoRaj3C4fHW7" target="_blank" rel="noopener noreferrer">
-            <MapPin size={14} />
-            Where to Find Us
-          </a>
+        <div className="header-utilities">
+          <nav className="header-nav desktop-only">
+            {hasLastOrder && (
+              <button className="header-nav-btn" type="button" onClick={onReorder}>
+                <RotateCcw size={14} />
+                Reorder
+              </button>
+            )}
 
-          <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
-            <Info size={14} />
-            About Us
-          </button>
+            <button className="header-nav-btn" type="button" onClick={() => setShowAbout(true)}>
+              <Info size={14} />
+              About Us
+            </button>
 
-          <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
-            <Star size={14} className="spinning-star" />
-            This Week's Specials
-          </button>
-        </nav>
+            <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
+              <Star size={14} className="spinning-star" />
+              Specials
+            </button>
+          </nav>
 
-        {/* Right actions */}
-        <div className="header-actions">
+          <div className="header-actions">
           {customer?.role === 'admin' && (
             <a className="header-action desktop-only" href="https://protoportal-admin.vercel.app" target="_blank" rel="noreferrer">
               <LayoutDashboard size={19} />
@@ -501,10 +472,7 @@ export default function Header({
 
           <button className="header-action desktop-only" type="button" onClick={onViewProfile}>
             <User size={19} />
-            <span>
-              <small>Trade</small>
-              My Profile
-            </span>
+            <span>My Profile</span>
           </button>
 
           {onLogout && (
@@ -527,41 +495,9 @@ export default function Header({
             <CartProgressIcon cartTotal={cartTotal} size={22} />
             <span><small>Order</small>R{cartTotal.toFixed(2)}</span>
           </div>
+          </div>
         </div>
       </header>
-
-      {/* Desktop search overlay */}
-      {searchOpen && (
-        <>
-          <div className="search-overlay-backdrop" onClick={closeSearch} />
-          <div className="search-overlay-wrap">
-            <div className="search-overlay-bar">
-              <Search size={16} color="#64748b" />
-              <input
-                ref={inputRef}
-                autoFocus
-                type="text"
-                placeholder="Search products, categories, codes…"
-                value={searchQuery}
-                onChange={(e) => handleInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="search-overlay-input"
-              />
-              <button type="button" onClick={closeSearch} className="search-overlay-close-red" aria-label="Close search">
-                <X size={16} />
-              </button>
-            </div>
-            <SearchPanel
-              query={searchQuery}
-              suggestions={suggestions}
-              catMatches={catMatches}
-              activeIdx={activeIdx}
-              onPickProduct={pickProduct}
-              onPickCategory={pickCategory}
-            />
-          </div>
-        </>
-      )}
 
       {/* Mobile bottom tab bar — primary navigation */}
       <nav className="mobile-tab-bar" aria-label="Mobile navigation">
@@ -590,7 +526,7 @@ export default function Header({
         <input
           autoFocus={mobileSearchOpen}
           type="search"
-          placeholder="Search products, codes…"
+          placeholder="Search products, SKU or barcode..."
           value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
@@ -641,7 +577,6 @@ export default function Header({
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-      {showFindUs && <FindUsModal onClose={() => setShowFindUs(false)} />}
       {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
     </>
   );

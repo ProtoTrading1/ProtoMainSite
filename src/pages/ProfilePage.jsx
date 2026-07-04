@@ -97,7 +97,7 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             {customer?.monthly_spend && <ProfileField icon={Store} label="Monthly spend" value={customer.monthly_spend} />}
             {customer?.website && <ProfileField icon={Globe} label="Website / social" value={customer.website} />}
             {customer?.vat_number && <ProfileField icon={ShieldCheck} label="VAT number" value={customer.vat_number} />}
-            {customer?.company_address && <ProfileField icon={MapPin} label="Company address" value={customer.company_address} />}
+            {customer?.company_address && <ProfileField icon={MapPin} label="Billing address" value={customer.company_address} />}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { resetPassword, signIn, signUp } from '../lib/auth';
+import ProtoLogo from './ProtoLogo';
 
 export default function LoginModal({ onLogin, onClose, onApply }) {
   const [mode, setMode] = useState('login');
@@ -68,11 +69,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Brand */}
           <div className="lm-brand">
-            <img src="/proto-logo.webp" alt="Proto Trading" className="lm-logo" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Trade portal</small>
-            </div>
+            <ProtoLogo variant="full" size="lg" tagline={false} />
           </div>
 
           {/* Heading */}

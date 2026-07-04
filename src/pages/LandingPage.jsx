@@ -1,6 +1,8 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
-import AddressAutocomplete from '../components/AddressAutocomplete';
+import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
+import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
+import ProtoLogo from '../components/ProtoLogo';
 import { motion, useInView } from 'motion/react';
 import {
   ArrowRight,
@@ -73,17 +75,6 @@ const showcaseProducts = [
   { code: 'MB001-3', name: 'Bead replenishment', dept: 'Jewellery', image: '/product-images/MB001-3.webp' },
 ];
 
-const SADC_COUNTRIES = [
-  'South Africa', 'Angola', 'Botswana', 'DRC', 'Eswatini',
-  'Lesotho', 'Malawi', 'Mozambique', 'Namibia', 'Tanzania',
-  'Zambia', 'Zimbabwe',
-];
-
-const SA_PROVINCES = [
-  'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
-  'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
-];
-
 const BUSINESS_TYPES = [
   'Retail store',
   'Online shop / e-commerce',
@@ -116,8 +107,6 @@ const MONTHLY_SPEND_BANDS = [
   'R25,000 – R50,000',
   'R50,000+',
 ];
-
-const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
@@ -406,35 +395,40 @@ function Questionnaire({ onLogin }) {
   const [showPw, setShowPw] = useState(false);
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [suburb, setSuburb] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [buildingType, setBuildingType] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
-  const [otherBuildingType, setOtherBuildingType] = useState('');
-  const handleCompanyAddressChange = (v) => {
-    setCompanyAddress(v);
-  };
-
-  const resolvedBuildingType = () => (
-    buildingType === 'Other' ? otherBuildingType.trim() : buildingType
-  );
-
-  const buildStructuredDeliveryAddress = () => {
-    const parts = [streetName.trim(), suburb.trim(), postalCode.trim()];
-    const bt = resolvedBuildingType();
-    if (bt) parts.push(bt);
-    if (buildingType === 'Apartments' && unitNumber.trim()) {
-      parts.push(`Unit ${unitNumber.trim()}`);
-    }
-    return parts.filter(Boolean).join(', ').toUpperCase();
-  };
-
-  const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('South Africa');
   const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  const addresses = useBillingDeliveryAddresses({ setProvince, setCountry });
+  const {
+    billingStreet,
+    billingSuburb,
+    billingCity,
+    billingPostalCode,
+    setBillingStreet,
+    setBillingSuburb,
+    setBillingCity,
+    setBillingPostalCode,
+    deliverySameAsBilling,
+    streetName,
+    suburb,
+    postalCode,
+    city,
+    buildingType,
+    unitNumber,
+    otherBuildingType,
+    setStreetName,
+    setSuburb,
+    setPostalCode,
+    setCity,
+    setBuildingType,
+    setUnitNumber,
+    setOtherBuildingType,
+    onBillingPlaceSelect,
+    handleDeliverySameAsBillingChange,
+    resolvedBuildingType,
+    buildStructuredBillingAddress,
+    buildStructuredDeliveryAddress,
+    deliveryFieldsLocked,
+  } = addresses;
   const [businessType, setBusinessType] = useState([]); // multi-select
   const [otherType, setOtherType] = useState('');
   const toggleBusinessType = (t) =>
@@ -464,13 +458,18 @@ function Questionnaire({ onLogin }) {
       return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
     }
     if (step === 2) {
+      const billingOk = billingStreet.trim()
+        && billingSuburb.trim()
+        && billingCity.trim()
+        && billingPostalCode.trim();
       const deliveryOk = streetName.trim()
         && suburb.trim()
+        && city.trim()
         && postalCode.trim()
         && buildingType
         && (buildingType !== 'Other' || otherBuildingType.trim())
         && (buildingType !== 'Apartments' || unitNumber.trim());
-      return companyAddress.trim() && deliveryOk;
+      return country.trim() && billingOk && deliveryOk;
     }
     if (step === 3) return true;
     return false;
@@ -492,14 +491,14 @@ function Questionnaire({ onLogin }) {
     setSubmitError('');
     try {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
-      const deliveryLine = resolvedDeliveryAddress();
+      const deliveryLine = buildStructuredDeliveryAddress();
       const result = await submitTradeApplication({
         email: email.trim(),
         password,
         contactName: contactName.trim(),
         businessName: companyName.trim(),
         phone: phone.trim(),
-        companyAddress: companyAddress.trim(),
+        companyAddress: buildStructuredBillingAddress(),
         deliveryAddress: deliveryLine,
         streetName: streetName.trim(),
         suburb: suburb.trim(),
@@ -507,9 +506,9 @@ function Questionnaire({ onLogin }) {
         buildingType: resolvedBuildingType(),
         unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
         vatNumber: vatNumber.trim() || null,
-        country: null,
-        province: null,
-        city: null,
+        country: country || null,
+        province: province || null,
+        city: billingCity.trim() || null,
         businessType: businessType
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
@@ -704,97 +703,41 @@ function Questionnaire({ onLogin }) {
 
         {step === 2 && (
           <div className="lp-quiz-step">
-            <h3>Enter the two addresses we need.</h3>
-            <div className="lp-quiz-fields">
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Full company address</label>
-                <AddressAutocomplete
-                  value={companyAddress}
-                  onChange={handleCompanyAddressChange}
-                  onKeyDown={handleKey}
-                  placeholder="Start typing your street address…"
-                />
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '8px 0 10px' }}>Delivery address</div>
-              <div className="lp-quiz-field">
-                <label>Street name</label>
-                <input
-                  value={streetName}
-                  onChange={(e) => setStreetName(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Street name and number"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Suburb</label>
-                <input
-                  value={suburb}
-                  onChange={(e) => setSuburb(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Suburb"
-                />
-              </div>
-              <div className="lp-quiz-field">
-                <label>Postal code</label>
-                <input
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Postal code"
-                />
-              </div>
-              <div className="lp-quiz-field lp-quiz-field--full">
-                <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Building type</div>
-                <div className="lp-quiz-types">
-                  {BUILDING_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`lp-quiz-type-card${buildingType === type ? ' selected' : ''}`}
-                      onClick={() => {
-                        setBuildingType(type);
-                        if (type !== 'Apartments') setUnitNumber('');
-                        if (type !== 'Other') setOtherBuildingType('');
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-                    onClick={() => {
-                      setBuildingType('Other');
-                      setUnitNumber('');
-                    }}
-                  >
-                    Other
-                  </button>
-                </div>
-              </div>
-              {buildingType === 'Other' && (
-                <div className="lp-quiz-field">
-                  <label>Describe building type</label>
-                  <input
-                    value={otherBuildingType}
-                    onChange={(e) => setOtherBuildingType(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="e.g. Warehouse, Industrial unit"
-                  />
-                </div>
-              )}
-              {buildingType === 'Apartments' && (
-                <div className="lp-quiz-field">
-                  <label>Unit / apartment number</label>
-                  <input
-                    value={unitNumber}
-                    onChange={(e) => setUnitNumber(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Unit number"
-                  />
-                </div>
-              )}
-            </div>
+            <h3>Billing and delivery addresses</h3>
+            <BillingDeliveryFields
+              country={country}
+              setCountry={setCountry}
+              province={province}
+              setProvince={setProvince}
+              billingStreet={billingStreet}
+              setBillingStreet={setBillingStreet}
+              billingSuburb={billingSuburb}
+              setBillingSuburb={setBillingSuburb}
+              billingPostalCode={billingPostalCode}
+              setBillingPostalCode={setBillingPostalCode}
+              billingCity={billingCity}
+              setBillingCity={setBillingCity}
+              onBillingPlaceSelect={onBillingPlaceSelect}
+              deliverySameAsBilling={deliverySameAsBilling}
+              onDeliverySameAsBillingChange={handleDeliverySameAsBillingChange}
+              streetName={streetName}
+              setStreetName={setStreetName}
+              suburb={suburb}
+              setSuburb={setSuburb}
+              postalCode={postalCode}
+              setPostalCode={setPostalCode}
+              city={city}
+              setCity={setCity}
+              buildingType={buildingType}
+              setBuildingType={setBuildingType}
+              unitNumber={unitNumber}
+              setUnitNumber={setUnitNumber}
+              otherBuildingType={otherBuildingType}
+              setOtherBuildingType={setOtherBuildingType}
+              deliveryFieldsLocked={deliveryFieldsLocked}
+              onKeyDown={handleKey}
+              buildingTypesClassName="lp-quiz-types"
+            />
           </div>
         )}
 
@@ -1069,11 +1012,7 @@ export default function LandingPage({ onLogin, onApply }) {
       {/* ── Original header ── */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
-          <div>
-            <strong>PROTO <span>TRADING</span></strong>
-            <small>Wholesale supplier since 1987</small>
-          </div>
+          <ProtoLogo variant="full" size="lg" tagline={false} />
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
@@ -1193,11 +1132,7 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
           <div className="lp-footer-brand">
-            <img src="/proto-logo.webp" alt="Proto Trading" />
-            <div>
-              <strong>PROTO <span>TRADING</span></strong>
-              <small>Wholesale supplier since 1987</small>
-            </div>
+            <ProtoLogo variant="full" size="md" tagline={false} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
             <p style={{ margin: 0 }}>Trade access only. Not open to the general public.</p>

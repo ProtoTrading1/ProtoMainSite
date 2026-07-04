@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import ProtoLogo from '../components/ProtoLogo';
 
 export default function ResetPasswordPage({ token, onDone }) {
   const [password, setPassword] = useState('');
@@ -36,15 +37,7 @@ export default function ResetPasswordPage({ token, onDone }) {
       <div style={{ width: '100%', maxWidth: '420px', background: '#111', border: '1px solid #2a2a2a', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
         <div style={{ height: '6px', background: '#c40000' }} />
         <div style={{ padding: '40px 36px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-            <img src="/proto-logo.webp" alt="Proto Trading" style={{ height: '32px' }} />
-            <div>
-              <div style={{ fontWeight: '900', fontSize: '16px', color: '#fff', fontFamily: 'Outfit, sans-serif' }}>
-                PROTO <span style={{ color: '#c40000' }}>TRADING</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Trade portal</div>
-            </div>
-          </div>
+          <ProtoLogo variant="full" size="md" tagline={false} className="reset-password-logo" />
 
           {done ? (
             <div style={{ textAlign: 'center' }}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Lock } from 'lucide-react';
+import ProtoLogo from '../components/ProtoLogo';
 
 const POLICIES = [
   {
@@ -288,11 +289,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Header */}
       <header className="access-header">
         <div className="access-brand">
-          <img src="/proto-logo.webp" alt="Proto Trading" loading="eager" fetchPriority="high" decoding="async" />
-          <div>
-            <strong>PROTO <span>TRADING</span></strong>
-            <small>Wholesale supplier since 1987</small>
-          </div>
+          <ProtoLogo variant="full" size="lg" tagline={false} />
         </div>
         <nav className="access-nav" aria-label="Policies navigation">
           <a
@@ -451,11 +448,7 @@ export default function PoliciesPage({ onLogin }) {
       {/* Footer */}
       <footer className="lp-footer">
         <div className="lp-footer-brand">
-          <img src="/proto-logo.webp" alt="Proto Trading" />
-          <div>
-            <strong>PROTO <span>TRADING</span></strong>
-            <small>Wholesale supplier since 1987</small>
-          </div>
+          <ProtoLogo variant="full" size="md" tagline={false} />
         </div>
         <p>Trade access only. Not open to the general public.</p>
         <a

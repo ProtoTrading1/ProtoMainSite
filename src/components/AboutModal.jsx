@@ -1,4 +1,5 @@
-import { X } from 'lucide-react';
+import { Mail, MapPin, Phone, X } from 'lucide-react';
+import { PROTO_OFFICE_ADDRESS } from '../lib/brandAssets';
 
 export default function AboutModal({ onClose }) {
   return (
@@ -29,6 +30,51 @@ export default function AboutModal({ onClose }) {
             <div><strong>5,000+</strong><span>Product lines</span></div>
             <div><strong>SA-wide</strong><span>Delivery</span></div>
             <div><strong>40 yrs</strong><span>Experience</span></div>
+          </div>
+
+          <div className="about-modal-visit">
+            <h3 className="about-modal-section-title">Find us</h3>
+            <a
+              className="about-modal-map-frame"
+              href={PROTO_OFFICE_ADDRESS.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open PROTO TRADING CC in Google Maps"
+            >
+              <img
+                className="about-modal-map-image"
+                src={PROTO_OFFICE_ADDRESS.mapImage}
+                alt="Map showing PROTO TRADING CC in District Six, Cape Town"
+                loading="lazy"
+              />
+            </a>
+            <p className="about-modal-visit-address">
+              <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
+              {PROTO_OFFICE_ADDRESS.company}
+              <br />
+              {PROTO_OFFICE_ADDRESS.street}
+              <br />
+              {PROTO_OFFICE_ADDRESS.area}
+            </p>
+            <div className="about-modal-contact-links">
+              <a className="about-modal-contact-link" href={`tel:${PROTO_OFFICE_ADDRESS.phoneTel}`}>
+                <Phone size={15} />
+                {PROTO_OFFICE_ADDRESS.phone}
+              </a>
+              <a className="about-modal-contact-link" href={`mailto:${PROTO_OFFICE_ADDRESS.email}`}>
+                <Mail size={15} />
+                {PROTO_OFFICE_ADDRESS.email}
+              </a>
+              <a
+                className="about-modal-contact-link"
+                href={PROTO_OFFICE_ADDRESS.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MapPin size={15} />
+                Open in Google Maps
+              </a>
+            </div>
           </div>
         </div>
       </div>
