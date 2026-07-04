@@ -37,12 +37,31 @@ const FLAT_CATS = (() => {
   return out;
 })();
 
+function scoreCategoryMatch(label, query) {
+  const l = label.toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (!l.includes(q) && !q.split(' ').some((w) => w.length > 2 && l.includes(w))) return 0;
+
+  let score = 10;
+  if (/\bbags?\b/.test(l)) score += 40;
+  if (/\s+bags?\s*$/.test(l)) score += 25;
+  if (l.startsWith(q)) score += 15;
+  if (/\b(components|straps|accessories|clasps|tools)\b/.test(l)) score -= 30;
+  if (/\bcases\b/.test(l)) score -= 15;
+  if (/\bpackets?\s+and\s+bags\b/.test(l)) score -= 10;
+  if (l.split(/\s+/).length <= 3) score += 5;
+  return score;
+}
+
 function matchCategories(query) {
   if (!query.trim()) return [];
   const q = query.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
   return FLAT_CATS
-    .filter((c) => c.label.toLowerCase().includes(q) || q.split(' ').some((w) => w.length > 2 && c.label.toLowerCase().includes(w)))
-    .slice(0, 4);
+    .map((c) => ({ cat: c, score: scoreCategoryMatch(c.label, q) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.cat.label.localeCompare(b.cat.label))
+    .slice(0, 4)
+    .map(({ cat }) => cat);
 }
 
 function ProductRequestModal({ onClose, customer }) {
