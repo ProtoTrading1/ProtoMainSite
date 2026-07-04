@@ -89,7 +89,7 @@ function StockCheck({ sku }) {
   );
 }
 
-function ProductImage({ src, alt, width = 400, priority = false }) {
+function ProductImage({ src, alt, priority = false, variant = 'card' }) {
   const candidates = buildImageCandidates(src);
   const [imageIdx, setImageIdx] = useState(0);
 
@@ -98,22 +98,45 @@ function ProductImage({ src, alt, width = 400, priority = false }) {
   }, [src]);
 
   if (!candidates.length || !candidates[imageIdx]) {
+    if (variant === 'card') {
+      return (
+        <div className="product-image-frame product-image-frame--empty" aria-hidden="true">
+          <ImageOff size={28} />
+        </div>
+      );
+    }
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', color: '#d1d5db' }}>
+      <div className="pz-image-placeholder" aria-hidden="true">
         <ImageOff size={28} />
+      </div>
+    );
+  }
+
+  if (variant === 'card') {
+    return (
+      <div className="product-image-frame">
+        <img
+          className="catalogue-photo"
+          src={candidates[imageIdx]}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding="async"
+          onError={() => setImageIdx((idx) => idx + 1)}
+        />
       </div>
     );
   }
 
   return (
     <img
+      className="pz-photo"
       src={candidates[imageIdx]}
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}
-      fetchpriority={priority ? 'high' : 'auto'}
+      fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"
       onError={() => setImageIdx((idx) => idx + 1)}
-      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
     />
   );
 }
@@ -239,63 +262,66 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
         </button>
 
-        {/* Body */}
+        {/* Body — footer pinned for equal grid row heights */}
         <div className="product-body">
-          <div className="product-meta">
-            <span>{product.code}</span>
-            {isVariantGroup && variantCount > 1 && (
-              <span className="pc-variant-count">{variantCount} options</span>
+          <div className="product-card-top">
+            <div className="product-meta">
+              <span>{product.code}</span>
+              {isVariantGroup && variantCount > 1 && (
+                <span className="pc-variant-count">{variantCount} options</span>
+              )}
+            </div>
+
+            <button className="product-title-button" onClick={openPreview} type="button">
+              <h3>{product.name}</h3>
+            </button>
+
+            {product.originalDescription && (
+              <p className="product-desc">{product.originalDescription}</p>
+            )}
+
+            {safeBadges.length > 0 && (
+              <div className="product-badges">
+                {safeBadges.map((b) => <span key={b}>{b}</span>)}
+              </div>
             )}
           </div>
 
-          <button className="product-title-button" onClick={openPreview} type="button">
-            <h3>{product.name}</h3>
-          </button>
+          <div className="product-card-footer">
+            {activeProduct.price > 0 && (
+              <div className="price-row price-row--card">
+                <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
+                <span>incl. VAT</span>
+              </div>
+            )}
 
-          {product.originalDescription && (
-            <p className="product-desc">{product.originalDescription}</p>
-          )}
+            <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
 
-          {safeBadges.length > 0 && (
-            <div className="product-badges">
-              {safeBadges.map((b) => <span key={b}>{b}</span>)}
-            </div>
-          )}
+            {shouldShowStockPolicy(product) && (
+              <p className="product-stock-policy">
+                (Limited stock available. Orders exceeding current stock can still be fulfilled — please allow additional time for delivery.)
+              </p>
+            )}
 
-          {activeProduct.price > 0 && (
-            <div className="price-row">
-              <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-              <span>incl. VAT</span>
-            </div>
-          )}
-
-          <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
-
-          {shouldShowStockPolicy(product) && (
-            <p className="product-stock-policy">
-              (Limited stock available. Orders exceeding current stock can still be fulfilled — please allow additional time for delivery.)
-            </p>
-          )}
-
-          {/* Always the same control: typeable quantity + Add button */}
-          <div className="buy-row">
-            <div className="qty-stepper" aria-label="Quantity">
-              <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
-                <Minus size={14} />
-              </button>
-              <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-              <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
-                <Plus size={14} />
+            <div className="buy-row">
+              <div className="qty-stepper" aria-label="Quantity">
+                <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                  <Minus size={14} />
+                </button>
+                <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                  <Plus size={14} />
+                </button>
+              </div>
+              <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
+                <ShoppingCart size={15} />
+                {isVariantGroup ? 'View options' : 'Add'}
               </button>
             </div>
-            <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
-              <ShoppingCart size={15} />
-              {isVariantGroup ? 'View options' : 'Add'}
-            </button>
+            {inCart && (
+              <span className="pc-in-order">In your order: {cartQty}</span>
+            )}
           </div>
-          {inCart && (
-            <span className="pc-in-order">In your order: {cartQty}</span>
-          )}
         </div>
       </article>
 
@@ -320,7 +346,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <ProductImage
                 src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
                 alt={activeProduct.name}
-                width={1200}
+                variant="modal"
               />
               {galleryImages && (
                 <div className="pz-gallery-strip">
