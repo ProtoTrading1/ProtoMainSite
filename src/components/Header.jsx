@@ -56,11 +56,17 @@ function scoreCategoryMatch(label, query) {
 function matchCategories(query) {
   if (!query.trim()) return [];
   const q = query.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  const seen = new Set();
   return FLAT_CATS
     .map((c) => ({ cat: c, score: scoreCategoryMatch(c.label, q) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || a.cat.label.localeCompare(b.cat.label))
-    .slice(0, 4)
+    .filter(({ cat }) => {
+      if (seen.has(cat.label)) return false;
+      seen.add(cat.label);
+      return true;
+    })
+    .slice(0, 6)
     .map(({ cat }) => cat);
 }
 
