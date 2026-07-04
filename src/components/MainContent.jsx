@@ -212,7 +212,7 @@ export default function MainContent({
       ) : products.length === 0 && (isCategoryPage || activeCollection !== 'all' || searchQuery) ? (
         <div className="empty-state">
           <Search size={32} />
-          <h3>No matching products</h3>
+          <h3>{searchQuery ? 'No relevant products found.' : 'No matching products'}</h3>
           <p>Clear the search or choose another category to continue building the order.</p>
           <button onClick={() => { setSearchQuery(''); onShortcut('start'); navigate([]); }} type="button">
             Go back to all products
