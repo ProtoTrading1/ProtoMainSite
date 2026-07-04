@@ -84,7 +84,9 @@ function barcodeValues(product) {
 function isSkuLikeQuery(query) {
   const raw = String(query || '').trim();
   if (!raw || /\s/.test(raw)) return false;
-  return /^[a-z0-9-]+$/i.test(raw) && (/\d/.test(raw) || raw.length >= 6);
+  // SKU/barcode lookups contain digits — avoid treating brand names (e.g. motarro) as SKUs.
+  if (!/\d/.test(raw)) return false;
+  return /^[a-z0-9-]+$/i.test(raw);
 }
 
 function productSearchText(product) {
