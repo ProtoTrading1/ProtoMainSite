@@ -2034,8 +2034,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: block;
   width: auto;
   height: auto;
-  max-width: 100%;
-  max-height: 196px;
+  max-width: 92%;
+  max-height: 92%;
   object-fit: contain;
   object-position: center;
   transition: transform 0.22s ease;
@@ -3571,7 +3571,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   }
   .product-image { height: 156px; }
   .product-image-frame { padding: 12px 14px; }
-  .product-image-frame .catalogue-photo { max-height: 132px; }
   .product-body { padding: 12px 12px 14px; }
   .product-card-footer { padding-top: 10px; }
   .product-desc,
@@ -3666,7 +3665,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   .product-body { padding: 10px 10px 12px; }
   .product-image { height: 144px; }
   .product-image-frame { padding: 10px 12px; }
-  .product-image-frame .catalogue-photo { max-height: 124px; }
   .price-row--card strong { font-size: 16px; }
   .buy-row { flex-direction: column; gap: 8px; }
   .qty-stepper { width: 100%; }

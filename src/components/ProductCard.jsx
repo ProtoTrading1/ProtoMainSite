@@ -97,6 +97,27 @@ function ProductImage({ src, alt, priority = false, variant = 'card' }) {
     setImageIdx(0);
   }, [src]);
 
+  const normalizeCardImage = (img) => {
+    const frame = img.closest('.product-image-frame');
+    if (!frame) return;
+    const { naturalWidth: w, naturalHeight: h } = img;
+    if (!w || !h) return;
+    const styles = getComputedStyle(frame);
+    const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+    const padX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+    const innerH = frame.clientHeight - padY;
+    const innerW = frame.clientWidth - padX;
+    const target = Math.min(innerW, innerH) * 0.92;
+    const scale = target / Math.max(w, h);
+    img.style.width = `${Math.round(w * scale)}px`;
+    img.style.height = `${Math.round(h * scale)}px`;
+  };
+
+  const handleImageLoad = (event) => {
+    if (variant !== 'card') return;
+    normalizeCardImage(event.currentTarget);
+  };
+
   if (!candidates.length || !candidates[imageIdx]) {
     if (variant === 'card') {
       return (
@@ -122,6 +143,7 @@ function ProductImage({ src, alt, priority = false, variant = 'card' }) {
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
+          onLoad={handleImageLoad}
           onError={() => setImageIdx((idx) => idx + 1)}
         />
       </div>
