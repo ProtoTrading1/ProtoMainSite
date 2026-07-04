@@ -2,86 +2,125 @@
 
 Last updated: 2026-07-04
 
-## RC1 — Complete
+## Objective
 
-RC1 is considered **complete**. The website is stable and production-ready.
+Make Proto Trading Online the **fastest and easiest wholesale ordering website**.
+
+**Decision rule:** Before any change, ask:
+1. Does this help a wholesale customer **find products faster**?
+2. Does this help a wholesale customer **place an order faster**?
+3. Does this **reduce friction**?
+
+If no → record as Post-RC1 enhancement, do not implement.
+
+---
+
+## Layout freeze (effective immediately)
+
+The current desktop layout is **frozen**. Do not redesign:
+
+- Pages
+- Navigation
+- Product cards
+- New widgets or dashboards
+
+Visual changes are only permitted when they directly fix a **usability issue** discovered during testing.
+
+---
+
+## Delivered & stable
 
 | Milestone | Status | Reference |
 |---|---|---|
-| RC1.1 refinement | Merged | PR #34 — `c7ce3e8` |
-| Production deploy | Live | `main` @ `c7ce3e8` |
-
-### RC1.1 scope (delivered)
-
-- Premium B2B header with inline search
-- Proto Trading Online logo and branding
-- About modal (map, contact, office address)
-- Registration wizard (billing/delivery, 4-step flow, country UX)
+| RC1 registration/header refinement | Merged | PR #34 — `c7ce3e8` |
+| P2.1 Premium Product Cards | **Rolled back** | Revert `b954f1f` (PR #35) |
+| Production | Live | `main` @ `b954f1f` |
 
 ### Repository separation
 
-- **Proto-Website** (`protoportal-main`) — active development repo
-- **protoportal-admin** / `admin.proto.co.za` — not modified during RC1 or P2.1
+- **Proto-Website** (`protoportal-main`) — sole active development repo
+- **protoportal-admin** / `admin.proto.co.za` — out of scope unless explicitly requested
 
 ---
 
-## Phase 2 — Customer Experience Refinement
+## RC1 priority order (refined)
 
-Phase 2 shifts from engineering refinement to **visible customer experience refinement**.
+One stage at a time. **Do not begin a new stage without approval.**
 
-Every improvement must be immediately noticeable and satisfy at least one business objective (faster ordering, better discovery, larger basket, higher AOV, perceived quality, customer confidence).
+### RC1.1 — Search Foundation ⏳ NEXT
 
-### Priority order
+Complete and verify all search functionality:
 
-1. **Premium Product Cards** — presentation polish
-2. **Search Experience** — autocomplete, highlighting, empty states, keyboard flow
-3. **Stock Visibility** — badges, low-stock indicators, live stock improvements
+- Autocomplete
+- Search relevance
+- Search consistency
+- Keyboard navigation
+- Accessibility
+- Tablet
+- Mobile
+- Performance
+
+**Status:** Awaiting approval to begin.
+
+### RC1.2 — Search Excellence
+
+Improve search quality only if required after RC1.1 testing:
+
+- Typo tolerance, SKU/barcode/supplier/department/category matching
+- Search highlighting, speed, empty states, ranking
+
+Only implement improvements with measurable value.
+
+**Status:** Not started.
+
+### RC1.3 — Ordering Workflow
+
+Review complete customer ordering journey. Reduce clicks and time to build an order:
+
+- Quantity changes, Add to Cart, cart updates, checkout
+- Keyboard efficiency, repeat ordering speed
+
+**Status:** Not started.
+
+### RC1.4 — Performance
+
+- Reduce unnecessary API calls
+- Improve perceived speed and loading states
+- Reduce layout shifts
+- Optimise images and bundle size where appropriate
+
+**Status:** Not started.
+
+### RC1.5 — Mobile
+
+Ensure mobile ordering is as efficient as possible:
+
+- Large touch targets, search usability, cart usability, checkout usability
+
+**Status:** Not started.
+
+### RC1.6 — Accessibility & QA
+
+Final accessibility review:
+
+- Keyboard navigation, screen reader support, focus management
+- Cross-browser testing
+
+**Status:** Not started.
 
 ---
 
-## P2.1 — Complete
+## Post-RC1 enhancements (deferred)
 
-**Tag:** `P2.1_COMPLETE`  
-**Merged:** PR #35 — `e912154`  
-**Branch:** `cursor/p2-1-premium-card-grid-1536`
+Recorded but not scheduled:
 
-### Delivered
-
-- Pure white image wells (`#ffffff`) — no coloured backgrounds
-- Longest-edge normalization (92% of inner frame) for consistent perceived size across aspect ratios
-- `object-fit: contain` — no crop, no stretch
-- Equal card heights via flex footer pinning (desktop + mobile)
-- Premium typography, spacing, and stacked price presentation
-- Subtle hover lift + image scale (desktop; disabled on touch / reduced-motion)
-- Mobile equal-height cards with 44px touch targets preserved
-
-### Pre-merge visual audit (2026-07-04)
-
-Categories audited: **Beads**, **Bags**, **Boxes**, **Glass**, **Toys**, **Stationery**
-
-| Category | Finding | Action |
-|---|---|---|
-| Beads | Wide vs portrait height spread (57px) | Fixed — longest-edge normalization |
-| Bags | Consistent (0px height spread) | No change |
-| Boxes | Consistent heights | No change |
-| Glass | Wide rondelles noticeably shorter | Fixed — longest-edge normalization |
-| Toys | Consistent (0px height spread) | No change |
-| Stationery | Wide memo books shorter | Fixed — longest-edge normalization |
-
-**Success criterion:** Customer should notice the improvement within 3 seconds of opening the catalogue.
-
-### Deferred to P2.2
-
-- Skeleton loading grid (replaces full-page spinner)
-
-### Not started
-
-- Add to Cart “Added ✓” feedback on grid cards
-- Search experience (Priority 2)
-- Stock badges (Priority 3)
+- Premium product card cosmetic polish (P2.1 rolled back — broke card layout)
+- Skeleton loading grid
+- Stock badges / low-stock indicators
+- Add to Cart “Added ✓” grid feedback
 
 ---
 
-## Next step
+## Execution mode
 
-**P2.2** — Skeleton loading. Awaiting instruction before beginning.
+Active. Work one approved RC1 stage at a time. Await approval before beginning RC1.1.
