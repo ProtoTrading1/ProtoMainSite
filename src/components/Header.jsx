@@ -543,7 +543,7 @@ export default function Header({
       </div>
 
       {/* Mobile category + product results */}
-      {mobileSearchOpen && mobileInput && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0) && (
+      {mobileSearchOpen && mobileInput.trim() && (
         <div className="mobile-search-results">
           {mobileCatMatches.map((cat) => (
             <button
@@ -573,6 +573,13 @@ export default function Header({
               {p.price > 0 && <span className="sp-product-price" style={{ color: '#fff' }}>R{p.price.toFixed(2)}</span>}
             </button>
           ))}
+          {mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
+            <div className="sp-empty sp-empty--mobile">
+              <Search size={24} />
+              <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>
+              <span>Try a different spelling or browse by department</span>
+            </div>
+          )}
         </div>
       )}
 
