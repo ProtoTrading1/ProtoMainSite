@@ -730,24 +730,22 @@ input, select, textarea { font-family: inherit; outline: none; }
   letter-spacing: 0.1em;
 }
 
-.cat-nav-home-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+.cat-nav-all-products-btn {
+  padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid #E5E7EB;
+  border: none;
   background: none;
-  color: #9CA3AF;
+  color: #6B7280;
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background 0.12s, color 0.12s;
   font-family: inherit;
+  white-space: nowrap;
 }
-.cat-nav-home-btn:hover {
-  background: #FEF2F2;
-  color: #7F1D1D;
-  border-color: #FECACA;
+.cat-nav-all-products-btn:hover {
+  background: #F3F4F6;
+  color: #111827;
 }
 
 .cat-nav-list {
