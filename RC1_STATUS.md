@@ -52,6 +52,7 @@ See `.cursor/rules/welcome-flow-frozen.mdc` for Welcome lifecycle spec.
 |---|---|---|
 | RC1 registration/header refinement | Merged | PR #34 |
 | RC1 Welcome Screen & Home Navigation | **Deployed** | PR #46 — `eb5bfe3` |
+| RC1.3A Available Only filter | **Deployed** | PR #47 — `da37b75` |
 | P2.1 Premium Product Cards | **Rolled back** | Revert `b954f1f` (PR #35) |
 
 ### Repository separation

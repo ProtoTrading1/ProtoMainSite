@@ -1,0 +1,29 @@
+# RC1.3A catalogue filter is FROZEN
+
+**Deployed:** 2026-07-05 — PR #47 — `main` @ `da37b75`
+
+## Hard rules
+
+1. **Do NOT** add filters (New, Specials, Clearance, Brands, etc.) without RC1.3B+ approval.
+2. **Do NOT** change Available Only semantics without explicit approval.
+3. Bug fixes only if they restore spec behaviour.
+
+## Available Only filter (frozen)
+
+**Show when:**
+- Stock qty > 0, OR
+- Explicit `keep_live_when_oos` / `keepLiveWhenOos` / `orderableWhenOutOfStock` flag on the product row
+
+**Hide when:**
+- Zero stock AND not flagged orderable
+
+**Do NOT** infer orderability from department, category, or product name.
+
+**Persistence:** `sessionStorage` key `proto_in_stock_only`. Home resets to OFF.
+
+## Key files
+
+- `src/lib/products.js` — `isProductAvailable`, `isOrderableWhenOutOfStock`, `applyInStockFilter`
+- `api/products.js` — maps `keep_live_when_oos` from `website_stock`
+- `src/App.jsx` — filter state + session persistence
+- `src/components/MainContent.jsx` — checkbox UI ("Available Only")
