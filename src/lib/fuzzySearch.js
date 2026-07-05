@@ -1,8 +1,15 @@
 export const SEARCH_MIN_CONFIDENCE = 50;
 
+import {
+  isAlphabeticSuffixVariant,
+  isIdentifierQuery,
+  normalizeIdentifier,
+} from './identifierNormalize.js';
+
 const SCORE = {
   EXACT_SKU: 100,
   EXACT_BARCODE: 99,
+  SKU_VARIANT: 98,
   EXACT_NAME: 95,
   HEAD_NOUN_NAME: 92,
   NAME_PREFIX: 90,
@@ -103,14 +110,6 @@ function barcodeValues(product) {
     .map((v) => String(v));
 }
 
-function isSkuLikeQuery(query) {
-  const raw = String(query || '').trim();
-  if (!raw || /\s/.test(raw)) return false;
-  // SKU/barcode lookups contain digits — avoid treating brand names (e.g. motarro) as SKUs.
-  if (!/\d/.test(raw)) return false;
-  return /^[a-z0-9-]+$/i.test(raw);
-}
-
 function productSearchText(product) {
   const pathLabels = (product.categoryPath || []).join(' ');
   return [
@@ -155,8 +154,16 @@ function getSearchIndex(product) {
     ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
   ].filter(Boolean).join(' '));
 
-  const skus = skuValues(product).map((v) => ({ norm: normalize(v), compact: compact(v) }));
-  const barcodes = barcodeValues(product).map((v) => ({ norm: normalize(v), compact: compact(v) }));
+  const skus = skuValues(product).map((v) => ({
+    norm: normalize(v),
+    compact: compact(v),
+    idNorm: normalizeIdentifier(v),
+  }));
+  const barcodes = barcodeValues(product).map((v) => ({
+    norm: normalize(v),
+    compact: compact(v),
+    idNorm: normalizeIdentifier(v),
+  }));
 
   const index = {
     name,
@@ -241,21 +248,44 @@ function scoreToken(index, token) {
   );
 }
 
-function scoreSkuLikeQuery(product, query) {
-  const token = normalize(query);
-  const tokenCompact = compact(query);
-  if (!token) return 0;
+function scoreIdentifierQuery(product, query) {
+  const queryId = normalizeIdentifier(query);
+  if (!queryId) return 0;
+
   const index = getSearchIndex(product);
-  return scoreExactSku(index, token, tokenCompact)
-    || scoreExactBarcode(index, token, tokenCompact);
+  let score = 0;
+
+  for (const sku of index.skus) {
+    if (sku.idNorm === queryId) return SCORE.EXACT_SKU;
+  }
+
+  for (const bc of index.barcodes) {
+    if (bc.idNorm === queryId) score = Math.max(score, SCORE.EXACT_BARCODE);
+  }
+  if (score > 0) return score;
+
+  if (/^\d+$/.test(queryId)) {
+    for (const sku of index.skus) {
+      if (isAlphabeticSuffixVariant(sku.idNorm, queryId)) {
+        score = Math.max(score, SCORE.SKU_VARIANT);
+      }
+    }
+    for (const bc of index.barcodes) {
+      if (isAlphabeticSuffixVariant(bc.idNorm, queryId)) {
+        score = Math.max(score, SCORE.SKU_VARIANT);
+      }
+    }
+  }
+
+  return score;
 }
 
 function scoreProduct(product, query) {
   const q = normalize(query);
   if (!q) return 0;
 
-  if (isSkuLikeQuery(query)) {
-    return scoreSkuLikeQuery(product, query);
+  if (isIdentifierQuery(query)) {
+    return scoreIdentifierQuery(product, query);
   }
 
   const tokens = q.split(/\s+/).filter(Boolean);
