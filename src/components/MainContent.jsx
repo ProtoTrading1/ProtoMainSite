@@ -67,6 +67,7 @@ export default function MainContent({
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
+  const isHomeFeatured = isAllProductsPage && !searchQuery && sort === 'featured';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
   const currentLabel = isCategoryPage
     ? catLabel(path[path.length - 1])
@@ -190,7 +191,9 @@ export default function MainContent({
           <span className="results-count">
             {searchQuery
               ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''} across all categories`
-              : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
+              : isHomeFeatured
+                ? `${categoryProductCount} featured product${categoryProductCount !== 1 ? 's' : ''}`
+                : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
           </span>
           <label className="sort-control">
             <span>Sort</span>
@@ -208,6 +211,12 @@ export default function MainContent({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#64748b' }}>
           <Loader2 size={24} className="spin" />
           <span>Loading catalogue…</span>
+        </div>
+      ) : products.length === 0 && isHomeFeatured ? (
+        <div className="empty-state">
+          <Sparkles size={32} />
+          <h3>No featured products yet</h3>
+          <p style={{ color: '#64748b', marginTop: 8 }}>Try a different sort, or browse by category.</p>
         </div>
       ) : products.length === 0 && (isCategoryPage || activeCollection !== 'all' || searchQuery) ? (
         <div className="empty-state">
