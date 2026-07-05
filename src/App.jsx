@@ -112,6 +112,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
+  const arrivalHighlightTokenRef = useRef(0);
+  const [arrivalHighlight, setArrivalHighlight] = useState(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const lastSearchLogKeyRef = useRef('');
   const [activeCollection, setActiveCollection] = useState('all');
@@ -395,6 +397,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setDrawerPeek(true);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
     drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
+
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      arrivalHighlightTokenRef.current += 1;
+      setArrivalHighlight({ id: product.id, token: arrivalHighlightTokenRef.current });
+    }
   };
 
   const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(i.product.stockQty || 9999, Number(qty) || 1)) })));
@@ -650,6 +657,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             autoCloseProgress={0}
             showAutoCloseBar={false}
             onClose={() => setCartDrawerOpen(false)}
+            arrivalHighlight={arrivalHighlight}
           />
         </aside>
       </div>

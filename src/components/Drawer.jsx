@@ -1,8 +1,49 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import { optimizedImageUrl } from '../lib/imageUrl';
 
 const MIN_ORDER = 1000;
+
+function subscribeReducedMotion(onStoreChange) {
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  mq.addEventListener('change', onStoreChange);
+  return () => mq.removeEventListener('change', onStoreChange);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(subscribeReducedMotion, getReducedMotionSnapshot, () => false);
+}
+
+function AnimatedSubtotal({ value }) {
+  const reducedMotion = usePrefersReducedMotion();
+  const [shown, setShown] = useState(value);
+  const [opacity, setOpacity] = useState(1);
+
+  useEffect(() => {
+    if (value === shown) return;
+    if (reducedMotion) {
+      setShown(value);
+      setOpacity(1);
+      return;
+    }
+    setOpacity(0.4);
+    const timer = window.setTimeout(() => {
+      setShown(value);
+      setOpacity(1);
+    }, 90);
+    return () => window.clearTimeout(timer);
+  }, [value, shown, reducedMotion]);
+
+  return (
+    <strong className="subtotal-value" style={{ opacity, transition: reducedMotion ? undefined : 'opacity 175ms ease' }}>
+      R{shown.toFixed(2)}
+    </strong>
+  );
+}
 
 function QuantityInput({ item, updateQty }) {
   const maxQty = item.product.stockQty || 9999;
@@ -28,7 +69,7 @@ function QuantityInput({ item, updateQty }) {
   );
 }
 
-export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail, autoCloseProgress = 0, showAutoCloseBar = false, onClose }) {
+export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail, autoCloseProgress = 0, showAutoCloseBar = false, onClose, arrivalHighlight = null }) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
   const isReady = cartTotal >= MIN_ORDER;
@@ -39,12 +80,32 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const rowRefs = useRef({});
+  const lastHighlightTokenRef = useRef(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const el = itemsRef.current;
     if (!el || !cartItems.length) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [cartItems]);
+    el.scrollTo({ top: el.scrollHeight, behavior: reducedMotion ? 'auto' : 'smooth' });
+  }, [cartItems, reducedMotion]);
+
+  useEffect(() => {
+    if (!arrivalHighlight || reducedMotion) return;
+    const row = rowRefs.current[arrivalHighlight.id];
+    if (!row) return;
+    if (lastHighlightTokenRef.current === arrivalHighlight.token) return;
+    lastHighlightTokenRef.current = arrivalHighlight.token;
+
+    row.classList.remove('drawer-line--arrival');
+    void row.offsetWidth;
+    row.classList.add('drawer-line--arrival');
+
+    const timer = window.setTimeout(() => {
+      row.classList.remove('drawer-line--arrival');
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [arrivalHighlight, cartItems, reducedMotion]);
 
   const handleSubmitClick = () => {
     setShowCourierPicker(true);
@@ -106,7 +167,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
           </div>
         )}
         {cartItems.map((item) => (
-          <div className="drawer-line" key={item.product.id}>
+          <div className="drawer-line" key={item.product.id} ref={(node) => { if (node) rowRefs.current[item.product.id] = node; else delete rowRefs.current[item.product.id]; }}>
             <div className="drawer-thumb">
               <img src={optimizedImageUrl(item.product.image)} alt={item.product.name} loading="lazy" decoding="async" />
             </div>
@@ -132,7 +193,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
       <div className="drawer-footer">
         <div className="subtotal-row">
           <span>Subtotal incl. VAT</span>
-          <strong>R{inclVatEstimate.toFixed(2)}</strong>
+          <AnimatedSubtotal value={inclVatEstimate} />
         </div>
         <div className="minimum-card">
           <div className="minimum-copy">

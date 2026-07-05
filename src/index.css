@@ -2826,6 +2826,23 @@ input, select, textarea { font-family: inherit; outline: none; }
   border-bottom: 1px solid #F3F4F6;
   background: #fff;
 }
+@keyframes drawer-line-arrival {
+  0% { background-color: #fff; }
+  18% { background-color: rgba(212, 173, 86, 0.16); }
+  82% { background-color: rgba(212, 173, 86, 0.16); }
+  100% { background-color: #fff; }
+}
+.drawer-line.drawer-line--arrival {
+  animation: drawer-line-arrival 800ms ease-in-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-line.drawer-line--arrival {
+    animation: none;
+  }
+  .subtotal-value {
+    transition: none !important;
+  }
+}
 .drawer-thumb {
   width: 44px;
   height: 44px;
@@ -2889,7 +2906,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.subtotal-row strong {
+.subtotal-row strong,
+.subtotal-row .subtotal-value {
   font-size: 22px;
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
