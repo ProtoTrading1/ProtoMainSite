@@ -175,16 +175,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [activeCollection, dismissWelcome]);
 
   useEffect(() => {
-    if (sort !== 'featured') dismissWelcome();
-  }, [sort, dismissWelcome]);
-
-  useEffect(() => {
     if (Object.keys(refinements).length > 0) dismissWelcome();
   }, [refinements, dismissWelcome]);
-
-  useEffect(() => {
-    if (page > 1) dismissWelcome();
-  }, [page, dismissWelcome]);
 
   useEffect(() => {
     try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
