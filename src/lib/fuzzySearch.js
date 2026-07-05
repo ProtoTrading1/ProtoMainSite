@@ -4,8 +4,10 @@ const SCORE = {
   EXACT_SKU: 100,
   EXACT_BARCODE: 99,
   EXACT_NAME: 95,
+  HEAD_NOUN_NAME: 92,
   NAME_PREFIX: 90,
   WHOLE_WORD_NAME: 85,
+  MODIFIER_NAME: 80,
   DESCRIPTION: 70,
   KEYWORD: 60,
   TYPO: 50,
@@ -34,6 +36,26 @@ function words(text) {
 function wholeWordIn(text, token) {
   if (!token) return false;
   return words(text).includes(token);
+}
+
+/** Title segment before | or dash; trim at "with/for/…" trailing phrases. */
+function primaryNameWords(name) {
+  const segment = String(name || '').split(/\||\u2013|\u2014|–/)[0];
+  let ws = words(segment);
+  const tail = ws.findIndex((w) => ['with', 'for', 'and', 'in', 'of'].includes(w));
+  if (tail > 0) ws = ws.slice(0, tail);
+  return ws;
+}
+
+function phraseHead(name) {
+  const ws = primaryNameWords(name);
+  return ws.length ? ws[ws.length - 1] : null;
+}
+
+/** Leading word in a two-word compound (e.g. "Bag Strap", "Pen Case") — not the product type. */
+function isLeadingCompoundModifier(name, token) {
+  const ws = primaryNameWords(name);
+  return ws.length === 2 && ws[0] === token && ws[1] !== token;
 }
 
 function editDistance(a, b) {
@@ -140,6 +162,8 @@ function getSearchIndex(product) {
     name,
     nameCompact,
     nameWords,
+    phraseWords: primaryNameWords(product.name),
+    phraseHead: phraseHead(product.name),
     description,
     descWords,
     keywordText,
@@ -167,8 +191,20 @@ function scoreExactBarcode(index, token, tokenCompact) {
 
 function scoreNameMatch(index, token, tokenCompact) {
   if (index.name === token || index.nameCompact === tokenCompact) return SCORE.EXACT_NAME;
-  if (index.name.startsWith(token) || index.nameCompact.startsWith(tokenCompact)) return SCORE.NAME_PREFIX;
-  if (wholeWordIn(index.name, token)) return SCORE.WHOLE_WORD_NAME;
+
+  const isWholeWord = wholeWordIn(index.name, token);
+  if (index.phraseHead === token && isWholeWord) return SCORE.HEAD_NOUN_NAME;
+  if (isLeadingCompoundModifier(index.name, token)) return SCORE.MODIFIER_NAME;
+
+  if (index.name.startsWith(token) || index.nameCompact.startsWith(tokenCompact)) {
+    // Multi-word names starting with the token are modifier compounds, not true prefixes.
+    if (index.phraseWords.length > 1 && index.phraseWords[0] === token) {
+      return isWholeWord ? SCORE.WHOLE_WORD_NAME : SCORE.MODIFIER_NAME;
+    }
+    return SCORE.NAME_PREFIX;
+  }
+
+  if (isWholeWord) return SCORE.WHOLE_WORD_NAME;
   return 0;
 }
 
