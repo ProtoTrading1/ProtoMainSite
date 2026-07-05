@@ -1,6 +1,12 @@
 import { supabase } from './supabase';
 
-export async function saveOrder(customerId, cartItems, totalExVat, { deliveryMethod = null, customerNotes = '' } = {}) {
+export async function saveOrder(customerId, cartItems, totalExVat, {
+  deliveryMethod = null,
+  customerNotes = '',
+  promoCode = null,
+  discountPct = null,
+  discountAmount = null,
+} = {}) {
   const items = cartItems.map((i) => ({
     productId: i.product.id,
     code: i.product.code,
@@ -12,6 +18,7 @@ export async function saveOrder(customerId, cartItems, totalExVat, { deliveryMet
   }));
 
   const notes = String(customerNotes || '').trim();
+  const code = String(promoCode || '').trim().toUpperCase() || null;
   const insertRow = {
     customer_id: customerId,
     items,
@@ -21,6 +28,9 @@ export async function saveOrder(customerId, cartItems, totalExVat, { deliveryMet
     total_ex_vat: totalExVat,
     ...(deliveryMethod ? { delivery_method: deliveryMethod } : {}),
     ...(notes ? { customer_notes: notes } : {}),
+    ...(code ? { promo_code: code } : {}),
+    ...(discountPct != null ? { discount_pct: discountPct } : {}),
+    ...(discountAmount != null ? { discount_amount: discountAmount } : {}),
   };
 
   const { data, error } = await supabase
