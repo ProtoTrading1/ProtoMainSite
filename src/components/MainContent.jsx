@@ -205,7 +205,7 @@ export default function MainContent({
                 checked={inStockOnly}
                 onChange={(e) => onInStockOnlyChange(e.target.checked)}
               />
-              <span>In Stock Only</span>
+              <span>Available Only</span>
             </label>
             <label className="sort-control">
               <span>Sort</span>

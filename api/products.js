@@ -89,6 +89,8 @@ function adapt(row, tree) {
     leadTime: '',
     tradeNote: '',
     inStock: (Number(row.available_stock ?? row.stock_qty) || 0) > 0,
+    keepLiveWhenOos: !!row.keep_live_when_oos,
+    orderableWhenOutOfStock: !!row.keep_live_when_oos,
     createdAt: row.created_at,
     yearlySales: 0,
     supplier: '',

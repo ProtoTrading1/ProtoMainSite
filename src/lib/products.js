@@ -114,15 +114,28 @@ export async function fetchDistinctCategories() {
 
 // ─── Filtering / sorting helpers ──────────────────────────────────────────────
 
-/** Whether a single product row is available for ordering (pre-grouping). */
+/** Explicit admin flag: product remains orderable when stock is zero. */
+export function isOrderableWhenOutOfStock(product) {
+  if (!product) return false;
+  return product.keepLiveWhenOos === true
+    || product.keep_live_when_oos === true
+    || product.orderableWhenOutOfStock === true
+    || product.orderable_when_out_of_stock === true;
+}
+
+function productStockQty(product) {
+  const qtyRaw = product.stockOnHand ?? product.stockQty ?? product.available_stock ?? product.stock_qty;
+  if (qtyRaw === undefined || qtyRaw === null) return null;
+  return Number(qtyRaw) || 0;
+}
+
+/** Whether a single product row is available to buy (pre-grouping). */
 export function isProductAvailable(product) {
   if (!product) return false;
-  const qtyRaw = product.stockOnHand ?? product.stockQty;
-  if (qtyRaw !== undefined && qtyRaw !== null) {
-    const qty = Number(qtyRaw) || 0;
-    if (qty <= 0) return product.keepLiveWhenOos === true;
-    return true;
-  }
+  const qty = productStockQty(product);
+  if (qty !== null && qty > 0) return true;
+  if (isOrderableWhenOutOfStock(product)) return true;
+  if (qty !== null && qty <= 0) return false;
   if (product.inStock === false) return false;
   return true;
 }
