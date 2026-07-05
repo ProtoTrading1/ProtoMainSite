@@ -14,7 +14,7 @@ const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimati
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort } from './lib/products';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
@@ -36,9 +36,18 @@ const CATALOG_PAGE_SIZE = 60;
 const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
+const CATALOG_SORT_KEY = 'proto_catalog_sort';
 
 function readInStockOnly() {
   try { return sessionStorage.getItem(IN_STOCK_ONLY_KEY) === '1'; } catch { return false; }
+}
+
+function readInitialSort() {
+  try {
+    const stored = sessionStorage.getItem(CATALOG_SORT_KEY);
+    if (stored) return normalizeCatalogSort(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_SORT;
 }
 
 function hashHasCategoryPath() {
@@ -131,6 +140,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     } catch { /* ignore */ }
   }, []);
 
+  const handleSortChange = useCallback((next) => {
+    const normalized = normalizeCatalogSort(next);
+    setSort(normalized);
+    try { sessionStorage.setItem(CATALOG_SORT_KEY, normalized); } catch { /* ignore */ }
+  }, []);
+
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
     scrollToTop();
@@ -141,7 +156,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     scrollToTop();
     hashNavigate(newPath, newRefinements);
   }, [hashNavigate]);
-  const [sort, setSort] = useState('featured');
+  const [sort, setSort] = useState(readInitialSort);
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
@@ -169,10 +184,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     skipNavScrollRef.current = true;
     try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
     setShowWelcome(true);
     setSearchQuery('');
     setActiveCollection('all');
-    setSort('featured');
+    setSort(DEFAULT_SORT);
     setInStockOnly(false);
     hashNavigate([], {});
     scrollToTopSmooth();
@@ -362,6 +378,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         }
         if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
         if (inStockOnly) rows = rows.filter(isProductAvailable);
+        rows = sortCatalogProducts(rows, sort, { hasSearch });
         rows = groupProductsByBarcode(rows);
         setUsingFallback(true);
         setCatalogTotal(rows.length);
@@ -704,7 +721,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             sort={sort}
-            setSort={setSort}
+            setSort={handleSortChange}
             onShortcut={handleShortcut}
             activeCollection={activeCollection}
             collectionLabel={collectionLabel(activeCollection)}

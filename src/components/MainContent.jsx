@@ -45,7 +45,7 @@ export default function MainContent({
   breadcrumb,
   searchQuery = '',
   setSearchQuery = () => {},
-  sort = 'featured',
+  sort = 'best-selling',
   setSort = () => {},
   onShortcut = () => {},
   activeCollection = 'all',
@@ -70,7 +70,6 @@ export default function MainContent({
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
-  const isHomeFeatured = isAllProductsPage && !searchQuery && sort === 'featured';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
   const currentLabel = isCategoryPage
     ? catLabel(path[path.length - 1])
@@ -81,10 +80,9 @@ export default function MainContent({
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
 
-  // Group products by their next subcategory level when landing is shown and sort is featured.
-  // This mirrors the admin ReorderGrid's structure so what you see in the admin matches the site.
+  // Group products by their next subcategory level when landing is shown and sort is best-selling.
   const productGroups = useMemo(() => {
-    if (!showLanding || sort !== 'featured' || !products.length) return null;
+    if (!showLanding || sort !== 'best-selling' || !products.length) return null;
     const groupKeys = [];
     const groupMap = new Map();
     for (const p of products) {
@@ -194,9 +192,7 @@ export default function MainContent({
           <span className="results-count">
             {searchQuery
               ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''} across all categories`
-              : isHomeFeatured
-                ? `${categoryProductCount} featured product${categoryProductCount !== 1 ? 's' : ''}`
-                : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
+              : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
           </span>
           <div className="results-control-actions">
             <label className="catalog-filter-control">
@@ -210,9 +206,12 @@ export default function MainContent({
             <label className="sort-control">
               <span>Sort</span>
               <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="featured">Featured</option>
+                <option value="best-selling">Best Selling</option>
+                <option value="newest">Newest</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
+                <option value="name-asc">A–Z</option>
+                <option value="name-desc">Z–A</option>
               </select>
             </label>
           </div>
@@ -223,12 +222,6 @@ export default function MainContent({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#64748b' }}>
           <Loader2 size={24} className="spin" />
           <span>Loading catalogue…</span>
-        </div>
-      ) : products.length === 0 && isHomeFeatured ? (
-        <div className="empty-state">
-          <Sparkles size={32} />
-          <h3>No featured products yet</h3>
-          <p style={{ color: '#64748b', marginTop: 8 }}>Try a different sort, or browse by category.</p>
         </div>
       ) : products.length === 0 && (isCategoryPage || activeCollection !== 'all' || searchQuery) ? (
         <div className="empty-state">

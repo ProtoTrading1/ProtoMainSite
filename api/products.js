@@ -50,7 +50,24 @@ function labelToSlug(label) {
   return String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-function adapt(row, tree) {
+async function loadSalesByBarcode(supabase) {
+  try {
+    const rows = await fetchAllRows(supabase, 'products', 'sku, yearly_sales');
+    const map = new Map();
+    for (const row of rows) {
+      const key = String(row.sku || '').trim().toUpperCase();
+      if (!key) continue;
+      const sales = Number(row.yearly_sales) || 0;
+      map.set(key, Math.max(map.get(key) || 0, sales));
+    }
+    return map;
+  } catch (err) {
+    console.warn('products api: yearly_sales unavailable:', err.message);
+    return new Map();
+  }
+}
+
+function adapt(row, tree, salesByBarcode = new Map()) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
@@ -91,8 +108,8 @@ function adapt(row, tree) {
     inStock: (Number(row.available_stock ?? row.stock_qty) || 0) > 0,
     keepLiveWhenOos: !!row.keep_live_when_oos,
     orderableWhenOutOfStock: !!row.keep_live_when_oos,
+    yearlySales: salesByBarcode.get(String(row.barcode || '').trim().toUpperCase()) || 0,
     createdAt: row.created_at,
-    yearlySales: 0,
     supplier: '',
   };
   return enrichMotarroCategoryFields(base, row, tree, categoryPath);
@@ -109,11 +126,12 @@ export default async function handler(req, res) {
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
-    const [rows, tree] = await Promise.all([
+    const [rows, tree, salesByBarcode] = await Promise.all([
       fetchAllRows(supabase, 'website_stock', '*'),
       loadTaxonomyTree(),
+      loadSalesByBarcode(supabase),
     ]);
-    const products = rows.map((row) => adapt(row, tree)).filter((p) => p.category);
+    const products = rows.map((row) => adapt(row, tree, salesByBarcode)).filter((p) => p.category);
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
     res.setHeader('Content-Type', 'application/json');
