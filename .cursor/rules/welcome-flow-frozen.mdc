@@ -1,0 +1,34 @@
+# Welcome flow is FROZEN (RC1 complete)
+
+**Deployed:** 2026-07-05 — PR #46 — `main` @ `eb5bfe3`
+
+## Hard rules
+
+1. **Do NOT** change Welcome show/hide lifecycle, Home action behaviour, or Home icon placement without explicit approval.
+2. **Do NOT** implement **Resume Shopping** (RC2) in this repo during RC1 — see Post-RC1 below.
+3. Bug fixes only if they restore spec behaviour; no redesigns.
+
+## Frozen behaviour
+
+| Trigger | Welcome |
+|---------|---------|
+| First browser session visit | Show |
+| Home (icon or logo) | Show |
+| Search | Hide |
+| Category / collection selection | Hide |
+| Open product / add to cart | Hide |
+| Sort change | **No change** |
+| Pagination | **No change** |
+
+**Home action:** clear search, category, filters; reset collection All + sort Featured; restore Welcome; smooth scroll top. **Cart must never be cleared.**
+
+## Key files
+
+- `src/App.jsx` — `showWelcome`, `dismissWelcome`, `goHome`, `WELCOME_DISMISSED_KEY`
+- `src/components/MainContent.jsx` — `showWelcome` prop gates `site-hero-banner`
+- `src/components/Header.jsx` + `Header.css` — Home icon + logo
+- `src/lib/scrollToTop.js` — `scrollToTopSmooth()`
+
+## RC2 (approved, NOT RC1)
+
+**Resume Shopping** — remember browsing context (scroll, category, search) so customer can return exactly where they left off after visiting Welcome. Do not implement until RC2 sprint is approved.

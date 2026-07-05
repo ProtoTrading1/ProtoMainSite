@@ -1,6 +1,6 @@
 # Proto Trading Online — Release Status
 
-Last updated: 2026-07-04
+Last updated: 2026-07-05
 
 ## Objective
 
@@ -15,16 +15,34 @@ If no → record as Post-RC1 enhancement, do not implement.
 
 ---
 
-## Layout freeze (effective immediately)
+## Frozen (do not change without approval)
 
-The current desktop layout is **frozen**. Do not redesign:
+| Area | Status | Reference |
+|------|--------|-----------|
+| Search | **FROZEN** | RC1.1 complete |
+| Sorting | **FROZEN** | Sort Phase 1 |
+| Product card layout | **FROZEN** | RC1.2 Phase 1 |
+| **Welcome flow & Home navigation** | **FROZEN** | PR #46 — `eb5bfe3` |
 
-- Pages
-- Navigation
-- Product cards
-- New widgets or dashboards
+See `.cursor/rules/welcome-flow-frozen.mdc` for Welcome lifecycle spec.
 
-Visual changes are only permitted when they directly fix a **usability issue** discovered during testing.
+---
+
+## Production
+
+| Item | Value |
+|------|-------|
+| Branch | `main` @ `eb5bfe3` |
+| Deploy | Vercel (`protoportal-main.vercel.app` / site.proto.co.za) |
+| RC1 Welcome & Home | **Deployed 2026-07-05** |
+
+---
+
+## RC2 (approved for future — NOT RC1)
+
+**Resume Shopping** — Remember the customer's previous browsing context (category, search, scroll position) and allow them to return exactly where they left off after visiting the Welcome screen.
+
+**Do not implement during RC1.**
 
 ---
 
@@ -32,9 +50,9 @@ Visual changes are only permitted when they directly fix a **usability issue** d
 
 | Milestone | Status | Reference |
 |---|---|---|
-| RC1 registration/header refinement | Merged | PR #34 — `c7ce3e8` |
+| RC1 registration/header refinement | Merged | PR #34 |
+| RC1 Welcome Screen & Home Navigation | **Deployed** | PR #46 — `eb5bfe3` |
 | P2.1 Premium Product Cards | **Rolled back** | Revert `b954f1f` (PR #35) |
-| Production | Live | `main` @ `b954f1f` |
 
 ### Repository separation
 
@@ -43,78 +61,10 @@ Visual changes are only permitted when they directly fix a **usability issue** d
 
 ---
 
-## RC1 priority order (refined)
-
-One stage at a time. **Do not begin a new stage without approval.**
-
-### RC1.1 — Search Foundation ⏳ NEXT
-
-Complete and verify all search functionality:
-
-- Autocomplete
-- Search relevance
-- Search consistency
-- Keyboard navigation
-- Accessibility
-- Tablet
-- Mobile
-- Performance
-
-**Status:** Awaiting approval to begin.
-
-### RC1.2 — Search Excellence
-
-Improve search quality only if required after RC1.1 testing:
-
-- Typo tolerance, SKU/barcode/supplier/department/category matching
-- Search highlighting, speed, empty states, ranking
-
-Only implement improvements with measurable value.
-
-**Status:** Not started.
-
-### RC1.3 — Ordering Workflow
-
-Review complete customer ordering journey. Reduce clicks and time to build an order:
-
-- Quantity changes, Add to Cart, cart updates, checkout
-- Keyboard efficiency, repeat ordering speed
-
-**Status:** Not started.
-
-### RC1.4 — Performance
-
-- Reduce unnecessary API calls
-- Improve perceived speed and loading states
-- Reduce layout shifts
-- Optimise images and bundle size where appropriate
-
-**Status:** Not started.
-
-### RC1.5 — Mobile
-
-Ensure mobile ordering is as efficient as possible:
-
-- Large touch targets, search usability, cart usability, checkout usability
-
-**Status:** Not started.
-
-### RC1.6 — Accessibility & QA
-
-Final accessibility review:
-
-- Keyboard navigation, screen reader support, focus management
-- Cross-browser testing
-
-**Status:** Not started.
-
----
-
 ## Post-RC1 enhancements (deferred)
 
-Recorded but not scheduled:
-
-- Premium product card cosmetic polish (P2.1 rolled back — broke card layout)
+- **Resume Shopping** (RC2 approved)
+- Premium product card cosmetic polish (P2.1 rolled back)
 - Skeleton loading grid
 - Stock badges / low-stock indicators
 - Add to Cart “Added ✓” grid feedback
@@ -123,4 +73,4 @@ Recorded but not scheduled:
 
 ## Execution mode
 
-Active. Work one approved RC1 stage at a time. Await approval before beginning RC1.1.
+**STOP after RC1 Welcome deploy + QA.** Await approval before next RC1 sprint.
