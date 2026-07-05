@@ -114,7 +114,7 @@ function StockCheck({ sku }) {
   );
 }
 
-function ProductImage({ src, alt, width = 400, priority = false }) {
+function ProductImage({ src, alt, priority = false, className = '' }) {
   const candidates = buildImageCandidates(src);
   const [imageIdx, setImageIdx] = useState(0);
 
@@ -132,13 +132,13 @@ function ProductImage({ src, alt, width = 400, priority = false }) {
 
   return (
     <img
+      className={className || undefined}
       src={candidates[imageIdx]}
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}
       fetchpriority={priority ? 'high' : 'auto'}
       decoding="async"
       onError={() => setImageIdx((idx) => idx + 1)}
-      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
     />
   );
 }
@@ -259,7 +259,12 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
           )}
           <div className="pc-image-frame">
-            <ProductImage src={product.localImage || product.image} alt={product.name} priority={priority} />
+            <ProductImage
+              className="pc-product-img"
+              src={product.localImage || product.image}
+              alt={product.name}
+              priority={priority}
+            />
           </div>
           <SpecialRibbon special={special} />
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
@@ -331,7 +336,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               <ProductImage
                 src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
                 alt={activeProduct.name}
-                width={1200}
               />
               {galleryImages && (
                 <div className="pz-gallery-strip">
