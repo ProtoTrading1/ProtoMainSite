@@ -6,6 +6,7 @@
   --proto-red-hover: #1a1a1a;
   --proto-red-dark: #111111;
   --proto-red-light: rgba(0, 0, 0, 0.07);
+  --proto-gold: #C89A3C;
   --accent: #7F1D1D;
   --accent-hover: #6B1A1A;
   --accent-light: #FEF2F2;
@@ -2464,7 +2465,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .add-button:hover { background: #333; transform: translateY(-1px); }
 .add-button:active { transform: translateY(0); }
-.add-button.added { background: #16a34a; }
+.add-button.added { background: var(--proto-gold); color: #111111; }
 .primary-order-button {
   width: 100%;
   min-height: 58px;
@@ -5044,8 +5045,8 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .pz-add-btn:hover { background: #222; transform: translateY(-1px); }
 .pz-add-btn:active { transform: translateY(0); }
-.pz-add-btn--added { background: #16a34a !important; }
-.pz-add-btn--added:hover { background: #15803d !important; }
+.pz-add-btn--added { background: var(--proto-gold) !important; color: #111111 !important; }
+.pz-add-btn--added:hover { background: var(--proto-gold) !important; color: #111111 !important; }
 
 /* ── pz modal: mobile stacked ── */
 @media (max-width: 900px) {
