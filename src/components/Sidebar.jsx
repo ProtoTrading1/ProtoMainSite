@@ -86,7 +86,7 @@ function ProductRequestModal({ onClose, customer }) {
   );
 }
 
-export default function Sidebar({ categories, path, navigate, counts, customer }) {
+export default function Sidebar({ categories, path, navigate, onAllProducts, counts, customer }) {
   const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
   const [menuTopOffset, setMenuTopOffset] = useState(0);
   const [showRequest, setShowRequest] = useState(false);
@@ -123,6 +123,7 @@ export default function Sidebar({ categories, path, navigate, counts, customer }
             categories={categories}
             path={path}
             navigate={navigate}
+            onAllProducts={onAllProducts}
             counts={counts}
             openCategoryId={openCategoryId}
             onToggleL1={handleToggleL1}

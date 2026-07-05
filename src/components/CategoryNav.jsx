@@ -8,7 +8,7 @@ const ICON_MAP = Object.fromEntries(
   categories.map((c) => [c.id, LUCIDE_ICON_MAP[c.icon] || null])
 );
 
-export default function CategoryNav({ categories: cats, path, navigate, onToggleL1, openCategoryId, counts }) {
+export default function CategoryNav({ categories: cats, path, navigate, onAllProducts, onToggleL1, openCategoryId, counts }) {
   const activeL1 = path?.[0] || null;
 
   return (
@@ -18,7 +18,7 @@ export default function CategoryNav({ categories: cats, path, navigate, onToggle
         <button
           type="button"
           className="cat-nav-all-products-btn"
-          onClick={() => { navigate([]); onToggleL1(null, null); }}
+          onClick={() => { onAllProducts(); onToggleL1(null, null); }}
         >
           All Products
         </button>

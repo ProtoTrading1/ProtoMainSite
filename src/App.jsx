@@ -152,6 +152,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     hashNavigate(newPath, newRefinements);
   }, [hashNavigate]);
 
+  const goAllProducts = useCallback(() => {
+    dismissWelcome();
+    navigate([]);
+  }, [dismissWelcome, navigate]);
+
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     scrollToTop();
     hashNavigate(newPath, newRefinements);
@@ -700,6 +705,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categories={categories}
             path={path}
             navigate={navigate}
+            onAllProducts={goAllProducts}
             setRefinement={setRefinement}
             counts={counts}
             customer={customer}
