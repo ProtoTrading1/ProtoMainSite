@@ -14,7 +14,7 @@ const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimati
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable } from './lib/products';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
@@ -35,6 +35,11 @@ const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
 const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
+const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
+
+function readInStockOnly() {
+  try { return sessionStorage.getItem(IN_STOCK_ONLY_KEY) === '1'; } catch { return false; }
+}
 
 function hashHasCategoryPath() {
   if (typeof window === 'undefined') return false;
@@ -107,6 +112,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
+  const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const skipNavScrollRef = useRef(false);
 
   const dismissWelcome = useCallback(() => {
@@ -115,6 +121,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       try { sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1'); } catch { /* ignore */ }
       return false;
     });
+  }, []);
+
+  const handleInStockOnlyChange = useCallback((next) => {
+    setInStockOnly(next);
+    try {
+      if (next) sessionStorage.setItem(IN_STOCK_ONLY_KEY, '1');
+      else sessionStorage.removeItem(IN_STOCK_ONLY_KEY);
+    } catch { /* ignore */ }
   }, []);
 
   const navigate = useCallback((newPath, newRefinements) => {
@@ -154,10 +168,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const goHome = useCallback(() => {
     skipNavScrollRef.current = true;
     try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     setShowWelcome(true);
     setSearchQuery('');
     setActiveCollection('all');
     setSort('featured');
+    setInStockOnly(false);
     hashNavigate([], {});
     scrollToTopSmooth();
   }, [hashNavigate]);
@@ -199,7 +215,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, sort, activeCollection, path.join('/')]);
+  }, [searchQuery, sort, activeCollection, path.join('/'), inStockOnly]);
 
   // Graceful fallback for legacy/unknown category slugs (taxonomy changed):
   // if the first path segment isn't a known department, resolve to the
@@ -300,8 +316,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             collection: activeCollection,
             sort,
             specialIds,
+            inStockOnly,
           }),
-          fetchCategoryCounts({ collection: activeCollection }),
+          fetchCategoryCounts({ collection: activeCollection, inStockOnly }),
         ]);
 
         if (cancelled) return;
@@ -317,6 +334,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categoryPath: path.slice(0, 1),
             collection: 'all',
             sort,
+            inStockOnly,
           });
           if (!cancelled && l1Data.total > 0) {
             setCatalogProducts(l1Data.products);
@@ -343,6 +361,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
         }
         if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
+        if (inStockOnly) rows = rows.filter(isProductAvailable);
         rows = groupProductsByBarcode(rows);
         setUsingFallback(true);
         setCatalogTotal(rows.length);
@@ -357,7 +376,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return () => {
       cancelled = true;
     };
-  }, [activeCollection, page, path, searchQuery, sort, categories]);
+  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -702,6 +721,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categories={categories}
             onProductPreview={handleProductPreview}
             showWelcome={showWelcome}
+            inStockOnly={inStockOnly}
+            onInStockOnlyChange={handleInStockOnlyChange}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
           />

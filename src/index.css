@@ -1966,6 +1966,30 @@ input, select, textarea { font-family: inherit; outline: none; }
   background: transparent;
   border: none;
 }
+.results-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.catalog-filter-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.catalog-filter-control input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--proto-red);
+  cursor: pointer;
+}
 .sort-control {
   display: flex;
   align-items: center;
@@ -3493,6 +3517,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 
   /* Sort control */
   .results-control { align-items: stretch; flex-direction: column; }
+  .results-control-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
   /* Product grid: cleaner cards on mobile */
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

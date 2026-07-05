@@ -114,6 +114,24 @@ export async function fetchDistinctCategories() {
 
 // ─── Filtering / sorting helpers ──────────────────────────────────────────────
 
+/** Whether a single product row is available for ordering (pre-grouping). */
+export function isProductAvailable(product) {
+  if (!product) return false;
+  const qtyRaw = product.stockOnHand ?? product.stockQty;
+  if (qtyRaw !== undefined && qtyRaw !== null) {
+    const qty = Number(qtyRaw) || 0;
+    if (qty <= 0) return product.keepLiveWhenOos === true;
+    return true;
+  }
+  if (product.inStock === false) return false;
+  return true;
+}
+
+function applyInStockFilter(products, inStockOnly) {
+  if (!inStockOnly) return products;
+  return products.filter(isProductAvailable);
+}
+
 function applyCollection(products, collection, specialIds = null) {
   // Stock-based collections are no-ops in catalogue-only mode.
   if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
@@ -207,6 +225,7 @@ export async function fetchProductPage({
   collection = 'all',
   sort = 'featured',
   specialIds = null,
+  inStockOnly = false,
 } = {}) {
   let products = await getAllCached();
   const sortOrders = await getSortOrders();
@@ -237,6 +256,7 @@ export async function fetchProductPage({
     products = applySort(products, sort, categoryPath, sortOrders, hasSearch);
   }
 
+  products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
 
   const total = products.length;
@@ -250,9 +270,10 @@ export async function fetchProductPage({
   };
 }
 
-export async function fetchCategoryCounts({ collection = 'all' } = {}) {
+export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false } = {}) {
   let products = await getAllCached();
   products = applyCollection(products, collection);
+  products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
   const tree = getActiveTaxonomy();
   const counts = { '': products.length };

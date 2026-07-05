@@ -65,6 +65,8 @@ export default function MainContent({
   searchActive = false,
   onSearchProductClick = null,
   showWelcome = false,
+  inStockOnly = false,
+  onInStockOnlyChange = () => {},
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
@@ -196,14 +198,24 @@ export default function MainContent({
                 ? `${categoryProductCount} featured product${categoryProductCount !== 1 ? 's' : ''}`
                 : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
           </span>
-          <label className="sort-control">
-            <span>Sort</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="featured">Featured</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-            </select>
-          </label>
+          <div className="results-control-actions">
+            <label className="catalog-filter-control">
+              <input
+                type="checkbox"
+                checked={inStockOnly}
+                onChange={(e) => onInStockOnlyChange(e.target.checked)}
+              />
+              <span>In Stock Only</span>
+            </label>
+            <label className="sort-control">
+              <span>Sort</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="featured">Featured</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="price-high">Price: High to Low</option>
+              </select>
+            </label>
+          </div>
         </div>
       )}
 
