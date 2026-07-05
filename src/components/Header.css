@@ -29,6 +29,40 @@
 
 .app-header--premium .brand-block {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-home-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #A3A3A3;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.header-home-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.header-home-btn:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 2px;
+}
+
+.brand-logo-hit {
+  display: flex;
+  align-items: center;
 }
 
 .app-header--premium .header-search-premium-wrap {

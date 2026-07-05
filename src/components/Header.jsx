@@ -432,8 +432,26 @@ export default function Header({
     <>
       <header className="app-header app-header--premium">
         {/* Brand */}
-        <div className="brand-block" role="button" tabIndex={0} onClick={onHome} onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }} style={{ cursor: onHome ? 'pointer' : undefined }}>
-          <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
+        <div className="brand-block">
+          <button
+            type="button"
+            className="header-home-btn desktop-only"
+            onClick={onHome}
+            aria-label="Home"
+            title="Home"
+          >
+            <Home size={18} aria-hidden="true" />
+          </button>
+          <div
+            className="brand-logo-hit"
+            role="button"
+            tabIndex={0}
+            onClick={onHome}
+            onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }}
+            style={{ cursor: onHome ? 'pointer' : undefined }}
+          >
+            <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
+          </div>
         </div>
 
         {/* Signature search */}

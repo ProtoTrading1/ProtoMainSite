@@ -64,6 +64,7 @@ export default function MainContent({
   bannerConfig = null,
   searchActive = false,
   onSearchProductClick = null,
+  showWelcome = false,
 }) {
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
@@ -96,7 +97,7 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
-      {isAllProductsPage && !searchQuery && !isCategoryPage && (
+      {showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage && (
         <div className="site-hero-banner">
           <img
             src="/main-site-banner.jpg"

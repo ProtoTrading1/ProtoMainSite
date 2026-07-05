@@ -27,13 +27,31 @@ import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { resolveNavPathForProducts } from './lib/taxonomy';
-import { scrollToTop } from './lib/scrollToTop';
+import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import './index.css';
 
 const HEADER_H = 72;
 const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
 const DRAWER_PEEK_MS = 5000;
+const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
+
+function hashHasCategoryPath() {
+  if (typeof window === 'undefined') return false;
+  const raw = window.location.hash.replace(/^#\/?/, '');
+  const pathStr = (raw.split('?')[0] || '').trim();
+  if (!pathStr) return false;
+  const segments = pathStr.split('/').filter(Boolean);
+  if (segments[0] === 'portal-preview') return segments.length > 1;
+  return segments.length > 0;
+}
+
+function readInitialShowWelcome() {
+  try {
+    if (sessionStorage.getItem(WELCOME_DISMISSED_KEY)) return false;
+  } catch { /* ignore */ }
+  return !hashHasCategoryPath();
+}
 
 function getProductImageUrl(product, siteOrigin = '') {
   const src = product.localImage || product.image || '';
@@ -88,6 +106,16 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
+  const skipNavScrollRef = useRef(false);
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome((prev) => {
+      if (!prev) return prev;
+      try { sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+      return false;
+    });
+  }, []);
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
@@ -122,6 +150,41 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [bannerConfig, setBannerConfig] = useState(null);
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
+
+  const goHome = useCallback(() => {
+    skipNavScrollRef.current = true;
+    try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
+    setShowWelcome(true);
+    setSearchQuery('');
+    setActiveCollection('all');
+    setSort('featured');
+    hashNavigate([], {});
+    scrollToTopSmooth();
+  }, [hashNavigate]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) dismissWelcome();
+  }, [searchQuery, dismissWelcome]);
+
+  useEffect(() => {
+    if (path.length > 0) dismissWelcome();
+  }, [path.join('/'), dismissWelcome]);
+
+  useEffect(() => {
+    if (activeCollection !== 'all') dismissWelcome();
+  }, [activeCollection, dismissWelcome]);
+
+  useEffect(() => {
+    if (sort !== 'featured') dismissWelcome();
+  }, [sort, dismissWelcome]);
+
+  useEffect(() => {
+    if (Object.keys(refinements).length > 0) dismissWelcome();
+  }, [refinements, dismissWelcome]);
+
+  useEffect(() => {
+    if (page > 1) dismissWelcome();
+  }, [page, dismissWelcome]);
 
   useEffect(() => {
     try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
@@ -161,12 +224,18 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   // useLayoutEffect so scroll resets before paint; also re-run after catalog loads
   // because shorter pages + scroll anchoring can leave the viewport at the bottom.
   useLayoutEffect(() => {
+    if (skipNavScrollRef.current) return;
     scrollToTop();
   }, [navScrollKey]);
 
   useLayoutEffect(() => {
+    if (skipNavScrollRef.current) return;
     if (!loading) scrollToTop();
   }, [loading, navScrollKey]);
+
+  useLayoutEffect(() => {
+    skipNavScrollRef.current = false;
+  });
 
   const handlePageChange = useCallback((nextPage) => {
     scrollToTop();
@@ -379,6 +448,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, []);
 
   const addToCart = (product, qty, buttonPos = null) => {
+    dismissWelcome();
     const maxQty = product.stockQty || 9999;
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
@@ -557,6 +627,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const [previewProduct, setPreviewProduct] = useState(null);
 
+  const handleProductPreview = useCallback((product) => {
+    dismissWelcome();
+    setPreviewProduct(product);
+  }, [dismissWelcome]);
+
   const handleSearchProductClick = useCallback((product, index) => {
     const track = searchTrackRef.current;
     if (!track.rowId || !searchQuery.trim()) return;
@@ -580,7 +655,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setSearchQuery={setSearchQuery}
         navigateForSearch={navigateForSearch}
         onMenuClick={() => setMobileMenuOpen(true)}
-        onHome={() => { navigate([]); setActiveCollection('all'); scrollToTop(); }}
+        onHome={goHome}
         customer={customer}
         onViewProfile={onViewProfile}
         onViewAdmin={onViewAdmin}
@@ -633,7 +708,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             categoryCounts={counts}
             categoryNode={categoryNode}
             categories={categories}
-            onProductPreview={setPreviewProduct}
+            onProductPreview={handleProductPreview}
+            showWelcome={showWelcome}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
           />
@@ -694,7 +770,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onViewProfile={onViewProfile}
         onViewAdmin={onViewAdmin}
         onLogout={onLogout}
-        onHome={() => { navigate([]); setActiveCollection('all'); setMobileMenuOpen(false); scrollToTop(); }}
+        onHome={() => { goHome(); setMobileMenuOpen(false); }}
         onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
         onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
       />
