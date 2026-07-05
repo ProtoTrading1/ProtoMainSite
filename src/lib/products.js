@@ -165,10 +165,10 @@ function applyPathFilter(products, categoryPath) {
   }));
 }
 
-function applySort(products, sort, categoryPath = [], sortOrders = {}) {
+function applySort(products, sort, categoryPath = [], sortOrders = {}, hasSearch = false) {
   const arr = [...products];
   if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if (sort === 'featured' && categoryPath.length) {
+  if (sort === 'featured' && categoryPath.length && !hasSearch) {
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
     if (skuOrder?.length) return applySkuOrder(arr, skuOrder);
   }
@@ -197,7 +197,7 @@ export async function fetchProductPage({
   const hasSearch = Boolean(searchQuery.trim());
   if (!hasSearch) products = applyPathFilter(products, categoryPath);
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
-  products = applySort(products, sort, categoryPath, sortOrders);
+  products = applySort(products, sort, categoryPath, sortOrders, hasSearch);
   products = groupProductsByBarcode(products);
 
   const total = products.length;

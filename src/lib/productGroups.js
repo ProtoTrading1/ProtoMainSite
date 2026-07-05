@@ -84,7 +84,7 @@ export function groupProductsByBarcode(products) {
 
 /** When search matches one variant, keep siblings that share the same barcode. */
 export function expandBarcodeSiblings(pool, matched) {
-  if (!Array.isArray(pool) || !Array.isArray(matched) || !matched.length) return matched || [];
+  if (!Array.isArray(matched) || !matched.length) return matched || [];
 
   const keys = new Set(matched.map(variantGroupKey).filter(Boolean));
   if (!keys.size) return matched;
@@ -95,5 +95,17 @@ export function expandBarcodeSiblings(pool, matched) {
     if (key && keys.has(key)) ids.add(product.id);
   }
 
-  return pool.filter((p) => ids.has(p.id));
+  const out = [];
+  const seen = new Set();
+  for (const product of matched) {
+    if (seen.has(product.id) || !ids.has(product.id)) continue;
+    out.push(product);
+    seen.add(product.id);
+  }
+  for (const product of pool) {
+    if (seen.has(product.id) || !ids.has(product.id)) continue;
+    out.push(product);
+    seen.add(product.id);
+  }
+  return out;
 }
