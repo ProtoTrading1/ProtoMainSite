@@ -167,9 +167,25 @@ function applyPathFilter(products, categoryPath) {
   }));
 }
 
+function compareByPrice(a, b, descending = false) {
+  const pa = Number(a.price) || 0;
+  const pb = Number(b.price) || 0;
+  if (pa === 0 && pb === 0) return 0;
+  if (pa === 0) return 1;
+  if (pb === 0) return -1;
+  return descending ? pb - pa : pa - pb;
+}
+
 function applySort(products, sort, categoryPath = [], sortOrders = {}, hasSearch = false) {
   const arr = [...products];
-  if (sort === 'latest') arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if (sort === 'price-low') {
+    arr.sort((a, b) => compareByPrice(a, b, false));
+    return arr;
+  }
+  if (sort === 'price-high') {
+    arr.sort((a, b) => compareByPrice(a, b, true));
+    return arr;
+  }
   if (sort === 'featured' && categoryPath.length && !hasSearch) {
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
     if (skuOrder?.length) return applySkuOrder(arr, skuOrder);
