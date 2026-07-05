@@ -1,4 +1,3 @@
-import { Home } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { lookupProductCount } from '../lib/taxonomy';
 import categories from '../data/categories.json';
@@ -16,14 +15,6 @@ export default function CategoryNav({ categories: cats, path, navigate, onToggle
     <div className="cat-nav">
       <div className="cat-nav-header">
         <span className="cat-nav-header-label">Departments</span>
-        <button
-          type="button"
-          className="cat-nav-home-btn"
-          onClick={() => { navigate([]); onToggleL1(null, null); }}
-          aria-label="All products"
-        >
-          <Home size={14} />
-        </button>
       </div>
 
       <ul className="cat-nav-list" role="list">

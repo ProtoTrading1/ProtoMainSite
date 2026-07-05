@@ -715,9 +715,6 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cat-nav-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 14px 16px 10px;
   border-bottom: 1px solid #F0F1F3;
 }
@@ -728,26 +725,6 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: #9CA3AF;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-}
-
-.cat-nav-home-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  border: 1px solid #E5E7EB;
-  background: none;
-  color: #9CA3AF;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  font-family: inherit;
-}
-.cat-nav-home-btn:hover {
-  background: #FEF2F2;
-  color: #7F1D1D;
-  border-color: #FECACA;
 }
 
 .cat-nav-list {
