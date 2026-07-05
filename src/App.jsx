@@ -96,9 +96,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [hashNavigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
-    scrollToTop();
+    if (newPath.join('/') !== path.join('/')) scrollToTop();
     hashNavigate(newPath, newRefinements);
-  }, [hashNavigate]);
+  }, [hashNavigate, path]);
   const [sort, setSort] = useState('featured');
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -156,16 +156,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [path, hashNavigate]);
 
   const pathKey = path.join('/');
-  const navScrollKey = `${pathKey}|${page}|${activeCollection}|${searchQuery}|${sort}`;
+  const navScrollKey = `${pathKey}|${page}|${activeCollection}|${sort}`;
+  const scrollAfterLoadRef = useRef(false);
 
-  // useLayoutEffect so scroll resets before paint; also re-run after catalog loads
-  // because shorter pages + scroll anchoring can leave the viewport at the bottom.
+  // Scroll to top only for intentional navigation (category, collection, page, sort) —
+  // not when search results reload or a search result is selected in-place.
   useLayoutEffect(() => {
+    scrollAfterLoadRef.current = true;
     scrollToTop();
   }, [navScrollKey]);
 
+  // Re-run after catalog loads when navigation context changed; shorter pages can
+  // leave the viewport anchored at the bottom without this second pass.
   useLayoutEffect(() => {
-    if (!loading) scrollToTop();
+    if (!loading && scrollAfterLoadRef.current) {
+      scrollToTop();
+      scrollAfterLoadRef.current = false;
+    }
   }, [loading, navScrollKey]);
 
   const handlePageChange = useCallback((nextPage) => {
