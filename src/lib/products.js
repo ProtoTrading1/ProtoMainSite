@@ -12,6 +12,7 @@ import {
   motarroPathMatchesFilter,
 } from './mottaroCategory';
 import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
+import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
@@ -83,6 +84,7 @@ export function invalidateProductCache() {
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
   _sortOrdersPromise = null;
+  invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch {}
 }
 
@@ -197,7 +199,28 @@ export async function fetchProductPage({
   const hasSearch = Boolean(searchQuery.trim());
   if (!hasSearch) products = applyPathFilter(products, categoryPath);
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
-  products = applySort(products, sort, categoryPath, sortOrders, hasSearch);
+
+  const isHomeDefault = sort === 'featured'
+    && categoryPath.length === 0
+    && collection === 'all'
+    && !hasSearch;
+
+  if (isHomeDefault) {
+    const featuredSkus = await getFeaturedProducts();
+    if (featuredSkus.length === 0) {
+      products = [];
+    } else {
+      const bySku = new Map(
+        products.map((p) => [String(p.sku || p.code || p.websiteSku || '').toUpperCase(), p]),
+      );
+      products = featuredSkus
+        .map((sku) => bySku.get(sku))
+        .filter(Boolean);
+    }
+  } else {
+    products = applySort(products, sort, categoryPath, sortOrders, hasSearch);
+  }
+
   products = groupProductsByBarcode(products);
 
   const total = products.length;
