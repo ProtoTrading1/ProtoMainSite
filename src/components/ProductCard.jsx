@@ -3,11 +3,10 @@ import { createPortal } from 'react-dom';
 import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
+import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
 const LOW_STOCK_THRESHOLD = 5;
-// Show the limited-stock order disclaimer only below this catalog quantity.
-const STOCK_POLICY_THRESHOLD = 20;
 
 function catalogStockQty(product) {
   if (!product) return null;
@@ -16,15 +15,41 @@ function catalogStockQty(product) {
   return Number(raw) || 0;
 }
 
-function shouldShowStockPolicy(product) {
-  if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length > 1) {
-    return product.variants.some((variant) => {
-      const qty = catalogStockQty(variant);
-      return qty !== null && qty < STOCK_POLICY_THRESHOLD;
-    });
-  }
+function catalogStockBadgeState(product) {
   const qty = catalogStockQty(product);
-  return qty !== null && qty < STOCK_POLICY_THRESHOLD;
+  if (qty !== null) {
+    if (qty <= 0) return product.keepLiveWhenOos ? 'in' : 'out';
+    if (qty <= LOW_STOCK_THRESHOLD) return 'low';
+    return 'in';
+  }
+  return product.inStock === false ? 'out' : 'in';
+}
+
+function catalogStockBadge(product) {
+  if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length > 1) {
+    const states = product.variants.map((variant) => catalogStockBadgeState(variant));
+    if (states.every((state) => state === 'out')) return 'out';
+    if (states.some((state) => state === 'low')) return 'low';
+    return 'in';
+  }
+  return catalogStockBadgeState(product);
+}
+
+const STOCK_BADGE_LABEL = {
+  in: 'In stock',
+  low: 'Low stock',
+  out: 'Out of stock',
+};
+
+function StockBadge({ product }) {
+  const state = catalogStockBadge(product);
+  return (
+    <div className="pc-stock-slot">
+      <span className={`pc-stock-badge pc-stock-badge--${state}`} aria-label={STOCK_BADGE_LABEL[state]}>
+        {state === 'in' ? 'In stock' : state === 'low' ? 'Low stock' : 'Out of stock'}
+      </span>
+    </div>
+  );
 }
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
@@ -98,8 +123,8 @@ function ProductImage({ src, alt, width = 400, priority = false }) {
   }, [src]);
 
   if (!candidates.length || !candidates[imageIdx]) {
-    return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb', color: '#d1d5db' }}>
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: '#d1d5db' }}>
         <ImageOff size={28} />
       </div>
     );
@@ -161,7 +186,6 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const safeTags = isVariantGroup
     ? [{ label: variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
     : baseTags;
-  const safeBadges = Array.isArray(product?.badges) ? product.badges : [];
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -234,50 +258,37 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               })}
             </div>
           )}
-          <ProductImage src={product.localImage || product.image} alt={product.name} priority={priority} />
+          <div className="pc-image-frame">
+            <ProductImage src={product.localImage || product.image} alt={product.name} priority={priority} />
+          </div>
           <SpecialRibbon special={special} />
           <span className="zoom-cue"><ZoomIn size={13} /> View</span>
         </button>
 
         {/* Body */}
         <div className="product-body">
-          <div className="product-meta">
-            <span>{product.code}</span>
+          <button className="product-title-button" onClick={openPreview} type="button">
+            <h3>{product.name}</h3>
+          </button>
+
+          <div className="pc-sku">
+            <span className="pc-sku-code">SKU: {product.code}</span>
             {isVariantGroup && variantCount > 1 && (
               <span className="pc-variant-count">{variantCount} options</span>
             )}
           </div>
 
-          <button className="product-title-button" onClick={openPreview} type="button">
-            <h3>{product.name}</h3>
-          </button>
+          <div className="pc-price-block">
+            {activeProduct.price > 0 ? (
+              <>
+                <strong className="pc-price-amount">R{Number(activeProduct.price).toFixed(2)}</strong>
+                <span className="pc-price-vat">Incl. VAT</span>
+              </>
+            ) : null}
+          </div>
 
-          {product.originalDescription && (
-            <p className="product-desc">{product.originalDescription}</p>
-          )}
+          <StockBadge product={product} />
 
-          {safeBadges.length > 0 && (
-            <div className="product-badges">
-              {safeBadges.map((b) => <span key={b}>{b}</span>)}
-            </div>
-          )}
-
-          {activeProduct.price > 0 && (
-            <div className="price-row">
-              <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-              <span>incl. VAT</span>
-            </div>
-          )}
-
-          <StockCheck sku={product.code || product.barcode || product.sku || product.id} />
-
-          {shouldShowStockPolicy(product) && (
-            <p className="product-stock-policy">
-              (Limited stock available. Orders exceeding current stock can still be fulfilled — please allow additional time for delivery.)
-            </p>
-          )}
-
-          {/* Always the same control: typeable quantity + Add button */}
           <div className="buy-row">
             <div className="qty-stepper" aria-label="Quantity">
               <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
@@ -290,7 +301,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </div>
             <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
               <ShoppingCart size={15} />
-              {isVariantGroup ? 'View options' : 'Add'}
+              {isVariantGroup ? 'View options' : 'Add to Cart'}
             </button>
           </div>
           {inCart && (
