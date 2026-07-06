@@ -31,8 +31,6 @@ import { resolveNavPathForProducts } from './lib/taxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import './index.css';
 
-const HEADER_H = 72;
-const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
 const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
@@ -884,7 +882,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [searchQuery, page]);
 
-  const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
@@ -907,7 +904,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onCartClick={() => { if (window.innerWidth > 1200) setCartDrawerOpen(true); else setMobileCartOpen(true); }}
       />
 
-      <div className="main-layout" style={{ height: bodyH }}>
+      <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
         <aside className="sidebar-rail">
           <Sidebar
             categories={categories}
