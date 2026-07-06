@@ -4923,14 +4923,16 @@ textarea:focus-visible,
 .results-count {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 32px;
-  padding: 0 10px;
+  min-width: 36px;
+  padding: 0 9px;
   border: 1px solid #e5e7eb;
   border-radius: 999px;
   background: #f8fafc;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
 }
 

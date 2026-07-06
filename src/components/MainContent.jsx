@@ -159,7 +159,7 @@ export default function MainContent({
     <div className="results-control">
       <div className="results-control-actions">
         <span className="results-count">
-          {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
+          {categoryProductCount}
         </span>
         <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
           <input
@@ -168,11 +168,10 @@ export default function MainContent({
             checked={inStockOnly}
             onChange={(e) => onInStockOnlyChange(e.target.checked)}
           />
-          <span>Available Only</span>
+          <span>Available</span>
         </label>
         <label className="sort-control" htmlFor={sortSelectId}>
-          <span>Sort</span>
-          <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)}>
+          <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
             <option value="featured">Featured</option>
             <option value="best-selling">Best Selling</option>
             <option value="newest">Newest</option>
