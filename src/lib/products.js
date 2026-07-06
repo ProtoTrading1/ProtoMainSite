@@ -12,6 +12,7 @@ import {
 import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
+import { preloadProductImages } from './imageUrl';
 
 export const DEFAULT_SORT = 'best-selling';
 
@@ -50,9 +51,20 @@ export function subscribeCatalogRefresh(fn) {
   return () => _refreshListeners.delete(fn);
 }
 
+function preloadCatalogImages(products, limit = 60) {
+  if (!products?.length) return;
+  const sorted = sortCatalogProducts(products, DEFAULT_SORT);
+  preloadProductImages(
+    sorted.slice(0, limit).map((p) => p.image || p.localImage),
+    { limit },
+  );
+}
+
 /** Start catalogue fetch early (e.g. on login) so data is ready before App mounts. */
 export function prefetchCatalog() {
-  void getAllCached();
+  const stale = loadFromLocalCache();
+  if (stale?.length) preloadCatalogImages(stale);
+  void getAllCached().then((products) => preloadCatalogImages(products));
 }
 
 function saveToLocalCache(data) {
