@@ -80,14 +80,29 @@ function PanelHeader({ label, onViewAll, color }) {
 
 const NAV_ROW_HEIGHT = 42;
 
-function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, onFocus, color }) {
+function ListItem({
+  itemId,
+  menuColumn,
+  label,
+  count,
+  hasArrow,
+  active,
+  onClick,
+  onMouseEnter,
+  onFocus,
+  onKeyDown,
+  color,
+}) {
   return (
     <button
       type="button"
       role="menuitem"
+      data-menu-col={menuColumn}
+      data-item-id={itemId}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onFocus={onFocus}
+      onKeyDown={onKeyDown}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 20px 0 16px', width: '100%', height: NAV_ROW_HEIGHT,
@@ -121,6 +136,7 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
   const countFor = (...segments) => lookupProductCount(counts, segments, categories);
   const l2List = filterNavChildrenByCount(l1Node?.children, [l1Node?.id].filter(Boolean), counts, categories);
   const [hoveredL2Id, setHoveredL2Id] = useState(l2List[0]?.id || null);
+  const flyoutRef = useRef(null);
   const leaveTimerRef = useRef(null);
 
   if (!l1Node) return null;
@@ -140,6 +156,55 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
 
   const go = (segments) => { navigate(segments); onClose(); };
 
+  const getMenuColumnItems = (column) => (
+    Array.from(flyoutRef.current?.querySelectorAll(`[data-menu-col="${column}"]`) || [])
+  );
+
+  const focusFirstInColumn = (column) => {
+    getMenuColumnItems(column)[0]?.focus();
+  };
+
+  const focusItemInColumn = (column, itemId) => {
+    const match = getMenuColumnItems(column).find((btn) => btn.dataset.itemId === itemId);
+    match?.focus();
+  };
+
+  const moveWithinColumn = (column, currentItemId, direction) => {
+    const items = getMenuColumnItems(column);
+    if (!items.length) return;
+    const currentIdx = items.findIndex((btn) => btn.dataset.itemId === currentItemId);
+    const fromIdx = currentIdx >= 0 ? currentIdx : 0;
+    const nextIdx = (fromIdx + direction + items.length) % items.length;
+    items[nextIdx]?.focus();
+  };
+
+  const handleListItemKeyDown = (event, { column, itemId }) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveWithinColumn(column, itemId, 1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveWithinColumn(column, itemId, -1);
+      return;
+    }
+    if (event.key === 'ArrowRight' && column === 'l2' && l3List.length > 0) {
+      event.preventDefault();
+      focusFirstInColumn('l3');
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      if (column === 'l3') {
+        focusItemInColumn('l2', hoveredL2?.id || l2List[0]?.id);
+        return;
+      }
+      const parentCategoryButton = document.querySelector('.cat-nav-btn[aria-expanded="true"]');
+      parentCategoryButton?.focus();
+    }
+  };
+
   // Delay closing L2 hover state so diagonal mouse movement to L3 doesn't flicker
   const handleL2Enter = (id) => {
     if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -155,6 +220,7 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
   return (
     <div
       className="mega-menu-flyout"
+      ref={flyoutRef}
       role="menu"
       aria-label={`${l1Node.label} categories`}
       onKeyDown={(e) => {
@@ -185,6 +251,8 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
           {l2List.map((l2) => (
             <ListItem
               key={l2.id}
+              itemId={l2.id}
+              menuColumn="l2"
               label={l2.label}
               count={countFor(l1Node.id, l2.id)}
               hasArrow={!!l2.children?.length}
@@ -193,6 +261,7 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
               onClick={() => go([l1Node.id, l2.id])}
               onMouseEnter={() => handleL2Enter(l2.id)}
               onFocus={() => handleL2Enter(l2.id)}
+              onKeyDown={(event) => handleListItemKeyDown(event, { column: 'l2', itemId: l2.id })}
             />
           ))}
         </div>
@@ -209,6 +278,8 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
               {l3List.map((l3) => (
                 <ListItem
                   key={l3.id}
+                  itemId={l3.id}
+                  menuColumn="l3"
                   label={l3.label}
                   count={countFor(l1Node.id, hoveredL2.id, l3.id)}
                   hasArrow={false}
@@ -216,6 +287,7 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
                   color={color}
                   onClick={() => go([l1Node.id, hoveredL2.id, l3.id])}
                   onMouseEnter={undefined}
+                  onKeyDown={(event) => handleListItemKeyDown(event, { column: 'l3', itemId: l3.id })}
                 />
               ))}
             </div>

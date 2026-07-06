@@ -135,6 +135,13 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
     }
   };
 
+  const focusFirstFlyoutItem = () => {
+    window.requestAnimationFrame(() => {
+      const firstItem = containerRef.current?.querySelector('.mega-menu-flyout [data-menu-col="l2"]');
+      firstItem?.focus();
+    });
+  };
+
   return (
     <div
       ref={containerRef}
@@ -152,6 +159,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
             counts={counts}
             openCategoryId={openCategoryId}
             onToggleL1={handleToggleL1}
+            onOpenFlyoutWithKeyboard={focusFirstFlyoutItem}
           />
         </div>
 

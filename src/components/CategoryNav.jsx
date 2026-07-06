@@ -8,7 +8,26 @@ const ICON_MAP = Object.fromEntries(
   categories.map((c) => [c.id, LUCIDE_ICON_MAP[c.icon] || null])
 );
 
-export default function CategoryNav({ categories: cats, path, navigate, onAllProducts, onToggleL1, openCategoryId, counts }) {
+function focusSiblingCategoryButton(currentButton, direction) {
+  const list = currentButton?.closest('.cat-nav-list');
+  if (!list) return;
+  const buttons = Array.from(list.querySelectorAll('.cat-nav-btn'));
+  const currentIndex = buttons.indexOf(currentButton);
+  if (currentIndex < 0 || buttons.length === 0) return;
+  const nextIndex = (currentIndex + direction + buttons.length) % buttons.length;
+  buttons[nextIndex]?.focus();
+}
+
+export default function CategoryNav({
+  categories: cats,
+  path,
+  navigate,
+  onAllProducts,
+  onToggleL1,
+  onOpenFlyoutWithKeyboard = () => {},
+  openCategoryId,
+  counts,
+}) {
   const activeL1 = path?.[0] || null;
 
   return (
@@ -45,6 +64,23 @@ export default function CategoryNav({ categories: cats, path, navigate, onAllPro
                 onClick={() => navigate([cat.id])}
                 onMouseEnter={(e) => onToggleL1(cat.id, e.currentTarget)}
                 onFocus={(e) => onToggleL1(cat.id, e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    focusSiblingCategoryButton(e.currentTarget, 1);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    focusSiblingCategoryButton(e.currentTarget, -1);
+                    return;
+                  }
+                  if (e.key === 'ArrowRight' && hasChildren) {
+                    e.preventDefault();
+                    onToggleL1(cat.id, e.currentTarget);
+                    onOpenFlyoutWithKeyboard();
+                  }
+                }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-haspopup={hasChildren ? 'menu' : undefined}
                 aria-expanded={hasChildren ? isOpen : undefined}
