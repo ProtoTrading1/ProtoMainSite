@@ -218,6 +218,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartItems, setCartItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); } catch { return []; }
   });
+  const [cartAnnouncement, setCartAnnouncement] = useState('');
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
   const [cartClock, setCartClock] = useState(Date.now());
   const [flyAnim, setFlyAnim] = useState(null);
@@ -225,6 +226,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const drawerTimerRef = useRef(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const lastSearchLogKeyRef = useRef('');
+  const hasInitializedCartAnnouncementRef = useRef(false);
+  const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
@@ -749,6 +752,25 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         ? 'warn'
         : 'ok';
 
+  useEffect(() => {
+    const prev = prevCartSnapshotRef.current;
+    const next = { count: totalItemCount, total: cartTotal };
+
+    if (!hasInitializedCartAnnouncementRef.current) {
+      hasInitializedCartAnnouncementRef.current = true;
+      prevCartSnapshotRef.current = next;
+      return;
+    }
+    if (prev.count === next.count && prev.total === next.total) return;
+
+    if (next.count === 0) {
+      setCartAnnouncement('Cart cleared.');
+    } else {
+      setCartAnnouncement(`Cart updated. ${next.count} item${next.count === 1 ? '' : 's'}. Total R${next.total.toFixed(2)}.`);
+    }
+    prevCartSnapshotRef.current = next;
+  }, [totalItemCount, cartTotal]);
+
   const sendOrderEmail = async (opts = {}) => {
     if (!cartItems.length) return;
     const courierChoice = opts?.courierChoice || null;
@@ -886,6 +908,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
         cartTotal={cartTotal}
@@ -920,7 +943,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         <main className="content-area">
           <MainContent
             products={catalogProducts}
-            allProductCount={counts[''] || catalogTotal}
+            resultsTotal={catalogTotal}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             onCartQtyChange={handleCartQtyChange}

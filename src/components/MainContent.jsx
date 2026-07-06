@@ -34,7 +34,7 @@ const shortcuts = [
 
 export default function MainContent({
   products,
-  allProductCount,
+  resultsTotal = products.length,
   addToCart,
   cartQtyMap = {},
   onCartQtyChange = () => {},
@@ -72,8 +72,10 @@ export default function MainContent({
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
   const [isGridFadeIn, setIsGridFadeIn] = useState(false);
+  const [resultsAnnouncement, setResultsAnnouncement] = useState('');
   const pendingReorderRef = useRef(false);
   const previousBrowseStateRef = useRef(null);
+  const hasAnnouncedResultsRef = useRef(false);
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -149,6 +151,33 @@ export default function MainContent({
     const timer = window.setTimeout(() => setIsGridFadeIn(false), 140);
     return () => window.clearTimeout(timer);
   }, [loading, products]);
+
+  useEffect(() => {
+    if (loading) return;
+    const total = Math.max(0, Number(resultsTotal) || 0);
+    const message = total === 0
+      ? 'No products match your current filters.'
+      : totalPages > 1
+        ? `${total} products found. Page ${page} of ${totalPages}.`
+        : `${total} products found.`;
+
+    if (!hasAnnouncedResultsRef.current) {
+      hasAnnouncedResultsRef.current = true;
+      return;
+    }
+    setResultsAnnouncement(message);
+  }, [
+    loading,
+    resultsTotal,
+    page,
+    totalPages,
+    pathKey,
+    searchKey,
+    activeCollection,
+    inStockOnly,
+    sort,
+    refinementsKey,
+  ]);
 
   const shouldShowSkeleton = loading && showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
@@ -273,6 +302,7 @@ export default function MainContent({
       )}
 
       {resultsControl}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
 
       {shouldShowSkeleton ? (
         <ProductGridSkeleton count={products.length || 12} />
