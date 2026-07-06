@@ -274,6 +274,15 @@ function SearchPanel({
   );
 }
 
+function moveActiveSuggestionIndex(currentIndex, totalItems, direction) {
+  if (totalItems <= 0) return -1;
+  if (currentIndex < 0) return direction > 0 ? 0 : totalItems - 1;
+  const next = currentIndex + direction;
+  if (next < 0) return totalItems - 1;
+  if (next >= totalItems) return 0;
+  return next;
+}
+
 // ─── Cart progress fill icon ──────────────────────────────────
 const MIN_ORDER = 1000;
 
@@ -403,8 +412,13 @@ export default function Header({
   const handleKeyDown = (e) => {
     const items = keyboardItems;
     if (e.key === 'Escape') { closeSearch(); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, items.length - 1)); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!searchOpen) openSearch();
+      const direction = e.key === 'ArrowDown' ? 1 : -1;
+      setActiveIdx((idx) => moveActiveSuggestionIndex(idx, items.length, direction));
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIdx >= 0 && items[activeIdx]) {
@@ -420,6 +434,12 @@ export default function Header({
   useEffect(() => {
     setActiveIdx((prevIdx) => Math.min(prevIdx, keyboardItems.length - 1));
   }, [keyboardItems.length]);
+
+  useEffect(() => {
+    if (!searchOpen || !activeDesktopItemId) return;
+    const activeEl = document.getElementById(activeDesktopItemId);
+    activeEl?.scrollIntoView({ block: 'nearest' });
+  }, [searchOpen, activeDesktopItemId]);
 
   const pickProduct = (p) => {
     saveRecent(p.name);
@@ -494,6 +514,12 @@ export default function Header({
   useEffect(() => {
     setMobileActiveIdx((prevIdx) => Math.min(prevIdx, mobileKeyboardItems.length - 1));
   }, [mobileKeyboardItems.length]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen || !activeMobileItemId) return;
+    const activeEl = document.getElementById(activeMobileItemId);
+    activeEl?.scrollIntoView({ block: 'nearest' });
+  }, [mobileSearchOpen, activeMobileItemId]);
 
   useEffect(() => {
     if (!searchOpen && !mobileSearchOpen) return undefined;
@@ -679,11 +705,11 @@ export default function Header({
             if (e.key === 'Escape') closeMobileSearch();
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setMobileActiveIdx((idx) => Math.min(idx + 1, mobileKeyboardItems.length - 1));
+              setMobileActiveIdx((idx) => moveActiveSuggestionIndex(idx, mobileKeyboardItems.length, 1));
             }
             if (e.key === 'ArrowUp') {
               e.preventDefault();
-              setMobileActiveIdx((idx) => Math.max(idx - 1, -1));
+              setMobileActiveIdx((idx) => moveActiveSuggestionIndex(idx, mobileKeyboardItems.length, -1));
             }
             if (e.key === 'Enter' && mobileInput.trim()) {
               e.preventDefault();
