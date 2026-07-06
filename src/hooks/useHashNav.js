@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { scrollToTop } from '../lib/scrollToTop';
 
 const ROUTE_PREFIXES = new Set(['portal-preview']);
@@ -39,26 +39,32 @@ function buildHash(path, refinements = {}, routePrefix = '') {
  */
 export function useHashNav() {
   const [state, setState] = useState(parseHash);
+  const shouldScrollOnHashChangeRef = useRef(true);
 
   useEffect(() => {
     const handler = () => {
-      scrollToTop();
+      if (shouldScrollOnHashChangeRef.current) {
+        scrollToTop();
+      }
+      shouldScrollOnHashChangeRef.current = true;
       setState(parseHash());
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  const navigate = (newPath, newRefinements = {}) => {
+  const navigate = (newPath, newRefinements = {}, options = {}) => {
+    const shouldScroll = options.scroll !== false;
+    shouldScrollOnHashChangeRef.current = shouldScroll;
     window.location.hash = buildHash(newPath, newRefinements, state.routePrefix);
-    scrollToTop();
+    if (shouldScroll) scrollToTop();
   };
 
   const back = () => {
     const { path, refinements } = state;
     // If refinements are active, clear them first before going up
     if (Object.keys(refinements).length > 0) {
-      navigate(path, {});
+      navigate(path, {}, { scroll: false });
     } else {
       navigate(path.slice(0, -1));
     }
@@ -72,7 +78,7 @@ export function useHashNav() {
     } else {
       next[key] = value;
     }
-    navigate(path, next);
+    navigate(path, next, { scroll: false });
   };
 
   const reset = () => navigate([]);

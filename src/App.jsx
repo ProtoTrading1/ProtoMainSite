@@ -320,7 +320,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, sort, activeCollection, path.join('/'), inStockOnly]);
+  }, [path.join('/')]);
 
   // Graceful fallback for legacy/unknown category slugs (taxonomy changed):
   // if the first path segment isn't a known department, resolve to the
@@ -332,19 +332,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [path, hashNavigate]);
 
   const pathKey = path.join('/');
-  const navScrollKey = `${pathKey}|${page}|${activeCollection}|${searchQuery}|${sort}`;
 
-  // useLayoutEffect so scroll resets before paint; also re-run after catalog loads
-  // because shorter pages + scroll anchoring can leave the viewport at the bottom.
+  // Keep browsing continuous for sort/filter changes; only reset for catalogue navigation.
   useLayoutEffect(() => {
     if (skipNavScrollRef.current) return;
     scrollToTop();
-  }, [navScrollKey]);
-
-  useLayoutEffect(() => {
-    if (skipNavScrollRef.current) return;
-    if (!loading) scrollToTop();
-  }, [loading, navScrollKey]);
+  }, [pathKey]);
 
   useLayoutEffect(() => {
     skipNavScrollRef.current = false;
@@ -354,6 +347,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     scrollToTop();
     setPage(nextPage);
   }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery('');
+    setActiveCollection('all');
+    setSort(DEFAULT_SORT);
+    setInStockOnly(false);
+    setPage(1);
+    if (Object.keys(refinements).length > 0) {
+      hashNavigate(path, {});
+    }
+    try {
+      sessionStorage.removeItem(IN_STOCK_ONLY_KEY);
+      sessionStorage.setItem(CATALOG_SORT_KEY, DEFAULT_SORT);
+    } catch { /* ignore */ }
+  }, [hashNavigate, path, refinements]);
 
   useEffect(() => {
     if (!path.length) return;
@@ -468,6 +476,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         if (cancelled) return;
         setUsingFallback(false);
+
+        if (pageData.total > 0 && pageData.products.length === 0 && page > 1) {
+          const maxPage = Math.max(1, Math.ceil(pageData.total / CATALOG_PAGE_SIZE));
+          if (maxPage !== page) {
+            setPage(maxPage);
+            return;
+          }
+        }
 
         // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
         // fall back to showing the top-level department so the page isn't empty.
@@ -947,6 +963,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             onInStockOnlyChange={handleInStockOnlyChange}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
+            onResetFilters={handleResetFilters}
+            refinements={refinements}
           />
         </main>
 

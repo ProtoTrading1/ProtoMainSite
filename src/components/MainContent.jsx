@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Flame,
@@ -67,7 +67,14 @@ export default function MainContent({
   showWelcome = false,
   inStockOnly = false,
   onInStockOnlyChange = () => {},
+  onResetFilters = () => {},
+  refinements = {},
 }) {
+  const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
+  const [isGridMuted, setIsGridMuted] = useState(false);
+  const [isGridFadeIn, setIsGridFadeIn] = useState(false);
+  const pendingReorderRef = useRef(false);
+  const previousBrowseStateRef = useRef(null);
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -79,8 +86,16 @@ export default function MainContent({
 
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
-  const isHomeFeatured = isAllProductsPage && !searchQuery && sort === 'featured';
   const showWelcomeHome = showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage;
+  const pathKey = path.join('/');
+  const searchKey = searchQuery.trim().toLowerCase();
+  const refinementsKey = useMemo(
+    () => Object.entries(refinements || {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}:${value}`)
+      .join('|'),
+    [refinements],
+  );
 
   // Group products by their next subcategory level when landing is shown and sort is featured.
   const productGroups = useMemo(() => {
@@ -96,6 +111,47 @@ export default function MainContent({
     if (groupKeys.length < 2) return null;
     return groupKeys.map((key) => ({ key, label: key === '__other__' ? 'Other' : slugToLabel(key), products: groupMap.get(key) }));
   }, [products, showLanding, sort, path]);
+
+  useEffect(() => {
+    if (!loading) {
+      setShowDelayedSkeleton(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowDelayedSkeleton(true), 200);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
+
+  useEffect(() => {
+    const nextState = { pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey };
+    const prevState = previousBrowseStateRef.current;
+    previousBrowseStateRef.current = nextState;
+    if (!prevState) return;
+
+    const pathChanged = prevState.pathKey !== nextState.pathKey;
+    const sortOrFilterChanged = (
+      prevState.activeCollection !== nextState.activeCollection
+      || prevState.sort !== nextState.sort
+      || prevState.inStockOnly !== nextState.inStockOnly
+      || prevState.searchKey !== nextState.searchKey
+      || prevState.refinementsKey !== nextState.refinementsKey
+    );
+
+    if (!pathChanged && sortOrFilterChanged) {
+      pendingReorderRef.current = true;
+      setIsGridMuted(true);
+    }
+  }, [pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey]);
+
+  useEffect(() => {
+    if (!pendingReorderRef.current || loading) return;
+    pendingReorderRef.current = false;
+    setIsGridMuted(false);
+    setIsGridFadeIn(true);
+    const timer = window.setTimeout(() => setIsGridFadeIn(false), 140);
+    return () => window.clearTimeout(timer);
+  }, [loading, products]);
+
+  const shouldShowSkeleton = loading && showDelayedSkeleton;
 
   return (
     <div className="catalog-page">
@@ -192,11 +248,7 @@ export default function MainContent({
       {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && !showWelcomeHome && (
         <div className="results-control">
           <span className="results-count">
-            {searchQuery
-              ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''} across all categories`
-              : isHomeFeatured
-                ? `${categoryProductCount} featured product${categoryProductCount !== 1 ? 's' : ''}`
-                : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
+            {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
           </span>
           <div className="results-control-actions">
             <label className="catalog-filter-control">
@@ -223,29 +275,19 @@ export default function MainContent({
         </div>
       )}
 
-      {loading ? (
+      {shouldShowSkeleton ? (
         <ProductGridSkeleton count={products.length || 12} />
-      ) : products.length === 0 && isHomeFeatured ? (
-        <div className="empty-state">
-          <Sparkles size={32} />
-          <h3>No featured products yet</h3>
-          <p>Try a different sort, or browse by category.</p>
-          <button onClick={() => setSort('best-selling')} type="button">
-            Show best selling
-          </button>
-        </div>
-      ) : products.length === 0 && (isCategoryPage || activeCollection !== 'all' || searchQuery) ? (
+      ) : products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />
-          <h3>{searchQuery ? 'No relevant products found.' : 'No matching products'}</h3>
-          <p>Clear the search or choose another category to continue building the order.</p>
-          <button onClick={() => { setSearchQuery(''); onShortcut('start'); navigate([]); }} type="button">
-            Go back to all products
+          <h3>No products match your current filters.</h3>
+          <button onClick={onResetFilters} type="button">
+            Reset Filters
           </button>
         </div>
       ) : (
         <>
-          <div className="product-grid">
+          <div className={`product-grid${isGridMuted ? ' product-grid--muted' : ''}${isGridFadeIn ? ' product-grid--fade-in' : ''}`}>
             {productGroups
               ? productGroups.flatMap((group) => [
                   <div key={`hdr-${group.key}`} className="product-grid-section-header">{group.label}</div>,

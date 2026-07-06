@@ -2029,6 +2029,18 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: 18px;
+  opacity: 1;
+  transition: opacity 100ms ease;
+}
+.product-grid--muted {
+  opacity: 0.56;
+}
+.product-grid--fade-in {
+  animation: productGridFadeIn 120ms ease;
+}
+@keyframes productGridFadeIn {
+  from { opacity: 0.62; }
+  to { opacity: 1; }
 }
 .product-grid-section-header {
   grid-column: 1 / -1;
