@@ -313,6 +313,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setPage(1);
   }, [path.join('/')]);
 
+  useEffect(() => {
+    // Collection switches represent a new catalogue scope — restart pagination.
+    setPage(1);
+  }, [activeCollection]);
+
   // Graceful fallback for legacy/unknown category slugs (taxonomy changed):
   // if the first path segment isn't a known department, resolve to the
   // catalogue root instead of showing an empty/broken page.
@@ -511,6 +516,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (inStockOnly) rows = rows.filter(isProductAvailable);
         rows = sortCatalogProducts(rows, sort, { hasSearch });
         rows = groupProductsByBarcode(rows);
+        if (rows.length > 0) {
+          const maxPage = Math.max(1, Math.ceil(rows.length / CATALOG_PAGE_SIZE));
+          if (page > maxPage) {
+            setPage(maxPage);
+            return;
+          }
+        }
         setUsingFallback(true);
         setCatalogTotal(rows.length);
         setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
