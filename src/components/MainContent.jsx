@@ -152,9 +152,41 @@ export default function MainContent({
   }, [loading, products]);
 
   const shouldShowSkeleton = loading && showDelayedSkeleton;
+  const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
+  const resultsControl = showResultsControl ? (
+    <div className="results-control">
+      <span className="results-count">
+        {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
+      </span>
+      <div className="results-control-actions">
+        <label className="catalog-filter-control">
+          <input
+            type="checkbox"
+            checked={inStockOnly}
+            onChange={(e) => onInStockOnlyChange(e.target.checked)}
+          />
+          <span>Available Only</span>
+        </label>
+        <label className="sort-control">
+          <span>Sort</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="featured">Featured</option>
+            <option value="best-selling">Best Selling</option>
+            <option value="newest">Newest</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="name-asc">A–Z</option>
+            <option value="name-desc">Z–A</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="catalog-page">
+      {showWelcomeHome && resultsControl}
+
       {showWelcomeHome && (
         <div className="site-hero-banner">
           <img
@@ -244,36 +276,7 @@ export default function MainContent({
         </div>
       )}
 
-      {/* Sort + count bar — always available while browsing */}
-      {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && (
-        <div className="results-control">
-          <span className="results-count">
-            {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
-          </span>
-          <div className="results-control-actions">
-            <label className="catalog-filter-control">
-              <input
-                type="checkbox"
-                checked={inStockOnly}
-                onChange={(e) => onInStockOnlyChange(e.target.checked)}
-              />
-              <span>Available Only</span>
-            </label>
-            <label className="sort-control">
-              <span>Sort</span>
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="featured">Featured</option>
-                <option value="best-selling">Best Selling</option>
-                <option value="newest">Newest</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name-asc">A–Z</option>
-                <option value="name-desc">Z–A</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      )}
+      {!showWelcomeHome && resultsControl}
 
       {shouldShowSkeleton ? (
         <ProductGridSkeleton count={products.length || 12} />
