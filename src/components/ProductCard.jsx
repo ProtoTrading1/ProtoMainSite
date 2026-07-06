@@ -435,9 +435,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               {isVariantGroup ? 'View options' : 'Add to Cart'}
             </button>
           </div>
-          {inCart && (
-            <span className="pc-in-order">In your order: {cartQty}</span>
-          )}
+          <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
+            {inCart ? `In your order: ${cartQty}` : '\u00A0'}
+          </span>
         </div>
       </article>
 
