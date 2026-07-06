@@ -1988,7 +1988,17 @@ input, select, textarea { font-family: inherit; outline: none; }
     top: 0;
     z-index: 80;
     padding: 8px 0;
-    background: #fff;
+    background: transparent;
+  }
+
+  .results-control-actions {
+    margin-left: auto;
+    padding: 6px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
   }
 }
 .results-control-actions {

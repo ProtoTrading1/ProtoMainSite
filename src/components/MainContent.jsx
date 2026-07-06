@@ -185,8 +185,6 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
-      {showWelcomeHome && resultsControl}
-
       {showWelcomeHome && (
         <div className="site-hero-banner">
           <img
@@ -276,7 +274,7 @@ export default function MainContent({
         </div>
       )}
 
-      {!showWelcomeHome && resultsControl}
+      {resultsControl}
 
       {shouldShowSkeleton ? (
         <ProductGridSkeleton count={products.length || 12} />
