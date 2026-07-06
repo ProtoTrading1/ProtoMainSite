@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Flame,
@@ -153,23 +153,26 @@ export default function MainContent({
 
   const shouldShowSkeleton = loading && showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
+  const inStockOnlyId = useId();
+  const sortSelectId = useId();
   const resultsControl = showResultsControl ? (
     <div className="results-control">
       <span className="results-count">
         {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
       </span>
       <div className="results-control-actions">
-        <label className="catalog-filter-control">
+        <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
           <input
+            id={inStockOnlyId}
             type="checkbox"
             checked={inStockOnly}
             onChange={(e) => onInStockOnlyChange(e.target.checked)}
           />
           <span>Available Only</span>
         </label>
-        <label className="sort-control">
+        <label className="sort-control" htmlFor={sortSelectId}>
           <span>Sort</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="featured">Featured</option>
             <option value="best-selling">Best Selling</option>
             <option value="newest">Newest</option>

@@ -69,7 +69,17 @@ h1, h2, h3, h4, .font-heading {
 
 button { font-family: inherit; border: none; background: none; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s, box-shadow 0.15s, transform 0.1s; touch-action: manipulation; }
 a { text-decoration: none; color: inherit; transition: color 0.15s, opacity 0.15s; touch-action: manipulation; }
-input, select, textarea { font-family: inherit; outline: none; }
+input, select, textarea { font-family: inherit; }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
 
 /* ── Typography Utilities ── */
 .gradient-text {
@@ -2033,6 +2043,9 @@ input, select, textarea { font-family: inherit; outline: none; }
   accent-color: var(--proto-red);
   cursor: pointer;
 }
+.catalog-filter-control input:focus-visible {
+  outline-color: #8b1a1a;
+}
 .sort-control {
   display: flex;
   align-items: center;
@@ -2052,6 +2065,9 @@ input, select, textarea { font-family: inherit; outline: none; }
   cursor: pointer;
 }
 .sort-control select:hover { border-color: #94a3b8; }
+.sort-control select:focus-visible {
+  border-color: #8b1a1a;
+}
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
@@ -3097,6 +3113,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   background: #000;
 }
 .locked-order-button {
+  width: 100%;
   height: 42px;
   display: flex;
   align-items: center;
@@ -3104,9 +3121,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 7px;
   border: 1.5px dashed #d1d5db;
   border-radius: 10px;
+  background: transparent;
   color: #9ca3af;
   font-weight: 600;
   font-size: 13px;
+  cursor: not-allowed;
+  opacity: 1;
+  font-family: inherit;
 }
 .clear-button {
   width: 100%;

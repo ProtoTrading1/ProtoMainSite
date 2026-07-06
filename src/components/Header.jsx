@@ -444,16 +444,14 @@ export default function Header({
           >
             <Home size={18} aria-hidden="true" />
           </button>
-          <div
+          <button
+            type="button"
             className="brand-logo-hit"
-            role="button"
-            tabIndex={0}
             onClick={onHome}
-            onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }}
-            style={{ cursor: onHome ? 'pointer' : undefined }}
+            aria-label="Home"
           >
             <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
-          </div>
+          </button>
         </div>
 
         {/* Signature search */}
@@ -536,10 +534,12 @@ export default function Header({
             </button>
           )}
 
-          <div
+          <button
+            type="button"
             className={`cart-summary${orderTargetMet ? ' cart-summary--ready' : ''}`}
             onClick={onCartClick}
             style={onCartClick ? { cursor: 'pointer' } : undefined}
+            aria-label={`Open cart. ${cartItemCount} item${cartItemCount === 1 ? '' : 's'}. Order total R${cartTotal.toFixed(2)}.`}
           >
             <span className="cart-summary-icon">
               <CartProgressIcon cartTotal={cartTotal} size={22} />
@@ -548,7 +548,7 @@ export default function Header({
               <small>Order total</small>
               <strong className="cart-summary-amount">R{cartTotal.toFixed(2)}</strong>
             </span>
-          </div>
+          </button>
           </div>
         </div>
       </header>

@@ -63,6 +63,12 @@
 .brand-logo-hit {
   display: flex;
   align-items: center;
+  border-radius: 10px;
+}
+
+.brand-logo-hit:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 2px;
 }
 
 .app-header--premium .header-search-premium-wrap {
@@ -315,6 +321,11 @@
 .app-header--premium .cart-summary:hover {
   border-color: #4B4B4B;
   background: #121212;
+}
+
+.app-header--premium .cart-summary:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 2px;
 }
 
 .app-header--premium .cart-summary--ready:hover {

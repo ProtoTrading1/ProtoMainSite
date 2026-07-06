@@ -170,9 +170,21 @@ export default function Drawer({
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <div className="mini-stepper">
-                  <button onClick={() => updateQty(item.product.id, item.qty - 1)} type="button">-</button>
+                  <button
+                    onClick={() => updateQty(item.product.id, item.qty - 1)}
+                    type="button"
+                    aria-label={`Decrease quantity for ${item.product.name}`}
+                  >
+                    -
+                  </button>
                   <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} />
-                  <button onClick={() => updateQty(item.product.id, item.qty + 1)} type="button">+</button>
+                  <button
+                    onClick={() => updateQty(item.product.id, item.qty + 1)}
+                    type="button"
+                    aria-label={`Increase quantity for ${item.product.name}`}
+                  >
+                    +
+                  </button>
                 </div>
                 <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label="Remove item">
                   <Trash2 size={14} />
@@ -225,10 +237,10 @@ export default function Drawer({
             Submit order request
           </button>
         ) : (
-          <div className="locked-order-button">
+          <button className="locked-order-button" type="button" disabled aria-disabled="true">
             <Lock size={15} />
             Add more products to submit
-          </div>
+          </button>
         )}
         <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button">
           <Trash2 size={13} />
