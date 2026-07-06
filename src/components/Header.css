@@ -11,7 +11,7 @@
   --search-border-hover: #D62828;
   --search-border-focus: #C89A3C;
   --search-glow: 0 0 10px rgba(200, 154, 60, 0.18);
-  --search-placeholder: #9A9A9A;
+  --search-placeholder: #B0B0B0;
 
   height: var(--header-premium-height);
   padding: 0 var(--header-premium-pad-x);
@@ -97,8 +97,8 @@
   white-space: nowrap;
   flex-shrink: 0;
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: #A3A3A3;
   background: transparent;
   transition: color 180ms ease, opacity 180ms ease;
@@ -244,8 +244,8 @@
 .app-header--premium .header-action {
   gap: 8px;
   color: #E5E5E5;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   transition: opacity 180ms ease;
 }
 
@@ -327,8 +327,8 @@
 }
 
 .app-header--premium .header-action span {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
