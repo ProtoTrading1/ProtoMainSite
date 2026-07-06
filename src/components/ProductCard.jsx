@@ -252,10 +252,14 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
       entityLabel: product?.name || product?.code,
     });
   };
-  const closePreview = () => { setZoomOpen(false); onZoomClose?.(); };
+  const closePreview = () => {
+    setZoomOpen(false);
+    setSelectedVariant(null);
+    onZoomClose?.();
+  };
 
   const handleAdd = () => {
-    if (isVariantGroup && !selectedVariant) {
+    if (isVariantGroup) {
       openPreview();
       return;
     }
