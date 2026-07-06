@@ -272,7 +272,7 @@ export default function MainContent({
                     cartQty={cartQtyForProduct(product, cartQtyMap)}
                     onCartQtyChange={onCartQtyChange}
                     special={specialsMap[product.id] || null}
-                    priority={idx < 8}
+                    priority={idx < 24}
                     onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
                   />
                 ))

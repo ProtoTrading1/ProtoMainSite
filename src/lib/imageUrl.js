@@ -22,3 +22,20 @@ export function buildImageCandidates(url) {
   const candidates = [optimizedImageUrl(raw), raw];
   return [...new Set(candidates.filter(Boolean))];
 }
+
+/** Warm browser cache for catalogue thumbnails (non-blocking). */
+export function preloadProductImages(urls, { limit = 24 } = {}) {
+  if (typeof window === 'undefined' || !urls?.length) return;
+  const seen = new Set();
+  let count = 0;
+  for (const url of urls) {
+    if (count >= limit) break;
+    const src = optimizedImageUrl(url);
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    count += 1;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+  }
+}

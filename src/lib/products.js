@@ -33,9 +33,27 @@ let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
 
-// ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
+// ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
-const LS_TTL = 90 * 1000;
+const LS_TTL = 24 * 60 * 60 * 1000;
+
+const _refreshListeners = new Set();
+
+function emitCatalogRefresh() {
+  for (const fn of _refreshListeners) {
+    try { fn(); } catch { /* ignore */ }
+  }
+}
+
+export function subscribeCatalogRefresh(fn) {
+  _refreshListeners.add(fn);
+  return () => _refreshListeners.delete(fn);
+}
+
+/** Start catalogue fetch early (e.g. on login) so data is ready before App mounts. */
+export function prefetchCatalog() {
+  void getAllCached();
+}
 
 function saveToLocalCache(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
@@ -67,25 +85,38 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache } = {}) {
 
 // Customer catalogue: live /api/products first (includes admin price edits).
 // Fallbacks: static products.json, then localStorage.
+function startCatalogFetch() {
+  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store' })
+    .catch(() => fetchJsonWithTimeout('/products.json', 12000))
+    .catch(() => {
+      const local = loadFromLocalCache();
+      if (local) return local;
+      throw new Error('Catalogue unavailable');
+    })
+    .then((products) => {
+      const hadPrior = !!_cache;
+      _cache = products;
+      saveToLocalCache(products);
+      if (hadPrior) emitCatalogRefresh();
+      return _cache;
+    })
+    .catch((err) => {
+      _loadPromise = null;
+      throw err;
+    });
+}
+
 function getAllCached() {
-  if (!_loadPromise) {
-    _loadPromise = fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store' })
-      .catch(() => fetchJsonWithTimeout('/products.json', 12000))
-      .catch(() => {
-        const local = loadFromLocalCache();
-        if (local) return local;
-        throw new Error('Catalogue unavailable');
-      })
-      .then((products) => {
-        _cache = products;
-        saveToLocalCache(products);
-        return _cache;
-      })
-      .catch((err) => {
-        _loadPromise = null;
-        throw err;
-      });
+  if (!_cache) {
+    const stale = loadFromLocalCache();
+    if (stale) _cache = stale;
   }
+
+  if (!_loadPromise) {
+    _loadPromise = startCatalogFetch();
+  }
+
+  if (_cache) return Promise.resolve(_cache);
   return _loadPromise;
 }
 

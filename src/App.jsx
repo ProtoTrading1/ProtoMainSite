@@ -14,7 +14,8 @@ const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimati
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
+import { preloadProductImages } from './lib/imageUrl';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
 import { saveOrder, fetchLastOrder } from './lib/orders';
@@ -183,6 +184,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const lastSearchLogKeyRef = useRef('');
   const [activeCollection, setActiveCollection] = useState('all');
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
@@ -328,6 +330,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [loadBanner]);
 
   useEffect(() => {
+    return subscribeCatalogRefresh(() => setCatalogRefreshKey((k) => k + 1));
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
@@ -367,6 +373,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             setCatalogProducts(l1Data.products);
             setCatalogTotal(l1Data.total);
             setCounts(nextCounts);
+            preloadProductImages(l1Data.products.map((p) => p.image || p.localImage));
             return;
           }
         }
@@ -374,6 +381,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setCatalogProducts(pageData.products);
         setCatalogTotal(pageData.total);
         setCounts(nextCounts);
+        preloadProductImages(pageData.products.map((p) => p.image || p.localImage));
       } catch {
         const response = await fetch('/stockProducts.json');
         const fallback = await response.json();
@@ -404,7 +412,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return () => {
       cancelled = true;
     };
-  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly]);
+  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
