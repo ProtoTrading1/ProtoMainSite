@@ -428,6 +428,8 @@ export default function Header({
     closeMobileSearch();
   };
 
+  const orderTargetMet = cartTotal >= MIN_ORDER;
+
   return (
     <>
       <header className="app-header app-header--premium">
@@ -534,9 +536,18 @@ export default function Header({
             </button>
           )}
 
-          <div className="cart-summary" onClick={onCartClick} style={onCartClick ? { cursor: 'pointer' } : undefined}>
-            <CartProgressIcon cartTotal={cartTotal} size={22} />
-            <span><small>Order</small>R{cartTotal.toFixed(2)}</span>
+          <div
+            className={`cart-summary${orderTargetMet ? ' cart-summary--ready' : ''}`}
+            onClick={onCartClick}
+            style={onCartClick ? { cursor: 'pointer' } : undefined}
+          >
+            <span className="cart-summary-icon">
+              <CartProgressIcon cartTotal={cartTotal} size={22} />
+            </span>
+            <span className="cart-summary-meta">
+              <small>Order total</small>
+              <strong className="cart-summary-amount">R{cartTotal.toFixed(2)}</strong>
+            </span>
           </div>
           </div>
         </div>
