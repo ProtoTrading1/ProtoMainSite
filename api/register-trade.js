@@ -34,12 +34,21 @@ function buildAdminSignupHtml({
   city,
   businessType,
   customerCode,
+  vatNumber,
+  monthlySpend,
+  website,
+  acceptWhatsapp,
 }) {
+  const waLabel = acceptWhatsapp === true ? 'YES' : acceptWhatsapp === false ? 'NO' : 'NOT ANSWERED';
   const rows = [
     ['Contact', caps(contactName)],
     ['Business', caps(businessName)],
     ['Email', caps(email)],
     ['Phone', caps(phone)],
+    ['WhatsApp opt-in', waLabel],
+    ['VAT number', caps(vatNumber)],
+    ['Website / social', caps(website)],
+    ['Monthly spend', caps(monthlySpend)],
     ['Billing address', caps(companyAddress)],
     ['Delivery address', caps(deliveryAddress)],
     ['Street', caps(streetName)],
@@ -442,6 +451,10 @@ export default async function handler(req, res) {
       city,
       businessType,
       customerCode: allocatedCustomerCode,
+      vatNumber: normalizedVatNumber,
+      monthlySpend: monthlySpend || null,
+      website: website || null,
+      acceptWhatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
     });
 
     if (fullPayload.accept_whatsapp === true && normalizedPhone && shouldApprove) {

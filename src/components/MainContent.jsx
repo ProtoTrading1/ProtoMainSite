@@ -45,7 +45,7 @@ export default function MainContent({
   breadcrumb,
   searchQuery = '',
   setSearchQuery = () => {},
-  sort = 'best-selling',
+  sort = 'featured',
   setSort = () => {},
   onShortcut = () => {},
   activeCollection = 'all',
@@ -79,10 +79,11 @@ export default function MainContent({
 
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
+  const isHomeFeatured = isAllProductsPage && !searchQuery && sort === 'featured';
 
-  // Group products by their next subcategory level when landing is shown and sort is best-selling.
+  // Group products by their next subcategory level when landing is shown and sort is featured.
   const productGroups = useMemo(() => {
-    if (!showLanding || sort !== 'best-selling' || !products.length) return null;
+    if (!showLanding || sort !== 'featured' || !products.length) return null;
     const groupKeys = [];
     const groupMap = new Map();
     for (const p of products) {
@@ -192,7 +193,9 @@ export default function MainContent({
           <span className="results-count">
             {searchQuery
               ? `${categoryProductCount} result${categoryProductCount !== 1 ? 's' : ''} across all categories`
-              : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
+              : isHomeFeatured
+                ? `${categoryProductCount} featured product${categoryProductCount !== 1 ? 's' : ''}`
+                : `${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''}`}
           </span>
           <div className="results-control-actions">
             <label className="catalog-filter-control">
@@ -206,6 +209,7 @@ export default function MainContent({
             <label className="sort-control">
               <span>Sort</span>
               <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="featured">Featured</option>
                 <option value="best-selling">Best Selling</option>
                 <option value="newest">Newest</option>
                 <option value="price-low">Price: Low to High</option>
@@ -222,6 +226,15 @@ export default function MainContent({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#64748b' }}>
           <Loader2 size={24} className="spin" />
           <span>Loading catalogue…</span>
+        </div>
+      ) : products.length === 0 && isHomeFeatured ? (
+        <div className="empty-state">
+          <Sparkles size={32} />
+          <h3>No featured products yet</h3>
+          <p>Try a different sort, or browse by category.</p>
+          <button onClick={() => setSort('best-selling')} type="button">
+            Show best selling
+          </button>
         </div>
       ) : products.length === 0 && (isCategoryPage || activeCollection !== 'all' || searchQuery) ? (
         <div className="empty-state">
