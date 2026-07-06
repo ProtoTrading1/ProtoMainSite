@@ -212,6 +212,7 @@
 }
 
 .header-search-dropdown .sp-cat-row:hover,
+.header-search-dropdown .sp-cat-row.active,
 .header-search-dropdown .sp-product-row:hover,
 .header-search-dropdown .sp-product-row.active {
   background: #1A1A1A;

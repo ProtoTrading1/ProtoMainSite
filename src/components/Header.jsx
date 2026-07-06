@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useId } from 'react';
 import {
   Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
@@ -161,17 +161,26 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory, onCommitSearch }) {
+function SearchPanel({
+  query,
+  suggestions,
+  catMatches,
+  activeItemId,
+  listboxId,
+  onPickProduct,
+  onPickCategory,
+  onCommitSearch,
+}) {
   if (!query.trim()) {
     return (
-      <div className="search-panel search-panel--empty">
+      <div className="search-panel search-panel--empty" id={listboxId} role="listbox" aria-label="Search suggestions">
         <p className="sp-empty-hint">Start typing to search products…</p>
       </div>
     );
   }
 
   return (
-    <div className="search-panel">
+    <div className="search-panel" id={listboxId} role="listbox" aria-label="Search suggestions">
       {/* Category matches */}
       {catMatches.length > 0 && (
         <div className="sp-section">
@@ -179,11 +188,17 @@ function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct,
           {catMatches.map((cat) => {
             const color = DEPT_COLORS[cat.path[0]] || '#374151';
             const Icon = cat.icon ? LUCIDE_ICON_MAP[cat.icon] : null;
+            const optionId = `${listboxId}-cat-${cat.id}`;
+            const isActive = activeItemId === optionId;
             return (
               <button
                 key={cat.id}
+                id={optionId}
                 type="button"
-                className="sp-cat-row"
+                className={`sp-cat-row${isActive ? ' active' : ''}`}
+                role="option"
+                aria-selected={isActive}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onPickCategory(cat.path)}
               >
                 {Icon && <span className="sp-cat-icon" style={{ background: `${color}18`, color }}><Icon size={13} /></span>}
@@ -200,29 +215,42 @@ function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct,
         <div className="sp-section">
           <div className="sp-section-head">
             <span>Products</span>
-            <button type="button" className="sp-view-all-link" onMouseDown={(e) => { e.preventDefault(); onCommitSearch(query); }}>
+            <button
+              type="button"
+              className="sp-view-all-link"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onCommitSearch(query)}
+            >
               View all results →
             </button>
           </div>
-          {suggestions.map((p, i) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`sp-product-row${i === activeIdx ? ' active' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); onPickProduct(p); }}
-            >
-              <div className="sp-product-img">
-                {p.image
-                  ? <img src={p.image} alt={p.name} loading="lazy" />
-                  : <div className="sp-product-img-empty" />}
-              </div>
-              <div className="sp-product-info">
-                <span className="sp-product-code">{p.code}</span>
-                <span className="sp-product-name">{p.name}</span>
-              </div>
-              {p.price > 0 && <span className="sp-product-price">R{p.price.toFixed(2)}</span>}
-            </button>
-          ))}
+          {suggestions.map((p) => {
+            const optionId = `${listboxId}-product-${p.id}`;
+            const isActive = activeItemId === optionId;
+            return (
+              <button
+                key={p.id}
+                id={optionId}
+                type="button"
+                className={`sp-product-row${isActive ? ' active' : ''}`}
+                role="option"
+                aria-selected={isActive}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onPickProduct(p)}
+              >
+                <div className="sp-product-img">
+                  {p.image
+                    ? <img src={p.image} alt={p.name} loading="lazy" />
+                    : <div className="sp-product-img-empty" />}
+                </div>
+                <div className="sp-product-info">
+                  <span className="sp-product-code">{p.code}</span>
+                  <span className="sp-product-name">{p.name}</span>
+                </div>
+                {p.price > 0 && <span className="sp-product-price">R{p.price.toFixed(2)}</span>}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -273,11 +301,14 @@ export default function Header({
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [mobileActiveIdx, setMobileActiveIdx] = useState(-1);
   const productsCache = useRef(null);
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
   const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
+  const desktopListboxId = useId();
+  const mobileListboxId = useId();
 
   const loadProductsOnce = useCallback(async () => {
     if (productsCache.current) return productsCache.current;
@@ -353,19 +384,33 @@ export default function Header({
     scheduleSuggestions(val);
   };
 
+  const keyboardItems = [
+    ...catMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
+    ...suggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+  ];
+  const activeDesktopItem = activeIdx >= 0 ? keyboardItems[activeIdx] : null;
+  const activeDesktopItemId = activeDesktopItem ? `${desktopListboxId}-${activeDesktopItem.id}` : undefined;
+
   const handleKeyDown = (e) => {
-    const items = suggestions;
+    const items = keyboardItems;
     if (e.key === 'Escape') { closeSearch(); return; }
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, items.length - 1)); }
     if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
     if (e.key === 'Enter') {
+      e.preventDefault();
       if (activeIdx >= 0 && items[activeIdx]) {
-        pickProduct(items[activeIdx]);
+        const activeItem = items[activeIdx];
+        if (activeItem.type === 'cat') pickCategory(activeItem.cat.path);
+        else pickProduct(activeItem.product);
       } else if (searchQuery.trim()) {
         commitSearch(searchQuery.trim());
       }
     }
   };
+
+  useEffect(() => {
+    setActiveIdx((prevIdx) => Math.min(prevIdx, keyboardItems.length - 1));
+  }, [keyboardItems.length]);
 
   const pickProduct = (p) => {
     saveRecent(p.name);
@@ -402,6 +447,7 @@ export default function Header({
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
     setMobileInput('');
+    setMobileActiveIdx(-1);
     void loadProductsOnce();
   };
   const closeMobileSearch = () => {
@@ -409,10 +455,12 @@ export default function Header({
     setMobileSuggestions([]);
     setMobileCatMatches([]);
     setMobileInput('');
+    setMobileActiveIdx(-1);
   };
   const handleMobileInput = (val) => {
     setMobileInput(val);
     setSearchQuery(val);
+    setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
     debounceRef.current = setTimeout(() => {
@@ -422,11 +470,21 @@ export default function Header({
       });
     }, 120);
   };
+  const mobileKeyboardItems = [
+    ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
+    ...mobileSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+  ];
+  const activeMobileItem = mobileActiveIdx >= 0 ? mobileKeyboardItems[mobileActiveIdx] : null;
+  const activeMobileItemId = activeMobileItem ? `${mobileListboxId}-${activeMobileItem.id}` : undefined;
   const commitMobileSearch = (term) => {
     commitSearch(term);
     setMobileInput('');
     closeMobileSearch();
   };
+
+  useEffect(() => {
+    setMobileActiveIdx((prevIdx) => Math.min(prevIdx, mobileKeyboardItems.length - 1));
+  }, [mobileKeyboardItems.length]);
 
   const orderTargetMet = cartTotal >= MIN_ORDER;
 
@@ -468,6 +526,12 @@ export default function Header({
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
               aria-label="Search products, SKU or barcode"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searchOpen}
+              aria-haspopup="listbox"
+              aria-controls={desktopListboxId}
+              aria-activedescendant={activeDesktopItemId}
             />
           </div>
           {searchOpen && (
@@ -476,7 +540,8 @@ export default function Header({
                 query={searchQuery}
                 suggestions={suggestions}
                 catMatches={catMatches}
-                activeIdx={activeIdx}
+                activeItemId={activeDesktopItemId}
+                listboxId={desktopListboxId}
                 onPickProduct={pickProduct}
                 onPickCategory={pickCategory}
                 onCommitSearch={commitSearch}
@@ -585,8 +650,36 @@ export default function Header({
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') closeMobileSearch();
-            if (e.key === 'Enter' && mobileInput.trim()) commitMobileSearch(mobileInput.trim());
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setMobileActiveIdx((idx) => Math.min(idx + 1, mobileKeyboardItems.length - 1));
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setMobileActiveIdx((idx) => Math.max(idx - 1, -1));
+            }
+            if (e.key === 'Enter' && mobileInput.trim()) {
+              e.preventDefault();
+              if (activeMobileItem) {
+                if (activeMobileItem.type === 'cat') {
+                  pickCategory(activeMobileItem.cat.path);
+                } else {
+                  pickProduct(activeMobileItem.product);
+                }
+                setMobileInput('');
+                closeMobileSearch();
+                return;
+              }
+              commitMobileSearch(mobileInput.trim());
+            }
           }}
+          aria-label="Search products, SKU or barcode"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={mobileSearchOpen && Boolean(mobileInput.trim())}
+          aria-haspopup="listbox"
+          aria-controls={mobileListboxId}
+          aria-activedescendant={activeMobileItemId}
         />
         {mobileInput && (
           <button type="button" onClick={() => { setMobileInput(''); setSearchQuery(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
@@ -598,35 +691,51 @@ export default function Header({
 
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
-        <div className="mobile-search-results">
-          {mobileCatMatches.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              className="sp-cat-row sp-cat-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
-            >
-              <span className="sp-cat-label">{cat.label}</span>
-              <span className="sp-cat-arrow">→</span>
-            </button>
-          ))}
-          {mobileSuggestions.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="sp-product-row sp-product-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
-            >
-              <div className="sp-product-img">
-                {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
-              </div>
-              <div className="sp-product-info">
-                <span className="sp-product-code">{p.code}</span>
-                <span className="sp-product-name">{p.name}</span>
-              </div>
-              {p.price > 0 && <span className="sp-product-price" style={{ color: '#fff' }}>R{p.price.toFixed(2)}</span>}
-            </button>
-          ))}
+        <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
+          {mobileCatMatches.map((cat) => {
+            const optionId = `${mobileListboxId}-cat-${cat.id}`;
+            const isActive = activeMobileItemId === optionId;
+            return (
+              <button
+                key={cat.id}
+                id={optionId}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                className={`sp-cat-row sp-cat-row--dark${isActive ? ' active' : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
+              >
+                <span className="sp-cat-label">{cat.label}</span>
+                <span className="sp-cat-arrow">→</span>
+              </button>
+            );
+          })}
+          {mobileSuggestions.map((p) => {
+            const optionId = `${mobileListboxId}-product-${p.id}`;
+            const isActive = activeMobileItemId === optionId;
+            return (
+              <button
+                key={p.id}
+                id={optionId}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                className={`sp-product-row sp-product-row--dark${isActive ? ' active' : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
+              >
+                <div className="sp-product-img">
+                  {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
+                </div>
+                <div className="sp-product-info">
+                  <span className="sp-product-code">{p.code}</span>
+                  <span className="sp-product-name">{p.name}</span>
+                </div>
+                {p.price > 0 && <span className="sp-product-price" style={{ color: '#fff' }}>R{p.price.toFixed(2)}</span>}
+              </button>
+            );
+          })}
           {mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
             <div className="sp-empty sp-empty--mobile">
               <Search size={24} />

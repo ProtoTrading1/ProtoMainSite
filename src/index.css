@@ -805,6 +805,9 @@ textarea:focus-visible,
 .cat-nav-btn:hover {
   background: rgba(0, 0, 0, 0.04);
 }
+.cat-nav-btn:focus-visible {
+  outline-color: #7F1D1D;
+}
 .cat-nav-item--active .cat-nav-btn {
   background: transparent;
 }
@@ -1229,8 +1232,10 @@ textarea:focus-visible,
   font-family: inherit;
 }
 .sp-cat-row:hover { background: #F8FAFC; }
+.sp-cat-row.active { background: #F8FAFC; }
 .sp-cat-row--dark { color: #fff; padding: 12px 16px; }
 .sp-cat-row--dark:hover { background: rgba(255,255,255,0.08); }
+.sp-cat-row--dark.active { background: rgba(255,255,255,0.12); }
 .sp-cat-icon {
   display: flex;
   align-items: center;
@@ -1275,6 +1280,11 @@ textarea:focus-visible,
 .sp-product-row.active { background: #F8FAFC; }
 .sp-product-row--dark { padding: 10px 16px; }
 .sp-product-row--dark:hover { background: rgba(255,255,255,0.06); }
+.sp-product-row--dark.active { background: rgba(255,255,255,0.1); }
+.sp-cat-row:focus-visible,
+.sp-product-row:focus-visible {
+  outline-offset: -2px;
+}
 .sp-product-img {
   width: 42px;
   height: 42px;

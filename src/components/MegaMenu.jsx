@@ -80,12 +80,14 @@ function PanelHeader({ label, onViewAll, color }) {
 
 const NAV_ROW_HEIGHT = 42;
 
-function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color }) {
+function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, onFocus, color }) {
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
+      onFocus={onFocus}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 20px 0 16px', width: '100%', height: NAV_ROW_HEIGHT,
@@ -153,6 +155,11 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
   return (
     <div
       className="mega-menu-flyout"
+      role="menu"
+      aria-label={`${l1Node.label} categories`}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
       style={{
         position: 'absolute',
         left: '100%',
@@ -185,6 +192,7 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
               color={color}
               onClick={() => go([l1Node.id, l2.id])}
               onMouseEnter={() => handleL2Enter(l2.id)}
+              onFocus={() => handleL2Enter(l2.id)}
             />
           ))}
         </div>
