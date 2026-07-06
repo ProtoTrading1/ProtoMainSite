@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
+import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 
 const MIN_ORDER = 1000;
@@ -28,17 +29,26 @@ function QuantityInput({ item, updateQty }) {
   );
 }
 
-export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail, autoCloseProgress = 0, showAutoCloseBar = false, onClose }) {
+export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail, customer, autoCloseProgress = 0, showAutoCloseBar = false, onClose }) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
   const isReady = cartTotal >= MIN_ORDER;
-  const inclVatEstimate = cartTotal;
 
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState(null);
   const [showCourierPicker, setShowCourierPicker] = useState(false);
   const [courierChoice, setCourierChoice] = useState(null);
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+
+  const inclVatEstimate = cartTotal;
+  const discountAmount = appliedPromo?.discountAmount || 0;
+  const estimatedTotal = Math.max(0, inclVatEstimate - discountAmount);
+
+  useEffect(() => {
+    setAppliedPromo(null);
+  }, [cartTotal]);
 
   useEffect(() => {
     const el = itemsRef.current;
@@ -47,6 +57,11 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
   }, [cartItems]);
 
   const handleSubmitClick = () => {
+    setShowCheckoutModal(true);
+  };
+
+  const handleCheckoutContinue = () => {
+    setShowCheckoutModal(false);
     setShowCourierPicker(true);
     setCourierChoice(null);
     setCustomerNotes('');
@@ -55,10 +70,15 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
   const handleConfirmCourier = async () => {
     setSubmitting(true);
     try {
-      await sendOrderEmail({ courierChoice, customerNotes: customerNotes.trim() });
+      await sendOrderEmail({
+        courierChoice,
+        customerNotes: customerNotes.trim(),
+        promo: appliedPromo,
+      });
       setShowCourierPicker(false);
       setCourierChoice(null);
       setCustomerNotes('');
+      setAppliedPromo(null);
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +154,18 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
           <span>Subtotal incl. VAT</span>
           <strong>R{inclVatEstimate.toFixed(2)}</strong>
         </div>
+        {appliedPromo && (
+          <>
+            <div className="subtotal-row drawer-promo-row">
+              <span>Promo ({appliedPromo.code}, {appliedPromo.discountPct}%)</span>
+              <strong>-R{discountAmount.toFixed(2)}</strong>
+            </div>
+            <div className="subtotal-row drawer-estimated-total">
+              <span>Estimated total</span>
+              <strong>R{estimatedTotal.toFixed(2)}</strong>
+            </div>
+          </>
+        )}
         <div className="minimum-card">
           <div className="minimum-copy">
             <span>{isReady ? 'Minimum reached' : 'Minimum order'}</span>
@@ -168,6 +200,18 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
           <li>Send for confirmation</li>
         </ol>
       </div>
+
+      <CheckoutModal
+        isOpen={showCheckoutModal}
+        onClose={() => setShowCheckoutModal(false)}
+        cartSubtotal={cartTotal}
+        customer={customer}
+        appliedPromo={appliedPromo}
+        onPromoApplied={setAppliedPromo}
+        onPromoClear={() => setAppliedPromo(null)}
+        onKeepShopping={() => setShowCheckoutModal(false)}
+        onContinue={handleCheckoutContinue}
+      />
 
       {showCourierPicker && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}>

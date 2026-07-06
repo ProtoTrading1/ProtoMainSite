@@ -3,6 +3,7 @@ import { requireAuth } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
+import { validatePromoCode } from './_promo-codes.js';
 
 const DEFAULT_NOTIFY_EMAILS = ['online@proto.co.za', 'danieljoffeinfo@gmail.com'];
 
@@ -60,7 +61,18 @@ async function prepareItems(items) {
   }));
 }
 
-function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes }) {
+function computeSubtotal(items) {
+  return items.reduce((sum, item) => {
+    const product = item.product || {};
+    return sum + Number(product.price || 0) * Number(item.qty || 0);
+  }, 0);
+}
+
+function estimatedTotal(subtotal, discountAmount) {
+  return Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
+}
+
+function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes, promo }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42 });
     const chunks = [];
@@ -120,13 +132,18 @@ function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes
 
     doc.moveDown(0.3);
     doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Subtotal incl. VAT: ${money(totals?.subtotal)}`, { align: 'right' });
+    if (promo?.code) {
+      doc.font('Helvetica').fontSize(11).fillColor('#64748b').text(`Promo (${promo.code}, ${promo.discountPct}%): -${money(promo.discountAmount)}`, { align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Est. total incl. VAT: ${money(totals?.total)}`, { align: 'right' });
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Estimated discount — final pricing confirmed by reply.', { align: 'right' });
+    }
     doc.moveDown(1.2);
     doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Please confirm stock availability, wholesale pricing and delivery estimate by reply.');
     doc.end();
   });
 }
 
-function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes }) {
+function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }) {
   const rows = items.map((item) => {
     const product = item.product || {};
     const qty = Number(item.qty || 0);
@@ -146,6 +163,12 @@ function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes
     : '';
   const notesLine = customerNotes
     ? `<strong>Customer notes:</strong> ${escapeHtml(cleanText(customerNotes))}<br/>`
+    : '';
+
+  const promoLines = promo?.code
+    ? `<p style="font-size:14px;color:#64748b;">Promo <strong>${escapeHtml(promo.code)}</strong> (${promo.discountPct}%): -${money(promo.discountAmount)}<br/>
+      <strong style="font-size:16px;color:#111827;">Est. total incl. VAT: ${money(totals?.total)}</strong><br/>
+      <span style="font-size:12px;">Estimated discount — final pricing confirmed by reply.</span></p>`
     : '';
 
   return `
@@ -169,6 +192,7 @@ function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes
         <tbody>${rows}</tbody>
       </table>
       <p style="font-size:16px;"><strong>Subtotal incl. VAT: ${money(totals?.subtotal)}</strong></p>
+      ${promoLines}
     </div>
   `;
 }
@@ -189,10 +213,10 @@ export default async function handler(req, res) {
   const {
     items = [],
     customer = {},
-    totals = {},
     orderId: rawOrderId,
     deliveryMethod: rawDeliveryMethod,
     customerNotes: rawCustomerNotes,
+    promoCode: rawPromoCode,
   } = req.body || {};
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'No order items supplied' });
@@ -203,6 +227,27 @@ export default async function handler(req, res) {
   if (!deliveryMethod) {
     return res.status(400).json({ error: 'Delivery method is required' });
   }
+
+  const subtotal = computeSubtotal(items);
+  let promo = null;
+  const promoCode = cleanText(rawPromoCode).toUpperCase();
+  if (promoCode) {
+    const promoResult = await validatePromoCode(promoCode, subtotal);
+    if (!promoResult.valid) {
+      return res.status(400).json({ error: promoResult.error || 'Invalid promo code.' });
+    }
+    promo = {
+      code: promoResult.code,
+      discountPct: promoResult.discountPct,
+      discountAmount: promoResult.discountAmount,
+    };
+  }
+
+  const totals = {
+    subtotal,
+    discountAmount: promo?.discountAmount || 0,
+    total: promo ? estimatedTotal(subtotal, promo.discountAmount) : subtotal,
+  };
 
   const notifyEmails = resolveOrderNotifyRecipients();
 
@@ -218,6 +263,7 @@ export default async function handler(req, res) {
       totals,
       deliveryMethod,
       customerNotes,
+      promo,
     });
   } catch (err) {
     console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
@@ -245,7 +291,7 @@ export default async function handler(req, res) {
         to: notifyEmails.map((email) => ({ email })),
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
         subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes }),
+        htmlContent: buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
     });
@@ -270,6 +316,11 @@ export default async function handler(req, res) {
       const patch = {
         delivery_method: deliveryMethod,
         ...(customerNotes ? { customer_notes: customerNotes } : {}),
+        ...(promo?.code ? {
+          promo_code: promo.code,
+          discount_pct: promo.discountPct,
+          discount_amount: promo.discountAmount,
+        } : {}),
       };
       const { error: patchErr } = await supabase.from('orders').update(patch).eq('id', orderId);
       if (patchErr) console.error('send-order: delivery/notes update failed:', patchErr.message);

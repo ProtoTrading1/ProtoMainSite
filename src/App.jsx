@@ -75,7 +75,7 @@ function getProductImageUrl(product, siteOrigin = '') {
   return `${siteOrigin}${src.startsWith('/') ? src : `/${src}`}`;
 }
 
-function buildOrderText(cartItems, cartTotal) {
+function buildOrderText(cartItems, cartTotal, promo = null) {
   const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const divider = '-'.repeat(52);
   const lines = cartItems.map((item, n) => {
@@ -84,6 +84,12 @@ function buildOrderText(cartItems, cartTotal) {
     const pad = Math.max(1, 52 - label.length - lineTotal.length);
     return label + ' '.repeat(pad) + lineTotal;
   });
+  const footer = [`SUBTOTAL (incl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`];
+  if (promo?.code) {
+    footer.push(`PROMO (${promo.code}, ${promo.discountPct}%):${' '.repeat(Math.max(1, 52 - 20 - promo.code.length))}-R${promo.discountAmount.toFixed(2)}`);
+    footer.push(`EST. TOTAL (incl. VAT):${' '.repeat(22)}R${(promo.total ?? cartTotal - promo.discountAmount).toFixed(2)}`);
+    footer.push('(Estimated — final pricing confirmed by reply.)');
+  }
   return [
     'Hi Proto Trading,',
     '',
@@ -93,7 +99,7 @@ function buildOrderText(cartItems, cartTotal) {
     divider,
     ...lines,
     divider,
-    `SUBTOTAL (incl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`,
+    ...footer,
     '',
     'Please confirm availability, pricing, and delivery.',
     '',
@@ -560,6 +566,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (!cartItems.length) return;
     const courierChoice = opts?.courierChoice || null;
     const customerNotes = String(opts?.customerNotes || '').trim();
+    const promo = opts?.promo || null;
     const deliveryMethod = courierChoice === 'own'
       ? "Customer's own courier"
       : courierChoice === 'proto'
@@ -574,7 +581,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
 
     const siteOrigin = window.location.origin;
-    const text = buildOrderText(cartItems, cartTotal);
+    const text = buildOrderText(cartItems, cartTotal, promo);
     setOrderText(text);
     setOrderStatus('sending');
     setOrderError('');
@@ -583,13 +590,24 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try {
       let savedOrder = null;
       if (customer?.id) {
-        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, { deliveryMethod, customerNotes });
+        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, {
+          deliveryMethod,
+          customerNotes,
+          promoCode: promo?.code || null,
+          discountPct: promo?.discountPct ?? null,
+          discountAmount: promo?.discountAmount ?? null,
+        });
         fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       }
 
       const payload = {
         customer: customerDetails,
-        totals: { subtotal: cartTotal },
+        totals: {
+          subtotal: cartTotal,
+          discountAmount: promo?.discountAmount || 0,
+          total: promo?.total ?? cartTotal,
+        },
+        promoCode: promo?.code || null,
         deliveryMethod,
         customerNotes,
         orderId: savedOrder?.id || null,
@@ -759,6 +777,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             removeFromCart={removeFromCart}
             clearCart={clearCart}
             sendOrderEmail={sendOrderEmail}
+            customer={customer}
             autoCloseProgress={0}
             showAutoCloseBar={false}
             onClose={() => setCartDrawerOpen(false)}
@@ -835,6 +854,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
                 sendOrderEmail={(opts) => { setMobileCartOpen(false); sendOrderEmail(opts); }}
+                customer={customer}
               />
             </div>
           </div>

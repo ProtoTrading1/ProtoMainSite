@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail,
+  ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail, MessageCircle,
   MapPin, Package, Phone, ShieldCheck, Store, User,
 } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
@@ -17,6 +17,24 @@ function ProfileField({ icon: Icon, label, value }) {
       </div>
     </div>
   );
+}
+
+function whatsappLabel(value) {
+  if (value === true) return 'Yes — stock updates & specials';
+  if (value === false) return 'No';
+  return null;
+}
+
+function structuredDeliverySummary(customer) {
+  const parts = [
+    customer?.street_name,
+    customer?.suburb,
+    customer?.city,
+    customer?.postal_code,
+    customer?.country,
+  ].filter(Boolean);
+  if (parts.length) return parts.join(', ');
+  return customer?.delivery_address || '';
 }
 
 export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
@@ -55,7 +73,7 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const latestOrder = orders[0] || null;
+  const deliverySummary = structuredDeliverySummary(customer);
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
@@ -93,11 +111,17 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             <ProfileField icon={User} label="Contact person" value={customer?.name} />
             <ProfileField icon={Mail} label="Email" value={customer?.email} />
             <ProfileField icon={Phone} label="Phone" value={customer?.phone} />
+            {customer?.customer_code && <ProfileField icon={ShieldCheck} label="Customer code" value={customer.customer_code} />}
+            <ProfileField icon={MessageCircle} label="WhatsApp updates" value={whatsappLabel(customer?.accept_whatsapp)} />
             <ProfileField icon={Store} label="Business type" value={customer?.business_type} />
-            {customer?.monthly_spend && <ProfileField icon={Store} label="Monthly spend" value={customer.monthly_spend} />}
-            {customer?.website && <ProfileField icon={Globe} label="Website / social" value={customer.website} />}
-            {customer?.vat_number && <ProfileField icon={ShieldCheck} label="VAT number" value={customer.vat_number} />}
-            {customer?.company_address && <ProfileField icon={MapPin} label="Billing address" value={customer.company_address} />}
+            <ProfileField icon={Store} label="Monthly spend" value={customer?.monthly_spend} />
+            <ProfileField icon={Globe} label="Website / social" value={customer?.website} />
+            <ProfileField icon={ShieldCheck} label="VAT number" value={customer?.vat_number} />
+            <ProfileField icon={MapPin} label="Billing address" value={customer?.company_address} />
+            <ProfileField icon={MapPin} label="Delivery address" value={deliverySummary} />
+            {customer?.building_type && <ProfileField icon={Building2} label="Building type" value={customer.building_type} />}
+            {customer?.unit_number && <ProfileField icon={Building2} label="Unit / apartment" value={customer.unit_number} />}
+            {customer?.province && <ProfileField icon={MapPin} label="Province / region" value={customer.province} />}
           </div>
         </div>
 

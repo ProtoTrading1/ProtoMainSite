@@ -10,10 +10,13 @@ import {
   motarroPathMatchesFilter,
 } from './mottaroCategory';
 import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
+import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
+import { applySkuOrder, lookupSortOrder } from './taxonomy';
 
-export const DEFAULT_SORT = 'best-selling';
+export const DEFAULT_SORT = 'featured';
 
 export const CATALOG_SORT_OPTIONS = [
+  'featured',
   'best-selling',
   'newest',
   'price-low',
@@ -25,6 +28,10 @@ export const CATALOG_SORT_OPTIONS = [
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
 let _cache = null;
+let _sortOrdersPromise = null;
+let _sortOrdersCache = null;
+let _sortOrdersCachedAt = 0;
+const SORT_ORDERS_TTL = 15_000;
 
 // ─── localStorage cache (5 min TTL) for instant repeat page loads ────────────
 const LS_KEY = 'proto_catalog_v10';
@@ -85,7 +92,34 @@ function getAllCached() {
 export function invalidateProductCache() {
   _cache = null;
   _loadPromise = null;
+  _sortOrdersCache = null;
+  _sortOrdersCachedAt = 0;
+  _sortOrdersPromise = null;
+  invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
+async function getSortOrders() {
+  if (_sortOrdersCache && Date.now() - _sortOrdersCachedAt < SORT_ORDERS_TTL) return _sortOrdersCache;
+  _sortOrdersCache = null;
+  if (!_sortOrdersPromise) {
+    _sortOrdersPromise = fetchJsonWithTimeout('/api/sort-orders', 8000, { cache: 'no-store' })
+      .then((store) => {
+        _sortOrdersCache = store?.orders || {};
+        _sortOrdersCachedAt = Date.now();
+        _sortOrdersPromise = null;
+        return _sortOrdersCache;
+      })
+      .catch(() => {
+        _sortOrdersPromise = null;
+        return {};
+      });
+  }
+  return _sortOrdersPromise;
+}
+
+function productSkuKey(product) {
+  return String(product.sku || product.code || product.websiteSku || '').toUpperCase();
 }
 
 
@@ -190,7 +224,6 @@ function compareByPrice(a, b, descending = false) {
 }
 
 export function normalizeCatalogSort(sort) {
-  if (sort === 'featured') return DEFAULT_SORT;
   return CATALOG_SORT_OPTIONS.includes(sort) ? sort : DEFAULT_SORT;
 }
 
@@ -201,12 +234,21 @@ function compareByName(a, b, descending = false) {
   return descending ? -cmp : cmp;
 }
 
-/** Sort catalogue rows. During search, best-selling preserves fuzzy relevance order. */
+/** Sort catalogue rows. During search, featured/best-selling preserve fuzzy relevance order. */
 export function sortCatalogProducts(products, sort = DEFAULT_SORT, { hasSearch = false } = {}) {
   const mode = normalizeCatalogSort(sort);
   const arr = [...products];
 
-  if (hasSearch && mode === DEFAULT_SORT) return arr;
+  if (hasSearch && (mode === 'featured' || mode === 'best-selling')) return arr;
+
+  if (mode === 'featured') {
+    arr.sort((a, b) => {
+      const diff = (Number(b.yearlySales) || 0) - (Number(a.yearlySales) || 0);
+      if (diff !== 0) return diff;
+      return compareByName(a, b, false);
+    });
+    return arr;
+  }
 
   if (mode === 'price-low') {
     arr.sort((a, b) => compareByPrice(a, b, false));
@@ -260,7 +302,28 @@ export async function fetchProductPage({
   if (!hasSearch) products = applyPathFilter(products, categoryPath);
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
 
-  products = sortCatalogProducts(products, sort, { hasSearch });
+  const normalizedSort = normalizeCatalogSort(sort);
+  const isHomeFeatured = normalizedSort === 'featured'
+    && categoryPath.length === 0
+    && collection === 'all'
+    && !hasSearch;
+
+  if (isHomeFeatured) {
+    const featuredSkus = await getFeaturedProducts();
+    if (featuredSkus.length === 0) {
+      products = [];
+    } else {
+      const bySku = new Map(products.map((p) => [productSkuKey(p), p]));
+      products = featuredSkus.map((sku) => bySku.get(sku)).filter(Boolean);
+    }
+  } else if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
+    const sortOrders = await getSortOrders();
+    const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
+    products = skuOrder?.length ? applySkuOrder(products, skuOrder) : sortCatalogProducts(products, 'best-selling');
+  } else {
+    products = sortCatalogProducts(products, normalizedSort, { hasSearch });
+  }
+
   products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
 
