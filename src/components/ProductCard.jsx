@@ -8,6 +8,25 @@ import './ProductCard.css';
 // At or below this quantity we warn "Low stock". Configurable in one place.
 const LOW_STOCK_THRESHOLD = 5;
 
+function productBarcode(product) {
+  return String(
+    product?.barcode
+    || product?.websiteSku
+    || product?.sku
+    || product?.code
+    || product?.id
+    || '',
+  ).trim();
+}
+
+function productCodeLine(product) {
+  const barcode = productBarcode(product);
+  const sku = String(product?.code || product?.sku || product?.websiteSku || '').trim();
+  if (!barcode && !sku) return 'Barcode: —';
+  if (barcode && sku && barcode !== sku) return `Barcode: ${barcode} · SKU: ${sku}`;
+  return `Barcode: ${barcode || sku}`;
+}
+
 function catalogStockQty(product) {
   if (!product) return null;
   const raw = product.stockOnHand ?? product.stockQty;
@@ -331,7 +350,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
           </button>
 
           <div className="pc-sku">
-            <span className="pc-sku-code">SKU: {product.code}</span>
+            <span className="pc-sku-code">{productCodeLine(product)}</span>
             {isVariantGroup && variantCount > 1 && (
               <span className="pc-variant-count">{variantCount} options</span>
             )}
@@ -419,7 +438,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             {/* White details panel */}
             <div className="pz-details">
               <div className="pz-scroll">
-                <span className="pz-code">{activeProduct.code}</span>
+                <span className="pz-code">{productBarcode(activeProduct)}</span>
                 <h2 className="pz-name">{activeProduct.name}</h2>
 
                 {activeProduct.originalDescription && (
@@ -454,7 +473,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                             )}
                             <div className="pz-variant-info">
                               <span className="pz-variant-name">{v.name}</span>
-                              <span className="pz-variant-code">{v.sku || v.websiteSku || v.code}</span>
+                              <span className="pz-variant-code">{productBarcode(v)}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
                             </div>
                           </button>
