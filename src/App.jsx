@@ -63,9 +63,7 @@ function readInitialSort() {
   try {
     const stored = sessionStorage.getItem(CATALOG_SORT_KEY);
     if (stored) {
-      const normalized = normalizeCatalogSort(stored);
-      if (normalized === 'featured') return DEFAULT_SORT;
-      return normalized;
+      return normalizeCatalogSort(stored);
     }
   } catch { /* ignore */ }
   return DEFAULT_SORT;

@@ -57,9 +57,14 @@ function labelToSlug(label) {
   return String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-async function loadSalesByBarcode(supabase) {
+async function loadSalesByBarcode(supabase, skuFilter = null) {
   try {
-    const rows = await fetchAllRows(supabase, 'products', 'sku, yearly_sales');
+    const rows = await fetchAllRows(
+      supabase,
+      'products',
+      'sku, yearly_sales',
+      skuFilter?.length ? (q) => q.in('sku', skuFilter) : null,
+    );
     const map = new Map();
     for (const row of rows) {
       const key = String(row.sku || '').trim().toUpperCase();
@@ -72,6 +77,16 @@ async function loadSalesByBarcode(supabase) {
     console.warn('products api: yearly_sales unavailable:', err.message);
     return new Map();
   }
+}
+
+function parseSkuQuery(raw) {
+  const value = Array.isArray(raw) ? raw.join(',') : String(raw || '');
+  const list = value
+    .split(',')
+    .map((sku) => sku.trim())
+    .filter(Boolean);
+  if (!list.length) return null;
+  return [...new Set(list)];
 }
 
 function adapt(row, tree, salesByBarcode = new Map()) {
@@ -128,15 +143,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    const requestedSkus = parseSkuQuery(req.query?.skus);
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
     const [rows, tree, salesByBarcode] = await Promise.all([
-      fetchAllRows(supabase, 'website_stock', STOCK_SELECT),
+      fetchAllRows(
+        supabase,
+        'website_stock',
+        STOCK_SELECT,
+        requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
+      ),
       loadTaxonomyTree(),
-      loadSalesByBarcode(supabase),
+      loadSalesByBarcode(supabase, requestedSkus),
     ]);
     const products = rows
       .map((row) => adapt(row, tree, salesByBarcode))

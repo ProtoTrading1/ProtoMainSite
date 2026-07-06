@@ -15,7 +15,8 @@ import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
 
-export const DEFAULT_SORT = 'best-selling';
+export const DEFAULT_SORT = 'featured';
+const FEATURED_PRODUCTS_BATCH_SIZE = 80;
 
 export const CATALOG_SORT_OPTIONS = [
   'featured',
@@ -164,6 +165,48 @@ async function getSortOrders() {
 
 function productSkuKey(product) {
   return String(product.sku || product.code || product.websiteSku || '').toUpperCase();
+}
+
+function chunkArray(items, size) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function fetchFeaturedCatalogProducts() {
+  const featuredSkus = await getFeaturedProducts();
+  if (!featuredSkus.length) return [];
+
+  try {
+    const batches = chunkArray(featuredSkus, FEATURED_PRODUCTS_BATCH_SIZE);
+    const responses = await Promise.all(
+      batches.map((batch) => fetchJsonWithTimeout(
+        `/api/products?skus=${encodeURIComponent(batch.join(','))}`,
+        10000,
+        { cache: 'no-store' },
+      )),
+    );
+
+    const bySku = new Map();
+    for (const product of responses.flat()) {
+      const key = productSkuKey(product);
+      if (key && !bySku.has(key)) bySku.set(key, product);
+    }
+
+    return featuredSkus
+      .map((sku) => bySku.get(String(sku || '').toUpperCase()))
+      .filter(Boolean);
+  } catch {
+    // Fall back to cached full catalogue when the fast SKU request path fails.
+    const allProducts = await getAllCached();
+    const bySku = new Map(allProducts.map((product) => [productSkuKey(product), product]));
+    return featuredSkus
+      .map((sku) => bySku.get(String(sku || '').toUpperCase()))
+      .filter(Boolean);
+  }
 }
 
 
@@ -349,28 +392,36 @@ export async function fetchProductPage({
   specialIds = null,
   inStockOnly = false,
 } = {}) {
-  let products = await getAllCached();
-  const pool = products;
-  products = applyCollection(products, collection, specialIds);
-  const hasSearch = Boolean(searchQuery.trim());
-  if (!hasSearch) products = applyPathFilter(products, categoryPath);
-  if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
-
   const normalizedSort = normalizeCatalogSort(sort);
+  const hasSearch = Boolean(searchQuery.trim());
   const isHomeFeatured = normalizedSort === 'featured'
     && categoryPath.length === 0
     && collection === 'all'
     && !hasSearch;
 
   if (isHomeFeatured) {
-    const featuredSkus = await getFeaturedProducts();
-    if (featuredSkus.length === 0) {
-      products = [];
-    } else {
-      const bySku = new Map(products.map((p) => [productSkuKey(p), p]));
-      products = featuredSkus.map((sku) => bySku.get(sku)).filter(Boolean);
-    }
-  } else if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
+    let products = await fetchFeaturedCatalogProducts();
+    products = applyInStockFilter(products, inStockOnly);
+    products = groupProductsByBarcode(products);
+
+    const total = products.length;
+    const from = (page - 1) * pageSize;
+    return {
+      products: products.slice(from, from + pageSize),
+      total,
+      page,
+      pageSize,
+      hasMore: total > from + pageSize,
+    };
+  }
+
+  let products = await getAllCached();
+  const pool = products;
+  products = applyCollection(products, collection, specialIds);
+  if (!hasSearch) products = applyPathFilter(products, categoryPath);
+  if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
+
+  if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
     const sortOrders = await getSortOrders();
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
     products = skuOrder?.length ? applySkuOrder(products, skuOrder) : sortCatalogProducts(products, 'best-selling');
