@@ -459,11 +459,14 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   })}
                 </div>
               )}
-              <ProductImage
-                variant="modal"
-                src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
-                alt={activeProduct.name}
-              />
+              <div className="pz-main-image">
+                <ProductImage
+                  className="pz-main-image-img"
+                  variant="modal"
+                  src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
+                  alt={activeProduct.name}
+                />
+              </div>
               {galleryImages && (
                 <div className="pz-gallery-strip">
                   {galleryImages.map((img, idx) => (
