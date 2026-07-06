@@ -30,6 +30,7 @@ export function catalogCardImageUrl(url) {
     parsed.searchParams.set('width', '400');
     parsed.searchParams.set('quality', '80');
     parsed.searchParams.set('resize', 'contain');
+    parsed.searchParams.set('format', 'webp');
     return parsed.toString();
   } catch {
     return encoded;
