@@ -35,7 +35,6 @@ const shortcuts = [
 export default function MainContent({
   products,
   allProductCount,
-  categoryProductCount = products.length,
   addToCart,
   cartQtyMap = {},
   onCartQtyChange = () => {},
@@ -158,9 +157,6 @@ export default function MainContent({
   const resultsControl = showResultsControl ? (
     <div className="results-control">
       <div className="results-control-actions">
-        <span className="results-count">
-          {categoryProductCount}
-        </span>
         <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
           <input
             id={inStockOnlyId}

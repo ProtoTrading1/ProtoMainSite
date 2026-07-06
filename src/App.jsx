@@ -921,7 +921,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           <MainContent
             products={catalogProducts}
             allProductCount={counts[''] || catalogTotal}
-            categoryProductCount={catalogTotal}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             onCartQtyChange={handleCartQtyChange}

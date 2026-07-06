@@ -2004,7 +2004,6 @@ textarea:focus-visible,
     pointer-events: none;
   }
 
-  .results-control .results-count,
   .results-control-actions {
     pointer-events: auto;
   }
@@ -4919,23 +4918,6 @@ textarea:focus-visible,
   color: #0f172a;
 }
 
-/* results count */
-.results-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  min-width: 36px;
-  padding: 0 9px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
 /* ══════════════════════════════════════════
    PAGINATION
 ══════════════════════════════════════════ */
@@ -6282,11 +6264,6 @@ textarea:focus-visible,
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
-  }
-
-  .results-control-actions .results-count {
-    grid-column: 1 / -1;
-    justify-self: start;
   }
 
   .catalog-filter-control,
