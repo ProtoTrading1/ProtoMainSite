@@ -5,6 +5,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
 import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
+import { setMonitoringUser } from './lib/monitoring';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -108,6 +109,7 @@ export default function Root() {
       const profile = await getCustomerProfile(userId, sessionOrToken);
       if (nonce !== loadNonce.current) return;
       setCustomer(profile);
+      setMonitoringUser(profile);
       if (!profile) return;
 
       if (adminHost) {
@@ -210,6 +212,7 @@ export default function Root() {
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);
+    setMonitoringUser(null);
     window.sessionStorage.removeItem('proto-surface');
     setView('landing');
     window.location.hash = '';
