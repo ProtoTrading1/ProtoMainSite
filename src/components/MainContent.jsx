@@ -2,13 +2,13 @@ import { useMemo } from 'react';
 import {
   ArrowLeft,
   Flame,
-  Loader2,
   PackageCheck,
   Search,
   Sparkles,
   Tag,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
+import { ProductGridSkeleton } from './ProductCardSkeleton';
 import CategoryLanding from './CategoryLanding';
 import { slugToLabel } from '../lib/taxonomy';
 
@@ -224,10 +224,7 @@ export default function MainContent({
       )}
 
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px', gap: '12px', color: '#64748b' }}>
-          <Loader2 size={24} className="spin" />
-          <span>Loading catalogue…</span>
-        </div>
+        <ProductGridSkeleton count={products.length || 12} />
       ) : products.length === 0 && isHomeFeatured ? (
         <div className="empty-state">
           <Sparkles size={32} />
