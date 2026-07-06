@@ -4743,3 +4743,16 @@ a.lp-register-login { text-decoration: none; }
     grid-template-columns: 1fr;
   }
 }
+
+/* Mobile landing header logo balance:
+   reduce omega icon only (keep wordmark text unchanged). */
+@media (max-width: 900px) {
+  .access-brand .proto-logo-wordmark__icon,
+  .access-brand .proto-logo-wordmark__icon--fallback {
+    width: calc(var(--logo-height, 36px) * 0.74);
+    height: calc(var(--logo-height, 36px) * 0.74);
+  }
+  .access-brand .proto-logo-wordmark__top {
+    gap: 3px;
+  }
+}
