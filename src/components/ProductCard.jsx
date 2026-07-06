@@ -115,7 +115,7 @@ function StockCheck({ sku }) {
 }
 
 function ProductImage({ src, alt, priority = false, className = '', variant = 'card' }) {
-  const candidates = buildImageCandidates(src);
+  const candidates = buildImageCandidates(src, { variant });
   const [imageIdx, setImageIdx] = useState(0);
   const imgRef = useRef(null);
 
