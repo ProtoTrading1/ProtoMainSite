@@ -44,6 +44,7 @@ const CART_LAST_ACTIVITY_KEY = 'proto_cart_last_activity_at';
 const CART_INACTIVITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const CART_EXPIRY_WARN_MS = 72 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
+const CART_QTY_UNLIMITED = 9999;
 
 function readCartActivityAt() {
   try {
@@ -93,6 +94,38 @@ function getProductImageUrl(product, siteOrigin = '') {
   if (/^https?:\/\//i.test(src)) return src;
   if (!siteOrigin) return src;
   return `${siteOrigin}${src.startsWith('/') ? src : `/${src}`}`;
+}
+
+function productStockQtyForCart(product) {
+  const qtyRaw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
+  if (qtyRaw === undefined || qtyRaw === null || qtyRaw === '') return null;
+  const qty = Number(qtyRaw);
+  return Number.isFinite(qty) ? qty : null;
+}
+
+function productCanOrderWhenOos(product) {
+  return product?.keepLiveWhenOos === true
+    || product?.keep_live_when_oos === true
+    || product?.orderableWhenOutOfStock === true
+    || product?.orderable_when_out_of_stock === true;
+}
+
+function cartQtyCapForProduct(product) {
+  if (!product) return 0;
+  if (productCanOrderWhenOos(product)) return CART_QTY_UNLIMITED;
+
+  const qty = productStockQtyForCart(product);
+  if (qty === null) return product.inStock === false ? 0 : CART_QTY_UNLIMITED;
+  if (qty > 0) return Math.floor(qty);
+  if (qty === 0) return 0;
+  // Negative SOH lines are valid backorders; do not clamp to a negative max.
+  return CART_QTY_UNLIMITED;
+}
+
+function normalizeCartQtyInput(qty) {
+  const numeric = Number(qty);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 1;
+  return Math.max(1, Math.floor(numeric));
 }
 
 function buildOrderText(cartItems, cartTotal, promo = null) {
@@ -564,12 +597,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [cartItems.length, cartLastActivityAt, cartClock, clearCart]);
 
   const addToCart = (product, qty, buttonPos = null) => {
+    const maxQty = cartQtyCapForProduct(product);
+    if (maxQty <= 0) return;
+    const requestedQty = normalizeCartQtyInput(qty);
+
     dismissWelcome();
-    const maxQty = product.stockQty || 9999;
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: Math.min(maxQty, i.qty + qty) } : i));
-      return [...prev, { product, qty: Math.min(maxQty, qty) }];
+      if (existing) {
+        const nextQty = Math.min(maxQty, existing.qty + requestedQty);
+        if (nextQty === existing.qty) return prev;
+        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty } : i));
+      }
+      return [...prev, { product, qty: Math.min(maxQty, requestedQty) }];
     });
     markCartActivity();
 
@@ -585,7 +625,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   };
 
   const updateQty = (id, qty) => {
-    setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(i.product.stockQty || 9999, Number(qty) || 1)) })));
+    const requestedQty = normalizeCartQtyInput(qty);
+    setCartItems((prev) => prev.flatMap((item) => {
+      if (item.product.id !== id) return [item];
+      const maxQty = cartQtyCapForProduct(item.product);
+      if (maxQty <= 0) return [];
+      const nextQty = Math.max(1, Math.min(maxQty, requestedQty));
+      return [{ ...item, qty: nextQty }];
+    }));
     markCartActivity();
   };
   const removeFromCart = (id) => {
