@@ -723,7 +723,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cat-nav-header-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: #9CA3AF;
   text-transform: uppercase;
@@ -736,7 +736,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   border: none;
   background: none;
   color: #6B7280;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
@@ -805,7 +805,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 
 .cat-nav-label {
   flex: 1;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #374151;
   line-height: 1.2;
@@ -827,7 +827,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .cat-nav-count {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: #9CA3AF;
   background: #F3F4F6;
