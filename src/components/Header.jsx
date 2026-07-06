@@ -527,11 +527,11 @@ export default function Header({
           )}
 
           {/* Mobile-only icon buttons */}
-          <button className="header-icon-mobile" type="button" onClick={onViewProfile} aria-label="My profile">
+          <button className="header-icon-mobile header-icon-mobile--profile" type="button" onClick={onViewProfile} aria-label="My profile">
             <User size={17} />
           </button>
           {onLogout && (
-            <button className="header-icon-mobile" type="button" onClick={onLogout} aria-label="Log out" style={{ opacity: 0.65 }}>
+            <button className="header-icon-mobile header-icon-mobile--logout" type="button" onClick={onLogout} aria-label="Log out" style={{ opacity: 0.65 }}>
               <LogOut size={16} />
             </button>
           )}
