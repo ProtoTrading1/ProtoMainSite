@@ -13,9 +13,9 @@ export default function Hero({ onLogin, onApply }) {
     }}>
       {/* Full-width background image */}
       <picture style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <source srcSet="/main-banner.webp" type="image/webp" />
+        <source srcSet="/pre-register-banner.jpg?v=2" type="image/jpeg" />
         <img
-          src="/main-banner.jpg"
+          src="/pre-register-banner.jpg?v=2"
           alt=""
           aria-hidden="true"
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center right', display: 'block' }}
