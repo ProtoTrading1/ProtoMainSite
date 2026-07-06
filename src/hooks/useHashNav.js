@@ -55,9 +55,15 @@ export function useHashNav() {
 
   const navigate = (newPath, newRefinements = {}, options = {}) => {
     const shouldScroll = options.scroll !== false;
+    const nextHash = buildHash(newPath, newRefinements, state.routePrefix);
+    if (window.location.hash === nextHash) {
+      if (shouldScroll) scrollToTop();
+      shouldScrollOnHashChangeRef.current = true;
+      setState(parseHash());
+      return;
+    }
     shouldScrollOnHashChangeRef.current = shouldScroll;
-    window.location.hash = buildHash(newPath, newRefinements, state.routePrefix);
-    if (shouldScroll) scrollToTop();
+    window.location.hash = nextHash;
   };
 
   const back = () => {

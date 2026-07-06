@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -174,7 +174,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
-  const skipNavScrollRef = useRef(false);
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome((prev) => {
@@ -200,8 +199,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
-    scrollToTop();
-    hashNavigate(newPath, newRefinements);
+    hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
 
   const goAllProducts = useCallback(() => {
@@ -210,8 +208,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [dismissWelcome, navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
-    scrollToTop();
-    hashNavigate(newPath, newRefinements);
+    hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
   const [sort, setSort] = useState(readInitialSort);
   const [loading, setLoading] = useState(true);
@@ -241,7 +238,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [showPopup, setShowPopup] = useState(false);
 
   const goHome = useCallback(() => {
-    skipNavScrollRef.current = true;
     try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
@@ -250,7 +246,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setActiveCollection('all');
     setSort(DEFAULT_SORT);
     setInStockOnly(false);
-    hashNavigate([], {});
+    hashNavigate([], {}, { scroll: false });
     scrollToTopSmooth();
   }, [hashNavigate]);
 
@@ -328,16 +324,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const pathKey = path.join('/');
 
-  // Keep browsing continuous for sort/filter changes; only reset for catalogue navigation.
-  useLayoutEffect(() => {
-    if (skipNavScrollRef.current) return;
-    scrollToTop();
-  }, [pathKey]);
-
-  useLayoutEffect(() => {
-    skipNavScrollRef.current = false;
-  });
-
   const handlePageChange = useCallback((nextPage) => {
     scrollToTop();
     setPage(nextPage);
@@ -350,7 +336,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setInStockOnly(false);
     setPage(1);
     if (Object.keys(refinements).length > 0) {
-      hashNavigate(path, {});
+      hashNavigate(path, {}, { scroll: false });
     }
     try {
       sessionStorage.removeItem(IN_STOCK_ONLY_KEY);

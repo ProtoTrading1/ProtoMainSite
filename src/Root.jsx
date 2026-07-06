@@ -64,13 +64,23 @@ export default function Root() {
   }, []);
 
   useEffect(() => {
+    const shouldRootScrollOnHash = (hash) => {
+      if (!hash) return true;
+      return hash.startsWith('#/policies')
+        || hash.startsWith('#/worldclass')
+        || hash.startsWith('#/portal-preview')
+        || hash.startsWith('#/reset-password');
+    };
+
     const onHashChange = () => {
       if (preRegisterHost && window.location.hash) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         return;
       }
       setRoute(window.location.hash);
-      scrollToTop();
+      if (shouldRootScrollOnHash(window.location.hash)) {
+        scrollToTop();
+      }
     };
     const onPopState = () => {
       setPathname(window.location.pathname);
