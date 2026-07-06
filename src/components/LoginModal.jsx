@@ -32,7 +32,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
       if (mode === 'forgot') {
         if (!email) { setError('Enter your email address.'); setLoading(false); return; }
         await resetPassword(email);
-        setInfo('Password reset email sent. Check your inbox.');
+        setInfo('If that email is registered, we sent a password reset link. Check your inbox.');
         setMode('login');
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }

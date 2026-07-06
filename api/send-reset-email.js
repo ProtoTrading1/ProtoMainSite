@@ -1,4 +1,9 @@
+import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'crypto';
+import {
+  getPasswordResetBaseUrl,
+  notifyCustomerPasswordResetEmail,
+} from './_trade-application-notify.js';
 
 function makeToken(email, secret) {
   const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + 3600000 })).toString('base64url');
@@ -6,95 +11,69 @@ function makeToken(email, secret) {
   return `${payload}.${sig}`;
 }
 
-const RESET_HTML = (link) => `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Reset Your Password</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
-<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td style="padding:24px 34px 28px;background:#111111;">
-  <table cellpadding="0" cellspacing="0" style="margin-bottom:22px;"><tr>
-    <td style="vertical-align:middle;padding-right:13px;"><img src="https://protoportal-main.vercel.app/proto-logo.png" width="42" height="42" alt="Proto Trading" style="display:block;border-radius:8px;"></td>
-    <td style="vertical-align:middle;"><span style="font-size:25px;font-weight:900;color:#ffffff;letter-spacing:0.5px;">PROTO</span><span style="font-size:25px;font-weight:900;color:#dc2626;letter-spacing:0.5px;"> TRADING</span></td>
-  </tr></table>
-  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">Reset your password</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Secure password reset for your Proto Trading Online account</p>
-</td></tr>
-<tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;font-weight:700;">Hi there,</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We received a request to reset the password for your Proto Trading Online account.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Click the button below to create a new password. This link expires in 1 hour.</p>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td align="center">
-    <a href="${link}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:16px 42px;border-radius:10px;">Reset Password</a>
-  </td></tr></table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#111111;border-radius:12px;border-left:5px solid #c40000;">
-    <tr><td style="padding:20px 22px;">
-      <p style="margin:0 0 8px;color:#ffffff;font-size:15px;font-weight:800;">Security Notice</p>
-      <p style="margin:0;color:#d8d8d8;font-size:14px;line-height:1.7;">If you did not request this password reset, you can safely ignore this email.</p>
-    </td></tr>
-  </table>
-  <p style="margin:28px 0 10px;color:#666666;font-size:13px;">If the button does not work, copy and paste this link into your browser:</p>
-  <p style="margin:0;word-break:break-all;font-size:13px;"><a href="${link}" style="color:#c40000;">${link}</a></p>
-</td></tr>
-<tr><td align="center" style="padding:30px 34px;background:#181818;border-top:1px solid #292929;">
-  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0 0 12px;color:#cfcfcf;font-size:14px;">
-    <a href="tel:+27214615883" style="color:#ff3333;text-decoration:none;font-weight:700;">+27 21 461 5883</a>
-    &nbsp;|&nbsp;
-    <a href="mailto:online@proto.co.za" style="color:#ff3333;text-decoration:none;font-weight:700;">online@proto.co.za</a>
-  </p>
-  <p style="margin:0;color:#a9a9a9;font-size:13px;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
-</td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
+function getServiceClient() {
+  return createClient(
+    process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+async function lookupCustomerName(supabase, email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return { exists: false, name: '' };
+
+  const { data: { users }, error } = await supabase.auth.admin.listUsers({ filter: `email.eq.${normalized}` });
+  if (error) {
+    console.error('send-reset-email listUsers error:', error.message);
+    return { exists: false, name: '' };
+  }
+
+  const user = users?.find((u) => u.email?.toLowerCase() === normalized);
+  if (!user) return { exists: false, name: '' };
+
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('name, contact_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const name = customer?.contact_name || customer?.name || user.user_metadata?.name || '';
+  return { exists: true, name: String(name || '').trim() };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Email required' });
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return res.status(400).json({ error: 'Email required' });
 
   const secret = process.env.RESET_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
-
-  if (!process.env.BREVO_API_KEY) {
-    console.error('BREVO_API_KEY not configured');
-    return res.status(500).json({ error: 'Email service not configured' });
+  if (!secret) {
+    console.error('send-reset-email: RESET_TOKEN_SECRET / SUPABASE_SERVICE_ROLE_KEY not configured');
+    return res.status(200).json({ ok: true });
   }
 
-  const token = makeToken(email.trim(), secret);
-  const siteUrl = (process.env.SITE_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
-  const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
+  const supabase = getServiceClient();
+  const { exists, name } = await lookupCustomerName(supabase, normalizedEmail);
 
-  try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'api-key': process.env.BREVO_API_KEY,
-      },
-      body: JSON.stringify({
-        sender: {
-          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
-          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
-        },
-        to: [{ email: email.trim() }],
-        subject: 'Reset your Proto Trading password',
-        htmlContent: RESET_HTML(resetLink),
-      }),
+  if (exists) {
+    const token = makeToken(normalizedEmail, secret);
+    const baseUrl = getPasswordResetBaseUrl(req);
+    const resetLink = `${baseUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
+
+    const result = await notifyCustomerPasswordResetEmail({
+      email: normalizedEmail,
+      resetLink,
+      name,
     });
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      console.error('Brevo API error:', resp.status, JSON.stringify(body));
-      return res.status(500).json({ error: 'Failed to send email. Please try again.' });
+
+    if (!result?.ok && !result?.skipped) {
+      console.error('send-reset-email: admin password reset email failed', JSON.stringify(result));
     }
-  } catch (err) {
-    console.error('Brevo fetch error:', err.message);
-    return res.status(500).json({ error: 'Failed to send email. Please try again.' });
   }
 
+  // Generic response — do not reveal whether the account exists.
   return res.status(200).json({ ok: true });
 }
