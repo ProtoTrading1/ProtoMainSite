@@ -188,10 +188,7 @@
   grid-template-columns: 1fr;
   background:
     linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.1) 100%),
-    image-set(
-      url('/main-banner.webp?v=6') type('image/webp'),
-      url('/main-banner.jpg?v=6') type('image/jpeg')
-    ) center right / cover no-repeat;
+    url('/pre-register-banner.jpg?v=2') center right / cover no-repeat;
 }
 
 .hero-photo-bg h1 {
