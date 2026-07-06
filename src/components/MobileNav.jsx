@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
@@ -63,6 +63,17 @@ function MobileProductRequest({ onClose: closeAll, customer }) {
 export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout }) {
   const [showProductRequest, setShowProductRequest] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose?.();
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   let currentCategories = categories;
@@ -101,6 +112,9 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Browse categories"
         style={{
           width: '85%',
           maxWidth: '320px',

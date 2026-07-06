@@ -72,6 +72,7 @@ export default function MainContent({
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
   const [isGridFadeIn, setIsGridFadeIn] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [resultsAnnouncement, setResultsAnnouncement] = useState('');
   const pendingReorderRef = useRef(false);
   const previousBrowseStateRef = useRef(null);
@@ -123,6 +124,18 @@ export default function MainContent({
   }, [loading]);
 
   useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const syncPreference = () => setReduceMotion(media.matches);
+    syncPreference();
+    if (media.addEventListener) {
+      media.addEventListener('change', syncPreference);
+      return () => media.removeEventListener('change', syncPreference);
+    }
+    media.addListener(syncPreference);
+    return () => media.removeListener(syncPreference);
+  }, []);
+
+  useEffect(() => {
     const nextState = { pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey };
     const prevState = previousBrowseStateRef.current;
     previousBrowseStateRef.current = nextState;
@@ -138,19 +151,31 @@ export default function MainContent({
     );
 
     if (!pathChanged && sortOrFilterChanged) {
+      if (reduceMotion) {
+        pendingReorderRef.current = false;
+        setIsGridMuted(false);
+        setIsGridFadeIn(false);
+        return;
+      }
       pendingReorderRef.current = true;
       setIsGridMuted(true);
     }
-  }, [pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey]);
+  }, [pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey, reduceMotion]);
 
   useEffect(() => {
+    if (reduceMotion) {
+      pendingReorderRef.current = false;
+      setIsGridMuted(false);
+      setIsGridFadeIn(false);
+      return;
+    }
     if (!pendingReorderRef.current || loading) return;
     pendingReorderRef.current = false;
     setIsGridMuted(false);
     setIsGridFadeIn(true);
     const timer = window.setTimeout(() => setIsGridFadeIn(false), 140);
     return () => window.clearTimeout(timer);
-  }, [loading, products]);
+  }, [loading, products, reduceMotion]);
 
   useEffect(() => {
     if (loading) return;

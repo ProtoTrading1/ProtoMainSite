@@ -2106,6 +2106,15 @@ textarea:focus-visible,
   from { opacity: 0.62; }
   to { opacity: 1; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .product-grid,
+  .product-grid--muted,
+  .product-grid--fade-in {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
 .product-grid-section-header {
   grid-column: 1 / -1;
   font-size: 11px;

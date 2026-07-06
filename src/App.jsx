@@ -311,6 +311,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, []);
 
   useEffect(() => {
+    if (!mobileCartOpen) return undefined;
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMobileCartOpen(false);
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [mobileCartOpen]);
+
+  useEffect(() => {
     setPage(1);
   }, [path.join('/')]);
 
@@ -1046,10 +1057,16 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       {/* Mobile cart — opened from bottom tab bar */}
       {mobileCartOpen && (
         <div className="mobile-cart-backdrop" onClick={() => setMobileCartOpen(false)}>
-          <div className="mobile-cart-sheet" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="mobile-cart-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-cart-sheet-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mobile-cart-sheet-handle" />
             <div className="mobile-cart-sheet-header">
-              <span className="mobile-cart-sheet-title">Your Order</span>
+              <span className="mobile-cart-sheet-title" id="mobile-cart-sheet-title">Your Order</span>
               <button
                 type="button"
                 className="mobile-cart-sheet-close"

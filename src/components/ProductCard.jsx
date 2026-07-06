@@ -292,6 +292,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const addButtonRef = useRef(null);
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const lastFocusedElementRef = useRef(null);
 
   const activeProduct = selectedVariant || product;
   const galleryImages = Array.isArray(activeProduct.images) && activeProduct.images.length > 1
@@ -344,12 +347,43 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
   useEffect(() => {
     if (!zoomOpen) return;
-    const onKey = (e) => { if (e.key === 'Escape') closePreview(); };
+    lastFocusedElementRef.current = document.activeElement;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closePreview();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const modal = modalRef.current;
+      if (!modal) return;
+      const focusable = modal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modal.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      if (lastFocusedElementRef.current instanceof HTMLElement) {
+        lastFocusedElementRef.current.focus();
+      }
     };
   }, [zoomOpen]);
 
@@ -444,11 +478,18 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
       {/* Zoom modal — rendered at document.body to escape any CSS transform stacking context */}
       {zoomOpen && createPortal(
         <div className="pz-backdrop" onClick={closePreview}>
-          <div className="pz-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            ref={modalRef}
+            className="pz-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`pz-name-${activeProduct.id || product.id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
 
             {/* Dark image panel */}
             <div className="pz-image-panel">
-              <button className="pz-close" onClick={closePreview} type="button" aria-label="Close">
+              <button ref={closeButtonRef} className="pz-close" onClick={closePreview} type="button" aria-label="Close">
                 <X size={18} />
               </button>
               {safeTags.length > 0 && (
@@ -498,7 +539,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   <span className="pz-code">{productSkuLabel(activeProduct)}</span>
                   <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>
                 </div>
-                <h2 className="pz-name">{activeProduct.name}</h2>
+                <h2 className="pz-name" id={`pz-name-${activeProduct.id || product.id}`}>{activeProduct.name}</h2>
 
                 {activeProduct.originalDescription && (
                   <p className="pz-desc">{activeProduct.originalDescription}</p>
@@ -517,13 +558,15 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 {isVariantGroup && variants.length > 0 && (
                   <div className="pz-variants">
                     <span className="pz-variants-label">Select a variant</span>
-                    <div className="pz-variants-list">
+                    <div className="pz-variants-list" role="radiogroup" aria-label="Select a variant">
                       {variants.map((v) => {
                         const isSelected = selectedVariant?.id === v.id;
                         return (
                           <button
                             key={v.id}
                             type="button"
+                            role="radio"
+                            aria-checked={isSelected}
                             className={`pz-variant-row${isSelected ? ' pz-variant-row--selected' : ''}`}
                             onClick={() => selectVariant(v)}
                           >

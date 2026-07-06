@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
@@ -70,6 +70,7 @@ export default function Drawer({
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const courierDialogTitleId = useId();
 
   const inclVatEstimate = cartTotal;
   const discountAmount = appliedPromo?.discountAmount || 0;
@@ -118,6 +119,19 @@ export default function Drawer({
     setCourierChoice(null);
     setCustomerNotes('');
   };
+
+  useEffect(() => {
+    if (!showCourierPicker) return undefined;
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setShowCourierPicker(false);
+      setCourierChoice(null);
+      setCustomerNotes('');
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [showCourierPicker]);
 
   return (
     <div className="order-drawer" style={{ position: 'relative' }}>
@@ -270,9 +284,14 @@ export default function Drawer({
       />
 
       {showCourierPicker && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={courierDialogTitleId}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}
+        >
           <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', maxHeight: '85%', overflowY: 'auto' }}>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
+            <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select a delivery option before we send your quote request.</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
               {[
