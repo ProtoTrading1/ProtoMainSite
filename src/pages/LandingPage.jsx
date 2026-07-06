@@ -906,26 +906,24 @@ function VideoHero({ onLogin, onApply }) {
       <div
         className="vhero-copy"
       >
-        <h1>
-          <span style={{ color: '#fff', display: 'block' }}>Proto Trading</span>
-          <span style={{ color: '#dc2626', display: 'block' }}>Online</span>
+        <h1 className="vhero-headline" aria-label="Wholesale made smarter">
+          <span className="vhero-headline-line">WHOLESALE</span>
+          <span className="vhero-headline-line">MADE</span>
+          <span className="vhero-headline-line vhero-headline-line--accent">SMARTER.</span>
         </h1>
+        <div className="access-note">
+          <p className="access-note-trust">Trusted by South African retailers since 1987.</p>
+          <p className="access-note-value">
+            Exclusive wholesale access for retailers, resellers and growing businesses.
+          </p>
+        </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
-            Apply for trade access <ArrowRight size={18} />
+            Apply for Trade Access <ArrowRight size={18} />
           </button>
           <button className="access-login large" type="button" onClick={onLogin}>
-            Existing customer login
+            Existing Customer Login
           </button>
-        </div>
-        <div className="access-note">
-          Trusted by South African retailers since 1987.
-          <br />
-          Exclusive wholesale access for retailers, resellers and growing businesses.
-        </div>
-        <div className="hero-mini-proof">
-          <span>Established wholesale supplier</span>
-          <span>Nationwide trade support</span>
         </div>
       </div>
     </section>
