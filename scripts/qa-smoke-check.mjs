@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -98,5 +98,19 @@ const enrichedStored = enrichMotarroCategoryFields(
 );
 assert.deepEqual(enrichedStored.mottaroPath, ['mottaro', 'mottaro-school-office'], 'enrich exposes validated stored path');
 console.log('✓ mottaro_path stored-snapshot read logic');
+
+// Canonical availability rule — must match admin isPublishableOnWebsite
+const productsLibSrc = readFileSync(join(root, 'src/lib/products.js'), 'utf8');
+assert.match(productsLibSrc, /qty !== null && qty !== 0/, 'negative SOH counts as available (backorder lines live)');
+const cardSrc = readFileSync(join(root, 'src/components/ProductCard.jsx'), 'utf8');
+assert.match(cardSrc, /qty === 0\) return product\.keepLiveWhenOos/, 'badge shows out-of-stock only for exactly zero');
+console.log('✓ Canonical availability rule (matches admin)');
+
+// Stale fallback removed — last-ditch catalogue uses the regenerated file
+const appSrc = readFileSync(join(root, 'src/App.jsx'), 'utf8');
+assert.match(appSrc, /fetch\('\/products\.json'\)/, 'fallback fetches regenerated products.json');
+assert.doesNotMatch(appSrc, /stockProducts\.json'\)/, 'no fetch of frozen stockProducts.json');
+assert.ok(!existsSync(join(root, 'public/stockProducts.json')), 'frozen stockProducts.json deleted');
+console.log('✓ Stale catalogue fallback removed');
 
 console.log('\nAll portal smoke checks passed.');

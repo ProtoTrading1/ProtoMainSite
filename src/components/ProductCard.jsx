@@ -54,8 +54,10 @@ function catalogStockQty(product) {
 function catalogStockBadgeState(product) {
   const qty = catalogStockQty(product);
   if (qty !== null) {
-    if (qty <= 0) return product.keepLiveWhenOos ? 'in' : 'out';
-    if (qty <= LOW_STOCK_THRESHOLD) return 'low';
+    // Only EXACTLY zero is out of stock — negative SOH is a live backorder
+    // line (canonical rule shared with the admin portal).
+    if (qty === 0) return product.keepLiveWhenOos ? 'in' : 'out';
+    if (qty > 0 && qty <= LOW_STOCK_THRESHOLD) return 'low';
     return 'in';
   }
   return product.inStock === false ? 'out' : 'in';
