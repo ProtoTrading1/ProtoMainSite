@@ -122,6 +122,7 @@ export default function Root() {
       }
 
       if (profile.is_approved || profile.role === 'admin') {
+        void import('./lib/products').then((m) => m.prefetchCatalog());
         setSurface('portal');
         return;
       }
@@ -140,6 +141,7 @@ export default function Root() {
       authBootstrapped.current = true;
       setSession(sess ?? null);
       if (sess?.user) {
+        void import('./lib/products').then((m) => m.prefetchCatalog());
         void loadCustomer(sess.user.id, sess);
       } else {
         setCustomerLoading(false);
@@ -197,6 +199,7 @@ export default function Root() {
 
   const handleLogin = async (sess) => {
     setSession(sess);
+    void import('./lib/products').then((m) => m.prefetchCatalog());
     await loadCustomer(sess.user.id, sess);
   };
 
