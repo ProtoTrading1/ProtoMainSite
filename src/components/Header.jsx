@@ -79,6 +79,15 @@ function ProductRequestModal({ onClose, customer }) {
   const [error, setError] = useState('');
   const fileRef = useRef(null);
 
+  useEffect(() => {
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      onClose?.();
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [onClose]);
+
   const handleFile = (file) => {
     if (!file || !file.type.startsWith('image/')) { setError('Please select an image file.'); return; }
     const reader = new FileReader();
@@ -485,6 +494,24 @@ export default function Header({
   useEffect(() => {
     setMobileActiveIdx((prevIdx) => Math.min(prevIdx, mobileKeyboardItems.length - 1));
   }, [mobileKeyboardItems.length]);
+
+  useEffect(() => {
+    if (!searchOpen && !mobileSearchOpen) return undefined;
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      if (mobileSearchOpen) {
+        event.preventDefault();
+        closeMobileSearch();
+        return;
+      }
+      if (searchOpen) {
+        event.preventDefault();
+        closeSearch();
+      }
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [searchOpen, mobileSearchOpen, closeSearch, closeMobileSearch]);
 
   const orderTargetMet = cartTotal >= MIN_ORDER;
 

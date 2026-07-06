@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import MegaMenu from './MegaMenu';
@@ -12,6 +12,15 @@ function ProductRequestModal({ onClose, customer }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      onClose?.();
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [onClose]);
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith('image/')) { setError('Please select an image file.'); return; }
@@ -105,6 +114,17 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
   ), [menuNode, counts, categories]);
 
   const menuOpen = Boolean(visibleL2.length && openCategoryId);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpenCategoryId(null);
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    return () => document.removeEventListener('keydown', onGlobalEscape);
+  }, [menuOpen]);
 
   const handleToggleL1 = (id, btnEl) => {
     setOpenCategoryId(id);
