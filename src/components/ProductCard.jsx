@@ -9,21 +9,26 @@ import './ProductCard.css';
 const LOW_STOCK_THRESHOLD = 5;
 
 function productBarcode(product) {
-  return String(
+  const explicitBarcode = String(
     product?.barcode
-    || product?.websiteSku
-    || product?.sku
-    || product?.code
-    || product?.id
+    || product?.ean
+    || product?.upc
+    || product?.gtin
     || '',
   ).trim();
+  if (explicitBarcode) return explicitBarcode;
+
+  const code = String(product?.code || '').trim();
+  const sku = String(product?.sku || product?.websiteSku || '').trim();
+  if (code && (!sku || code !== sku)) return code;
+  return '';
 }
 
 function productSku(product) {
   return String(
-    product?.code
-    || product?.sku
+    product?.sku
     || product?.websiteSku
+    || product?.code
     || product?.id
     || '',
   ).trim();
