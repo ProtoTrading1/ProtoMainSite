@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Flame,
@@ -73,8 +73,11 @@ export default function MainContent({
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
   const [isGridFadeIn, setIsGridFadeIn] = useState(false);
+  const [resultsAnnouncement, setResultsAnnouncement] = useState('');
   const pendingReorderRef = useRef(false);
   const previousBrowseStateRef = useRef(null);
+  const inStockOnlyId = useId();
+  const sortSelectId = useId();
   const isCategoryPage = path && path.length > 0;
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
@@ -95,6 +98,10 @@ export default function MainContent({
       .map(([key, value]) => `${key}:${value}`)
       .join('|'),
     [refinements],
+  );
+  const reduceMotion = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
   );
 
   // Group products by their next subcategory level when landing is shown and sort is featured.
@@ -137,19 +144,38 @@ export default function MainContent({
     );
 
     if (!pathChanged && sortOrFilterChanged) {
+      if (reduceMotion) return;
       pendingReorderRef.current = true;
       setIsGridMuted(true);
     }
-  }, [pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey]);
+  }, [pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey, reduceMotion]);
 
   useEffect(() => {
     if (!pendingReorderRef.current || loading) return;
+    if (reduceMotion) {
+      pendingReorderRef.current = false;
+      setIsGridMuted(false);
+      setIsGridFadeIn(false);
+      return;
+    }
     pendingReorderRef.current = false;
     setIsGridMuted(false);
     setIsGridFadeIn(true);
     const timer = window.setTimeout(() => setIsGridFadeIn(false), 140);
     return () => window.clearTimeout(timer);
-  }, [loading, products]);
+  }, [loading, products, reduceMotion]);
+
+  useEffect(() => {
+    if (loading) {
+      setResultsAnnouncement('Updating products');
+      return;
+    }
+    if (categoryProductCount === 0) {
+      setResultsAnnouncement('No products match your current filters.');
+      return;
+    }
+    setResultsAnnouncement(`${categoryProductCount} product${categoryProductCount !== 1 ? 's' : ''} available.`);
+  }, [loading, categoryProductCount, pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey]);
 
   const shouldShowSkeleton = loading && showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
@@ -159,17 +185,18 @@ export default function MainContent({
         {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
       </span>
       <div className="results-control-actions">
-        <label className="catalog-filter-control">
+        <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
           <input
+            id={inStockOnlyId}
             type="checkbox"
             checked={inStockOnly}
             onChange={(e) => onInStockOnlyChange(e.target.checked)}
           />
           <span>Available Only</span>
         </label>
-        <label className="sort-control">
+        <label className="sort-control" htmlFor={sortSelectId}>
           <span>Sort</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="featured">Featured</option>
             <option value="best-selling">Best Selling</option>
             <option value="newest">Newest</option>
@@ -185,6 +212,7 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
       {showWelcomeHome && (
         <div className="site-hero-banner">
           <img

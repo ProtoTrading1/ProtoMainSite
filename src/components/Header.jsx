@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
@@ -161,17 +161,17 @@ function ProductRequestModal({ onClose, customer }) {
 }
 
 // ─── Search overlay panel ─────────────────────────────────────
-function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct, onPickCategory, onCommitSearch }) {
+function SearchPanel({ query, suggestions, catMatches, activeItemId, listboxId, onPickProduct, onPickCategory, onCommitSearch }) {
   if (!query.trim()) {
     return (
-      <div className="search-panel search-panel--empty">
+      <div className="search-panel search-panel--empty" id={listboxId} role="listbox" aria-label="Search suggestions">
         <p className="sp-empty-hint">Start typing to search products…</p>
       </div>
     );
   }
 
   return (
-    <div className="search-panel">
+    <div className="search-panel" id={listboxId} role="listbox" aria-label="Search suggestions">
       {/* Category matches */}
       {catMatches.length > 0 && (
         <div className="sp-section">
@@ -183,7 +183,11 @@ function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct,
               <button
                 key={cat.id}
                 type="button"
-                className="sp-cat-row"
+                id={`cat-option-${cat.id}`}
+                role="option"
+                aria-selected={activeItemId === `cat-option-${cat.id}`}
+                className={`sp-cat-row${activeItemId === `cat-option-${cat.id}` ? ' active' : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onPickCategory(cat.path)}
               >
                 {Icon && <span className="sp-cat-icon" style={{ background: `${color}18`, color }}><Icon size={13} /></span>}
@@ -200,7 +204,12 @@ function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct,
         <div className="sp-section">
           <div className="sp-section-head">
             <span>Products</span>
-            <button type="button" className="sp-view-all-link" onMouseDown={(e) => { e.preventDefault(); onCommitSearch(query); }}>
+            <button
+              type="button"
+              className="sp-view-all-link"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onCommitSearch(query)}
+            >
               View all results →
             </button>
           </div>
@@ -208,8 +217,12 @@ function SearchPanel({ query, suggestions, catMatches, activeIdx, onPickProduct,
             <button
               key={p.id}
               type="button"
-              className={`sp-product-row${i === activeIdx ? ' active' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); onPickProduct(p); }}
+              id={`product-option-${p.id}`}
+              role="option"
+              aria-selected={activeItemId === `product-option-${p.id}`}
+              className={`sp-product-row${activeItemId === `product-option-${p.id}` ? ' active' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPickProduct(p)}
             >
               <div className="sp-product-img">
                 {p.image
@@ -273,6 +286,13 @@ export default function Header({
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const keyboardItems = useMemo(() => [
+    ...catMatches.map((cat) => ({ id: `cat-option-${cat.id}`, type: 'category', value: cat })),
+    ...suggestions.map((product) => ({ id: `product-option-${product.id}`, type: 'product', value: product })),
+  ], [catMatches, suggestions]);
+  const activeItem = activeIdx >= 0 ? keyboardItems[activeIdx] : null;
+  const desktopListboxId = 'header-search-results-listbox';
+  const mobileListboxId = 'mobile-search-results-listbox';
   const productsCache = useRef(null);
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
@@ -316,6 +336,11 @@ export default function Header({
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   useEffect(() => {
+    if (activeIdx < keyboardItems.length) return;
+    setActiveIdx(keyboardItems.length - 1);
+  }, [activeIdx, keyboardItems.length]);
+
+  useEffect(() => {
     if (!searchOpen) return undefined;
     const onPointerDown = (e) => {
       if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
@@ -354,13 +379,17 @@ export default function Header({
   };
 
   const handleKeyDown = (e) => {
-    const items = suggestions;
+    const items = keyboardItems;
     if (e.key === 'Escape') { closeSearch(); return; }
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, items.length - 1)); }
     if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
     if (e.key === 'Enter') {
       if (activeIdx >= 0 && items[activeIdx]) {
-        pickProduct(items[activeIdx]);
+        if (items[activeIdx].type === 'category') {
+          pickCategory(items[activeIdx].value.path);
+        } else {
+          pickProduct(items[activeIdx].value);
+        }
       } else if (searchQuery.trim()) {
         commitSearch(searchQuery.trim());
       }
@@ -444,16 +473,14 @@ export default function Header({
           >
             <Home size={18} aria-hidden="true" />
           </button>
-          <div
+          <button
+            type="button"
             className="brand-logo-hit"
-            role="button"
-            tabIndex={0}
             onClick={onHome}
-            onKeyDown={(e) => { if (e.key === 'Enter') onHome?.(); }}
-            style={{ cursor: onHome ? 'pointer' : undefined }}
+            aria-label="Home"
           >
             <ProtoLogo variant="full" size={44} tagline={false} className="proto-logo-wordmark--enter" />
-          </div>
+          </button>
         </div>
 
         {/* Signature search */}
@@ -470,6 +497,12 @@ export default function Header({
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
               aria-label="Search products, SKU or barcode"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searchOpen}
+              aria-haspopup="listbox"
+              aria-controls={searchOpen ? desktopListboxId : undefined}
+              aria-activedescendant={searchOpen && activeItem ? activeItem.id : undefined}
             />
           </div>
           {searchOpen && (
@@ -478,7 +511,8 @@ export default function Header({
                 query={searchQuery}
                 suggestions={suggestions}
                 catMatches={catMatches}
-                activeIdx={activeIdx}
+                activeItemId={activeItem?.id}
+                listboxId={desktopListboxId}
                 onPickProduct={pickProduct}
                 onPickCategory={pickCategory}
                 onCommitSearch={commitSearch}
@@ -536,10 +570,12 @@ export default function Header({
             </button>
           )}
 
-          <div
+          <button
+            type="button"
             className={`cart-summary${orderTargetMet ? ' cart-summary--ready' : ''}`}
             onClick={onCartClick}
             style={onCartClick ? { cursor: 'pointer' } : undefined}
+            aria-label={`Open cart. ${cartItemCount} item${cartItemCount === 1 ? '' : 's'}. Order total R${cartTotal.toFixed(2)}.`}
           >
             <span className="cart-summary-icon">
               <CartProgressIcon cartTotal={cartTotal} size={22} />
@@ -548,7 +584,7 @@ export default function Header({
               <small>Order total</small>
               <strong className="cart-summary-amount">R{cartTotal.toFixed(2)}</strong>
             </span>
-          </div>
+          </button>
           </div>
         </div>
       </header>
@@ -587,6 +623,12 @@ export default function Header({
             if (e.key === 'Escape') closeMobileSearch();
             if (e.key === 'Enter' && mobileInput.trim()) commitMobileSearch(mobileInput.trim());
           }}
+          aria-label="Search products, SKU or barcode"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={mobileSearchOpen && mobileInput.trim().length > 0}
+          aria-haspopup="listbox"
+          aria-controls={mobileSearchOpen && mobileInput.trim() ? mobileListboxId : undefined}
         />
         {mobileInput && (
           <button type="button" onClick={() => { setMobileInput(''); setSearchQuery(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
@@ -598,13 +640,16 @@ export default function Header({
 
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
-        <div className="mobile-search-results">
+        <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
           {mobileCatMatches.map((cat) => (
             <button
               key={cat.id}
               type="button"
               className="sp-cat-row sp-cat-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
+              role="option"
+              id={`mobile-cat-option-${cat.id}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
             >
               <span className="sp-cat-label">{cat.label}</span>
               <span className="sp-cat-arrow">→</span>
@@ -615,7 +660,10 @@ export default function Header({
               key={p.id}
               type="button"
               className="sp-product-row sp-product-row--dark"
-              onMouseDown={(e) => { e.preventDefault(); setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
+              role="option"
+              id={`mobile-product-option-${p.id}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
             >
               <div className="sp-product-img">
                 {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <div className="sp-product-img-empty" />}

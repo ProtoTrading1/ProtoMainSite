@@ -44,7 +44,10 @@ export default function CategoryNav({ categories: cats, path, navigate, onAllPro
                 className="cat-nav-btn"
                 onClick={() => navigate([cat.id])}
                 onMouseEnter={(e) => onToggleL1(cat.id, e.currentTarget)}
+                onFocus={(e) => onToggleL1(cat.id, e.currentTarget)}
                 aria-current={isActive ? 'page' : undefined}
+                aria-haspopup={hasChildren ? 'menu' : undefined}
+                aria-expanded={hasChildren ? isOpen : undefined}
               >
                 {Icon && (
                   <span className="cat-nav-icon" style={highlighted ? { color } : undefined}>
