@@ -1,5 +1,5 @@
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
-import { lookupProductCount } from '../lib/taxonomy';
+import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
 import categories from '../data/categories.json';
 
 const RED = '#7F1D1D';
@@ -29,7 +29,8 @@ export default function CategoryNav({ categories: cats, path, navigate, onAllPro
           const isActive = activeL1 === cat.id;
           const isOpen = openCategoryId === cat.id;
           const highlighted = isActive || isOpen;
-          const hasChildren = !!cat.children?.length;
+          const visibleChildren = filterNavChildrenByCount(cat.children, [cat.id], counts, cats);
+          const hasChildren = visibleChildren.length > 0;
           const color = DEPT_COLORS[cat.id] || RED;
           const Icon = ICON_MAP[cat.id] || null;
           const count = lookupProductCount(counts, [cat.id], cats);

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
 import { buildImageCandidates } from '../lib/imageUrl';
-import { lookupProductCount } from '../lib/taxonomy';
+import { lookupProductCount, filterNavChildrenByCount } from '../lib/taxonomy';
 
 // ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPreview }) {
@@ -98,7 +98,7 @@ export default function CategoryLanding({
   const iconName   = categoryNode.icon || 'Package';
   const Icon       = LUCIDE_ICON_MAP[iconName] || null;
   const useCases   = USE_CASES[categoryNode.id] || [];
-  const subcats    = categoryNode.children || [];
+  const subcats = filterNavChildrenByCount(categoryNode.children, path, counts, categories);
   const totalCount = lookupProductCount(counts, path, categories) ?? products.length;
 
   const hotSellers = useMemo(() => products.slice(0, 14), [products]);

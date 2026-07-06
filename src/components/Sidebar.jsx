@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import MegaMenu from './MegaMenu';
+import { filterNavChildrenByCount } from '../lib/taxonomy';
 
 function ProductRequestModal({ onClose, customer }) {
   const [description, setDescription] = useState('');
@@ -99,7 +100,11 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
     return targetId ? categories.find((c) => c.id === targetId) : null;
   }, [activeRoot, categories, openCategoryId]);
 
-  const menuOpen = Boolean(menuNode?.children?.length && openCategoryId);
+  const visibleL2 = useMemo(() => (
+    menuNode ? filterNavChildrenByCount(menuNode.children, [menuNode.id], counts, categories) : []
+  ), [menuNode, counts, categories]);
+
+  const menuOpen = Boolean(visibleL2.length && openCategoryId);
 
   const handleToggleL1 = (id, btnEl) => {
     setOpenCategoryId(id);
