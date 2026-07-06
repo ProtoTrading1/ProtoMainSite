@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { captureError } from '../lib/monitoring';
 
 export default class PortalErrorBoundary extends Component {
   constructor(props) {
@@ -15,6 +16,7 @@ export default class PortalErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('PortalErrorBoundary caught portal render error:', error, errorInfo);
+    captureError(error, { componentStack: errorInfo?.componentStack });
   }
 
   handleRetry = () => {
