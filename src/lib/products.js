@@ -189,13 +189,19 @@ function productStockQty(product) {
   return Number(qtyRaw) || 0;
 }
 
-/** Whether a single product row is available to buy (pre-grouping). */
+/**
+ * Whether a single product row is available to buy (pre-grouping).
+ * Canonical rule shared with the admin's isPublishableOnWebsite
+ * (protoportal-admin lib/catalog-stock.mjs): only EXACTLY-zero stock is
+ * unavailable (unless keep_live_when_oos); negative SOH stays available —
+ * backorder lines are live and orderable by business rule.
+ */
 export function isProductAvailable(product) {
   if (!product) return false;
   const qty = productStockQty(product);
-  if (qty !== null && qty > 0) return true;
+  if (qty !== null && qty !== 0) return true;
   if (isOrderableWhenOutOfStock(product)) return true;
-  if (qty !== null && qty <= 0) return false;
+  if (qty !== null) return false;
   if (product.inStock === false) return false;
   return true;
 }

@@ -387,7 +387,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setCounts(nextCounts);
         preloadProductImages(pageData.products.map((p) => p.image || p.localImage));
       } catch {
-        const response = await fetch('/stockProducts.json');
+        // products.json is regenerated on every deploy; stockProducts.json was a frozen stale snapshot.
+        const response = await fetch('/products.json');
         const fallback = await response.json();
         if (cancelled) return;
         let rows = Array.isArray(fallback) ? fallback : [];
