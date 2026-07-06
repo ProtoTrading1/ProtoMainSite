@@ -199,6 +199,7 @@ export default function Root() {
 
   const handleLogin = async (sess) => {
     setSession(sess);
+    try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
     await loadCustomer(sess.user.id, sess);
   };

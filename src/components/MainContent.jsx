@@ -80,6 +80,7 @@ export default function MainContent({
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
   const isHomeFeatured = isAllProductsPage && !searchQuery && sort === 'featured';
+  const showWelcomeHome = showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage;
 
   // Group products by their next subcategory level when landing is shown and sort is featured.
   const productGroups = useMemo(() => {
@@ -98,7 +99,7 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
-      {showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage && (
+      {showWelcomeHome && (
         <div className="site-hero-banner">
           <img
             src="/main-site-banner.jpg"
@@ -187,8 +188,8 @@ export default function MainContent({
         </div>
       )}
 
-      {/* Sort + count bar — only show when browsing products, not on the category landing */}
-      {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && (
+      {/* Sort + count bar — hidden on welcome home; shown when browsing products */}
+      {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && !showWelcomeHome && (
         <div className="results-control">
           <span className="results-count">
             {searchQuery
