@@ -156,10 +156,10 @@
 
 .product-card .pc-sku {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 18px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 30px;
   margin: 6px 0 0;
   color: #9ca3af;
   font-size: 11px;
@@ -167,10 +167,27 @@
   letter-spacing: 0.02em;
 }
 
+.product-card .pc-sku-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .product-card .pc-sku-code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.product-card .pc-barcode-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b7280;
+  font-weight: 700;
+  letter-spacing: 0.015em;
 }
 
 .product-card .pc-variant-count {

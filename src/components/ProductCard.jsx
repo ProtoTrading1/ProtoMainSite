@@ -29,16 +29,14 @@ function productSku(product) {
   ).trim();
 }
 
-function productCodeLine(product) {
+function productSkuLabel(product, compact = false) {
   const sku = productSku(product) || '—';
-  const barcode = productBarcode(product) || '—';
-  return `SKU: ${sku} · Barcode: ${barcode}`;
+  return compact ? `SKU ${sku}` : `SKU: ${sku}`;
 }
 
-function productCodeLineCompact(product) {
-  const sku = productSku(product) || '—';
+function productBarcodeLabel(product, compact = false) {
   const barcode = productBarcode(product) || '—';
-  return `SKU ${sku} · Barcode ${barcode}`;
+  return compact ? `Barcode ${barcode}` : `Barcode: ${barcode}`;
 }
 
 function catalogStockQty(product) {
@@ -364,10 +362,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
           </button>
 
           <div className="pc-sku">
-            <span className="pc-sku-code">{productCodeLine(product)}</span>
-            {isVariantGroup && variantCount > 1 && (
-              <span className="pc-variant-count">{variantCount} options</span>
-            )}
+            <div className="pc-sku-top">
+              <span className="pc-sku-code">{productSkuLabel(product)}</span>
+              {isVariantGroup && variantCount > 1 && (
+                <span className="pc-variant-count">{variantCount} options</span>
+              )}
+            </div>
+            <span className="pc-barcode-code">{productBarcodeLabel(product)}</span>
           </div>
 
           <div className="pc-price-block">
@@ -452,7 +453,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             {/* White details panel */}
             <div className="pz-details">
               <div className="pz-scroll">
-                <span className="pz-code">{productCodeLine(activeProduct)}</span>
+                <div className="pz-code-block">
+                  <span className="pz-code">{productSkuLabel(activeProduct)}</span>
+                  <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>
+                </div>
                 <h2 className="pz-name">{activeProduct.name}</h2>
 
                 {activeProduct.originalDescription && (
@@ -487,7 +491,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                             )}
                             <div className="pz-variant-info">
                               <span className="pz-variant-name">{v.name}</span>
-                              <span className="pz-variant-code">{productCodeLineCompact(v)}</span>
+                              <span className="pz-variant-code">{productSkuLabel(v, true)}</span>
+                              <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
                             </div>
                           </button>

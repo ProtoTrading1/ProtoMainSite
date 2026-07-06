@@ -4948,6 +4948,12 @@ input, select, textarea { font-family: inherit; outline: none; }
   overflow-y: auto;
   padding: 36px 32px 20px;
 }
+.pz-code-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
 .pz-code {
   display: block;
   font-size: 11px;
@@ -4955,7 +4961,11 @@ input, select, textarea { font-family: inherit; outline: none; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8B1A1A;
-  margin-bottom: 8px;
+  margin-bottom: 0;
+}
+.pz-code--secondary {
+  color: #6b7280;
+  letter-spacing: 0.08em;
 }
 .pz-name {
   margin: 0 0 20px;
@@ -5115,6 +5125,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+.pz-variant-barcode {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .pz-variant-name {
   font-size: 12px;
