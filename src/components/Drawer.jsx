@@ -61,6 +61,7 @@ export default function Drawer({
   const isReady = cartTotal >= MIN_ORDER;
   const hasExpiry = cartItems.length > 0 && cartExpiryRemainingMs !== null;
   const expiryLabel = formatCartExpiry(cartExpiryRemainingMs);
+  const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -199,7 +200,7 @@ export default function Drawer({
             </div>
           </>
         )}
-        {hasExpiry && (
+        {showExpiryNote && (
           <div className={`cart-expiry-note cart-expiry-note--${cartExpiryTone}`}>
             <span>Inactivity timer</span>
             <strong>
