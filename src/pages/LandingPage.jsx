@@ -908,7 +908,7 @@ function VideoHero({ onLogin, onApply }) {
       >
         <h1>
           <span style={{ color: '#fff', display: 'block' }}>Proto Trading</span>
-          <span style={{ color: '#dc2626', display: 'block' }}>Online.</span>
+          <span style={{ color: '#dc2626', display: 'block' }}>Online</span>
         </h1>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
@@ -919,7 +919,9 @@ function VideoHero({ onLogin, onApply }) {
           </button>
         </div>
         <div className="access-note">
-          Applications are reviewed for genuine trade customers. Public retail sales are not available.
+          Trusted by South African retailers since 1987.
+          <br />
+          Exclusive wholesale access for retailers, resellers and growing businesses.
         </div>
         <div className="hero-mini-proof">
           <span>Established wholesale supplier</span>
