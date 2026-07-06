@@ -413,24 +413,60 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     let cancelled = false;
+    let cancelDeferredImageWarm = null;
+
+    const warmPageImages = (products) => {
+      const imageUrls = products
+        .map((product) => product.image || product.localImage)
+        .filter(Boolean);
+      if (!imageUrls.length) return;
+
+      // Prioritize the first visible rows, then warm the rest off the critical path.
+      const immediateLimit = page === 1 ? 12 : 20;
+      preloadProductImages(imageUrls, { limit: immediateLimit });
+
+      const deferredUrls = imageUrls.slice(immediateLimit);
+      if (!deferredUrls.length || typeof window === 'undefined') return;
+
+      const runDeferredWarm = () => {
+        if (cancelled) return;
+        preloadProductImages(deferredUrls, { limit: deferredUrls.length });
+      };
+
+      if (typeof window.requestIdleCallback === 'function') {
+        const idleId = window.requestIdleCallback(runDeferredWarm, { timeout: 1200 });
+        cancelDeferredImageWarm = () => {
+          if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+        };
+        return;
+      }
+
+      const timerId = window.setTimeout(runDeferredWarm, 250);
+      cancelDeferredImageWarm = () => window.clearTimeout(timerId);
+    };
 
     const load = async () => {
       setLoading(true);
+      let allowCountsUpdate = true;
       try {
         const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
-        const [pageData, nextCounts] = await Promise.all([
-          fetchProductPage({
-            page,
-            pageSize: CATALOG_PAGE_SIZE,
-            searchQuery,
-            categoryPath: path,
-            collection: activeCollection,
-            sort,
-            specialIds,
-            inStockOnly,
-          }),
-          fetchCategoryCounts({ collection: activeCollection, inStockOnly }),
-        ]);
+        const countsPromise = fetchCategoryCounts({ collection: activeCollection, inStockOnly })
+          .then((nextCounts) => {
+            if (cancelled || !allowCountsUpdate) return;
+            setCounts(nextCounts);
+          })
+          .catch(() => {});
+
+        const pageData = await fetchProductPage({
+          page,
+          pageSize: CATALOG_PAGE_SIZE,
+          searchQuery,
+          categoryPath: path,
+          collection: activeCollection,
+          sort,
+          specialIds,
+          inStockOnly,
+        });
 
         if (cancelled) return;
         setUsingFallback(false);
@@ -450,17 +486,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           if (!cancelled && l1Data.total > 0) {
             setCatalogProducts(l1Data.products);
             setCatalogTotal(l1Data.total);
-            setCounts(nextCounts);
-            preloadProductImages(l1Data.products.map((p) => p.image || p.localImage));
+            warmPageImages(l1Data.products);
             return;
           }
         }
 
         setCatalogProducts(pageData.products);
         setCatalogTotal(pageData.total);
-        setCounts(nextCounts);
-        preloadProductImages(pageData.products.map((p) => p.image || p.localImage));
+        warmPageImages(pageData.products);
+        void countsPromise;
       } catch {
+        // If primary catalogue load fails, keep fallback counts source authoritative.
+        // This avoids a late async counts write racing over fallback UI state.
+        allowCountsUpdate = false;
         // products.json is regenerated on every deploy; stockProducts.json was a frozen stale snapshot.
         const response = await fetch('/products.json');
         const fallback = await response.json();
@@ -490,6 +528,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     void load();
     return () => {
       cancelled = true;
+      if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
   }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
 
