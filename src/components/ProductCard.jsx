@@ -114,13 +114,50 @@ function StockCheck({ sku }) {
   );
 }
 
-function ProductImage({ src, alt, priority = false, className = '' }) {
+function ProductImage({ src, alt, priority = false, className = '', variant = 'card' }) {
   const candidates = buildImageCandidates(src);
   const [imageIdx, setImageIdx] = useState(0);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     setImageIdx(0);
+    const img = imgRef.current;
+    if (!img) return;
+    img.style.width = '';
+    img.style.height = '';
+    img.style.maxWidth = '';
+    img.style.maxHeight = '';
   }, [src]);
+
+  const normalizeCardImage = (img) => {
+    const frame = img.closest('.pc-image-frame');
+    if (!frame) return;
+    const { naturalWidth: w, naturalHeight: h } = img;
+    if (!w || !h) return;
+    const styles = getComputedStyle(frame);
+    const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+    const padX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+    const innerH = frame.clientHeight - padY;
+    const innerW = frame.clientWidth - padX;
+    if (innerW <= 0 || innerH <= 0) return;
+    const target = Math.min(innerW, innerH) * 0.96;
+    const scale = target / Math.max(w, h);
+    img.style.width = `${Math.round(w * scale)}px`;
+    img.style.height = `${Math.round(h * scale)}px`;
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+  };
+
+  const handleLoad = (event) => {
+    if (variant !== 'card') return;
+    normalizeCardImage(event.currentTarget);
+  };
+
+  useEffect(() => {
+    if (variant !== 'card') return;
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth) normalizeCardImage(img);
+  }, [src, imageIdx, variant]);
 
   if (!candidates.length || !candidates[imageIdx]) {
   return (
@@ -132,12 +169,14 @@ function ProductImage({ src, alt, priority = false, className = '' }) {
 
   return (
     <img
+      ref={imgRef}
       className={className || undefined}
       src={candidates[imageIdx]}
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}
       fetchpriority={priority ? 'high' : 'auto'}
       decoding="async"
+      onLoad={handleLoad}
       onError={() => setImageIdx((idx) => idx + 1)}
     />
   );
@@ -305,7 +344,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               </button>
             </div>
             <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
-              <ShoppingCart size={15} />
+              <ShoppingCart size={16} />
               {isVariantGroup ? 'View options' : 'Add to Cart'}
             </button>
           </div>
@@ -334,6 +373,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 </div>
               )}
               <ProductImage
+                variant="modal"
                 src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
                 alt={activeProduct.name}
               />
