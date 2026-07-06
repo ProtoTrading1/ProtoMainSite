@@ -102,23 +102,12 @@ const STOCK_BADGE_LABEL = {
 };
 
 function StockBadge({ product }) {
-  const { state, qty } = catalogStockState(product);
-  const showQty = qty !== null && !Number.isNaN(qty) && !product?.isVariantGroup;
-  let qtyLabel = null;
-  if (showQty) {
-    if (state === 'in') qtyLabel = `In stock: ${qty}`;
-    else if (state === 'low') qtyLabel = `Low stock: ${qty}`;
-    else qtyLabel = 'Out of stock';
-  }
+  const sku = product?.code || product?.barcode || product?.sku || product?.id;
+  if (!sku) return null;
 
   return (
     <div className="pc-stock-slot">
-      <span className={`pc-stock-badge pc-stock-badge--${state}`} aria-label={STOCK_BADGE_LABEL[state]}>
-        {state === 'in' ? 'In stock' : state === 'low' ? 'Low stock' : 'Out of stock'}
-      </span>
-      {qtyLabel && (
-        <span className={`pc-stock-qty pc-stock-qty--${state}`}>{qtyLabel}</span>
-      )}
+      <StockCheck sku={sku} />
     </div>
   );
 }
