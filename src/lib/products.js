@@ -13,7 +13,7 @@ import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 
-export const DEFAULT_SORT = 'featured';
+export const DEFAULT_SORT = 'best-selling';
 
 export const CATALOG_SORT_OPTIONS = [
   'featured',
