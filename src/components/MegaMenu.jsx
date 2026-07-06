@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { DEPT_THEME_CARDS } from '../lib/themeCards';
-import { lookupProductCount } from '../lib/taxonomy';
+import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
 
 // Compact theme card for the flyout 3rd column
 function FlyoutThemeCard({ card, color, onClick }) {
@@ -116,7 +116,8 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
 }
 
 export default function MegaMenu({ l1Node, navigate, counts, categories, onClose, topOffset = 0 }) {
-  const l2List = l1Node?.children || [];
+  const countFor = (...segments) => lookupProductCount(counts, segments, categories);
+  const l2List = filterNavChildrenByCount(l1Node?.children, [l1Node?.id].filter(Boolean), counts, categories);
   const [hoveredL2Id, setHoveredL2Id] = useState(l2List[0]?.id || null);
   const leaveTimerRef = useRef(null);
 
@@ -127,10 +128,14 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
   const themeCards = (DEPT_THEME_CARDS[l1Node.id] || []).slice(0, 4);
 
   const hoveredL2 = l2List.find((c) => c.id === hoveredL2Id) || l2List[0] || null;
-  const l3List = hoveredL2?.children || [];
+  const l3List = filterNavChildrenByCount(
+    hoveredL2?.children,
+    [l1Node.id, hoveredL2?.id].filter(Boolean),
+    counts,
+    categories,
+  );
   const hoveredL2Index = Math.max(0, l2List.findIndex((c) => c.id === (hoveredL2Id || l2List[0]?.id)));
 
-  const countFor = (...segments) => lookupProductCount(counts, segments, categories);
   const go = (segments) => { navigate(segments); onClose(); };
 
   // Delay closing L2 hover state so diagonal mouse movement to L3 doesn't flicker

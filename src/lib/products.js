@@ -1,6 +1,7 @@
 import { fuzzyFilter } from './fuzzySearch';
 import {
   getActiveTaxonomy,
+  productCountKey,
   resolveNavPathForProducts,
 } from './taxonomy';
 import {
@@ -218,22 +219,26 @@ function productPaths(product) {
   return [];
 }
 
+function productRowForMotarro(product) {
+  return {
+    title: product.title || product.name || '',
+    category: product.categoryLabel || '',
+    subcategory_one: product.subcategoryLabels?.[0] ?? null,
+    subcategory_two: product.subcategoryLabels?.[1] ?? null,
+    subcategory_three: product.subcategoryLabels?.[2] ?? null,
+    subcategory_four: product.subcategoryLabels?.[3] ?? null,
+    mottaro_path: product.mottaroPath ?? product.mottaro_path ?? null,
+  };
+}
+
 function productMatchesNavPath(product, tree, navPath) {
   if (!Array.isArray(navPath) || !navPath.length) return true;
 
   if (isMotarroBrowsePath(navPath)) {
     if (!isMotarroProduct(product)) return false;
-    const row = {
-      title: product.title || product.name || '',
-      category: product.categoryLabel || '',
-      subcategory_one: product.subcategoryLabels?.[0] ?? null,
-      subcategory_two: product.subcategoryLabels?.[1] ?? null,
-      subcategory_three: product.subcategoryLabels?.[2] ?? null,
-      subcategory_four: product.subcategoryLabels?.[3] ?? null,
-    };
     const mottaroPath = product.alternateCategoryPath?.length
       ? product.alternateCategoryPath
-      : inferMotarroPathFromRow(row, tree);
+      : inferMotarroPathFromRow(productRowForMotarro(product), tree);
     return motarroPathMatchesFilter(mottaroPath, navPath);
   }
 
@@ -381,6 +386,15 @@ export async function fetchProductPage({
   };
 }
 
+function collectTaxonomyNavPaths(nodes, prefix = [], out = []) {
+  for (const node of nodes || []) {
+    const path = [...prefix, node.id];
+    out.push(path);
+    if (node.children?.length) collectTaxonomyNavPaths(node.children, path, out);
+  }
+  return out;
+}
+
 export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false } = {}) {
   let products = await getAllCached();
   products = applyCollection(products, collection);
@@ -388,17 +402,15 @@ export async function fetchCategoryCounts({ collection = 'all', inStockOnly = fa
   products = groupProductsByBarcode(products);
   const tree = getActiveTaxonomy();
   const counts = { '': products.length };
-  for (const p of products) {
-    for (const path of productPaths(p)) {
-      const countPath = path[0] === 'mottaro'
-        ? resolveNavPathForProducts(path, tree)
-        : path;
-      if (!countPath.length) continue;
-      for (let i = 1; i <= countPath.length; i++) {
-        const key = countPath.slice(0, i).join('/');
-        counts[key] = (counts[key] || 0) + 1;
-      }
-    }
+
+  for (const navPath of collectTaxonomyNavPaths(tree)) {
+    const count = products.filter((p) => productMatchesNavPath(p, tree, navPath)).length;
+    if (count <= 0) continue;
+    const key = productCountKey(navPath, tree);
+    counts[key] = count;
+    const legacyKey = navPath.join('/');
+    if (legacyKey && legacyKey !== key) counts[legacyKey] = count;
   }
+
   return counts;
 }

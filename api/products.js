@@ -7,6 +7,13 @@ import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-c
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
 const BUNDLED_PATH = join(process.cwd(), 'src/data/categories.json');
+const STOCK_SELECT = [
+  'sku', 'barcode', 'title', 'original_description', 'price',
+  'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
+  'stock_qty', 'available_stock', 'keep_live_when_oos', 'created_at',
+  'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four',
+  'mottaro_path',
+].join(', ');
 
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
   const rows = [];
@@ -127,11 +134,13 @@ export default async function handler(req, res) {
     );
 
     const [rows, tree, salesByBarcode] = await Promise.all([
-      fetchAllRows(supabase, 'website_stock', '*'),
+      fetchAllRows(supabase, 'website_stock', STOCK_SELECT),
       loadTaxonomyTree(),
       loadSalesByBarcode(supabase),
     ]);
-    const products = rows.map((row) => adapt(row, tree, salesByBarcode)).filter((p) => p.category);
+    const products = rows
+      .map((row) => adapt(row, tree, salesByBarcode))
+      .filter((p) => p.category || (p.isMultiCategory && p.alternateCategoryPath?.length));
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
     res.setHeader('Content-Type', 'application/json');

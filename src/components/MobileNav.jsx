@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
-import { lookupProductCount } from '../lib/taxonomy';
+import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
 
 function MobileProductRequest({ onClose: closeAll, customer }) {
   const [description, setDescription] = useState('');
@@ -77,6 +77,10 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
       }
     }
     currentCategories = node;
+  }
+
+  if (path?.length > 0) {
+    currentCategories = filterNavChildrenByCount(currentCategories, path, counts, categories);
   }
 
   const currentLabel = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].label : 'All Categories';

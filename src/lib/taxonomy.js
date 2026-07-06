@@ -159,6 +159,19 @@ export function lookupProductCount(counts, navPath, categories) {
   return legacy ? counts[legacy] ?? null : counts[''];
 }
 
+/** Product count for a nav path; 0 when missing from the count map. */
+export function navPathProductCount(counts, navPath, categories) {
+  return lookupProductCount(counts, navPath, categories) ?? 0;
+}
+
+/** Hide subcategory nav nodes with no products (count/filter parity with catalogue). */
+export function filterNavChildrenByCount(nodes, parentNavPath, counts, categories) {
+  return (nodes || []).filter((node) => {
+    const path = [...parentNavPath, node.id];
+    return navPathProductCount(counts, path, categories) > 0;
+  });
+}
+
 /** Build a slug categoryPath from human labels (category + ordered subcategory levels). */
 export function buildCategoryPath(category, subLabels = []) {
   const catSlug = labelToSlug(category);
