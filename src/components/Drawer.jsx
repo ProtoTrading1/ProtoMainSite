@@ -5,6 +5,19 @@ import { optimizedImageUrl } from '../lib/imageUrl';
 
 const MIN_ORDER = 1000;
 
+function formatCartExpiry(remainingMs) {
+  if (remainingMs === null || remainingMs === undefined) return '';
+  if (remainingMs <= 0) return 'expired';
+
+  const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h left` : `${days}d left`;
+  return `${hours}h ${minutes}m left`;
+}
+
 function QuantityInput({ item, updateQty }) {
   const maxQty = item.product.stockQty || 9999;
   const [draftQty, setDraftQty] = useState(() => String(item.qty));
@@ -29,10 +42,25 @@ function QuantityInput({ item, updateQty }) {
   );
 }
 
-export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty, clearCart, sendOrderEmail, customer, autoCloseProgress = 0, showAutoCloseBar = false, onClose }) {
+export default function Drawer({
+  cartItems,
+  cartTotal,
+  removeFromCart,
+  updateQty,
+  clearCart,
+  sendOrderEmail,
+  customer,
+  autoCloseProgress = 0,
+  showAutoCloseBar = false,
+  cartExpiryRemainingMs = null,
+  cartExpiryTone = 'ok',
+  onClose,
+}) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
   const isReady = cartTotal >= MIN_ORDER;
+  const hasExpiry = cartItems.length > 0 && cartExpiryRemainingMs !== null;
+  const expiryLabel = formatCartExpiry(cartExpiryRemainingMs);
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -101,8 +129,13 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {isReady && <span className="ready-pill">Ready</span>}
+          {hasExpiry && (
+            <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
+              Cart expires: {expiryLabel}
+            </span>
+          )}
           {onClose && (
             <button onClick={onClose} type="button" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center' }} aria-label="Close cart">
               <X size={16} />
@@ -112,7 +145,7 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
       </div>
 
       {showAutoCloseBar && (
-        <div className="drawer-auto-close" aria-hidden="true">
+        <div className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`} aria-hidden="true">
           <div style={{ width: `${Math.max(0, Math.min(100, autoCloseProgress))}%` }} />
         </div>
       )}
@@ -165,6 +198,16 @@ export default function Drawer({ cartItems, cartTotal, removeFromCart, updateQty
               <strong>R{estimatedTotal.toFixed(2)}</strong>
             </div>
           </>
+        )}
+        {hasExpiry && (
+          <div className={`cart-expiry-note cart-expiry-note--${cartExpiryTone}`}>
+            <span>Inactivity timer</span>
+            <strong>
+              {cartExpiryTone === 'danger'
+                ? `Expires soon (${expiryLabel})`
+                : `Reset by updating cart (${expiryLabel})`}
+            </strong>
+          </div>
         )}
         <div className="minimum-card">
           <div className="minimum-copy">

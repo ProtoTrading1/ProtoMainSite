@@ -38,6 +38,21 @@ const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
+const CART_STORAGE_KEY = 'proto_cart';
+const CART_OWNER_KEY = 'proto_cart_owner';
+const CART_LAST_ACTIVITY_KEY = 'proto_cart_last_activity_at';
+const CART_INACTIVITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const CART_EXPIRY_WARN_MS = 72 * 60 * 60 * 1000;
+const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
+
+function readCartActivityAt() {
+  try {
+    const raw = Number(localStorage.getItem(CART_LAST_ACTIVITY_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
 
 function readInStockOnly() {
   try { return sessionStorage.getItem(IN_STOCK_ONLY_KEY) === '1'; } catch { return false; }
@@ -180,8 +195,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
   const [cartItems, setCartItems] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('proto_cart') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); } catch { return []; }
   });
+  const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
+  const [cartClock, setCartClock] = useState(Date.now());
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
@@ -228,8 +245,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [refinements, dismissWelcome]);
 
   useEffect(() => {
-    try { localStorage.setItem('proto_cart', JSON.stringify(cartItems)); } catch { /* ignore */ }
+    try {
+      if (cartItems.length) localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+      else localStorage.removeItem(CART_STORAGE_KEY);
+    } catch { /* ignore */ }
   }, [cartItems]);
+
+  useEffect(() => {
+    if (!cartItems.length) {
+      if (cartLastActivityAt !== null) setCartLastActivityAt(null);
+      try { localStorage.removeItem(CART_LAST_ACTIVITY_KEY); } catch { /* ignore */ }
+      return;
+    }
+    if (cartLastActivityAt) return;
+    const now = Date.now();
+    setCartLastActivityAt(now);
+    try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(now)); } catch { /* ignore */ }
+  }, [cartItems.length, cartLastActivityAt]);
 
   // Scope the cart to the logged-in account. If a different user signs in
   // (e.g. a brand-new account), drop the previous user's cart so it never
@@ -238,13 +270,22 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     const uid = customer?.id || null;
     if (!uid) return;
     let owner = null;
-    try { owner = localStorage.getItem('proto_cart_owner'); } catch { /* ignore */ }
+    try { owner = localStorage.getItem(CART_OWNER_KEY); } catch { /* ignore */ }
     if (owner && owner !== uid) {
       setCartItems([]);
-      try { localStorage.removeItem('proto_cart'); } catch { /* ignore */ }
+      setCartLastActivityAt(null);
+      try {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
+      } catch { /* ignore */ }
     }
-    try { localStorage.setItem('proto_cart_owner', uid); } catch { /* ignore */ }
+    try { localStorage.setItem(CART_OWNER_KEY, uid); } catch { /* ignore */ }
   }, [customer?.id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCartClock(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -499,6 +540,29 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
   }, []);
 
+  const markCartActivity = useCallback(() => {
+    const now = Date.now();
+    setCartLastActivityAt(now);
+    setCartClock(now);
+    try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(now)); } catch { /* ignore */ }
+  }, []);
+
+  const clearCart = useCallback(() => {
+    setCartItems([]);
+    setCartLastActivityAt(null);
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (!cartItems.length || !cartLastActivityAt) return;
+    if (cartClock - cartLastActivityAt < CART_INACTIVITY_WINDOW_MS) return;
+    clearCart();
+    setDrawerPeek(false);
+  }, [cartItems.length, cartLastActivityAt, cartClock, clearCart]);
+
   const addToCart = (product, qty, buttonPos = null) => {
     dismissWelcome();
     const maxQty = product.stockQty || 9999;
@@ -507,6 +571,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (existing) return prev.map((i) => (i.product.id === product.id ? { ...i, qty: Math.min(maxQty, i.qty + qty) } : i));
       return [...prev, { product, qty: Math.min(maxQty, qty) }];
     });
+    markCartActivity();
 
     if (searchTrackRef.current.rowId && searchQuery.trim()) {
       void logSearchCartAdd(searchTrackRef.current.rowId);
@@ -519,9 +584,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
   };
 
-  const updateQty = (id, qty) => setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(i.product.stockQty || 9999, Number(qty) || 1)) })));
-  const removeFromCart = (id) => setCartItems((prev) => prev.filter((i) => i.product.id !== id));
-  const clearCart = () => setCartItems([]);
+  const updateQty = (id, qty) => {
+    setCartItems((prev) => prev.map((i) => (i.product.id !== id ? i : { ...i, qty: Math.max(1, Math.min(i.product.stockQty || 9999, Number(qty) || 1)) })));
+    markCartActivity();
+  };
+  const removeFromCart = (id) => {
+    setCartItems((prev) => prev.filter((i) => i.product.id !== id));
+    markCartActivity();
+  };
 
   const cartQtyMap = useMemo(() => {
     const map = {};
@@ -574,6 +644,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const cartTotal = cartItems.reduce((acc, i) => acc + i.product.price * i.qty, 0);
   const totalItemCount = cartItems.reduce((acc, i) => acc + i.qty, 0);
+  const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
+    ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
+    : null;
+  const cartExpiryProgress = cartExpiryRemainingMs === null
+    ? 0
+    : Math.min(100, Math.max(0, ((CART_INACTIVITY_WINDOW_MS - cartExpiryRemainingMs) / CART_INACTIVITY_WINDOW_MS) * 100));
+  const cartExpiryTone = cartExpiryRemainingMs === null
+    ? 'ok'
+    : cartExpiryRemainingMs <= CART_EXPIRY_DANGER_MS
+      ? 'danger'
+      : cartExpiryRemainingMs <= CART_EXPIRY_WARN_MS
+        ? 'warn'
+        : 'ok';
 
   const sendOrderEmail = async (opts = {}) => {
     if (!cartItems.length) return;
@@ -685,6 +768,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       }
       return next;
     });
+    markCartActivity();
 
     setReorderModal(false);
   };
@@ -791,8 +875,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             clearCart={clearCart}
             sendOrderEmail={sendOrderEmail}
             customer={customer}
-            autoCloseProgress={0}
-            showAutoCloseBar={false}
+            autoCloseProgress={cartExpiryProgress}
+            showAutoCloseBar={cartExpiryRemainingMs !== null}
+            cartExpiryRemainingMs={cartExpiryRemainingMs}
+            cartExpiryTone={cartExpiryTone}
             onClose={() => setCartDrawerOpen(false)}
           />
         </aside>
@@ -868,6 +954,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 clearCart={clearCart}
                 sendOrderEmail={(opts) => { setMobileCartOpen(false); sendOrderEmail(opts); }}
                 customer={customer}
+                autoCloseProgress={cartExpiryProgress}
+                showAutoCloseBar={cartExpiryRemainingMs !== null}
+                cartExpiryRemainingMs={cartExpiryRemainingMs}
+                cartExpiryTone={cartExpiryTone}
               />
             </div>
           </div>
