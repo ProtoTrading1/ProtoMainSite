@@ -55,6 +55,7 @@ const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 const COLOR_GREY = '#333333';
 const COLOR_RED = '#6e0d0d';  // other African countries — dark red
 const COLOR_SA = '#e60000';   // South Africa — strong red
+const FRAME_INTERVAL_MS = 1000 / 30; // cap updates at 30fps for low CPU cost
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -64,33 +65,42 @@ const lerpView = (from, to, t) => ({
   scale: lerp(from.scale, to.scale, t),
 });
 
+function withPulse(frame, t) {
+  const pulseT = frame.pinT > 0 ? ((t % 1100) / 1100) : 0;
+  return { ...frame, pulseT };
+}
+
 function frameAt(t) {
   let m = t;
-  if (m < T.greyHold) return { redCount: 0, view: VIEW_AFRICA, pinT: 0 };
+  if (m < T.greyHold) return withPulse({ redCount: 0, view: VIEW_AFRICA, pinT: 0 }, t);
   m -= T.greyHold;
-  if (m < T.redden) return { redCount: Math.ceil((m / T.redden) * N), view: VIEW_AFRICA, pinT: 0 };
+  if (m < T.redden) return withPulse({ redCount: Math.ceil((m / T.redden) * N), view: VIEW_AFRICA, pinT: 0 }, t);
   m -= T.redden;
-  if (m < T.redHold) return { redCount: N, view: VIEW_AFRICA, pinT: 0 };
+  if (m < T.redHold) return withPulse({ redCount: N, view: VIEW_AFRICA, pinT: 0 }, t);
   m -= T.redHold;
   if (m < T.zoomIn) {
     const e = easeInOut(m / T.zoomIn);
-    return { redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) };
+    return withPulse({ redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) }, t);
   }
   m -= T.zoomIn;
-  if (m < T.capeHold) return { redCount: N, view: VIEW_CAPE, pinT: 1 };
+  if (m < T.capeHold) return withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1 }, t);
   m -= T.capeHold;
   // Pull back out to the full continent, then the cycle restarts (the CSS fill
   // transition fades the countries red → grey on the next pass).
   const e = easeInOut(m / T.zoomOut);
-  return { redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: 1 - e };
+  return withPulse({ redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: 1 - e }, t);
 }
 
 export default function SouthernAfricaMap() {
   const [logoIndex, setLogoIndex] = useState(0);
   const ref = useRef(null);
   const rafRef = useRef(null);
+  const phaseRef = useRef(0);
+  const lastFrameTsRef = useRef(-FRAME_INTERVAL_MS);
   const [inView, setInView] = useState(false);
-  const [{ redCount, view, pinT }, setFrame] = useState(() => frameAt(0));
+  const [isVisible, setIsVisible] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [{ redCount, view, pinT, pulseT }, setFrame] = useState(() => frameAt(0));
 
   // African country features, bundled locally (no runtime fetch — see NOTE 2).
   const geos = useMemo(
@@ -98,41 +108,58 @@ export default function SouthernAfricaMap() {
     []
   );
 
-  // Fire the animation once, when the section first scrolls into view
+  // Observe visibility so we can pause animation when off-screen.
   useEffect(() => {
     const node = ref.current;
     if (!node) return undefined;
     const observer = new IntersectionObserver(
       ([entry]) => {
+        setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
           setInView(true);
-          observer.disconnect();
         }
       },
-      { rootMargin: '80px 0px' }
+      { rootMargin: '80px 0px', threshold: 0.05 }
     );
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const syncReduceMotion = () => setReduceMotion(Boolean(media?.matches));
+    syncReduceMotion();
+    if (media?.addEventListener) {
+      media.addEventListener('change', syncReduceMotion);
+      return () => media.removeEventListener('change', syncReduceMotion);
+    }
+    media?.addListener(syncReduceMotion);
+    return () => media?.removeListener(syncReduceMotion);
+  }, []);
+
+  useEffect(() => {
     if (!inView) return undefined;
-    const reduce =
-      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) {
-      // Skip the motion; show the final resting frame.
-      setFrame({ redCount: N, view: VIEW_CAPE, pinT: 1 });
+    if (reduceMotion) {
+      // Skip motion; keep a strong but static final frame.
+      phaseRef.current = 0;
+      setFrame(withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1 }, 0));
       return undefined;
     }
-    const start = performance.now();
+    if (!isVisible) return undefined;
+
+    const start = performance.now() - phaseRef.current;
     const tick = (now) => {
-      // Modulo the elapsed time so the timeline plays on a constant loop.
-      setFrame(frameAt((now - start) % CYCLE));
+      const phase = (now - start) % CYCLE;
+      phaseRef.current = phase;
+      if (now - lastFrameTsRef.current >= FRAME_INTERVAL_MS) {
+        lastFrameTsRef.current = now;
+        setFrame(frameAt(phase));
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [inView]);
+  }, [inView, isVisible, reduceMotion]);
 
   // Projection + path generator for the current camera frame
   const { paths, pin } = useMemo(() => {
@@ -177,6 +204,24 @@ export default function SouthernAfricaMap() {
 
         {pinT > 0.01 && pin && (
           <g transform={`translate(${pin[0]}, ${pin[1]})`}>
+            <circle
+              cx="0"
+              cy="0"
+              r={20 + pulseT * 10}
+              fill="none"
+              stroke="#ff3b3b"
+              strokeWidth="1.8"
+              style={{ opacity: pinT * (1 - pulseT) * 0.85 }}
+            />
+            <circle
+              cx="0"
+              cy="0"
+              r={15 + pulseT * 7}
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="1.2"
+              style={{ opacity: pinT * (1 - pulseT) * 0.45 }}
+            />
             {/* Proto Trading badge — logo + name where the camera lands */}
             <clipPath id="protoLogoClip">
               <circle cx="0" cy="0" r="16" />
