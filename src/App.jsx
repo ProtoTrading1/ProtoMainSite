@@ -60,12 +60,7 @@ function readInStockOnly() {
 }
 
 function readInitialSort() {
-  try {
-    const stored = sessionStorage.getItem(CATALOG_SORT_KEY);
-    if (stored) {
-      return normalizeCatalogSort(stored);
-    }
-  } catch { /* ignore */ }
+  // Featured should be the consistent default on every visit/reload.
   return DEFAULT_SORT;
 }
 
