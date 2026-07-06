@@ -323,8 +323,12 @@
      so the logo sits cleaner within the compact top bar. */
   .app-header .proto-logo-wordmark__icon,
   .app-header .proto-logo-wordmark__icon--fallback {
-    width: calc(var(--logo-height, 30px) * 0.87);
-    height: calc(var(--logo-height, 30px) * 0.87);
+    width: calc(var(--logo-height, 30px) * 0.72);
+    height: calc(var(--logo-height, 30px) * 0.72);
+  }
+
+  .app-header .proto-logo-wordmark__top {
+    gap: 3px;
   }
 
   .access-brand .proto-logo-wordmark,
