@@ -220,6 +220,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
 export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
+  const defaultVariant = variants[0] || null;
   const variantCount = product?.variantCount || variants.length;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
@@ -243,8 +244,18 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     setActiveImageIdx(0);
   }, [product?.id]);
 
+  const selectVariant = (variant) => {
+    if (!variant) return;
+    setSelectedVariant(variant);
+    setQty(variant.minQty || 1);
+    setActiveImageIdx(0);
+  };
+
   const openPreview = () => {
     onSearchEngage?.();
+    if (isVariantGroup && defaultVariant) {
+      selectVariant(defaultVariant);
+    }
     setZoomOpen(true);
     trackEvent({
       eventType: 'product_view',
@@ -430,13 +441,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     <span className="pz-variants-label">Select a variant</span>
                     <div className="pz-variants-list">
                       {variants.map((v) => {
-                        const isSelected = (selectedVariant?.id || variants[0]?.id) === v.id;
+                        const isSelected = selectedVariant?.id === v.id;
                         return (
                           <button
                             key={v.id}
                             type="button"
                             className={`pz-variant-row${isSelected ? ' pz-variant-row--selected' : ''}`}
-                            onClick={() => { setSelectedVariant(v); setQty(v.minQty || 1); setActiveImageIdx(0); }}
+                            onClick={() => selectVariant(v)}
                           >
                             {v.image && (
                               <img src={v.image} alt={v.name} className="pz-variant-img" />
