@@ -157,10 +157,10 @@ export default function MainContent({
   const sortSelectId = useId();
   const resultsControl = showResultsControl ? (
     <div className="results-control">
-      <span className="results-count">
-        {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
-      </span>
       <div className="results-control-actions">
+        <span className="results-count">
+          {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
+        </span>
         <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
           <input
             id={inStockOnlyId}

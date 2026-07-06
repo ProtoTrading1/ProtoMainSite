@@ -4921,9 +4921,17 @@ textarea:focus-visible,
 
 /* results count */
 .results-count {
-  color: #374151;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* ══════════════════════════════════════════
@@ -6272,6 +6280,11 @@ textarea:focus-visible,
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 10px;
+  }
+
+  .results-control-actions .results-count {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .catalog-filter-control,
