@@ -3076,9 +3076,9 @@ input, select, textarea { font-family: inherit; outline: none; }
   gap: 6px;
   margin-top: 6px;
   padding: 7px;
-  color: #9ca3af;
+  color: #6b7280;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 800;
 }
 .clear-button:hover { color: #374151; }
 .drawer-trust {
@@ -3086,8 +3086,9 @@ input, select, textarea { font-family: inherit; outline: none; }
   justify-content: center;
   gap: 6px;
   margin-top: 10px;
-  color: #9ca3af;
-  font-size: 11px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
 }
 .quote-steps { display: none; }
 .sticky-order-bar {
