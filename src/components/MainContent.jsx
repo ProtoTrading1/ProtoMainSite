@@ -45,7 +45,7 @@ export default function MainContent({
   breadcrumb,
   searchQuery = '',
   setSearchQuery = () => {},
-  sort = 'featured',
+  sort = 'best-selling',
   setSort = () => {},
   onShortcut = () => {},
   activeCollection = 'all',

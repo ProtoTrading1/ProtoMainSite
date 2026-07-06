@@ -46,7 +46,11 @@ function readInStockOnly() {
 function readInitialSort() {
   try {
     const stored = sessionStorage.getItem(CATALOG_SORT_KEY);
-    if (stored) return normalizeCatalogSort(stored);
+    if (stored) {
+      const normalized = normalizeCatalogSort(stored);
+      if (normalized === 'featured') return DEFAULT_SORT;
+      return normalized;
+    }
   } catch { /* ignore */ }
   return DEFAULT_SORT;
 }
