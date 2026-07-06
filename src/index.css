@@ -1982,6 +1982,15 @@ input, select, textarea { font-family: inherit; outline: none; }
   background: transparent;
   border: none;
 }
+@media (min-width: 901px) {
+  .results-control {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    padding: 8px 0;
+    background: #fff;
+  }
+}
 .results-control-actions {
   display: flex;
   align-items: center;
