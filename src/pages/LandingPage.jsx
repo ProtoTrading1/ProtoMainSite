@@ -912,8 +912,7 @@ function VideoHero({ onLogin, onApply }) {
           <span className="vhero-headline-line vhero-headline-line--accent">SMARTER.</span>
         </h1>
         <div className="access-note">
-          <p className="access-note-trust">TRUSTED SINCE 1987</p>
-          <p className="access-note-detail">Serving South African retailers for nearly four decades.</p>
+          <p className="access-note-trust">Trusted by South African retailers since 1987.</p>
           <p className="access-note-value">
             Exclusive wholesale access for retailers, resellers and growing businesses.
           </p>
@@ -923,36 +922,36 @@ function VideoHero({ onLogin, onApply }) {
             Apply for Trade Access <ArrowRight size={18} />
           </button>
           <button className="access-login large" type="button" onClick={onLogin}>
-            Existing Customer Login
+            Sign In
           </button>
         </div>
         <div className="vhero-trust-strip" role="list" aria-label="Wholesale platform highlights">
           <div className="vhero-trust-item" role="listitem">
             <CheckCircle2 size={15} />
             <div>
-              <strong>EST. 1987</strong>
-              <span>Nearly four decades of trusted service</span>
-            </div>
-          </div>
-          <div className="vhero-trust-item" role="listitem">
-            <CheckCircle2 size={15} />
-            <div>
               <strong>5,000+ PRODUCTS</strong>
-              <span>Everything your business needs</span>
+              <span>One supplier for your business.</span>
             </div>
           </div>
           <div className="vhero-trust-item" role="listitem">
             <CheckCircle2 size={15} />
             <div>
               <strong>REAL-TIME STOCK</strong>
-              <span>Accurate stock levels you can rely on</span>
+              <span>Live inventory, always up to date.</span>
             </div>
           </div>
           <div className="vhero-trust-item" role="listitem">
             <CheckCircle2 size={15} />
             <div>
-              <strong>NATIONWIDE DELIVERY</strong>
-              <span>Fast, reliable delivery across South Africa</span>
+              <strong>EXCLUSIVE TRADE PRICING</strong>
+              <span>Wholesale pricing for approved customers.</span>
+            </div>
+          </div>
+          <div className="vhero-trust-item" role="listitem">
+            <CheckCircle2 size={15} />
+            <div>
+              <strong>FAST REORDERING</strong>
+              <span>Buy your favourites again in seconds.</span>
             </div>
           </div>
         </div>
