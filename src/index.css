@@ -1617,6 +1617,23 @@ input, select, textarea { font-family: inherit; outline: none; }
   height: auto;
   display: block;
 }
+/* Desktop compact pass for the welcome banner:
+   keep artwork/copy unchanged, but reduce occupied vertical space. */
+@media (min-width: 1024px) {
+  .site-hero-banner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #050505;
+    max-height: 560px;
+  }
+  .site-hero-banner img {
+    width: auto;
+    max-width: 100%;
+    max-height: 560px;
+    height: auto;
+  }
+}
 .trade-hero {
   min-height: 220px;
   display: grid;
