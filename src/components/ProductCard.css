@@ -6,10 +6,18 @@
 }
 
 .product-card:hover {
-  transform: translateY(-3px);
+  transform: none;
   border-color: #e8eaed;
   border-width: 1px;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(15, 23, 42, 0.06);
+}
+
+.product-grid {
+  align-items: stretch;
+}
+
+.product-grid .product-card {
+  height: 100%;
 }
 
 /* ── Loading skeleton (mirrors card layout to avoid content-shift) ───────── */
@@ -323,6 +331,11 @@
 
 .product-card .pc-in-order {
   margin-top: 8px;
+  min-height: 16px;
+}
+
+.product-card .pc-in-order--empty {
+  visibility: hidden;
 }
 
 @media (max-width: 768px) {
