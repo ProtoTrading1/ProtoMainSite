@@ -230,7 +230,7 @@
 }
 
 .product-card .pc-stock-slot {
-  min-height: 24px;
+  min-height: 32px;
   margin-top: 8px;
 }
 
@@ -259,6 +259,25 @@
 
 .product-card .pc-stock-badge--out {
   background: #f3f4f6;
+  color: #6b7280;
+}
+
+.product-card .pc-stock-qty {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.product-card .pc-stock-qty--in {
+  color: #15803d;
+}
+
+.product-card .pc-stock-qty--low {
+  color: #b45309;
+}
+
+.product-card .pc-stock-qty--out {
   color: #6b7280;
 }
 

@@ -5224,6 +5224,13 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 .pz-add-btn:hover { background: #222; transform: translateY(-1px); }
 .pz-add-btn:active { transform: translateY(0); }
+.pz-add-btn:disabled {
+  background: #9ca3af;
+  color: #f9fafb;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.75;
+}
 .pz-add-btn--added { background: var(--proto-gold) !important; color: #111111 !important; }
 .pz-add-btn--added:hover { background: var(--proto-gold) !important; color: #111111 !important; }
 

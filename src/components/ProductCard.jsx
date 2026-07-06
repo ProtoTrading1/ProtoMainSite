@@ -71,6 +71,28 @@ function catalogStockBadge(product) {
   return catalogStockBadgeState(product);
 }
 
+function catalogStockState(product) {
+  if (!product) return { state: 'in', qty: null, canOrder: true };
+
+  const qty = catalogStockQty(product);
+  const state = catalogStockBadge(product);
+
+  // Pinned OOS products remain orderable.
+  if (product.keepLiveWhenOos) {
+    return { state, qty, canOrder: true };
+  }
+
+  if (qty !== null) {
+    return { state, qty, canOrder: qty > 0 };
+  }
+
+  if (product.inStock === false) {
+    return { state, qty: null, canOrder: false };
+  }
+
+  return { state, qty, canOrder: true };
+}
+
 const STOCK_BADGE_LABEL = {
   in: 'In stock',
   low: 'Low stock',
@@ -78,12 +100,23 @@ const STOCK_BADGE_LABEL = {
 };
 
 function StockBadge({ product }) {
-  const state = catalogStockBadge(product);
+  const { state, qty } = catalogStockState(product);
+  const showQty = qty !== null && !Number.isNaN(qty) && !product?.isVariantGroup;
+  let qtyLabel = null;
+  if (showQty) {
+    if (state === 'in') qtyLabel = `In stock: ${qty}`;
+    else if (state === 'low') qtyLabel = `Low stock: ${qty}`;
+    else qtyLabel = 'Out of stock';
+  }
+
   return (
     <div className="pc-stock-slot">
       <span className={`pc-stock-badge pc-stock-badge--${state}`} aria-label={STOCK_BADGE_LABEL[state]}>
         {state === 'in' ? 'In stock' : state === 'low' ? 'Low stock' : 'Out of stock'}
       </span>
+      {qtyLabel && (
+        <span className={`pc-stock-qty pc-stock-qty--${state}`}>{qtyLabel}</span>
+      )}
     </div>
   );
 }
@@ -274,6 +307,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     ? activeProduct.images
     : null;
   const inCart = cartQty > 0;
+  const { canOrder: cardCanOrder } = catalogStockState(product);
+  const { canOrder: modalCanOrder } = catalogStockState(activeProduct);
 
   useEffect(() => {
     setSelectedVariant(null);
@@ -310,6 +345,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
       openPreview();
       return;
     }
+    if (!cardCanOrder) return;
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
     addToCart(activeProduct, qty, pos);
@@ -397,7 +433,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 <Plus size={14} />
               </button>
             </div>
-            <button ref={addButtonRef} className="add-button" onClick={handleAdd} type="button">
+            <button
+              ref={addButtonRef}
+              className="add-button"
+              onClick={handleAdd}
+              type="button"
+              disabled={!isVariantGroup && !cardCanOrder}
+            >
               <ShoppingCart size={16} />
               {isVariantGroup ? 'View options' : 'Add to Cart'}
             </button>
@@ -541,7 +583,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 ) : (
                   <button
                     className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
+                    disabled={!modalCanOrder}
                     onClick={() => {
+                      if (!modalCanOrder) return;
                       addToCart(activeProduct, qty, null, true);
                       setJustAdded(true);
                       setTimeout(() => setJustAdded(false), 1800);
