@@ -4,10 +4,17 @@
  * Run: node scripts/qa-smoke-check.mjs
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { injectMotarroIntoTree, isMotarroProduct, enrichMotarroCategoryFields } from '../lib/mottaro-category.mjs';
+import {
+  enrichMotarroCategoryFields,
+  inferMotarroPathFromRow,
+  injectMotarroIntoTree,
+  isMotarroProduct,
+  parseStoredMotarroPath,
+} from '../lib/mottaro-category.mjs';
 import { shouldShowPopup, dismissPopup } from '../src/lib/popupSpecial.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,5 +67,36 @@ const productsSrc = readFileSync(join(root, 'src/lib/products.js'), 'utf8');
 assert.match(productsSrc, /SORT_ORDERS_TTL\s*=\s*15_000/, 'sort-order TTL is 15s');
 assert.doesNotMatch(productsSrc, /localStorage.*sort/i, 'sort orders not in localStorage catalogue key');
 console.log('✓ Item 4 sort-order cache settings');
+
+// Shared Mottaro module — must stay byte-identical to the admin copy
+const MOTTARO_SHARED_HASH = '9f9e87791ab159cd';
+const mottaroShared = readFileSync(join(root, 'lib/mottaro-category.mjs'), 'utf8');
+assert.equal(
+  createHash('sha256').update(mottaroShared).digest('hex').slice(0, 16),
+  MOTTARO_SHARED_HASH,
+  'lib/mottaro-category.mjs must stay byte-identical to protoportal-admin/lib/mottaro-category.mjs — edit both copies together and update the pinned hash in both qa-smoke-check.mjs files',
+);
+console.log('✓ Shared Mottaro module in sync with protoportal-admin');
+
+// mottaro_path persistence — stored snapshot keeps placement when labels vanish
+assert.deepEqual(
+  inferMotarroPathFromRow({ title: 'MOTTARO brush', category: null, mottaro_path: '["mottaro","mottaro-art-supplies"]' }, tree),
+  ['mottaro', 'mottaro-art-supplies'],
+  'stored mottaro_path wins when primary labels are gone',
+);
+assert.deepEqual(
+  inferMotarroPathFromRow({ title: 'MOTTARO thing', category: '', mottaro_path: '["bogus"]' }, tree),
+  ['mottaro', 'mottaro-other', 'mottaro-other-general'],
+  'invalid stored path falls back to Other›General',
+);
+assert.equal(parseStoredMotarroPath('["mottaro","deleted-branch"]', tree), null, 'stored path validated against current tree');
+const enrichedStored = enrichMotarroCategoryFields(
+  {},
+  { title: 'MOTTARO pen', category: 'Stationery', mottaro_path: '["mottaro","mottaro-school-office"]' },
+  tree,
+  ['stationery'],
+);
+assert.deepEqual(enrichedStored.mottaroPath, ['mottaro', 'mottaro-school-office'], 'enrich exposes validated stored path');
+console.log('✓ mottaro_path stored-snapshot read logic');
 
 console.log('\nAll portal smoke checks passed.');
