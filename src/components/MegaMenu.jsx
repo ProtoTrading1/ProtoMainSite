@@ -86,6 +86,7 @@ function ListItem({ label, count, hasArrow, active, onClick, onMouseEnter, color
       type="button"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
+      onFocus={onMouseEnter}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 20px 0 16px', width: '100%', height: NAV_ROW_HEIGHT,
@@ -153,6 +154,11 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
   return (
     <div
       className="mega-menu-flyout"
+      role="menu"
+      aria-label={`${l1Node.label} categories`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
       style={{
         position: 'absolute',
         left: '100%',

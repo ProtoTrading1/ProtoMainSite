@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -31,8 +31,6 @@ import { resolveNavPathForProducts } from './lib/taxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import './index.css';
 
-const HEADER_H = 72;
-const TOPNAV_H = 0;
 const CATALOG_PAGE_SIZE = 60;
 const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
@@ -174,7 +172,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
-  const skipNavScrollRef = useRef(false);
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome((prev) => {
@@ -200,8 +197,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
-    scrollToTop();
-    hashNavigate(newPath, newRefinements);
+    hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
 
   const goAllProducts = useCallback(() => {
@@ -210,8 +206,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [dismissWelcome, navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
-    scrollToTop();
-    hashNavigate(newPath, newRefinements);
+    hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
   const [sort, setSort] = useState(readInitialSort);
   const [loading, setLoading] = useState(true);
@@ -223,6 +218,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartItems, setCartItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); } catch { return []; }
   });
+  const [cartAnnouncement, setCartAnnouncement] = useState('');
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
   const [cartClock, setCartClock] = useState(Date.now());
   const [flyAnim, setFlyAnim] = useState(null);
@@ -241,7 +237,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [showPopup, setShowPopup] = useState(false);
 
   const goHome = useCallback(() => {
-    skipNavScrollRef.current = true;
     try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
@@ -250,7 +245,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setActiveCollection('all');
     setSort(DEFAULT_SORT);
     setInStockOnly(false);
-    hashNavigate([], {});
+    hashNavigate([], {}, { scroll: false });
     scrollToTopSmooth();
   }, [hashNavigate]);
 
@@ -317,26 +312,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setPage(1);
   }, [path.join('/')]);
 
+  useEffect(() => {
+    // Collection switches represent a new catalogue scope: always restart at page 1.
+    setPage(1);
+  }, [activeCollection]);
+
   // Graceful fallback for legacy/unknown category slugs (taxonomy changed):
   // if the first path segment isn't a known department, resolve to the
   // catalogue root instead of showing an empty/broken page.
   useEffect(() => {
     if (path.length && !categories.some((c) => c.id === path[0])) {
-      hashNavigate([]);
+      hashNavigate([], {}, { scroll: true });
     }
   }, [path, hashNavigate]);
 
   const pathKey = path.join('/');
-
-  // Keep browsing continuous for sort/filter changes; only reset for catalogue navigation.
-  useLayoutEffect(() => {
-    if (skipNavScrollRef.current) return;
-    scrollToTop();
-  }, [pathKey]);
-
-  useLayoutEffect(() => {
-    skipNavScrollRef.current = false;
-  });
 
   const handlePageChange = useCallback((nextPage) => {
     scrollToTop();
@@ -350,7 +340,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setInStockOnly(false);
     setPage(1);
     if (Object.keys(refinements).length > 0) {
-      hashNavigate(path, {});
+      hashNavigate(path, {}, { scroll: false });
     }
     try {
       sessionStorage.removeItem(IN_STOCK_ONLY_KEY);
@@ -525,6 +515,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (inStockOnly) rows = rows.filter(isProductAvailable);
         rows = sortCatalogProducts(rows, sort, { hasSearch });
         rows = groupProductsByBarcode(rows);
+        if (rows.length > 0) {
+          const maxPage = Math.max(1, Math.ceil(rows.length / CATALOG_PAGE_SIZE));
+          if (page > maxPage) {
+            setPage(maxPage);
+            return;
+          }
+        }
         setUsingFallback(true);
         setCatalogTotal(rows.length);
         setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
@@ -739,6 +736,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const cartTotal = cartItems.reduce((acc, i) => acc + i.product.price * i.qty, 0);
   const totalItemCount = cartItems.reduce((acc, i) => acc + i.qty, 0);
+  const cartStateRef = useRef(null);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -886,11 +884,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, [searchQuery, page]);
 
-  const bodyH = `calc(100vh - ${HEADER_H}px - ${TOPNAV_H}px)`;
+  useEffect(() => {
+    const signature = cartItems.map((item) => `${item.product.id}:${item.qty}`).join('|');
+    const prev = cartStateRef.current;
+    cartStateRef.current = signature;
+    if (prev === null || prev === signature) return;
+    if (totalItemCount === 0) {
+      setCartAnnouncement('Cart cleared.');
+      return;
+    }
+    setCartAnnouncement(`Cart updated. ${totalItemCount} item${totalItemCount === 1 ? '' : 's'}. Total R${cartTotal.toFixed(2)}.`);
+  }, [cartItems, totalItemCount, cartTotal]);
+
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
         cartTotal={cartTotal}
@@ -909,7 +919,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onCartClick={() => { if (window.innerWidth > 1200) setCartDrawerOpen(true); else setMobileCartOpen(true); }}
       />
 
-      <div className="main-layout" style={{ height: bodyH }}>
+      <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
         <aside className="sidebar-rail">
           <Sidebar
             categories={categories}
@@ -1029,10 +1039,16 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       {/* Mobile cart — opened from bottom tab bar */}
       {mobileCartOpen && (
         <div className="mobile-cart-backdrop" onClick={() => setMobileCartOpen(false)}>
-          <div className="mobile-cart-sheet" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="mobile-cart-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-cart-sheet-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mobile-cart-sheet-handle" />
             <div className="mobile-cart-sheet-header">
-              <span className="mobile-cart-sheet-title">Your Order</span>
+              <span className="mobile-cart-sheet-title" id="mobile-cart-sheet-title">Your Order</span>
               <button
                 type="button"
                 className="mobile-cart-sheet-close"

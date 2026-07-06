@@ -70,6 +70,7 @@ export default function Drawer({
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const courierDialogTitleId = 'courier-picker-title';
 
   const inclVatEstimate = cartTotal;
   const discountAmount = appliedPromo?.discountAmount || 0;
@@ -118,6 +119,17 @@ export default function Drawer({
     setCourierChoice(null);
     setCustomerNotes('');
   };
+
+  useEffect(() => {
+    if (!showCourierPicker) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeCourierPicker();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showCourierPicker]);
 
   return (
     <div className="order-drawer" style={{ position: 'relative' }}>
@@ -170,9 +182,21 @@ export default function Drawer({
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <div className="mini-stepper">
-                  <button onClick={() => updateQty(item.product.id, item.qty - 1)} type="button">-</button>
+                  <button
+                    onClick={() => updateQty(item.product.id, item.qty - 1)}
+                    type="button"
+                    aria-label={`Decrease quantity for ${item.product.name}`}
+                  >
+                    -
+                  </button>
                   <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} />
-                  <button onClick={() => updateQty(item.product.id, item.qty + 1)} type="button">+</button>
+                  <button
+                    onClick={() => updateQty(item.product.id, item.qty + 1)}
+                    type="button"
+                    aria-label={`Increase quantity for ${item.product.name}`}
+                  >
+                    +
+                  </button>
                 </div>
                 <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label="Remove item">
                   <Trash2 size={14} />
@@ -225,10 +249,10 @@ export default function Drawer({
             Submit order request
           </button>
         ) : (
-          <div className="locked-order-button">
+          <button className="locked-order-button" type="button" disabled aria-disabled="true">
             <Lock size={15} />
             Add more products to submit
-          </div>
+          </button>
         )}
         <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button">
           <Trash2 size={13} />
@@ -258,9 +282,17 @@ export default function Drawer({
       />
 
       {showCourierPicker && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}>
-          <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', maxHeight: '85%', overflowY: 'auto' }}>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
+        <div
+          role="presentation"
+          style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={courierDialogTitleId}
+            style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', maxHeight: '85%', overflowY: 'auto' }}
+          >
+            <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select a delivery option before we send your quote request.</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
               {[

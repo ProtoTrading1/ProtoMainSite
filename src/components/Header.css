@@ -63,6 +63,16 @@
 .brand-logo-hit {
   display: flex;
   align-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.brand-logo-hit:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 4px;
 }
 
 .app-header--premium .header-search-premium-wrap {
@@ -159,6 +169,12 @@
   color: var(--search-placeholder);
 }
 
+.header-search-premium__input:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 /* Search results dropdown — no glassmorphism */
 .header-search-dropdown {
   position: absolute;
@@ -206,6 +222,7 @@
 }
 
 .header-search-dropdown .sp-cat-row:hover,
+.header-search-dropdown .sp-cat-row.active,
 .header-search-dropdown .sp-product-row:hover,
 .header-search-dropdown .sp-product-row.active {
   background: #1A1A1A;
@@ -272,6 +289,12 @@
   background: #0D0D0D;
   min-height: 42px;
   transition: border-color 180ms ease, background-color 180ms ease;
+  border-style: solid;
+  border-width: 1px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  appearance: none;
 }
 
 .app-header--premium .cart-summary-icon {
@@ -320,6 +343,11 @@
 .app-header--premium .cart-summary--ready:hover {
   border-color: #D4AD56;
   background: rgba(200, 154, 60, 0.14);
+}
+
+.app-header--premium .cart-summary:focus-visible {
+  outline: 2px solid #D4AD56;
+  outline-offset: 2px;
 }
 
 .app-header--premium .header-icon-mobile {
