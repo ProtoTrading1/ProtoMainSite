@@ -3,7 +3,7 @@ import BillingDeliveryFields from '../components/register/BillingDeliveryFields'
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
 import ProtoLogo from '../components/ProtoLogo';
-import { motion, useInView } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -334,49 +334,6 @@ function TruckScrollbar() {
       {/* Start glow dot */}
       <div style={{ position: 'absolute', top: PAD, left: '50%', transform: 'translate(-50%, -50%)', width: dotSize, height: dotSize, borderRadius: '50%', background: '#8B1A1A', boxShadow: '0 0 8px rgba(139,26,26,0.9)' }} />
     </div>
-  );
-}
-
-function useCountUp(to, from = 0, duration = 1800, active = false) {
-  const [val, setVal] = useState(from);
-  useEffect(() => {
-    if (!active) return;
-    let start = null;
-    const step = (ts) => {
-      if (!start) start = ts;
-      const p = Math.min((ts - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(from + (to - from) * ease));
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [active, to, from, duration]);
-  return val;
-}
-
-function StatCard({ value, suffix = '', label, from = 0, duration = 1800, active }) {
-  const num = useCountUp(value, from, duration, active);
-  return (
-    <div className="lp-stat-card">
-      <strong>{num.toLocaleString()}{suffix}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function DeptCountCard({ name, count, active, delay = 0 }) {
-  const num = useCountUp(count, 0, 1400, active);
-  return (
-    <motion.div
-      className="lp-dept-card"
-      initial={{ opacity: 0, y: 22 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.45, delay }}
-    >
-      <strong className="lp-dept-count">{num.toLocaleString()}</strong>
-      <span className="lp-dept-name">{name}</span>
-    </motion.div>
   );
 }
 
@@ -1026,11 +983,6 @@ export default function LandingPage({ onLogin, onApply }) {
   }, []);
 
   const [showAbout, setShowAbout] = useState(false);
-  const statsRef = useRef(null);
-  const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
-
-  const deptRef = useRef(null);
-  const deptInView = useInView(deptRef, { once: true, margin: '-80px' });
 
   const scrollToForm = () => {
     if (onApply) { onApply(); return; }
@@ -1057,16 +1009,6 @@ export default function LandingPage({ onLogin, onApply }) {
         <VideoHero onLogin={onLogin} onApply={scrollToForm} />
 
         <div>
-        {/* ── Animated stats ── */}
-        <section className="lp-stats" ref={statsRef}>
-          <StatCard value={5000} suffix="+" label="wholesale product lines" active={statsInView} duration={1600} />
-          <StatCard value={12} label="core buying departments" active={statsInView} duration={900} />
-          <div className="lp-stat-card lp-stat-text">
-            <strong>Nationwide</strong>
-            <span>delivery support across South Africa</span>
-          </div>
-        </section>
-
         {/* ── Southern Africa map ── */}
         <motion.section
           className="lp-map-wrapper"
@@ -1096,7 +1038,7 @@ export default function LandingPage({ onLogin, onApply }) {
         </motion.section>
 
         {/* ── Departments ── */}
-        <section className="lp-departments" id="lp-departments" ref={deptRef}>
+        <section className="lp-departments" id="lp-departments">
           <motion.div
             className="lp-section-header"
             initial={{ opacity: 0, y: 28 }}
