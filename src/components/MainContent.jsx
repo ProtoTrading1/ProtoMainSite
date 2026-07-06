@@ -244,8 +244,8 @@ export default function MainContent({
         </div>
       )}
 
-      {/* Sort + count bar — hidden on welcome home; shown when browsing products */}
-      {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && !showWelcomeHome && (
+      {/* Sort + count bar — always available while browsing */}
+      {(!showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all') && (
         <div className="results-control">
           <span className="results-count">
             {categoryProductCount} Product{categoryProductCount !== 1 ? 's' : ''}
