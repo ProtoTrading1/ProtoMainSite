@@ -4986,7 +4986,10 @@ textarea:focus-visible,
 .pz-modal {
   position: relative;
   width: min(940px, 100%);
+  height: min(720px, calc(100vh - 20px));
+  max-height: min(720px, calc(100vh - 20px));
   max-height: min(720px, calc(100svh - 20px));
+  height: min(720px, calc(100svh - 20px));
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
   overflow: hidden;
@@ -5335,6 +5338,7 @@ textarea:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex-shrink: 0;
 }
 .pz-price-row {
   display: flex;
