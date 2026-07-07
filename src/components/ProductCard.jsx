@@ -470,7 +470,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
             </button>
           </div>
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
-            {inCart ? `In your order: ${cartQty}` : '\u00A0'}
+            {inCart ? `In Your Order: ${cartQty}` : '\u00A0'}
           </span>
         </div>
       </article>
