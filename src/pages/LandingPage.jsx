@@ -523,9 +523,9 @@ function Questionnaire({ onLogin }) {
 
       <motion.div
         key={step}
-        initial={{ opacity: 0, x: 16 }}
+        initial={{ opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.22 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
       >
         {step === 0 && (
           <div className="lp-quiz-step">
@@ -598,9 +598,9 @@ function Questionnaire({ onLogin }) {
               {phone.replace(/\D/g, '').length >= 8 && (
                 <motion.div
                   className="lp-quiz-field lp-quiz-field--full"
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
                 >
                   <div style={{
                     background: 'rgba(22,163,74,0.1)',
@@ -743,9 +743,9 @@ function Questionnaire({ onLogin }) {
             {businessType.includes('Other') && (
               <motion.div
                 className="lp-quiz-field lp-quiz-other-field"
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
               >
                 <label>Describe your business</label>
                 <input
@@ -947,7 +947,7 @@ function VideoHero({ onLogin, onApply }) {
           <span className="vhero-headline-line">MADE</span>
           <span className="vhero-headline-line vhero-headline-line--accent">SMARTER.</span>
         </h1>
-        <div className="vhero-support-wrap" aria-live="polite" aria-atomic="true">
+        <div className="vhero-support-wrap" aria-live="off" aria-atomic="true">
           <p className={`vhero-support-message${isFading ? ' is-fading' : ''}`}>
             {activeMessage.map((line, idx) => (
               <span key={`${messageIdx}-${idx}`} className="vhero-support-line">
@@ -1094,10 +1094,10 @@ export default function LandingPage({ onLogin, onApply }) {
         {/* ── Southern Africa map ── */}
         <motion.section
           className="lp-map-wrapper"
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 22 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
+          transition={{ duration: 0.48, ease: 'easeOut' }}
         >
           <div className="lp-map-copy">
             <span className="lp-eyebrow">Delivery coverage</span>
@@ -1108,10 +1108,10 @@ export default function LandingPage({ onLogin, onApply }) {
           </div>
           <motion.div
             className="lp-map-inner"
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={{ opacity: 0, scale: 0.985 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
           >
             <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
               <SouthernAfricaMap />
@@ -1123,10 +1123,10 @@ export default function LandingPage({ onLogin, onApply }) {
         <section className="lp-departments" id="lp-departments">
           <motion.div
             className="lp-section-header"
-            initial={{ opacity: 0, y: 28 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.55 }}
+            transition={{ duration: 0.42, ease: 'easeOut' }}
           >
             <span className="lp-eyebrow">Catalogue departments</span>
             <h2>12 buying departments, 5,000+ products.</h2>
@@ -1163,10 +1163,10 @@ export default function LandingPage({ onLogin, onApply }) {
         <section className="lp-apply-wrapper" id="lp-apply">
           <motion.div
             className="lp-apply-copy"
-            initial={{ opacity: 0, x: -30 }}
+            initial={{ opacity: 0, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
           >
             <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
             <h2>Get access to Proto Trading's catalogue.</h2>
@@ -1174,10 +1174,10 @@ export default function LandingPage({ onLogin, onApply }) {
 
           <motion.div
             className="lp-apply-card"
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.15 }}
+            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
           >
             <Questionnaire onLogin={onLogin} />
           </motion.div>
