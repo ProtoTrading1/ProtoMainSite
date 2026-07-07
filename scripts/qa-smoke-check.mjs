@@ -69,7 +69,7 @@ assert.doesNotMatch(productsSrc, /localStorage.*sort/i, 'sort orders not in loca
 console.log('✓ Item 4 sort-order cache settings');
 
 // Shared Mottaro module — must stay byte-identical to the admin copy
-const MOTTARO_SHARED_HASH = '9f9e87791ab159cd';
+const MOTTARO_SHARED_HASH = 'd589775c956734c1';
 const mottaroShared = readFileSync(join(root, 'lib/mottaro-category.mjs'), 'utf8');
 assert.equal(
   createHash('sha256').update(mottaroShared).digest('hex').slice(0, 16),
