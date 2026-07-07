@@ -35,6 +35,34 @@
   z-index: 300;
 }
 
+.mega-menu-loading-skeleton {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 280px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 16px 0 40px rgba(15, 23, 42, 0.08);
+  z-index: 300;
+}
+
+.mega-menu-skeleton-row {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(15,23,42,0.1), rgba(15,23,42,0.02), rgba(15,23,42,0.1));
+  animation: skeleton-loading 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { transform: translateX(-12%); }
+  50% { transform: translateX(2%); background-color: rgba(15,23,42,0.08); }
+  100% { transform: translateX(-12%); }
+}
+
 .access-header {
   height: 88px;
   display: flex;

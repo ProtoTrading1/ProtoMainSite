@@ -1,7 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
-const LazyMegaMenu = lazy(() => import('./MegaMenu'));
+let megaMenuPreloadPromise = null;
+
+export function preloadMegaMenu() {
+  if (!megaMenuPreloadPromise) {
+    megaMenuPreloadPromise = import('./MegaMenu');
+  }
+  return megaMenuPreloadPromise;
+}
+
+const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
 function ProductRequestModal({ onClose, customer }) {
@@ -96,6 +105,16 @@ function ProductRequestModal({ onClose, customer }) {
   );
 }
 
+function MegaMenuSkeleton() {
+  return (
+    <div className="mega-menu-loading-skeleton" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <span key={idx} className="mega-menu-skeleton-row" />
+      ))}
+    </div>
+  );
+}
+
 export default function Sidebar({ categories, path, navigate, onAllProducts, counts, customer }) {
   const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
   const [menuTopOffset, setMenuTopOffset] = useState(0);
@@ -126,7 +145,25 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
     return () => document.removeEventListener('keydown', onGlobalEscape);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let idleHandle;
+    if (window.requestIdleCallback) {
+      idleHandle = window.requestIdleCallback(() => preloadMegaMenu());
+    } else {
+      idleHandle = window.setTimeout(() => preloadMegaMenu(), 400);
+    }
+    return () => {
+      if (window.cancelIdleCallback && typeof idleHandle === 'number') {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        window.clearTimeout(idleHandle);
+      }
+    };
+  }, []);
+
   const handleToggleL1 = (id, btnEl) => {
+    preloadMegaMenu();
     setOpenCategoryId(id);
     if (id && btnEl && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
@@ -189,7 +226,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
       </div>
 
       {menuOpen && menuNode && (
-        <Suspense fallback={<div className="mega-menu-loading" aria-hidden="true" />}>
+        <Suspense fallback={<MegaMenuSkeleton />}>
           <LazyMegaMenu
             key={menuNode.id}
             l1Node={menuNode}
