@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
-import MegaMenu from './MegaMenu';
+const LazyMegaMenu = lazy(() => import('./MegaMenu'));
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
 function ProductRequestModal({ onClose, customer }) {
@@ -189,15 +189,17 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
       </div>
 
       {menuOpen && menuNode && (
-        <MegaMenu
-          key={menuNode.id}
-          l1Node={menuNode}
-          navigate={navigate}
-          counts={counts}
-          categories={categories}
-          onClose={() => setOpenCategoryId(null)}
-          topOffset={menuTopOffset}
-        />
+        <Suspense fallback={<div className="mega-menu-loading" aria-hidden="true" />}>
+          <LazyMegaMenu
+            key={menuNode.id}
+            l1Node={menuNode}
+            navigate={navigate}
+            counts={counts}
+            categories={categories}
+            onClose={() => setOpenCategoryId(null)}
+            topOffset={menuTopOffset}
+          />
+        </Suspense>
       )}
 
       {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}

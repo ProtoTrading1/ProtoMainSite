@@ -32,6 +32,8 @@ const shortcuts = [
   { id: 'clearance', icon: Tag, title: 'Clearance' },
 ];
 
+const PRIORITY_CHUNK_SIZE = 16;
+
 export default function MainContent({
   products,
   resultsTotal = products.length,
@@ -135,6 +137,37 @@ export default function MainContent({
     return () => media.removeListener(syncPreference);
   }, []);
 
+  const [visibleCount, setVisibleCount] = useState(Math.min(products.length, PRIORITY_CHUNK_SIZE));
+  const idleHandleRef = useRef(null);
+
+  useEffect(() => {
+    setVisibleCount(Math.min(products.length, PRIORITY_CHUNK_SIZE));
+    if (idleHandleRef.current) {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idleHandleRef.current);
+      else clearTimeout(idleHandleRef.current);
+    }
+
+    if (products.length <= PRIORITY_CHUNK_SIZE) return undefined;
+
+    const applyRemaining = () => {
+      if (products.length) setVisibleCount(products.length);
+      idleHandleRef.current = null;
+    };
+
+    if (window.requestIdleCallback) {
+      idleHandleRef.current = window.requestIdleCallback(applyRemaining, { timeout: 300 });
+    } else {
+      idleHandleRef.current = window.setTimeout(applyRemaining, 120);
+    }
+
+    return () => {
+      if (idleHandleRef.current) {
+        if (window.cancelIdleCallback) window.cancelIdleCallback(idleHandleRef.current);
+        else clearTimeout(idleHandleRef.current);
+      }
+    };
+  }, [products.length]);
+
   useEffect(() => {
     const nextState = { pathKey, activeCollection, sort, inStockOnly, searchKey, refinementsKey };
     const prevState = previousBrowseStateRef.current;
@@ -234,6 +267,11 @@ export default function MainContent({
       </div>
     </div>
   ) : null;
+
+  const shouldChunk = !productGroups && products.length > PRIORITY_CHUNK_SIZE;
+  const displayedProducts = shouldChunk ? products.slice(0, visibleCount) : products;
+  const hasPartial = shouldChunk && visibleCount < products.length;
+  const skeletonCount = Math.min(products.length - visibleCount, PRIORITY_CHUNK_SIZE);
 
   return (
     <div className="catalog-page">
@@ -372,6 +410,12 @@ export default function MainContent({
                 ))
             }
           </div>
+
+          {hasPartial && (
+            <div className="catalog-progress-placeholder" aria-live="polite" aria-atomic="true">
+              <ProductGridSkeleton count={skeletonCount || 4} />
+            </div>
+          )}
 
           {totalPages > 1 && (
             <div className="pagination-bar">
