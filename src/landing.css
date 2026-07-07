@@ -5,12 +5,12 @@
 }
 
 .access-header {
-  height: 84px;
+  height: 88px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 20px;
-  padding: 0 32px;
+  padding: 0 34px;
   background: #000;
   color: #fff;
   position: sticky;
@@ -44,7 +44,7 @@
 .access-brand .proto-logo__svg,
 .access-brand .proto-logo__image--full {
   width: auto;
-  --logo-height: 56px;
+  --logo-height: 62px;
   border-radius: 0;
   object-fit: contain;
   background: transparent;
@@ -52,7 +52,7 @@
 
 .access-brand .proto-logo {
   opacity: 0;
-  animation: header-logo-in 320ms ease-out forwards;
+  animation: header-logo-in 220ms ease-out forwards;
 }
 
 .access-brand .proto-logo-wordmark__top {
@@ -290,9 +290,9 @@
   /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
   object-position: 72% center;
   z-index: 0;
-  filter: brightness(0.58) saturate(0.64);
+  filter: brightness(0.52) saturate(0.52) contrast(0.94);
   transform: scale(1.02);
-  animation: vhero-bg-in 760ms ease-out forwards;
+  animation: vhero-bg-in 820ms ease-out forwards;
 }
 
 /* Darken the left so the headline + CTAs stay legible over the image. */
@@ -301,16 +301,16 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.24)),
+    linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
     linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.96) 0%,
-      rgba(0, 0, 0, 0.84) 24%,
-      rgba(0, 0, 0, 0.64) 48%,
-      rgba(0, 0, 0, 0.38) 72%
+      rgba(0, 0, 0, 0.97) 0%,
+      rgba(0, 0, 0, 0.88) 24%,
+      rgba(0, 0, 0, 0.7) 48%,
+      rgba(0, 0, 0, 0.46) 72%
     );
   opacity: 1;
-  animation: vhero-scrim-in 760ms ease-out forwards;
+  animation: vhero-scrim-in 820ms ease-out forwards;
 }
 
 @media (max-width: 700px) {
@@ -335,7 +335,7 @@
   padding-top: 80px;
   max-width: 780px;
   display: grid;
-  gap: 38px;
+  gap: 44px;
   align-content: center;
 }
 
@@ -349,7 +349,7 @@
   text-transform: uppercase;
   opacity: 0;
   transform: translateY(18px);
-  animation: vhero-copy-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: vhero-copy-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) 170ms forwards;
 }
 
 .vhero-headline-line {
@@ -376,6 +376,32 @@
   .vhero-headline { font-size: 40px; }
 }
 
+.vhero-support-wrap {
+  max-width: 660px;
+  height: 76px;
+  opacity: 0;
+  animation: vhero-fade-in 220ms ease-out 470ms forwards;
+}
+
+.vhero-support-message {
+  margin: 0;
+  color: #e5e7eb;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  opacity: 1;
+  transition: opacity 200ms linear;
+}
+
+.vhero-support-message.is-fading {
+  opacity: 0;
+}
+
+.vhero-support-line {
+  display: block;
+}
+
 @keyframes vhero-copy-in {
   from {
     opacity: 0;
@@ -387,17 +413,22 @@
   }
 }
 
+@keyframes vhero-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes header-logo-in {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes vhero-bg-in {
   from {
-    filter: brightness(0.53) saturate(0.58);
+    filter: brightness(0.48) saturate(0.46) contrast(0.92);
   }
   to {
-    filter: brightness(0.58) saturate(0.64);
+    filter: brightness(0.52) saturate(0.52) contrast(0.94);
   }
 }
 
@@ -533,7 +564,7 @@
   .vhero-banner-img,
   .vhero-banner-scrim,
   .vhero-headline,
-  .access-note,
+  .vhero-support-wrap,
   .access-hero-buttons,
   .vhero-trust-strip {
     animation: none;
@@ -542,6 +573,7 @@
   }
   .vhero-track { animation: none; }
   .vhero-stream-streaks span { animation: none; opacity: 0; }
+  .vhero-support-message { transition: none; }
 }
 
 /* ── Featured category cards (11 departments) ────────────────────────────── */
@@ -1017,8 +1049,7 @@
   gap: 24px;
   flex-wrap: wrap;
   opacity: 0;
-  transform: translateY(16px);
-  animation: vhero-copy-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) 200ms forwards;
+  animation: vhero-fade-in 220ms ease-out 560ms forwards;
 }
 
 .access-note {
@@ -1087,8 +1118,7 @@
   padding: 24px 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   opacity: 0;
-  transform: translateY(16px);
-  animation: vhero-copy-in 460ms cubic-bezier(0.2, 0.8, 0.2, 1) 280ms forwards;
+  animation: vhero-fade-in 220ms ease-out 660ms forwards;
 }
 
 .vhero-trust-item {
@@ -3479,8 +3509,13 @@
     color: rgba(255,255,255,0.7);
   }
 
-  .access-note {
-    display: none;
+  .vhero-support-wrap {
+    height: 88px;
+  }
+
+  .vhero-support-message {
+    font-size: 15px;
+    line-height: 1.42;
   }
 
   /* Scroll hint */
