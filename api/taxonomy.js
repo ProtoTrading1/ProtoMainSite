@@ -4,7 +4,17 @@ import { readSiteConfigJson } from './_site-config.js';
 import { injectMotarroIntoTree } from './_mottaro-category.js';
 
 const TAXONOMY_FILE = 'taxonomy/categories.json';
+const MOTTARO_HIDDEN_FILE = 'taxonomy/mottaro-hidden.json';
 const BUNDLED_PATH = join(process.cwd(), 'src/data/categories.json');
+
+async function loadHiddenMottaroIds() {
+  try {
+    const stored = await readSiteConfigJson(MOTTARO_HIDDEN_FILE, null);
+    if (Array.isArray(stored?.ids)) return stored.ids.filter((x) => typeof x === 'string' && x);
+    if (Array.isArray(stored)) return stored.filter((x) => typeof x === 'string' && x);
+  } catch { /* none hidden */ }
+  return [];
+}
 
 function loadBundled() {
   try {
@@ -47,7 +57,8 @@ export default async function handler(req, res) {
 
     if (!categories || !categories.length) categories = loadBundled();
 
-    categories = injectMotarroIntoTree(categories);
+    const hidden = await loadHiddenMottaroIds();
+    categories = injectMotarroIntoTree(categories, hidden);
 
     // Short edge cache so category edits in admin reflect on the storefront
     // within seconds (the portal is a live mirror).

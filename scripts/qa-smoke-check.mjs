@@ -69,7 +69,7 @@ assert.doesNotMatch(productsSrc, /localStorage.*sort/i, 'sort orders not in loca
 console.log('✓ Item 4 sort-order cache settings');
 
 // Shared Mottaro module — must stay byte-identical to the admin copy
-const MOTTARO_SHARED_HASH = '15207c5f4ac16723';
+const MOTTARO_SHARED_HASH = '702c264b95de85b8';
 const mottaroShared = readFileSync(join(root, 'lib/mottaro-category.mjs'), 'utf8');
 assert.equal(
   createHash('sha256').update(mottaroShared).digest('hex').slice(0, 16),
@@ -119,5 +119,18 @@ console.log('✓ Stale catalogue fallback removed');
 assert.doesNotMatch(productsLibSrc, /const depth = Math\.min\(cp\.length, resolved\.length\)/, 'no Math.min prefix leak in category filter');
 assert.match(productsLibSrc, /cp\.length >= resolved\.length && resolved\.every\(\(seg, i\) => cp\[i\] === seg\)/, 'category filter requires nav path to be a prefix of the product path');
 console.log('✓ Category leaf filter is prefix-exact (no shallow-product leak)');
+
+// Deleted Motarro subcategories are hidden from the live tree + APIs read the list
+const hiddenTree = injectMotarroIntoTree([
+  { id: 'arts-and-crafts', label: 'Arts and Crafts', children: [{ id: 'crafts', label: 'Crafts', children: [] }] },
+  { id: 'stationery', label: 'Stationery', children: [] },
+], ['mottaro-crafts']);
+assert.ok(!hiddenTree.find((n) => n.id === 'mottaro').children.some((c) => c.id === 'mottaro-crafts'), 'hidden Motarro node pruned from portal tree');
+for (const f of ['api/products.js', 'api/taxonomy.js']) {
+  const src = readFileSync(join(root, f), 'utf8');
+  assert.match(src, /taxonomy\/mottaro-hidden\.json/, `${f} reads the hidden Motarro list`);
+  assert.match(src, /injectMotarroIntoTree\([^)]*hidden/, `${f} passes hidden ids into the tree`);
+}
+console.log('✓ Motarro deletions mirror to the storefront');
 
 console.log('\nAll portal smoke checks passed.');

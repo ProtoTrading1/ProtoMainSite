@@ -38,17 +38,29 @@ function loadBundledTaxonomy() {
   }
 }
 
+const MOTTARO_HIDDEN_FILE = 'taxonomy/mottaro-hidden.json';
+
+async function loadHiddenMottaroIds() {
+  try {
+    const stored = await readSiteConfigJson(MOTTARO_HIDDEN_FILE, null);
+    if (Array.isArray(stored?.ids)) return stored.ids.filter((x) => typeof x === 'string' && x);
+    if (Array.isArray(stored)) return stored.filter((x) => typeof x === 'string' && x);
+  } catch { /* none hidden */ }
+  return [];
+}
+
 async function loadTaxonomyTree() {
+  const hidden = await loadHiddenMottaroIds();
   try {
     const stored = await readSiteConfigJson(TAXONOMY_FILE, null);
     let categories = null;
     if (Array.isArray(stored)) categories = stored;
     else if (stored?.categories && Array.isArray(stored.categories)) categories = stored.categories;
-    if (categories?.length) return injectMotarroIntoTree(categories);
+    if (categories?.length) return injectMotarroIntoTree(categories, hidden);
   } catch {
     // fall through to bundled
   }
-  return injectMotarroIntoTree(loadBundledTaxonomy());
+  return injectMotarroIntoTree(loadBundledTaxonomy(), hidden);
 }
 
 // Must match labelToSlug in src/lib/taxonomy.js and scripts/lib/master.mjs.
