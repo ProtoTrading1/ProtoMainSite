@@ -10,6 +10,8 @@ export function preloadMegaMenu() {
   return megaMenuPreloadPromise;
 }
 
+preloadMegaMenu();
+
 const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
