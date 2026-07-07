@@ -3334,6 +3334,19 @@ textarea:focus-visible,
   border-color: #0f172a;
   background: #f8fafc;
 }
+.checkout-modal-btn--wa {
+  position: relative;
+  overflow: hidden;
+}
+.checkout-modal-btn--wa:hover {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+  box-shadow: 0 0 16px rgba(15, 23, 42, 0.25);
+}
+.checkout-modal-btn--wa:active {
+  transform: translateY(1px);
+}
 .checkout-modal-btn--full {
   width: 100%;
   margin-top: 4px;
