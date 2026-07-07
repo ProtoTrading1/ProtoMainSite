@@ -1,79 +1,22 @@
-import { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
 import ProtoLogo from '../components/ProtoLogo';
+import LandingHero from '../components/landing/LandingHero';
+import LandingMapSection from '../components/landing/LandingMapSection';
+import LandingDepartmentsSection from '../components/landing/LandingDepartmentsSection';
+import LandingApplySection from '../components/landing/LandingApplySection';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
-  ArrowLeft,
   CheckCircle2,
   Eye,
   EyeOff,
-  Gem,
-  Home,
-  Info,
   Lock,
   MessageCircle,
-  PackageSearch,
-  Palette,
-  SprayCan,
-  PartyPopper,
-  ShoppingBag,
-  CupSoda,
-  Wrench,
-  CookingPot,
-  Package,
-  Spool,
-  Gamepad2,
 } from 'lucide-react';
 import '../landing.css';
-
-const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const SADC_IDS = new Set([24, 72, 426, 454, 508, 516, 710, 748, 894, 716, 834, 180]);
-const HIGHLIGHT_SEQ = [24, 180, 894, 454, 508, 516, 72, 716, 748, 426, 834, 710];
-
-const departments = [
-  { name: 'Art Supplies and Stationery' },
-  { name: 'Beads, Jewellery & Accessories' },
-  { name: 'Beauty & Personal Care' },
-  { name: 'Events & Parties' },
-  { name: 'Fashion & Accessories' },
-  { name: 'Food & Drinks' },
-  { name: 'Hardware' },
-  { name: 'Homeware & Kitchen' },
-  { name: 'Motarro' },
-  { name: 'Packaging' },
-  { name: 'Textiles' },
-  { name: 'Toys, Games & Kids' },
-];
-
-// Brand logos shown in the endless marquee under the departments grid
-const BRANDS = [
-  { name: 'dala', src: '/brands/dala.jpg' },
-  { name: 'Mötarro', src: '/brands/motarro.jpg' },
-  { name: 'STAEDTLER', src: '/brands/staedtler.jpg' },
-  { name: 'Vinnic', src: '/brands/vinnic.jpg' },
-  { name: 'Conan', src: '/brands/conan.jpg' },
-  { name: 'Marlin', src: '/brands/marlin.jpg' },
-  { name: 'Waterlily', src: '/brands/waterlily.jpg' },
-  { name: 'OYA', src: '/brands/oya.jpg' },
-  { name: 'amazcolor', src: '/brands/amazcolor.jpg' },
-  { name: 'Keep Smiling', src: '/brands/keepsmiling.jpg' },
-];
-
-const unlocks = [
-  { label: 'Trade catalogue', detail: 'Images, codes and departments' },
-  { label: 'Order builder', detail: 'Quantities, totals and quote flow' },
-  { label: 'PDF requests', detail: 'Product images included' },
-];
-
-const showcaseProducts = [
-  { code: 'MA002-3', name: 'Paperclips 50mm', dept: 'Stationery', image: '/product-images/MA002-3.webp' },
-  { code: 'MA005-11', name: 'Office essentials', dept: 'Stationery', image: '/product-images/MA005-11.webp' },
-  { code: 'MA024-6', name: 'Retail craft line', dept: 'Crafts', image: '/product-images/MA024-6.webp' },
-  { code: 'MB001-3', name: 'Bead replenishment', dept: 'Jewellery', image: '/product-images/MB001-3.webp' },
-];
 
 const BUSINESS_TYPES = [
   'Retail store',
@@ -109,16 +52,6 @@ const MONTHLY_SPEND_BANDS = [
 ];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
-const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
-
-const ROTATING_SUPPORT_MESSAGES = [
-  'Trusted by South African retailers since 1987.',
-  '5,000+ wholesale products with live stock.',
-  'Exclusive trade pricing for approved retailers.',
-  'Built for retailers, resellers and growing businesses.',
-  'Spend less time ordering.\nMore time growing your business.',
-  'One supplier.\nThousands of possibilities.',
-];
 
 function CustomerIcon() {
   return (
@@ -807,252 +740,6 @@ function Questionnaire({ onLogin }) {
   );
 }
 
-// One product per Proto Trading category, arranged into three parallax lanes
-// (back → front). The lanes flow left → right as "Proto Trading's world of
-// wholesale products in motion". Icons are isolated glyphs — no cards — so the
-// same slots can later hold real cutout product renders.
-const STREAM_LANES = [
-  // Back lane — small, dim, soft-blurred, slowest
-  { speed: 38, items: [
-    { Icon: SprayCan, label: 'Beauty & Personal Care' },
-    { Icon: Wrench, label: 'Hardware' },
-    { Icon: Spool, label: 'Textiles' },
-    { Icon: Package, label: 'Packaging' },
-  ] },
-  // Mid lane — medium scale and brightness
-  { speed: 30, items: [
-    { Icon: CookingPot, label: 'Homeware & Kitchen' },
-    { Icon: CupSoda, label: 'Food & Drinks' },
-    { Icon: PartyPopper, label: 'Events & Parties' },
-    { Icon: Palette, label: 'Art Supplies & Stationery' },
-  ] },
-  // Front lane — large, sharp, red-lit, fastest
-  { speed: 24, items: [
-    { Icon: Gem, label: 'Beads, Jewellery & Accessories' },
-    { Icon: ShoppingBag, label: 'Fashion & Accessories' },
-    { Icon: Gamepad2, label: 'Toys, Games & Kids' },
-  ] },
-];
-
-function ProductStream() {
-  return (
-    <div className="vhero-stream" aria-hidden="true">
-      <div className="vhero-stream-glow" />
-      <div className="vhero-stream-streaks">
-        <span style={{ top: '22%', animationDuration: '4.5s' }} />
-        <span style={{ top: '47%', animationDuration: '3.2s', animationDelay: '1.1s' }} />
-        <span style={{ top: '71%', animationDuration: '5.4s', animationDelay: '0.6s' }} />
-      </div>
-      {STREAM_LANES.map((lane, li) => (
-        <div className={`vhero-lane vhero-lane--${li}`} key={li}>
-          <div className="vhero-track" style={{ animationDuration: `${lane.speed}s` }}>
-            {[...lane.items, ...lane.items].map(({ Icon, label }, i) => (
-              <div className="vhero-item" key={`${label}-${i}`}>
-                <Icon strokeWidth={1.4} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function VideoHero({ onLogin, onApply }) {
-  const [messageIdx, setMessageIdx] = useState(0);
-  const [isFading, setIsFading] = useState(false);
-  const reduceMotion = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    reduceMotion.current = media.matches;
-    const onChange = (e) => {
-      reduceMotion.current = e.matches;
-    };
-    if (media.addEventListener) media.addEventListener('change', onChange);
-    else media.addListener(onChange);
-    return () => {
-      if (media.removeEventListener) media.removeEventListener('change', onChange);
-      else media.removeListener(onChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion.current || ROTATING_SUPPORT_MESSAGES.length <= 1) return undefined;
-
-    let holdTimer = null;
-    let fadeTimer = null;
-    let cancelled = false;
-
-    const scheduleNext = () => {
-      if (cancelled) return;
-      holdTimer = window.setTimeout(() => {
-        if (cancelled || document.visibilityState !== 'visible') return;
-        setIsFading(true);
-        fadeTimer = window.setTimeout(() => {
-          if (cancelled) return;
-          setMessageIdx((prev) => (prev + 1) % ROTATING_SUPPORT_MESSAGES.length);
-          setIsFading(false);
-          scheduleNext();
-        }, 200);
-      }, 9000);
-    };
-
-    const handleVisibilityChange = () => {
-      if (holdTimer) {
-        window.clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-      if (fadeTimer) {
-        window.clearTimeout(fadeTimer);
-        fadeTimer = null;
-      }
-      setIsFading(false);
-      if (document.visibilityState === 'visible') {
-        scheduleNext();
-      }
-    };
-
-    if (document.visibilityState === 'visible') {
-      scheduleNext();
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      if (holdTimer) window.clearTimeout(holdTimer);
-      if (fadeTimer) window.clearTimeout(fadeTimer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  const activeMessage = ROTATING_SUPPORT_MESSAGES[messageIdx].split('\n');
-
-  return (
-    <section className="vhero-section vhero-section--static vhero-section--banner">
-      <img
-        src="/proto-banner.jpg"
-        alt="Proto Trading Online wholesale showroom"
-        className="vhero-banner-img"
-        fetchPriority="high"
-        decoding="async"
-      />
-      <div className="vhero-banner-scrim" />
-      <div
-        className="vhero-copy"
-      >
-        <h1 className="vhero-headline" aria-label="Wholesale made smarter">
-          <span className="vhero-headline-line">WHOLESALE</span>
-          <span className="vhero-headline-line">MADE</span>
-          <span className="vhero-headline-line vhero-headline-line--accent">SMARTER.</span>
-        </h1>
-        <div className="vhero-support-wrap" aria-live="off" aria-atomic="true">
-          <p className={`vhero-support-message${isFading ? ' is-fading' : ''}`}>
-            {activeMessage.map((line, idx) => (
-              <span key={`${messageIdx}-${idx}`} className="vhero-support-line">
-                {line}
-              </span>
-            ))}
-          </p>
-        </div>
-        <div className="access-hero-buttons">
-          <button className="access-apply large" type="button" onClick={onApply}>
-            Apply for Trade Account <ArrowRight size={18} />
-          </button>
-          <button className="access-login large" type="button" onClick={onLogin}>
-            Sign In
-          </button>
-        </div>
-        <div className="vhero-trust-strip" role="list" aria-label="Wholesale platform highlights">
-          <div className="vhero-trust-item" role="listitem">
-            <CheckCircle2 size={15} />
-            <div>
-              <strong>5,000+ PRODUCTS</strong>
-              <span>One supplier for your business.</span>
-            </div>
-          </div>
-          <div className="vhero-trust-item" role="listitem">
-            <CheckCircle2 size={15} />
-            <div>
-              <strong>REAL-TIME STOCK</strong>
-              <span>Live inventory, always up to date.</span>
-            </div>
-          </div>
-          <div className="vhero-trust-item" role="listitem">
-            <CheckCircle2 size={15} />
-            <div>
-              <strong>EXCLUSIVE TRADE PRICING</strong>
-              <span>Wholesale pricing for approved customers.</span>
-            </div>
-          </div>
-          <div className="vhero-trust-item" role="listitem">
-            <CheckCircle2 size={15} />
-            <div>
-              <strong>FAST REORDERING</strong>
-              <span>Buy your favourites again in seconds.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const CAT_CARDS = [
-  { id: 'cat-1',  label: 'Homeware & Kitchen',            img: '/cat-homeware.jpg' },
-  { id: 'cat-2',  label: 'Beads, Jewellery & Accessories', img: '/cat-beads.jpg' },
-  { id: 'cat-3',  label: 'Toys, Games & Kids',             img: '/cat-toys.jpg' },
-  { id: 'cat-4',  label: 'Arts, Crafts & Stationery',      img: '/cat-arts.jpg' },
-  { id: 'cat-5',  label: 'Beauty & Personal Care',         img: '/cat-beauty.jpg' },
-  { id: 'cat-6',  label: 'Fashion & Accessories',          img: '/cat-fashion.jpg' },
-  { id: 'cat-7',  label: 'Hardware & Tools',               img: '/cat-hardware.jpg' },
-  { id: 'cat-8',  label: 'Packaging',                      img: '/cat-packaging.jpg' },
-  { id: 'cat-9',  label: 'Textiles & Ribbons',             img: '/cat-textiles.jpg' },
-  { id: 'cat-10', label: 'Events & Parties',               img: '/cat-events.jpg' },
-  { id: 'cat-11', label: 'Crackers & Seasonal',            img: '/cat-crackers.jpg' },
-];
-
-function CategoryCarousel() {
-  const [idx, setIdx] = useState(0);
-  const total = CAT_CARDS.length;
-  const prev = () => setIdx((i) => (i - 1 + total) % total);
-  const next = () => setIdx((i) => (i + 1) % total);
-  const peekIdx = (idx + 1) % total;
-
-  return (
-    <div className="lp-carousel">
-      {/* Peek card — sits behind, slightly offset right */}
-      <div className="lp-carousel-peek" key={peekIdx}>
-        <img src={CAT_CARDS[peekIdx].img} alt="" className="lp-feat-card-bg" />
-        <div className="lp-feat-card-overlay" />
-      </div>
-
-      {/* Main card */}
-      <div className="lp-carousel-main" key={idx}>
-        <img src={CAT_CARDS[idx].img} alt={CAT_CARDS[idx].label} className="lp-feat-card-bg" />
-        <div className="lp-feat-card-overlay" />
-        <div className="lp-feat-card-footer">{CAT_CARDS[idx].label}</div>
-      </div>
-
-      {/* Arrows */}
-      <button className="lp-carousel-btn lp-carousel-btn--prev" onClick={prev} aria-label="Previous">
-        <ArrowLeft size={20} />
-      </button>
-      <button className="lp-carousel-btn lp-carousel-btn--next" onClick={next} aria-label="Next">
-        <ArrowRight size={20} />
-      </button>
-
-      {/* Dots */}
-      <div className="lp-carousel-dots">
-        {CAT_CARDS.map((_, i) => (
-          <button key={i} className={`lp-carousel-dot${i === idx ? ' active' : ''}`} onClick={() => setIdx(i)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function LandingPage({ onLogin, onApply }) {
   useEffect(() => {
     const prev = document.body.style.background;
@@ -1088,100 +775,14 @@ export default function LandingPage({ onLogin, onApply }) {
 
       <main>
         {/* ── Video hero ── */}
-        <VideoHero onLogin={onLogin} onApply={scrollToForm} />
+        <LandingHero onLogin={onLogin} onApply={scrollToForm} />
 
         <div>
-        {/* ── Southern Africa map ── */}
-        <motion.section
-          className="lp-map-wrapper"
-          initial={{ opacity: 0, y: 22 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.48, ease: 'easeOut' }}
-        >
-          <div className="lp-map-copy">
-            <span className="lp-eyebrow">Delivery coverage</span>
-            <h2>Serving trade buyers across Southern Africa.</h2>
-            <p>
-              Proto Trading ships to retailers and resellers throughout South Africa and the wider SADC region. One supplier, nationwide reach.
-            </p>
-          </div>
-          <motion.div
-            className="lp-map-inner"
-            initial={{ opacity: 0, scale: 0.985 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.55, ease: 'easeOut' }}
-          >
-            <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
-              <SouthernAfricaMap />
-            </Suspense>
-          </motion.div>
-        </motion.section>
-
-        {/* ── Departments ── */}
-        <section className="lp-departments" id="lp-departments">
-          <motion.div
-            className="lp-section-header"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.42, ease: 'easeOut' }}
-          >
-            <span className="lp-eyebrow">Catalogue departments</span>
-            <h2>12 buying departments, 5,000+ products.</h2>
-          </motion.div>
-          <div className="lp-dept-tags">
-            {departments.map((dept) => (
-              <span className="lp-dept-tag" key={dept.name}>{dept.name}</span>
-            ))}
-          </div>
-          <ul className="lp-dept-list" role="list">
-            {departments.map((dept) => (
-              <li key={dept.name}>
-                <span className="lp-dept-list-item">{dept.name}</span>
-              </li>
-            ))}
-          </ul>
-
-          {/* ── Brands we work with (endless right-moving marquee) ── */}
-          <div className="lp-brands">
-            <span className="lp-brands-label">Brands we work with</span>
-            <div className="lp-brands-marquee">
-              <div className="lp-brands-track">
-                {[...BRANDS, ...BRANDS].map((b, i) => (
-                  <div className="lp-brand" key={`${b.name}-${i}`} aria-hidden={i >= BRANDS.length}>
-                    <img src={b.src} alt={b.name} loading="lazy" decoding="async" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Apply / Questionnaire ── */}
-        <section className="lp-apply-wrapper" id="lp-apply">
-          <motion.div
-            className="lp-apply-copy"
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-          >
-            <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
-            <h2>Get access to Proto Trading's catalogue.</h2>
-          </motion.div>
-
-          <motion.div
-            className="lp-apply-card"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
-          >
-            <Questionnaire onLogin={onLogin} />
-          </motion.div>
-        </section>
+        <LandingMapSection />
+        <LandingDepartmentsSection />
+        <LandingApplySection>
+          <Questionnaire onLogin={onLogin} />
+        </LandingApplySection>
 
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
