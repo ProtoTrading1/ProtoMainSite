@@ -4974,7 +4974,7 @@ textarea:focus-visible,
   z-index: 1200;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: clamp(10px, 2vh, 20px);
   background: rgba(5,8,18,0.75);
   backdrop-filter: blur(6px);
   animation: pzFadeIn 0.2s ease;
@@ -4986,7 +4986,7 @@ textarea:focus-visible,
 .pz-modal {
   position: relative;
   width: min(940px, 100%);
-  max-height: min(720px, calc(100vh - 40px));
+  max-height: min(720px, calc(100svh - 20px));
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
   overflow: hidden;
@@ -5020,15 +5020,15 @@ textarea:focus-visible,
   position: relative;
   background: #f8f9fb;
   border-right: 1px solid #e5e7eb;
-  min-height: 480px;
+  min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 .pz-main-image {
   position: relative;
-  flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5036,8 +5036,9 @@ textarea:focus-visible,
 .pz-main-image-img {
   width: 100%;
   height: 100%;
+  max-height: 100%;
   object-fit: contain;
-  padding: 12px 18px 6px;
+  padding: 12px 18px 0;
   box-sizing: border-box;
   mix-blend-mode: normal;
 }
@@ -5048,13 +5049,19 @@ textarea:focus-visible,
 .pz-gallery-strip {
   position: relative;
   display: flex;
+  align-items: center;
+  justify-content: flex-start;
   gap: 6px;
   z-index: 2;
-  margin: 0 auto 12px;
-  padding: 4px;
-  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 8px 12px 12px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 62px;
+  box-sizing: border-box;
   overflow-x: auto;
   scrollbar-width: none;
+  flex-shrink: 0;
 }
 .pz-gallery-strip::-webkit-scrollbar {
   display: none;
