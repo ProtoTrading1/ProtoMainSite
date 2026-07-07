@@ -90,9 +90,9 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
     currentCategories = node;
   }
 
-  if (path?.length > 0) {
-    currentCategories = filterNavChildrenByCount(currentCategories, path, counts, categories);
-  }
+  // Hide empty categories at every level — including empty top-level
+  // departments at the root — so mobile matches the desktop rail.
+  currentCategories = filterNavChildrenByCount(currentCategories, path || [], counts, categories);
 
   const currentLabel = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].label : 'All Categories';
 

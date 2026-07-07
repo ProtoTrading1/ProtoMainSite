@@ -44,14 +44,28 @@ export default function CategoryNav({
       </div>
 
       <ul className="cat-nav-list" role="list">
-        {cats.map((cat) => {
+        {(() => {
+          // Hide empty top-level departments — an exact mirror of the admin,
+          // where a category with no products should not show. Only filter
+          // once counts have loaded, so nothing flashes hidden on first paint.
+          const countsReady = counts && Object.keys(counts).length > 0;
+          const visibleCats = countsReady
+            ? cats.filter((cat) => (lookupProductCount(counts, [cat.id], cats) || 0) > 0
+                // Never hide the department the user is currently viewing, even
+                // if a background count poll briefly drops it to zero.
+                || cat.id === activeL1)
+            : cats;
+          return visibleCats;
+        })().map((cat) => {
           const isActive = activeL1 === cat.id;
           const isOpen = openCategoryId === cat.id;
           const highlighted = isActive || isOpen;
           const visibleChildren = filterNavChildrenByCount(cat.children, [cat.id], counts, cats);
           const hasChildren = visibleChildren.length > 0;
           const color = DEPT_COLORS[cat.id] || RED;
-          const Icon = ICON_MAP[cat.id] || null;
+          // Prefer the live node's icon (new/renamed categories), fall back to
+          // the bundled id map so existing departments keep their icons.
+          const Icon = LUCIDE_ICON_MAP[cat.icon] || ICON_MAP[cat.id] || null;
           const count = lookupProductCount(counts, [cat.id], cats);
 
           return (

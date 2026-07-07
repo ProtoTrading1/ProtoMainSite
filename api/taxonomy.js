@@ -49,7 +49,9 @@ export default async function handler(req, res) {
 
     categories = injectMotarroIntoTree(categories);
 
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
+    // Short edge cache so category edits in admin reflect on the storefront
+    // within seconds (the portal is a live mirror).
+    res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30');
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({ categories });
   } catch (err) {
