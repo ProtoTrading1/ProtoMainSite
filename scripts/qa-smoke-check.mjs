@@ -133,4 +133,10 @@ for (const f of ['api/products.js', 'api/taxonomy.js']) {
 }
 console.log('✓ Motarro deletions mirror to the storefront');
 
+// Registration must NEVER auto-generate a customer code (allocated manually)
+const registerTradeSrc = readFileSync(join(root, 'api/register-trade.js'), 'utf8');
+assert.doesNotMatch(registerTradeSrc, /allocateCustomerCode\(/, 'register-trade no longer allocates a customer code');
+assert.match(registerTradeSrc, /allocatedCustomerCode = null/, 'register-trade leaves the customer code null');
+console.log('✓ Registration never auto-generates a customer code');
+
 console.log('\nAll portal smoke checks passed.');
