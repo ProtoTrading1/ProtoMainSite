@@ -113,4 +113,11 @@ assert.doesNotMatch(appSrc, /stockProducts\.json'\)/, 'no fetch of frozen stockP
 assert.ok(!existsSync(join(root, 'public/stockProducts.json')), 'frozen stockProducts.json deleted');
 console.log('✓ Stale catalogue fallback removed');
 
+// Leaf category browse must not leak shallow products — the nav path must be a
+// PREFIX of the product path (product filed at least as deep). A Math.min depth
+// let a department/L1 product surface under every leaf beneath it.
+assert.doesNotMatch(productsLibSrc, /const depth = Math\.min\(cp\.length, resolved\.length\)/, 'no Math.min prefix leak in category filter');
+assert.match(productsLibSrc, /cp\.length >= resolved\.length && resolved\.every\(\(seg, i\) => cp\[i\] === seg\)/, 'category filter requires nav path to be a prefix of the product path');
+console.log('✓ Category leaf filter is prefix-exact (no shallow-product leak)');
+
 console.log('\nAll portal smoke checks passed.');
