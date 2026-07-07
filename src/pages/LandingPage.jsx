@@ -1,9 +1,12 @@
-import { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
 import ProtoLogo from '../components/ProtoLogo';
 import LandingHero from '../components/landing/LandingHero';
+import LandingMapSection from '../components/landing/LandingMapSection';
+import LandingDepartmentsSection from '../components/landing/LandingDepartmentsSection';
+import LandingApplySection from '../components/landing/LandingApplySection';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
@@ -14,35 +17,6 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
-
-const departments = [
-  { name: 'Art Supplies and Stationery' },
-  { name: 'Beads, Jewellery & Accessories' },
-  { name: 'Beauty & Personal Care' },
-  { name: 'Events & Parties' },
-  { name: 'Fashion & Accessories' },
-  { name: 'Food & Drinks' },
-  { name: 'Hardware' },
-  { name: 'Homeware & Kitchen' },
-  { name: 'Motarro' },
-  { name: 'Packaging' },
-  { name: 'Textiles' },
-  { name: 'Toys, Games & Kids' },
-];
-
-// Brand logos shown in the endless marquee under the departments grid
-const BRANDS = [
-  { name: 'dala', src: '/brands/dala.jpg' },
-  { name: 'Mötarro', src: '/brands/motarro.jpg' },
-  { name: 'STAEDTLER', src: '/brands/staedtler.jpg' },
-  { name: 'Vinnic', src: '/brands/vinnic.jpg' },
-  { name: 'Conan', src: '/brands/conan.jpg' },
-  { name: 'Marlin', src: '/brands/marlin.jpg' },
-  { name: 'Waterlily', src: '/brands/waterlily.jpg' },
-  { name: 'OYA', src: '/brands/oya.jpg' },
-  { name: 'amazcolor', src: '/brands/amazcolor.jpg' },
-  { name: 'Keep Smiling', src: '/brands/keepsmiling.jpg' },
-];
 
 const BUSINESS_TYPES = [
   'Retail store',
@@ -78,7 +52,6 @@ const MONTHLY_SPEND_BANDS = [
 ];
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
-const SouthernAfricaMap = lazy(() => import('../components/SouthernAfricaMap'));
 
 function CustomerIcon() {
   return (
@@ -805,97 +778,11 @@ export default function LandingPage({ onLogin, onApply }) {
         <LandingHero onLogin={onLogin} onApply={scrollToForm} />
 
         <div>
-        {/* ── Southern Africa map ── */}
-        <motion.section
-          className="lp-map-wrapper"
-          initial={{ opacity: 0, y: 22 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.48, ease: 'easeOut' }}
-        >
-          <div className="lp-map-copy">
-            <span className="lp-eyebrow">Delivery coverage</span>
-            <h2>Serving trade buyers across Southern Africa.</h2>
-            <p>
-              Proto Trading ships to retailers and resellers throughout South Africa and the wider SADC region. One supplier, nationwide reach.
-            </p>
-          </div>
-          <motion.div
-            className="lp-map-inner"
-            initial={{ opacity: 0, scale: 0.985 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.55, ease: 'easeOut' }}
-          >
-            <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
-              <SouthernAfricaMap />
-            </Suspense>
-          </motion.div>
-        </motion.section>
-
-        {/* ── Departments ── */}
-        <section className="lp-departments" id="lp-departments">
-          <motion.div
-            className="lp-section-header"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.42, ease: 'easeOut' }}
-          >
-            <span className="lp-eyebrow">Catalogue departments</span>
-            <h2>12 buying departments, 5,000+ products.</h2>
-          </motion.div>
-          <div className="lp-dept-tags">
-            {departments.map((dept) => (
-              <span className="lp-dept-tag" key={dept.name}>{dept.name}</span>
-            ))}
-          </div>
-          <ul className="lp-dept-list" role="list">
-            {departments.map((dept) => (
-              <li key={dept.name}>
-                <span className="lp-dept-list-item">{dept.name}</span>
-              </li>
-            ))}
-          </ul>
-
-          {/* ── Brands we work with (endless right-moving marquee) ── */}
-          <div className="lp-brands">
-            <span className="lp-brands-label">Brands we work with</span>
-            <div className="lp-brands-marquee">
-              <div className="lp-brands-track">
-                {[...BRANDS, ...BRANDS].map((b, i) => (
-                  <div className="lp-brand" key={`${b.name}-${i}`} aria-hidden={i >= BRANDS.length}>
-                    <img src={b.src} alt={b.name} loading="lazy" decoding="async" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Apply / Questionnaire ── */}
-        <section className="lp-apply-wrapper" id="lp-apply">
-          <motion.div
-            className="lp-apply-copy"
-            initial={{ opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-          >
-            <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
-            <h2>Get access to Proto Trading's catalogue.</h2>
-          </motion.div>
-
-          <motion.div
-            className="lp-apply-card"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
-          >
-            <Questionnaire onLogin={onLogin} />
-          </motion.div>
-        </section>
+        <LandingMapSection />
+        <LandingDepartmentsSection />
+        <LandingApplySection>
+          <Questionnaire onLogin={onLogin} />
+        </LandingApplySection>
 
         {/* ── Footer ── */}
         <footer className="lp-footer" style={{ flexWrap: 'wrap', rowGap: '16px' }}>
