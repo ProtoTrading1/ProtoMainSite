@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
 import {
-  allocateCustomerCode,
   lookupProtoActiveCustomer,
   sendWelcomeWhatsapp,
 } from './_customer-onboard.js';
@@ -324,16 +323,11 @@ export default async function handler(req, res) {
   const shouldApprove = wantsInstantApproval || isProtoActive;
 
   if (userId) {
-    if (shouldApprove) {
-      try {
-        const preferred = isProtoActive ? protoActive.account_code : null;
-        allocatedCustomerCode = await allocateCustomerCode(supabase, preferred);
-      } catch (codeErr) {
-        console.error('customer code allocation failed:', codeErr.message);
-        await supabase.auth.admin.deleteUser(userId);
-        return res.status(500).json({ error: 'Failed to create customer profile. Please try again.' });
-      }
-    }
+    // Customer codes are NEVER auto-generated — they are allocated manually in
+    // the admin dashboard, whenever the admin is ready. Approval does not
+    // require a code. (Was: allocateCustomerCode for approved/10000-club
+    // signups, which contradicted that rule.)
+    allocatedCustomerCode = null;
 
     const fullPayload = {
       id: userId,
