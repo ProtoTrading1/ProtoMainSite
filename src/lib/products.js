@@ -292,10 +292,15 @@ function productMatchesNavPath(product, tree, navPath) {
   }
 
   const resolved = resolveNavPathForProducts(navPath, tree);
-  return productPaths(product).some((cp) => {
-    const depth = Math.min(cp.length, resolved.length);
-    return depth > 0 && resolved.slice(0, depth).every((seg, i) => cp[i] === seg);
-  });
+  if (!resolved.length) return true;
+  // The nav path must be a PREFIX of the product path: the product has to be
+  // filed at least as deep as the browsed node and match every segment. Using
+  // Math.min here let a shallow product (e.g. filed only at a department or an
+  // L1 subcategory) leak into every leaf beneath it — that broke the live
+  // reflection (leaves showed products the admin never put there). Admin
+  // filters with exact per-level SQL, so this matches it.
+  return productPaths(product).some((cp) =>
+    cp.length >= resolved.length && resolved.every((seg, i) => cp[i] === seg));
 }
 
 function applyPathFilter(products, categoryPath) {
@@ -305,10 +310,9 @@ function applyPathFilter(products, categoryPath) {
     return products.filter((p) => productMatchesNavPath(p, tree, categoryPath));
   }
   const resolved = resolveNavPathForProducts(categoryPath, tree);
-  return products.filter((p) => productPaths(p).some((cp) => {
-    const depth = Math.min(cp.length, resolved.length);
-    return depth > 0 && resolved.slice(0, depth).every((seg, i) => cp[i] === seg);
-  }));
+  if (!resolved.length) return products;
+  return products.filter((p) => productPaths(p).some((cp) =>
+    cp.length >= resolved.length && resolved.every((seg, i) => cp[i] === seg)));
 }
 
 function compareByPrice(a, b, descending = false) {
