@@ -96,6 +96,16 @@ function ProductRequestModal({ onClose, customer }) {
   );
 }
 
+function MegaMenuSkeleton() {
+  return (
+    <div className="mega-menu-loading-skeleton" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <span key={idx} className="mega-menu-skeleton-row" />
+      ))}
+    </div>
+  );
+}
+
 export default function Sidebar({ categories, path, navigate, onAllProducts, counts, customer }) {
   const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
   const [menuTopOffset, setMenuTopOffset] = useState(0);
@@ -189,7 +199,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
       </div>
 
       {menuOpen && menuNode && (
-        <Suspense fallback={<div className="mega-menu-loading" aria-hidden="true" />}>
+        <Suspense fallback={<MegaMenuSkeleton />}>
           <LazyMegaMenu
             key={menuNode.id}
             l1Node={menuNode}
