@@ -8,14 +8,19 @@ import {
 
 let _fetchPromise = null;
 let _hasFetched = false;
+// Monotonic request id so a slow response can never overwrite a newer one.
+let _requestSeq = 0;
 
 // Re-pull the taxonomy periodically (and on window focus) so admin edits
 // — rename / reorder / add / delete — appear on the storefront without a
 // full page reload. The portal is a live mirror of the admin dashboard.
 const REVALIDATE_MS = 60 * 1000;
 
-async function fetchLiveTaxonomy() {
+function fetchLiveTaxonomy() {
+  // In-flight dedup: never run two concurrent fetches (a focus + poll burst
+  // would otherwise race and the older response could clobber the newer).
   if (_fetchPromise) return _fetchPromise;
+  const seq = ++_requestSeq;
   _fetchPromise = fetch('/api/taxonomy', { credentials: 'same-origin', cache: 'no-store' })
     .then((res) => {
       if (!res.ok) throw new Error(`taxonomy ${res.status}`);
@@ -23,9 +28,9 @@ async function fetchLiveTaxonomy() {
     })
     .then((json) => {
       const next = Array.isArray(json?.categories) ? json.categories : null;
-      // setActiveTaxonomy notifies subscribers, so a poll that finds changed
-      // categories live-updates every mounted nav/sidebar.
-      if (next?.length) setActiveTaxonomy(next);
+      // Only apply if this is still the latest request, and notify
+      // subscribers so a poll live-updates every mounted nav/sidebar.
+      if (next?.length && seq === _requestSeq) setActiveTaxonomy(next);
       _hasFetched = true;
       return next || getActiveTaxonomy();
     })
@@ -39,9 +44,8 @@ async function fetchLiveTaxonomy() {
   return _fetchPromise;
 }
 
-/** Force a re-pull now (used by the poll + on window focus). */
+/** Re-pull now (used by the poll + on window focus); reuses any in-flight fetch. */
 export function refreshLiveTaxonomy() {
-  _fetchPromise = null;
   return fetchLiveTaxonomy();
 }
 
@@ -62,7 +66,8 @@ export function useLiveTaxonomy() {
     }
 
     const interval = setInterval(() => { void refreshLiveTaxonomy(); }, REVALIDATE_MS);
-    const onFocus = () => { void refreshLiveTaxonomy(); };
+    // Revalidate only when the tab becomes visible again (not when hidden).
+    const onFocus = () => { if (!document.hidden) void refreshLiveTaxonomy(); };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
 

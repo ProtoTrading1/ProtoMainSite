@@ -50,7 +50,10 @@ export default function CategoryNav({
           // once counts have loaded, so nothing flashes hidden on first paint.
           const countsReady = counts && Object.keys(counts).length > 0;
           const visibleCats = countsReady
-            ? cats.filter((cat) => (lookupProductCount(counts, [cat.id], cats) || 0) > 0)
+            ? cats.filter((cat) => (lookupProductCount(counts, [cat.id], cats) || 0) > 0
+                // Never hide the department the user is currently viewing, even
+                // if a background count poll briefly drops it to zero.
+                || cat.id === activeL1)
             : cats;
           return visibleCats;
         })().map((cat) => {
