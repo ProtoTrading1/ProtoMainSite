@@ -39,6 +39,16 @@ const MONTHLY_SPEND_BANDS = [
   'R50,000+',
 ];
 
+const toUpperTrim = (value) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.toUpperCase() : '';
+};
+
+const upperOrNull = (value) => {
+  const v = toUpperTrim(value);
+  return v || null;
+};
+
 export default function Questionnaire({ onLogin }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
@@ -149,32 +159,33 @@ export default function Questionnaire({ onLogin }) {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const { submitTradeApplication } = await import('../lib/tradeApplication');
+    const { submitTradeApplication } = await import('../lib/tradeApplication');
       const result = await submitTradeApplication({
-        email: email.trim(),
-        password,
-        contactName: contactName.trim(),
-        businessName: companyName.trim(),
-        phone: phone.trim(),
-        companyAddress: buildStructuredBillingAddress(),
-        deliveryAddress: buildStructuredDeliveryAddress(),
-        streetName: streetName.trim(),
-        suburb: suburb.trim(),
-        postalCode: postalCode.trim(),
-        buildingType: resolvedBuildingType(),
-        unitNumber: buildingType === 'Apartments' ? unitNumber.trim() : '',
-        vatNumber: vatNumber.trim() || null,
-        country: country || null,
-        province: province || null,
-        city: billingCity.trim() || null,
-        businessType: businessType
-          .map((t) => (t === 'Other' ? otherType.trim() : t))
-          .filter(Boolean)
-          .join(', ') || null,
-        monthlySpend: monthlySpend || null,
-        website: website.trim() || null,
-        acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
-        customerCode: customerCode.trim() || null,
+      email: email.trim(),
+      password,
+      contactName: toUpperTrim(contactName),
+      businessName: toUpperTrim(companyName),
+      phone: phone.trim(),
+      companyAddress: buildStructuredBillingAddress().toUpperCase() || null,
+      deliveryAddress: buildStructuredDeliveryAddress(),
+      streetName: toUpperTrim(streetName),
+      suburb: toUpperTrim(suburb),
+      postalCode: postalCode.trim(),
+      buildingType: upperOrNull(resolvedBuildingType()),
+      unitNumber: buildingType === 'Apartments' ? unitNumber.trim().toUpperCase() : '',
+      vatNumber: upperOrNull(vatNumber),
+      country: upperOrNull(country),
+      province: upperOrNull(province),
+      city: billingCity.trim() ? billingCity.trim().toUpperCase() : null,
+      businessType: businessType
+        .map((t) => (t === 'Other' ? otherType.trim() : t))
+        .filter(Boolean)
+        .map((value) => value.trim().toUpperCase())
+        .join(', ') || null,
+      monthlySpend: monthlySpend ? monthlySpend.toUpperCase() : null,
+      website: website.trim() ? website.trim().toUpperCase() : null,
+      acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
+      customerCode: upperOrNull(customerCode),
       });
       setInstantAccess(Boolean(result?.instantAccess));
       setDone(true);
