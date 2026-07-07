@@ -1,7 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
-const LazyMegaMenu = lazy(() => import('./MegaMenu'));
+let megaMenuPreloadPromise = null;
+
+export function preloadMegaMenu() {
+  if (!megaMenuPreloadPromise) {
+    megaMenuPreloadPromise = import('./MegaMenu');
+  }
+  return megaMenuPreloadPromise;
+}
+
+const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
 function ProductRequestModal({ onClose, customer }) {
@@ -136,7 +145,25 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
     return () => document.removeEventListener('keydown', onGlobalEscape);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let idleHandle;
+    if (window.requestIdleCallback) {
+      idleHandle = window.requestIdleCallback(() => preloadMegaMenu());
+    } else {
+      idleHandle = window.setTimeout(() => preloadMegaMenu(), 400);
+    }
+    return () => {
+      if (window.cancelIdleCallback && typeof idleHandle === 'number') {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        window.clearTimeout(idleHandle);
+      }
+    };
+  }, []);
+
   const handleToggleL1 = (id, btnEl) => {
+    preloadMegaMenu();
     setOpenCategoryId(id);
     if (id && btnEl && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
