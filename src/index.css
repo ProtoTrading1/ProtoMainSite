@@ -5054,13 +5054,13 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 12px;
   z-index: 2;
   margin: 0;
   padding: 10px 12px 12px;
   width: 100%;
   max-width: 100%;
-  min-height: 92px;
+  min-height: 106px;
   box-sizing: border-box;
   overflow-x: auto;
   scrollbar-width: none;
@@ -5070,8 +5070,8 @@ textarea:focus-visible,
   display: none;
 }
 .pz-gallery-thumb {
-  width: 70px;
-  height: 70px;
+  width: 84px;
+  height: 84px;
   border-radius: 8px;
   border: 2px solid rgba(255,255,255,0.6);
   background: #fff;
