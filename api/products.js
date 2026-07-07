@@ -163,7 +163,8 @@ export default async function handler(req, res) {
       .map((row) => adapt(row, tree, salesByBarcode))
       .filter((p) => p.category || (p.isMultiCategory && p.alternateCategoryPath?.length));
 
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
+    // Short edge cache so product membership / new products reflect quickly.
+    res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=60');
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
   } catch (err) {

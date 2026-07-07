@@ -9,6 +9,11 @@ import {
 let _fetchPromise = null;
 let _hasFetched = false;
 
+// Re-pull the taxonomy periodically (and on window focus) so admin edits
+// — rename / reorder / add / delete — appear on the storefront without a
+// full page reload. The portal is a live mirror of the admin dashboard.
+const REVALIDATE_MS = 60 * 1000;
+
 async function fetchLiveTaxonomy() {
   if (_fetchPromise) return _fetchPromise;
   _fetchPromise = fetch('/api/taxonomy', { credentials: 'same-origin', cache: 'no-store' })
@@ -18,6 +23,8 @@ async function fetchLiveTaxonomy() {
     })
     .then((json) => {
       const next = Array.isArray(json?.categories) ? json.categories : null;
+      // setActiveTaxonomy notifies subscribers, so a poll that finds changed
+      // categories live-updates every mounted nav/sidebar.
       if (next?.length) setActiveTaxonomy(next);
       _hasFetched = true;
       return next || getActiveTaxonomy();
@@ -27,23 +34,21 @@ async function fetchLiveTaxonomy() {
       return getActiveTaxonomy();
     })
     .finally(() => {
-      // Keep the resolved promise so repeat callers reuse the result, but
-      // clear after a short window so manual refreshes can re-fetch.
-      setTimeout(() => { _fetchPromise = null; }, 5 * 60 * 1000);
+      _fetchPromise = null;
     });
   return _fetchPromise;
 }
 
+/** Force a re-pull now (used by the poll + on window focus). */
 export function refreshLiveTaxonomy() {
   _fetchPromise = null;
-  _hasFetched = false;
   return fetchLiveTaxonomy();
 }
 
 /**
- * React hook: returns the active category tree and triggers a one-time
- * fetch of the live taxonomy from /api/taxonomy. Re-renders consumers when
- * the active tree changes (e.g. after the live fetch resolves).
+ * React hook: returns the active category tree, fetches the live taxonomy
+ * from /api/taxonomy, and keeps it fresh via a poll + on-focus revalidate so
+ * the storefront mirrors admin category edits live.
  */
 export function useLiveTaxonomy() {
   const [tree, setTree] = useState(() => getActiveTaxonomy() || bundledCategories);
@@ -51,13 +56,22 @@ export function useLiveTaxonomy() {
   useEffect(() => {
     const unsubscribe = subscribeTaxonomy((next) => setTree(next));
     if (!_hasFetched) {
-      void fetchLiveTaxonomy().then((next) => {
-        if (next) setTree(next);
-      });
+      void fetchLiveTaxonomy().then((next) => { if (next) setTree(next); });
     } else {
       setTree(getActiveTaxonomy());
     }
-    return unsubscribe;
+
+    const interval = setInterval(() => { void refreshLiveTaxonomy(); }, REVALIDATE_MS);
+    const onFocus = () => { void refreshLiveTaxonomy(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, []);
 
   return tree;
