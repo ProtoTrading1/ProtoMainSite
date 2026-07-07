@@ -55,6 +55,7 @@ const CYCLE = Object.values(T).reduce((a, b) => a + b, 0);
 const COLOR_GREY = '#333333';
 const COLOR_RED = '#6e0d0d';  // other African countries — dark red
 const COLOR_SA = '#e60000';   // South Africa — strong red
+const COLOR_SWEEP = '#ff3b3b'; // active country while sweep moves south
 const FRAME_INTERVAL_MS = 1000 / 30; // cap updates at 30fps for low CPU cost
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -72,23 +73,33 @@ function withPulse(frame, t) {
 
 function frameAt(t) {
   let m = t;
-  if (m < T.greyHold) return withPulse({ redCount: 0, view: VIEW_AFRICA, pinT: 0 }, t);
+  if (m < T.greyHold) return withPulse({ redCount: 0, view: VIEW_AFRICA, pinT: 0, sweepId: null }, t);
   m -= T.greyHold;
-  if (m < T.redden) return withPulse({ redCount: Math.ceil((m / T.redden) * N), view: VIEW_AFRICA, pinT: 0 }, t);
+  if (m < T.redden) {
+    const sweepProgress = Math.max(0, Math.min(1, m / T.redden));
+    const nextRedCount = Math.ceil(sweepProgress * N);
+    const sweepIndex = Math.max(0, Math.min(N - 1, nextRedCount - 1));
+    return withPulse({
+      redCount: nextRedCount,
+      view: VIEW_AFRICA,
+      pinT: 0,
+      sweepId: REDDEN_ORDER[sweepIndex] ?? null,
+    }, t);
+  }
   m -= T.redden;
-  if (m < T.redHold) return withPulse({ redCount: N, view: VIEW_AFRICA, pinT: 0 }, t);
+  if (m < T.redHold) return withPulse({ redCount: N, view: VIEW_AFRICA, pinT: 0, sweepId: null }, t);
   m -= T.redHold;
   if (m < T.zoomIn) {
     const e = easeInOut(m / T.zoomIn);
-    return withPulse({ redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6) }, t);
+    return withPulse({ redCount: N, view: lerpView(VIEW_AFRICA, VIEW_CAPE, e), pinT: Math.max(0, (e - 0.4) / 0.6), sweepId: null }, t);
   }
   m -= T.zoomIn;
-  if (m < T.capeHold) return withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1 }, t);
+  if (m < T.capeHold) return withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1, sweepId: null }, t);
   m -= T.capeHold;
   // Pull back out to the full continent, then the cycle restarts (the CSS fill
   // transition fades the countries red → grey on the next pass).
   const e = easeInOut(m / T.zoomOut);
-  return withPulse({ redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: 1 - e }, t);
+  return withPulse({ redCount: N, view: lerpView(VIEW_CAPE, VIEW_AFRICA, e), pinT: 1 - e, sweepId: null }, t);
 }
 
 export default function SouthernAfricaMap() {
@@ -100,7 +111,7 @@ export default function SouthernAfricaMap() {
   const [inView, setInView] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [{ redCount, view, pinT, pulseT }, setFrame] = useState(() => frameAt(0));
+  const [{ redCount, view, pinT, pulseT, sweepId }, setFrame] = useState(() => frameAt(0));
 
   // African country features, bundled locally (no runtime fetch — see NOTE 2).
   const geos = useMemo(
@@ -142,7 +153,7 @@ export default function SouthernAfricaMap() {
     if (reduceMotion) {
       // Skip motion; keep a strong but static final frame.
       phaseRef.current = 0;
-      setFrame(withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1 }, 0));
+      setFrame(withPulse({ redCount: N, view: VIEW_CAPE, pinT: 1, sweepId: null }, 0));
       return undefined;
     }
     if (!isVisible) return undefined;
@@ -171,14 +182,17 @@ export default function SouthernAfricaMap() {
     const built = geos.map((f) => {
       const id = +f.id;
       const isRed = (RANK.get(id) ?? Infinity) < redCount;
+      const isSweep = sweepId !== null && id === sweepId;
+      const fillColor = isSweep ? COLOR_SWEEP : (isRed ? (id === 710 ? COLOR_SA : COLOR_RED) : COLOR_GREY);
       return {
         key: f.id,
         d: path(f),
-        fill: isRed ? (id === 710 ? COLOR_SA : COLOR_RED) : COLOR_GREY,
+        fill: fillColor,
+        strokeWidth: isSweep ? 0.85 : 0.5,
       };
     });
     return { paths: built, pin: projection(CAPE_TOWN) };
-  }, [geos, view, redCount]);
+  }, [geos, view, redCount, sweepId]);
 
   return (
     <div ref={ref} style={{ width: '100%', height: '100%' }}>
@@ -195,8 +209,8 @@ export default function SouthernAfricaMap() {
                 d={p.d}
                 fill={p.fill}
                 stroke="#000"
-                strokeWidth={0.5}
-                style={{ transition: 'fill 0.5s ease' }}
+                strokeWidth={p.strokeWidth}
+                style={{ transition: 'fill 0.35s ease' }}
               />
             ) : null
           )}
@@ -207,20 +221,20 @@ export default function SouthernAfricaMap() {
             <circle
               cx="0"
               cy="0"
-              r={20 + pulseT * 10}
+              r={24 + pulseT * 16}
               fill="none"
               stroke="#ff3b3b"
-              strokeWidth="1.8"
-              style={{ opacity: pinT * (1 - pulseT) * 0.85 }}
+              strokeWidth="2.2"
+              style={{ opacity: pinT * (1 - pulseT) * 0.95 }}
             />
             <circle
               cx="0"
               cy="0"
-              r={15 + pulseT * 7}
+              r={17 + pulseT * 12}
               fill="none"
               stroke="#ffffff"
-              strokeWidth="1.2"
-              style={{ opacity: pinT * (1 - pulseT) * 0.45 }}
+              strokeWidth="1.5"
+              style={{ opacity: pinT * (1 - pulseT) * 0.55 }}
             />
             {/* Proto Trading badge — logo + name where the camera lands */}
             <clipPath id="protoLogoClip">
