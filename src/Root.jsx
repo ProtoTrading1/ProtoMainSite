@@ -257,7 +257,7 @@ export default function Root() {
           <div style={{ fontSize: '48px' }}>✓</div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
           <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
-            Your trade account is approved. You will receive confirmation by email with next steps.
+            Your trade account is live. We’ll notify you as soon as the site is launched.
           </p>
           <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
             Log out
