@@ -40,6 +40,18 @@ function labelToSlug(label) {
   return String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
+// subcategory_extra is a JSON array of labels for taxonomy depth beyond
+// subcategory_four (admin's api/_taxonomy-utils.js writes it the same way).
+function parseSubcategoryExtra(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchAllRows(table, selectCols = '*') {
   const rows = [];
   let from = 0;
@@ -55,7 +67,10 @@ async function fetchAllRows(table, selectCols = '*') {
 
 function adapt(row) {
   const images = [row.image_url_one, row.image_url_two].filter(Boolean);
-  const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
+  const subLabels = [
+    row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
+    ...parseSubcategoryExtra(row.subcategory_extra),
+  ].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
   return {
