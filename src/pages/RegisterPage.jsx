@@ -299,7 +299,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   Welcome, {contactName.trim()}. Your trade account is live
                   {customerCode ? ` (customer code ${customerCode})` : ''}.
                   {standalone
-                    ? ' You will receive confirmation by email with next steps.'
+                    ? ' We’ll notify you as soon as the site is launched.'
                     : ` Log in with ${email.trim()} to start ordering.`}
                 </p>
                 {!standalone && (
