@@ -338,7 +338,7 @@
   /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
   object-position: 72% center;
   z-index: 0;
-  filter: brightness(0.52) saturate(0.52) contrast(0.94);
+  filter: brightness(0.68) saturate(0.58) contrast(1);
   transform: scale(1.02);
   animation: vhero-bg-in 820ms ease-out forwards;
 }
@@ -349,13 +349,13 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+    linear-gradient(rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.26)),
     linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.97) 0%,
-      rgba(0, 0, 0, 0.88) 24%,
-      rgba(0, 0, 0, 0.7) 48%,
-      rgba(0, 0, 0, 0.46) 72%
+      rgba(0, 0, 0, 0.92) 0%,
+      rgba(0, 0, 0, 0.78) 24%,
+      rgba(0, 0, 0, 0.58) 48%,
+      rgba(0, 0, 0, 0.28) 72%
     );
   opacity: 1;
   animation: vhero-scrim-in 820ms ease-out forwards;
