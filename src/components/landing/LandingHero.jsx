@@ -34,9 +34,7 @@ export default function LandingHero({ onLogin, onApply }) {
   useEffect(() => {
     if (reduceMotion.current) return undefined;
     if (typeof window === 'undefined') return undefined;
-    const timer = window.setTimeout(() => {
-      setLineAnimationActive(true);
-    }, 220);
+    const timer = window.setTimeout(() => setLineAnimationActive(true), 320);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -155,12 +153,15 @@ export default function LandingHero({ onLogin, onApply }) {
           </div>
         </div>
       </div>
-      <div className={`vhero-line-visual${lineAnimationActive ? ' is-animated' : ''}`} aria-hidden="true">
+      <div
+        className={`vhero-line-visual${lineAnimationActive ? ' is-animated' : ''}`}
+        aria-hidden="true"
+      >
         <div className="vhero-line-track">
-          <span className="vhero-line-node" style={{ top: '12%' }} />
-          <span className="vhero-line-node" style={{ top: '36%' }} />
-          <span className="vhero-line-node" style={{ top: '68%' }} />
-          <span className="vhero-line-node" style={{ top: '92%' }} />
+          <span className="vhero-line-glow vhero-line-glow--1" />
+          <span className="vhero-line-glow vhero-line-glow--2" />
+          <span className="vhero-line-glow vhero-line-glow--3" />
+          <span className="vhero-line-glow vhero-line-glow--4" />
           <span className="vhero-line-tracer" />
         </div>
       </div>
