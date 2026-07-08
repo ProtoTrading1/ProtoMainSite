@@ -12,9 +12,21 @@ const STOCK_SELECT = [
   'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
   'stock_qty', 'available_stock', 'keep_live_when_oos', 'created_at',
   'is_new_arrival',
-  'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four',
+  'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four', 'subcategory_extra',
   'mottaro_path',
 ].join(', ');
+
+// subcategory_extra is a JSON array of labels for taxonomy depth beyond
+// subcategory_four (admin's api/_taxonomy-utils.js writes it the same way).
+function parseSubcategoryExtra(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
   const rows = [];
@@ -104,7 +116,10 @@ function parseSkuQuery(raw) {
 
 function adapt(row, tree, salesByBarcode = new Map()) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
-  const subLabels = [row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four].filter(Boolean);
+  const subLabels = [
+    row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
+    ...parseSubcategoryExtra(row.subcategory_extra),
+  ].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
   const base = {

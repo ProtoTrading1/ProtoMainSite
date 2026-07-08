@@ -145,4 +145,15 @@ assert.match(productsApiSrc, /'is_new_arrival'/, 'products API selects is_new_ar
 assert.match(productsApiSrc, /isNew: !!row\.is_new_arrival/, 'products API maps is_new_arrival to isNew (New Stock collection reflects admin)');
 console.log('✓ New Arrivals honours the admin is_new_arrival flag');
 
+// Unlimited category depth: subcategory_extra (admin's overflow column for
+// taxonomy depth beyond subcategory_four) must be read + folded into
+// subLabels everywhere the storefront adapts a stock row, or deep
+// subcategories save fine in admin but never show up here.
+for (const f of ['api/products.js', 'scripts/generate-catalog.js']) {
+  const src = readFileSync(join(root, f), 'utf8');
+  assert.match(src, /subcategory_extra/, `${f} references subcategory_extra`);
+  assert.match(src, /subcategory_four,\s*\n?\s*\.\.\.\w*[Ee]xtra/, `${f} folds parsed subcategory_extra into subLabels after subcategory_four`);
+}
+console.log('✓ Unlimited category depth (subcategory_extra) reaches the storefront');
+
 console.log('\nAll portal smoke checks passed.');
