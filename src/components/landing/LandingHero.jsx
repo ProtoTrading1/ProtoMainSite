@@ -14,7 +14,6 @@ export default function LandingHero({ onLogin, onApply }) {
   const [messageIdx, setMessageIdx] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const reduceMotion = useRef(false);
-  const [lineAnimationActive, setLineAnimationActive] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -29,13 +28,6 @@ export default function LandingHero({ onLogin, onApply }) {
       if (media.removeEventListener) media.removeEventListener('change', onChange);
       else media.removeListener(onChange);
     };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion.current) return undefined;
-    if (typeof window === 'undefined') return undefined;
-    const timer = window.setTimeout(() => setLineAnimationActive(true), 320);
-    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -151,18 +143,6 @@ export default function LandingHero({ onLogin, onApply }) {
               <span>Buy your favourites again in seconds.</span>
             </div>
           </div>
-        </div>
-      </div>
-      <div
-        className={`vhero-line-visual${lineAnimationActive ? ' is-animated' : ''}`}
-        aria-hidden="true"
-      >
-        <div className="vhero-line-track">
-          <span className="vhero-line-glow vhero-line-glow--1" />
-          <span className="vhero-line-glow vhero-line-glow--2" />
-          <span className="vhero-line-glow vhero-line-glow--3" />
-          <span className="vhero-line-glow vhero-line-glow--4" />
-          <span className="vhero-line-tracer" />
         </div>
       </div>
     </section>
