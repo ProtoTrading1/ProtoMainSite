@@ -145,7 +145,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
   <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review it shortly.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved, you will receive a follow-up email and can log in to access our full wholesale catalogue, live stock availability, and trade pricing.</p>
+  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm, and we'll notify you the moment Proto Trading Online launches so you can access our full wholesale catalogue, live stock availability, and trade pricing.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
     <tr><td style="padding:22px 24px;">
       <p style="margin:0 0 14px;color:#111111;font-size:15px;font-weight:800;">What you get as a trade account holder:</p>
@@ -189,11 +189,11 @@ const APPROVED_HTML = (name) => `<!DOCTYPE html>
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
   <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">You're approved</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account is live — log in now</p>
+  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account is approved</p>
 </td></tr>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Your trade account has been approved — you can log in right away to browse the wholesale catalogue, live stock, and trade pricing.</p>
+  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news — your Proto Trading Online trade account has been approved. Our brand-new online store is almost ready, and we'll notify you the moment it goes live so you can browse the full wholesale catalogue, live stock and trade pricing.</p>
   <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> · <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
 </td></tr>
 </table>
@@ -473,7 +473,7 @@ export default async function handler(req, res) {
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
           subject: shouldApprove
-            ? 'Your Proto Trading trade account is ready — log in now'
+            ? 'Your Proto Trading Online trade account is approved'
             : 'We have received your request — you will hear from us within 24 hours',
           htmlContent: shouldApprove
             ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
