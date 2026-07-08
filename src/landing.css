@@ -338,7 +338,7 @@
   /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
   object-position: 72% center;
   z-index: 0;
-  filter: brightness(0.52) saturate(0.52) contrast(0.94);
+  filter: brightness(0.68) saturate(0.58) contrast(1);
   transform: scale(1.02);
   animation: vhero-bg-in 820ms ease-out forwards;
 }
@@ -349,13 +349,13 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+    linear-gradient(rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.26)),
     linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.97) 0%,
-      rgba(0, 0, 0, 0.88) 24%,
-      rgba(0, 0, 0, 0.7) 48%,
-      rgba(0, 0, 0, 0.46) 72%
+      rgba(0, 0, 0, 0.92) 0%,
+      rgba(0, 0, 0, 0.78) 24%,
+      rgba(0, 0, 0, 0.58) 48%,
+      rgba(0, 0, 0, 0.28) 72%
     );
   opacity: 1;
   animation: vhero-scrim-in 820ms ease-out forwards;
@@ -438,6 +438,140 @@
 
 .vhero-support-line {
   display: block;
+}
+
+/* ── Animated red timeline overlay ───────────────────────────────────────────── */
+.vhero-line-visual {
+  position: absolute;
+  right: clamp(24px, 3vw, 68px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: clamp(240px, 32vw, 340px);
+  display: none;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.vhero-line-track {
+  position: relative;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+  background: linear-gradient(180deg, rgba(224, 32, 32, 0.4) 0%, rgba(224, 32, 32, 0.87) 90%);
+  border-radius: 1px;
+  box-shadow: 0 0 20px rgba(224, 32, 32, 0.35);
+}
+
+.vhero-line-node,
+.vhero-line-tracer {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%) scale(0.85);
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e02020;
+  box-shadow: 0 0 18px rgba(224, 32, 32, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.vhero-line-node {
+  opacity: 0.55;
+  transition: opacity 220ms ease;
+  animation: vhero-node-highlight 720ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: var(--node-delay, 0ms);
+  animation-fill-mode: forwards;
+  transform: translate(-50%, -50%) scale(0.85);
+}
+
+.vhero-line-node::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.vhero-line-tracer {
+  width: 26px;
+  height: 26px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(224, 32, 32, 0.4) 55%, rgba(224, 32, 32, 0.05) 100%);
+  border: none;
+  box-shadow: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(0) scale(0.9);
+}
+
+.vhero-line-visual.is-animated .vhero-line-node {
+  opacity: 1;
+}
+
+.vhero-line-visual.is-animated .vhero-line-node:nth-of-type(1) { animation-delay: 80ms; }
+.vhero-line-visual.is-animated .vhero-line-node:nth-of-type(2) { animation-delay: 220ms; }
+.vhero-line-visual.is-animated .vhero-line-node:nth-of-type(3) { animation-delay: 360ms; }
+.vhero-line-visual.is-animated .vhero-line-node:nth-of-type(4) { animation-delay: 520ms; }
+
+.vhero-line-visual.is-animated .vhero-line-tracer {
+  animation: vhero-line-trace 820ms cubic-bezier(0.2, 0.7, 0.35, 1) forwards;
+}
+
+@keyframes vhero-node-highlight {
+  0% {
+    transform: translate(-50%, -50%) scale(0.75);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.25);
+    opacity: 1;
+    box-shadow: 0 0 25px rgba(224, 32, 32, 0.8);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+    box-shadow: 0 0 14px rgba(224, 32, 32, 0.65);
+  }
+}
+
+@keyframes vhero-line-trace {
+  0% {
+    top: -10%;
+    opacity: 0;
+    transform: translateX(-50%) translateY(0) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+  }
+  35% {
+    top: 36%;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  60% {
+    top: 72%;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  100% {
+    top: 92%;
+    opacity: 0.25;
+    transform: translateX(-50%) translateY(0) scale(1.1);
+  }
+}
+
+@media (min-width: 900px) {
+  .vhero-line-visual {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vhero-line-visual {
+    display: none !important;
+  }
+  .vhero-line-node,
+  .vhero-line-tracer {
+    animation: none;
+  }
 }
 
 @keyframes vhero-copy-in {

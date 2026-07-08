@@ -14,6 +14,7 @@ export default function LandingHero({ onLogin, onApply }) {
   const [messageIdx, setMessageIdx] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const reduceMotion = useRef(false);
+  const [lineAnimationActive, setLineAnimationActive] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -28,6 +29,15 @@ export default function LandingHero({ onLogin, onApply }) {
       if (media.removeEventListener) media.removeEventListener('change', onChange);
       else media.removeListener(onChange);
     };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion.current) return undefined;
+    if (typeof window === 'undefined') return undefined;
+    const timer = window.setTimeout(() => {
+      setLineAnimationActive(true);
+    }, 220);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -143,6 +153,15 @@ export default function LandingHero({ onLogin, onApply }) {
               <span>Buy your favourites again in seconds.</span>
             </div>
           </div>
+        </div>
+      </div>
+      <div className={`vhero-line-visual${lineAnimationActive ? ' is-animated' : ''}`} aria-hidden="true">
+        <div className="vhero-line-track">
+          <span className="vhero-line-node" style={{ top: '12%' }} />
+          <span className="vhero-line-node" style={{ top: '36%' }} />
+          <span className="vhero-line-node" style={{ top: '68%' }} />
+          <span className="vhero-line-node" style={{ top: '92%' }} />
+          <span className="vhero-line-tracer" />
         </div>
       </div>
     </section>
