@@ -11,6 +11,7 @@ const STOCK_SELECT = [
   'sku', 'barcode', 'title', 'original_description', 'price',
   'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
   'stock_qty', 'available_stock', 'keep_live_when_oos', 'created_at',
+  'is_new_arrival',
   'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four',
   'mottaro_path',
 ].join(', ');
@@ -130,7 +131,9 @@ function adapt(row, tree, salesByBarcode = new Map()) {
     subcategoryLabels: subLabels,
     tags: [],
     badges: [],
-    isNew: false,
+    // Honour the admin's "Add to New Arrivals" flag so the storefront's New
+    // Stock collection reflects what the admin curated (source of truth).
+    isNew: !!row.is_new_arrival,
     isSpecial: false,
     isArchived: false,
     sortOrder: 0,

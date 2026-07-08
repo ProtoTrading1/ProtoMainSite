@@ -139,4 +139,10 @@ assert.doesNotMatch(registerTradeSrc, /allocateCustomerCode\(/, 'register-trade 
 assert.match(registerTradeSrc, /allocatedCustomerCode = null/, 'register-trade leaves the customer code null');
 console.log('✓ Registration never auto-generates a customer code');
 
+// New Arrivals contract: the storefront must honour the admin's is_new_arrival flag
+const productsApiSrc = readFileSync(join(root, 'api/products.js'), 'utf8');
+assert.match(productsApiSrc, /'is_new_arrival'/, 'products API selects is_new_arrival from stock');
+assert.match(productsApiSrc, /isNew: !!row\.is_new_arrival/, 'products API maps is_new_arrival to isNew (New Stock collection reflects admin)');
+console.log('✓ New Arrivals honours the admin is_new_arrival flag');
+
 console.log('\nAll portal smoke checks passed.');
