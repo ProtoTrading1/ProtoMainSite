@@ -44,6 +44,7 @@ async function applyTable(supabase, table, rows) {
         subcategory_two: row.subcategory_two,
         subcategory_three: row.subcategory_three,
         subcategory_four: row.subcategory_four,
+        subcategory_extra: row.subcategory_extra ?? null,
         updated_at: new Date().toISOString(),
       };
       const { data, error } = await supabase

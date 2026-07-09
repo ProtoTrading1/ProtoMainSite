@@ -76,12 +76,16 @@ function inferExtraSubcategory(productName, pathLabels) {
 
 function pathToRow(pathLabels) {
   const [category, subcategory_one, subcategory_two = null, subcategory_three = null, subcategory_four = null] = pathLabels;
+  // Depth beyond subcategory_four is stored as a JSON array in subcategory_extra
+  // (matches the admin app's api/_taxonomy-utils.js labelsToDbFields).
+  const extra = pathLabels.slice(5).filter((v) => v != null && String(v).trim());
   return {
     category,
     subcategory_one,
     subcategory_two,
     subcategory_three,
     subcategory_four,
+    subcategory_extra: extra.length ? JSON.stringify(extra) : null,
     path: pathLabels,
   };
 }
