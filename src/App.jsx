@@ -95,8 +95,10 @@ function productStockQtyForCart(product) {
 }
 
 function productCanOrderWhenOos(product) {
-  return product?.keepLiveWhenOos === true
-    || product?.keep_live_when_oos === true
+  // Only "to order" products are orderable at zero stock — keep_live_when_oos
+  // alone keeps a product visible but shown as out-of-stock (not orderable).
+  return product?.toOrder === true
+    || product?.to_order === true
     || product?.orderableWhenOutOfStock === true
     || product?.orderable_when_out_of_stock === true;
 }
@@ -791,7 +793,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       ? "Customer's own courier"
       : courierChoice === 'proto'
         ? 'Proto Trading delivers'
-        : null;
+        : courierChoice === 'pickup'
+          ? 'In store pick up'
+          : null;
 
     if (!deliveryMethod) {
       setOrderError('Please choose a delivery option before submitting.');

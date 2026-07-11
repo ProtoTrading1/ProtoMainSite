@@ -297,6 +297,7 @@ export default function Drawer({
               {[
                 { key: 'own', icon: '🚚', title: "I'll use my own courier", desc: 'You arrange collection or delivery.' },
                 { key: 'proto', icon: '📦', title: 'Proto Trading delivers', desc: 'We will arrange delivery and include the cost in your quote.' },
+                { key: 'pickup', icon: '🏬', title: 'Pick up in store', desc: 'Collect your order from Proto — no delivery.' },
               ].map(({ key, icon, title, desc }) => (
                 <button
                   key={key}

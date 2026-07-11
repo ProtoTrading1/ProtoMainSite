@@ -217,11 +217,16 @@ export async function fetchDistinctCategories() {
 
 // ─── Filtering / sorting helpers ──────────────────────────────────────────────
 
-/** Explicit admin flag: product remains orderable when stock is zero. */
+/**
+ * Explicit admin "To order" flag: product is orderable even at zero stock.
+ * This is DISTINCT from keep_live_when_oos (which only keeps a zero-stock
+ * product visible/shown as out-of-stock). Only a "to order" product can be
+ * bought when out of stock.
+ */
 export function isOrderableWhenOutOfStock(product) {
   if (!product) return false;
-  return product.keepLiveWhenOos === true
-    || product.keep_live_when_oos === true
+  return product.toOrder === true
+    || product.to_order === true
     || product.orderableWhenOutOfStock === true
     || product.orderable_when_out_of_stock === true;
 }
