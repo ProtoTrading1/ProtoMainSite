@@ -156,8 +156,19 @@ console.log('✓ Registration never auto-generates a customer code');
 // New Arrivals contract: the storefront must honour the admin's is_new_arrival flag
 const productsApiSrc = readFileSync(join(root, 'api/products.js'), 'utf8');
 assert.match(productsApiSrc, /'is_new_arrival'/, 'products API selects is_new_arrival from stock');
-assert.match(productsApiSrc, /isNew: !!row\.is_new_arrival/, 'products API maps is_new_arrival to isNew (New Stock collection reflects admin)');
+assert.match(productsApiSrc, /isNew: !!row\.is_new_arrival/, 'products API maps is_new_arrival to isNew');
 console.log('✓ New Arrivals honours the admin is_new_arrival flag');
+
+// "This Week's Specials" = union of the admin flag (isNew) AND the Specials
+// panel (specialsMap ids). Flagged products also get a synthesized ribbon, and
+// the standalone "New Stock" collection was retired.
+const productsLibSpecials = readFileSync(join(root, 'src/lib/products.js'), 'utf8');
+assert.match(productsLibSpecials, /collection === 'specials'[\s\S]*?p\.isNew \|\|[\s\S]*?specialIds/, 'specials collection unions the isNew flag with specialsMap ids');
+assert.doesNotMatch(productsLibSpecials, /collection === 'new'/, 'standalone New Stock collection retired from applyCollection');
+const mainContentSrc = readFileSync(join(root, 'src/components/MainContent.jsx'), 'utf8');
+assert.match(mainContentSrc, /product\.isNew \? \{ deal: 'none' \}/, 'flagged products get a synthesized This Week\'s Special ribbon');
+assert.doesNotMatch(mainContentSrc, /id: 'new'/, 'New Stock shortcut removed from the nav');
+console.log('✓ Specials = admin flag ∪ Specials panel; New Stock retired');
 
 // Unlimited category depth: subcategory_extra (admin's overflow column for
 // taxonomy depth beyond subcategory_four) must be read + folded into

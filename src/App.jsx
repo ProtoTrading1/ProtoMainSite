@@ -155,7 +155,6 @@ function buildOrderText(cartItems, cartTotal, promo = null) {
 
 function collectionLabel(collection) {
   if (collection === 'hot') return 'Hot Sellers';
-  if (collection === 'new') return 'New Stock';
   if (collection === 'clearance') return 'Clearance Stock';
   if (collection === 'specials') return "This Week's Specials";
   if (collection === 'instock') return 'In Stock';
@@ -519,7 +518,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (cancelled) return;
         let rows = Array.isArray(fallback) ? fallback : [];
         if (activeCollection === 'hot') rows = rows.filter((item) => (item.badges || []).includes('Hot seller'));
-        if (activeCollection === 'new') rows = rows.filter((item) => item.isNew);
+        if (activeCollection === 'specials') rows = rows.filter((item) => item.isNew);
         if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
         const hasSearch = Boolean(searchQuery.trim());
         if (!hasSearch && path.length) {
@@ -719,11 +718,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
     if (id === 'hot') {
       setActiveCollection('hot');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'new') {
-      setActiveCollection('new');
       setSearchQuery('');
       navigate([]);
     }
@@ -1034,7 +1028,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             addToCart={addToCart}
             cartQty={cartQtyMap[previewProduct.id] || 0}
             onCartQtyChange={handleCartQtyChange}
-            special={specialsMap[previewProduct.id] || null}
+            special={specialsMap[previewProduct.id] || (previewProduct.isNew ? { deal: 'none' } : null)}
             initialZoomOpen={true}
             onZoomClose={() => setPreviewProduct(null)}
           />

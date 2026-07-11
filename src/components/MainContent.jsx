@@ -4,7 +4,6 @@ import {
   Flame,
   PackageCheck,
   Search,
-  Sparkles,
   Tag,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
@@ -28,9 +27,14 @@ function cartQtyForProduct(product, cartQtyMap) {
 const shortcuts = [
   { id: 'start', icon: PackageCheck, title: 'All Products' },
   { id: 'hot', icon: Flame, title: 'Hot Sellers' },
-  { id: 'new', icon: Sparkles, title: 'New Stock' },
   { id: 'clearance', icon: Tag, title: 'Clearance' },
 ];
+
+// A flagged product (isNew, backed by is_new_arrival) that has no explicit
+// Specials-panel deal still shows the generic "This Week's Special" ribbon.
+function specialForProduct(product, specialsMap) {
+  return specialsMap[product.id] || (product.isNew ? { deal: 'none' } : null);
+}
 
 const PRIORITY_CHUNK_SIZE = 16;
 
@@ -390,7 +394,7 @@ export default function MainContent({
                       addToCart={addToCart}
                       cartQty={cartQtyForProduct(product, cartQtyMap)}
                       onCartQtyChange={onCartQtyChange}
-                      special={specialsMap[product.id] || null}
+                      special={specialForProduct(product, specialsMap)}
                       priority={false}
                       onSearchEngage={null}
                     />
@@ -403,7 +407,7 @@ export default function MainContent({
                     addToCart={addToCart}
                     cartQty={cartQtyForProduct(product, cartQtyMap)}
                     onCartQtyChange={onCartQtyChange}
-                    special={specialsMap[product.id] || null}
+                    special={specialForProduct(product, specialsMap)}
                     priority={idx < 16}
                     onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
                   />
