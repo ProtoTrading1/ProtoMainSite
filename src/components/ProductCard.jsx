@@ -56,7 +56,9 @@ function catalogStockBadgeState(product) {
   if (qty !== null) {
     // Only EXACTLY zero is out of stock — negative SOH is a live backorder
     // line (canonical rule shared with the admin portal).
-    if (qty === 0) return product.keepLiveWhenOos ? 'in' : 'out';
+    // A zero-stock product is orderable (shown "Available to order") only when
+    // marked "to order"; keep_live_when_oos alone shows plain "Out of stock".
+    if (qty === 0) return product.toOrder ? 'toorder' : 'out';
     if (qty > 0 && qty <= LOW_STOCK_THRESHOLD) return 'low';
     return 'in';
   }
@@ -68,6 +70,8 @@ function catalogStockBadge(product) {
     const states = product.variants.map((variant) => catalogStockBadgeState(variant));
     if (states.every((state) => state === 'out')) return 'out';
     if (states.some((state) => state === 'low')) return 'low';
+    // No in-stock variants, but at least one is orderable-to-order.
+    if (states.every((state) => state === 'out' || state === 'toorder') && states.some((state) => state === 'toorder')) return 'toorder';
     return 'in';
   }
   return catalogStockBadgeState(product);
@@ -79,8 +83,9 @@ function catalogStockState(product) {
   const qty = catalogStockQty(product);
   const state = catalogStockBadge(product);
 
-  // Pinned OOS products remain orderable.
-  if (product.keepLiveWhenOos) {
+  // "To order" products remain orderable at zero stock; keep_live_when_oos
+  // alone does NOT make a product orderable (it only keeps it visible).
+  if (product.toOrder || product.orderableWhenOutOfStock) {
     return { state, qty, canOrder: true };
   }
 
@@ -99,6 +104,7 @@ const STOCK_BADGE_LABEL = {
   in: 'In stock',
   low: 'Low stock',
   out: 'Out of stock',
+  toorder: 'Available to order',
 };
 
 function StockBadge({ product }) {
@@ -115,11 +121,11 @@ function StockBadge({ product }) {
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
 function StockCheck({ sku }) {
-  const [state, setState] = useState({ status: 'idle', qty: null, keepLive: false });
+  const [state, setState] = useState({ status: 'idle', qty: null, toOrder: false });
 
   const check = async () => {
     if (!sku) return;
-    setState({ status: 'loading', qty: null, keepLive: false });
+    setState({ status: 'loading', qty: null, toOrder: false });
     try {
       const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
@@ -127,18 +133,18 @@ function StockCheck({ sku }) {
       setState({
         status: 'done',
         qty: Number(data.qty) || 0,
-        keepLive: !!data.keep_live_when_oos,
+        toOrder: !!data.to_order,
       });
     } catch {
-      setState({ status: 'error', qty: null, keepLive: false });
+      setState({ status: 'error', qty: null, toOrder: false });
     }
   };
 
   let readout = null;
   if (state.status === 'done') {
     const qty = state.qty;
-    if (state.keepLive && qty <= 0) {
-      readout = <span className="stock-readout stock-readout--in">Available</span>;
+    if (state.toOrder && qty <= 0) {
+      readout = <span className="stock-readout stock-readout--in">Available to order</span>;
     } else if (qty <= 0) {
       readout = <span className="stock-readout stock-readout--out">Out of stock</span>;
     } else if (qty <= LOW_STOCK_THRESHOLD) {
@@ -552,6 +558,13 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     {product.casePack && <span>{product.casePack}</span>}
                     {product.leadTime && <span>{product.leadTime}</span>}
                   </div>
+                )}
+
+                {/* "To order" disclaimer — item is orderable even without stock on hand. */}
+                {(activeProduct.toOrder || product.toOrder) && (
+                  <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#b45309', fontWeight: 600 }}>
+                    ⏳ Available to order — allow extra lead time. Place your order and we’ll confirm timing on your quote.
+                  </p>
                 )}
 
                 {/* Variant list for grouped products — click to swap image */}

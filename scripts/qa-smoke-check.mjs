@@ -99,12 +99,26 @@ const enrichedStored = enrichMotarroCategoryFields(
 assert.deepEqual(enrichedStored.mottaroPath, ['mottaro', 'mottaro-school-office'], 'enrich exposes validated stored path');
 console.log('✓ mottaro_path stored-snapshot read logic');
 
-// Canonical availability rule — must match admin isPublishableOnWebsite
+// Canonical availability rule — negative SOH stays available (backorder lines).
 const productsLibSrc = readFileSync(join(root, 'src/lib/products.js'), 'utf8');
 assert.match(productsLibSrc, /qty !== null && qty !== 0/, 'negative SOH counts as available (backorder lines live)');
 const cardSrc = readFileSync(join(root, 'src/components/ProductCard.jsx'), 'utf8');
-assert.match(cardSrc, /qty === 0\) return product\.keepLiveWhenOos/, 'badge shows out-of-stock only for exactly zero');
+assert.match(cardSrc, /qty === 0\) return product\.toOrder \? 'toorder' : 'out'/, 'zero-stock badge is out-of-stock unless marked to order');
 console.log('✓ Canonical availability rule (matches admin)');
+
+// "To order": zero-stock products are orderable ONLY when explicitly marked
+// to_order (distinct from keep_live_when_oos, which only keeps them visible).
+assert.match(productsLibSrc, /isOrderableWhenOutOfStock[\s\S]*?product\.toOrder === true/, 'orderable-when-OOS keys off to_order, not keep_live');
+assert.doesNotMatch(
+  productsLibSrc.slice(productsLibSrc.indexOf('function isOrderableWhenOutOfStock'), productsLibSrc.indexOf('function isOrderableWhenOutOfStock') + 400),
+  /keepLiveWhenOos/,
+  'orderability no longer depends on keep_live_when_oos',
+);
+const apiProductsSrc = readFileSync(join(root, 'api/products.js'), 'utf8');
+assert.match(apiProductsSrc, /toOrder: !!row\.to_order/, 'products API exposes toOrder');
+assert.match(apiProductsSrc, /orderableWhenOutOfStock: !!row\.to_order/, 'products API ties orderability to to_order');
+assert.match(cardSrc, /Available to order/, 'card shows an "Available to order" state/disclaimer for to_order products');
+console.log('✓ To-order: zero-stock orderability is opt-in (to_order)');
 
 // Stale fallback removed — last-ditch catalogue uses the regenerated file
 const appSrc = readFileSync(join(root, 'src/App.jsx'), 'utf8');

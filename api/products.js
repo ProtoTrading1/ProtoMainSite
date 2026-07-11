@@ -10,7 +10,7 @@ const BUNDLED_PATH = join(process.cwd(), 'src/data/categories.json');
 const STOCK_SELECT = [
   'sku', 'barcode', 'title', 'original_description', 'price',
   'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
-  'stock_qty', 'available_stock', 'keep_live_when_oos', 'created_at',
+  'stock_qty', 'available_stock', 'keep_live_when_oos', 'to_order', 'created_at',
   'is_new_arrival',
   'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four', 'subcategory_extra',
   'mottaro_path',
@@ -159,7 +159,10 @@ function adapt(row, tree, salesByBarcode = new Map()) {
     tradeNote: '',
     inStock: (Number(row.available_stock ?? row.stock_qty) || 0) > 0,
     keepLiveWhenOos: !!row.keep_live_when_oos,
-    orderableWhenOutOfStock: !!row.keep_live_when_oos,
+    // "To order" is what makes a zero-stock product ORDERABLE (with a lead-time
+    // disclaimer). keep_live_when_oos only keeps it VISIBLE (shown out-of-stock).
+    toOrder: !!row.to_order,
+    orderableWhenOutOfStock: !!row.to_order,
     yearlySales: salesByBarcode.get(String(row.barcode || '').trim().toUpperCase()) || 0,
     createdAt: row.created_at,
     supplier: '',
