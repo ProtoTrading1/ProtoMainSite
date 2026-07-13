@@ -165,10 +165,11 @@ assert.match(checkoutModalSrc, /checkout-modal-btn--danger[^]*No, keep shopping/
 const indexCssSrc = readFileSync(join(root, 'src/index.css'), 'utf8');
 assert.match(indexCssSrc, /\.checkout-modal-btn--confirm\s*\{[^}]*#16a34a/, 'confirm button is green');
 assert.match(indexCssSrc, /\.checkout-modal-btn--danger\s*\{[^}]*#dc2626/, 'keep-shopping button is red');
-assert.match(appSrc, /const \[debouncedSearchQuery, setDebouncedSearchQuery\]/, 'App keeps a debounced search value');
-assert.match(appSrc, /setTimeout\(\(\) => setDebouncedSearchQuery\(searchQuery\), 280\)/, 'search is debounced ~280ms');
-assert.match(appSrc, /searchQuery: debouncedSearchQuery/, 'catalogue fetch uses the debounced search, not per-keystroke');
-assert.doesNotMatch(appSrc, /\[activeCollection, page, path, searchQuery, sort/, 'catalogue effect no longer keyed on raw searchQuery');
+const headerSrc = readFileSync(join(root, 'src/components/Header.jsx'), 'utf8');
+assert.match(headerSrc, /const \[desktopInput, setDesktopInput\] = useState\(searchQuery\)/, 'desktop search input is local state (no per-keystroke App re-render)');
+assert.match(headerSrc, /setTimeout\(\(\) => setSearchQuery\(val\), 220\)/, 'typed value is pushed to the parent on a debounce');
+assert.match(headerSrc, /value=\{desktopInput\}/, 'the desktop input renders the local value');
+assert.doesNotMatch(headerSrc, /value=\{searchQuery\}\n\s*onFocus=\{focusSearch\}/, 'desktop input no longer bound directly to the committed searchQuery');
 const drawerSrc = readFileSync(join(root, 'src/components/Drawer.jsx'), 'utf8');
 assert.match(drawerSrc, /setShowCourierPicker\(true\)/, 'Continue to delivery opens the delivery picker');
 assert.match(drawerSrc, /showCourierPicker && createPortal\(/, 'delivery picker renders as a portalled modal so it always appears');

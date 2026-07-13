@@ -325,6 +325,17 @@ export default function Header({
   const inputRef = useRef(null);
   const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
+  // Desktop input is kept local so typing doesn't re-render the whole App (and
+  // its product grid) on every keystroke — we only push the committed value up
+  // to the parent (which drives the catalogue fetch) after a short debounce.
+  const [desktopInput, setDesktopInput] = useState(searchQuery);
+  const commitDebounceRef = useRef(null);
+  useEffect(() => { setDesktopInput(searchQuery); }, [searchQuery]);
+  useEffect(() => () => clearTimeout(commitDebounceRef.current), []);
+  const commitSearchValue = useCallback((val) => {
+    clearTimeout(commitDebounceRef.current);
+    commitDebounceRef.current = setTimeout(() => setSearchQuery(val), 220);
+  }, [setSearchQuery]);
   const desktopListboxId = useId();
   const mobileListboxId = useId();
 
@@ -397,9 +408,10 @@ export default function Header({
   }, [openSearch]);
 
   const handleInput = (val) => {
-    setSearchQuery(val);
+    setDesktopInput(val);
     setActiveIdx(-1);
     scheduleSuggestions(val);
+    commitSearchValue(val);
   };
 
   const keyboardItems = [
@@ -425,8 +437,8 @@ export default function Header({
         const activeItem = items[activeIdx];
         if (activeItem.type === 'cat') pickCategory(activeItem.cat.path);
         else pickProduct(activeItem.product);
-      } else if (searchQuery.trim()) {
-        commitSearch(searchQuery.trim());
+      } else if (desktopInput.trim()) {
+        commitSearch(desktopInput.trim());
       }
     }
   };
@@ -442,6 +454,7 @@ export default function Header({
   }, [searchOpen, activeDesktopItemId]);
 
   const pickProduct = (p) => {
+    clearTimeout(commitDebounceRef.current);
     saveRecent(p.name);
     setSearchQuery(p.name);
     navigateForSearch?.([]);
@@ -452,6 +465,7 @@ export default function Header({
   };
 
   const pickCategory = (catPath) => {
+    clearTimeout(commitDebounceRef.current);
     navigateForSearch?.(catPath);
     setSearchQuery('');
     closeSearch();
@@ -459,6 +473,7 @@ export default function Header({
 
   const commitSearch = (term) => {
     if (!term) return;
+    clearTimeout(commitDebounceRef.current);
     saveRecent(term);
     setSearchQuery(term);
     navigateForSearch?.([]);
@@ -574,7 +589,7 @@ export default function Header({
               type="text"
               className="header-search-premium__input"
               placeholder="Search products, SKU or barcode..."
-              value={searchQuery}
+              value={desktopInput}
               onFocus={focusSearch}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -590,7 +605,7 @@ export default function Header({
           {searchOpen && (
             <div className="header-search-dropdown">
               <SearchPanel
-                query={searchQuery}
+                query={desktopInput}
                 suggestions={suggestions}
                 catMatches={catMatches}
                 activeItemId={activeDesktopItemId}
