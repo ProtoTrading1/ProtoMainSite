@@ -145,4 +145,17 @@ assert.match(productsApiSrc, /'is_new_arrival'/, 'products API selects is_new_ar
 assert.match(productsApiSrc, /isNew: !!row\.is_new_arrival/, 'products API maps is_new_arrival to isNew (New Stock collection reflects admin)');
 console.log('✓ New Arrivals honours the admin is_new_arrival flag');
 
+// Email revamp — Email 1 (reset) points at site.proto.co.za; Email 2 wording;
+// Email 5 (customer order acknowledgement) sent on order placement.
+const resetSrc = readFileSync(join(root, 'api/send-reset-email.js'), 'utf8');
+assert.match(resetSrc, /SITE_URL \|\| 'https:\/\/site\.proto\.co\.za'/, 'reset link defaults to site.proto.co.za');
+assert.doesNotMatch(resetSrc, /protoportal-main\.vercel\.app/, 'reset email no longer references the old vercel host');
+const registerSrc = readFileSync(join(root, 'api/register-trade.js'), 'utf8');
+assert.match(registerSrc, /approve your request within 24 hours/, 'application-received email states the 24-hour window');
+const sendOrderSrc = readFileSync(join(root, 'api/send-order.js'), 'utf8');
+assert.match(sendOrderSrc, /async function sendCustomerOrderAck/, 'order flow acknowledges the customer');
+assert.match(sendOrderSrc, /We have received your order/, 'customer order ack says we received your order');
+assert.match(sendOrderSrc, /await sendCustomerOrderAck\(\{ customer, itemCount: items\.length \}\)/, 'order handler sends the customer acknowledgement');
+console.log('✓ Email revamp (portal): reset URL, received wording, order acknowledgement');
+
 console.log('\nAll portal smoke checks passed.');
