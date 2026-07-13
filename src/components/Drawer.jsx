@@ -290,9 +290,9 @@ export default function Drawer({
           aria-modal="true"
           aria-labelledby={courierDialogTitleId}
           onClick={closeCourierPicker}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 1000 }}
+          className="courier-modal-backdrop"
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 20px 32px', width: '100%', maxWidth: 420, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
+          <div onClick={(e) => e.stopPropagation()} className="courier-modal-sheet">
             <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select a delivery option before we send your quote request.</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>

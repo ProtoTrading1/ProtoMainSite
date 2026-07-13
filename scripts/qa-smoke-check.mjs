@@ -172,7 +172,9 @@ assert.doesNotMatch(appSrc, /\[activeCollection, page, path, searchQuery, sort/,
 const drawerSrc = readFileSync(join(root, 'src/components/Drawer.jsx'), 'utf8');
 assert.match(drawerSrc, /setShowCourierPicker\(true\)/, 'Continue to delivery opens the delivery picker');
 assert.match(drawerSrc, /showCourierPicker && createPortal\(/, 'delivery picker renders as a portalled modal so it always appears');
-assert.match(drawerSrc, /position: 'fixed', inset: 0/, 'delivery modal covers the viewport (not scoped to the cart panel)');
+assert.match(drawerSrc, /className="courier-modal-backdrop"/, 'delivery modal uses the responsive backdrop class');
+assert.match(indexCssSrc, /\.courier-modal-backdrop\s*\{[^}]*position: fixed/, 'delivery modal covers the viewport (not scoped to the cart panel)');
+assert.match(indexCssSrc, /@media \(max-width: 640px\)[^]*courier-modal-sheet[^]*border-radius: 16px 16px 0 0/, 'delivery modal is a bottom-sheet on mobile');
 const catNavSrc = readFileSync(join(root, 'src/components/CategoryNav.jsx'), 'utf8');
 assert.match(catNavSrc, /Object\.keys\(counts\)\.some\(\(k\) => k !== ''\)/, 'category nav treats the placeholder counts as not-ready');
 assert.match(catNavSrc, /cat-nav-skeleton/, 'category nav renders a skeleton while counts load');
