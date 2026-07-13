@@ -30,10 +30,14 @@ export default function CategoryNav({
 }) {
   const activeL1 = path?.[0] || null;
 
-  // Counts start as a placeholder ({ '': 0 }) before the first real fetch, so
-  // "ready" means at least one actual category key exists — until then we show
-  // a skeleton instead of an empty (all-filtered-out) list.
-  const countsReady = Boolean(counts && Object.keys(counts).some((k) => k !== ''));
+  // Counts start as the placeholder { '': 0 } before the first real fetch —
+  // that's the ONLY not-ready shape. Anything else (real per-category counts,
+  // or the API-fallback shape { '': N }) counts as loaded, so the skeleton
+  // never sticks during an outage. Until ready we show a skeleton instead of an
+  // empty (all-filtered-out) list.
+  const countsReady = Boolean(counts) && !(
+    Object.keys(counts).length === 1 && Number(counts['']) === 0
+  );
   const skeletonRows = Math.min(Math.max((cats?.length || 11), 8), 14);
 
   return (

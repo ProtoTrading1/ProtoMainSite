@@ -126,12 +126,20 @@ export default function Drawer({
     const onGlobalEscape = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      event.stopImmediatePropagation();
       setShowCourierPicker(false);
       setCourierChoice(null);
       setCustomerNotes('');
     };
-    document.addEventListener('keydown', onGlobalEscape);
-    return () => document.removeEventListener('keydown', onGlobalEscape);
+    // Capture phase so this runs before other document Escape handlers (e.g. the
+    // mobile cart) — Escape should close only the delivery modal, not the cart.
+    document.addEventListener('keydown', onGlobalEscape, true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onGlobalEscape, true);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [showCourierPicker]);
 
   return (

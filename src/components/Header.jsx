@@ -330,7 +330,13 @@ export default function Header({
   // to the parent (which drives the catalogue fetch) after a short debounce.
   const [desktopInput, setDesktopInput] = useState(searchQuery);
   const commitDebounceRef = useRef(null);
-  useEffect(() => { setDesktopInput(searchQuery); }, [searchQuery]);
+  // Sync the local input when the parent changes searchQuery externally (a
+  // category/collection nav clears it). Cancel any in-flight debounced commit
+  // so a stale keystroke can't fire after and resurrect the old search.
+  useEffect(() => {
+    clearTimeout(commitDebounceRef.current);
+    setDesktopInput(searchQuery);
+  }, [searchQuery]);
   useEffect(() => () => clearTimeout(commitDebounceRef.current), []);
   const commitSearchValue = useCallback((val) => {
     clearTimeout(commitDebounceRef.current);

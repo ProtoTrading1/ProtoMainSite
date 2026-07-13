@@ -232,8 +232,11 @@ function buildCustomerAckHtml({ customer, itemCount }) {
 </body></html>`;
 }
 
-async function sendCustomerOrderAck({ customer, itemCount }) {
-  const to = cleanText(customer?.email);
+async function sendCustomerOrderAck({ customer, itemCount, toEmail }) {
+  // Recipient is the AUTHENTICATED account email, never the client-supplied
+  // customer.email — otherwise a logged-in user could make Proto's Brevo send
+  // "order received" mail to any address they type. Name is cosmetic only.
+  const to = cleanText(toEmail);
   if (!to || !to.includes('@')) return;
   try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -252,6 +255,8 @@ async function sendCustomerOrderAck({ customer, itemCount }) {
         subject: 'We have received your order — Proto Trading Online',
         htmlContent: buildCustomerAckHtml({ customer, itemCount }),
       }),
+      // Bounded so a hung Brevo connection can't stall the order response.
+      signal: AbortSignal.timeout(5000),
     });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
@@ -373,9 +378,6 @@ export default async function handler(req, res) {
     emailFailReason = err?.message || 'Network error';
   }
 
-  // Email 5 — acknowledge the customer right away. Never blocks the order.
-  await sendCustomerOrderAck({ customer, itemCount: items.length });
-
   const orderId = String(rawOrderId || '').trim();
   let notifyResult = null;
   if (orderId) {
@@ -428,6 +430,11 @@ export default async function handler(req, res) {
       console.error('send-order: premium tier check failed:', err.message);
     }
   }
+
+  // Email 5 — acknowledge the customer (to their verified account email) after
+  // all order-critical work. Best-effort + bounded, so it never blocks/​fails
+  // the order.
+  await sendCustomerOrderAck({ customer, itemCount: items.length, toEmail: user?.email });
 
   return res.status(200).json({
     success: true,

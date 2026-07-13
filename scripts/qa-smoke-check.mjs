@@ -155,8 +155,10 @@ assert.match(registerSrc, /approve your request within 24 hours/, 'application-r
 const sendOrderSrc = readFileSync(join(root, 'api/send-order.js'), 'utf8');
 assert.match(sendOrderSrc, /async function sendCustomerOrderAck/, 'order flow acknowledges the customer');
 assert.match(sendOrderSrc, /We have received your order/, 'customer order ack says we received your order');
-assert.match(sendOrderSrc, /await sendCustomerOrderAck\(\{ customer, itemCount: items\.length \}\)/, 'order handler sends the customer acknowledgement');
-console.log('✓ Email revamp (portal): reset URL, received wording, order acknowledgement');
+assert.match(sendOrderSrc, /await sendCustomerOrderAck\(\{ customer, itemCount: items\.length, toEmail: user\?\.email \}\)/, 'order handler sends the ack to the AUTHENTICATED account email');
+assert.match(sendOrderSrc, /const to = cleanText\(toEmail\)/, 'ack recipient is the verified email, never the client-supplied customer.email');
+assert.match(sendOrderSrc, /signal: AbortSignal\.timeout\(5000\)/, 'ack email is time-bounded so it cannot stall the order response');
+console.log('✓ Email revamp (portal): reset URL, received wording, order acknowledgement (verified recipient + bounded)');
 
 // Phase two — checkout clarity, search debounce, delivery modal, category skeleton
 const checkoutModalSrc = readFileSync(join(root, 'src/components/CheckoutModal.jsx'), 'utf8');
@@ -177,9 +179,13 @@ assert.match(drawerSrc, /className="courier-modal-backdrop"/, 'delivery modal us
 assert.match(indexCssSrc, /\.courier-modal-backdrop\s*\{[^}]*position: fixed/, 'delivery modal covers the viewport (not scoped to the cart panel)');
 assert.match(indexCssSrc, /@media \(max-width: 640px\)[^]*courier-modal-sheet[^]*border-radius: 16px 16px 0 0/, 'delivery modal is a bottom-sheet on mobile');
 const catNavSrc = readFileSync(join(root, 'src/components/CategoryNav.jsx'), 'utf8');
-assert.match(catNavSrc, /Object\.keys\(counts\)\.some\(\(k\) => k !== ''\)/, 'category nav treats the placeholder counts as not-ready');
+assert.match(catNavSrc, /const countsReady = Boolean\(counts\) && !\(/, 'category nav treats the placeholder counts as not-ready');
 assert.match(catNavSrc, /cat-nav-skeleton/, 'category nav renders a skeleton while counts load');
 assert.match(indexCssSrc, /@keyframes cat-nav-shimmer/, 'category skeleton has a shimmer animation');
+// Review hardening
+assert.match(headerSrc, /clearTimeout\(commitDebounceRef\.current\);\s*\n\s*setDesktopInput\(searchQuery\)/, 'external search clears cancel a pending debounced commit (no ghost search)');
+assert.match(catNavSrc, /Object\.keys\(counts\)\.length === 1 && Number\(counts\[''\]\) === 0/, 'skeleton only shows for the initial placeholder — never sticks in API-fallback mode');
+assert.match(drawerSrc, /document\.body\.style\.overflow = 'hidden'/, 'delivery modal locks body scroll while open');
 console.log('✓ Phase two: submit dialog colours, search debounce, delivery modal, category skeleton');
 
 console.log('\nAll portal smoke checks passed.');
