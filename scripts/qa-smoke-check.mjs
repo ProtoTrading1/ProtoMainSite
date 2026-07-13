@@ -158,4 +158,25 @@ assert.match(sendOrderSrc, /We have received your order/, 'customer order ack sa
 assert.match(sendOrderSrc, /await sendCustomerOrderAck\(\{ customer, itemCount: items\.length \}\)/, 'order handler sends the customer acknowledgement');
 console.log('✓ Email revamp (portal): reset URL, received wording, order acknowledgement');
 
+// Phase two — checkout clarity, search debounce, delivery modal, category skeleton
+const checkoutModalSrc = readFileSync(join(root, 'src/components/CheckoutModal.jsx'), 'utf8');
+assert.match(checkoutModalSrc, /checkout-modal-btn--confirm[^]*Yes, submit/, 'submit dialog has a green Yes, submit button');
+assert.match(checkoutModalSrc, /checkout-modal-btn--danger[^]*No, keep shopping/, 'submit dialog has a red No, keep shopping button');
+const indexCssSrc = readFileSync(join(root, 'src/index.css'), 'utf8');
+assert.match(indexCssSrc, /\.checkout-modal-btn--confirm\s*\{[^}]*#16a34a/, 'confirm button is green');
+assert.match(indexCssSrc, /\.checkout-modal-btn--danger\s*\{[^}]*#dc2626/, 'keep-shopping button is red');
+assert.match(appSrc, /const \[debouncedSearchQuery, setDebouncedSearchQuery\]/, 'App keeps a debounced search value');
+assert.match(appSrc, /setTimeout\(\(\) => setDebouncedSearchQuery\(searchQuery\), 280\)/, 'search is debounced ~280ms');
+assert.match(appSrc, /searchQuery: debouncedSearchQuery/, 'catalogue fetch uses the debounced search, not per-keystroke');
+assert.doesNotMatch(appSrc, /\[activeCollection, page, path, searchQuery, sort/, 'catalogue effect no longer keyed on raw searchQuery');
+const drawerSrc = readFileSync(join(root, 'src/components/Drawer.jsx'), 'utf8');
+assert.match(drawerSrc, /setShowCourierPicker\(true\)/, 'Continue to delivery opens the delivery picker');
+assert.match(drawerSrc, /showCourierPicker && createPortal\(/, 'delivery picker renders as a portalled modal so it always appears');
+assert.match(drawerSrc, /position: 'fixed', inset: 0/, 'delivery modal covers the viewport (not scoped to the cart panel)');
+const catNavSrc = readFileSync(join(root, 'src/components/CategoryNav.jsx'), 'utf8');
+assert.match(catNavSrc, /Object\.keys\(counts\)\.some\(\(k\) => k !== ''\)/, 'category nav treats the placeholder counts as not-ready');
+assert.match(catNavSrc, /cat-nav-skeleton/, 'category nav renders a skeleton while counts load');
+assert.match(indexCssSrc, /@keyframes cat-nav-shimmer/, 'category skeleton has a shimmer animation');
+console.log('✓ Phase two: submit dialog colours, search debounce, delivery modal, category skeleton');
+
 console.log('\nAll portal smoke checks passed.');

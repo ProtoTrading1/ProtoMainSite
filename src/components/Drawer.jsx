@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
@@ -283,14 +284,15 @@ export default function Drawer({
         onContinue={handleCheckoutContinue}
       />
 
-      {showCourierPicker && (
+      {showCourierPicker && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby={courierDialogTitleId}
-          style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 300, borderRadius: 'inherit' }}
+          onClick={closeCourierPicker}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: 16, zIndex: 1000 }}
         >
-          <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', maxHeight: '85%', overflowY: 'auto' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 20px 32px', width: '100%', maxWidth: 420, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
             <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select a delivery option before we send your quote request.</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
@@ -339,7 +341,8 @@ export default function Drawer({
               Cancel
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

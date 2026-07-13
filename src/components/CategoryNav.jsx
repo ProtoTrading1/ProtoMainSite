@@ -30,6 +30,12 @@ export default function CategoryNav({
 }) {
   const activeL1 = path?.[0] || null;
 
+  // Counts start as a placeholder ({ '': 0 }) before the first real fetch, so
+  // "ready" means at least one actual category key exists — until then we show
+  // a skeleton instead of an empty (all-filtered-out) list.
+  const countsReady = Boolean(counts && Object.keys(counts).some((k) => k !== ''));
+  const skeletonRows = Math.min(Math.max((cats?.length || 11), 8), 14);
+
   return (
     <div className="cat-nav">
       <div className="cat-nav-header">
@@ -43,20 +49,21 @@ export default function CategoryNav({
         </button>
       </div>
 
+      {!countsReady ? (
+        <ul className="cat-nav-list cat-nav-list--loading" role="list" aria-hidden="true">
+          {Array.from({ length: skeletonRows }).map((_, i) => (
+            <li key={i} className="cat-nav-item cat-nav-skeleton">
+              <span className="cat-nav-skeleton-icon" />
+              <span className="cat-nav-skeleton-bar" style={{ width: `${55 + ((i * 13) % 35)}%` }} />
+            </li>
+          ))}
+        </ul>
+      ) : (
       <ul className="cat-nav-list" role="list">
-        {(() => {
-          // Hide empty top-level departments — an exact mirror of the admin,
-          // where a category with no products should not show. Only filter
-          // once counts have loaded, so nothing flashes hidden on first paint.
-          const countsReady = counts && Object.keys(counts).length > 0;
-          const visibleCats = countsReady
-            ? cats.filter((cat) => (lookupProductCount(counts, [cat.id], cats) || 0) > 0
-                // Never hide the department the user is currently viewing, even
-                // if a background count poll briefly drops it to zero.
-                || cat.id === activeL1)
-            : cats;
-          return visibleCats;
-        })().map((cat) => {
+        {cats.filter((cat) => (lookupProductCount(counts, [cat.id], cats) || 0) > 0
+          // Never hide the department the user is currently viewing, even if a
+          // background count poll briefly drops it to zero.
+          || cat.id === activeL1).map((cat) => {
           const isActive = activeL1 === cat.id;
           const isOpen = openCategoryId === cat.id;
           const highlighted = isActive || isOpen;
@@ -114,6 +121,7 @@ export default function CategoryNav({
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

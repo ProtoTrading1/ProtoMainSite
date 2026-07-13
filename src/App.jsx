@@ -170,6 +170,15 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // Debounced copy that drives the (network) catalogue fetch. Typing updates
+  // `searchQuery` instantly for the input + suggestions, but the grid only
+  // refetches ~280ms after the user pauses — so each keystroke no longer fires
+  // a server request (that was the "typing is extremely slow" cause).
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 280);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
 
@@ -464,7 +473,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         const pageData = await fetchProductPage({
           page,
           pageSize: CATALOG_PAGE_SIZE,
-          searchQuery,
+          searchQuery: debouncedSearchQuery,
           categoryPath: path,
           collection: activeCollection,
           sort,
@@ -485,7 +494,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
         // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
         // fall back to showing the top-level department so the page isn't empty.
-        if (pageData.total === 0 && path.length > 1 && !searchQuery && activeCollection === 'all') {
+        if (pageData.total === 0 && path.length > 1 && !debouncedSearchQuery && activeCollection === 'all') {
           const l1Data = await fetchProductPage({
             page: 1,
             pageSize: CATALOG_PAGE_SIZE,
@@ -519,12 +528,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (activeCollection === 'hot') rows = rows.filter((item) => (item.badges || []).includes('Hot seller'));
         if (activeCollection === 'new') rows = rows.filter((item) => item.isNew);
         if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
-        const hasSearch = Boolean(searchQuery.trim());
+        const hasSearch = Boolean(debouncedSearchQuery.trim());
         if (!hasSearch && path.length) {
           const resolved = resolveNavPathForProducts(path, categories);
           rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
         }
-        if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
+        if (hasSearch) rows = fuzzyFilter(rows, debouncedSearchQuery);
         if (inStockOnly) rows = rows.filter(isProductAvailable);
         rows = sortCatalogProducts(rows, sort, { hasSearch });
         rows = groupProductsByBarcode(rows);
@@ -549,7 +558,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       cancelled = true;
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
-  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
+  }, [activeCollection, page, path, debouncedSearchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
