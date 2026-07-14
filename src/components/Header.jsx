@@ -325,6 +325,12 @@ export default function Header({
   const inputRef = useRef(null);
   const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
+  const liftRef = useRef(null);
+  // Local mirror of the search box text. The parent's `searchQuery` (which
+  // drives the catalogue query and re-renders the whole product grid) is only
+  // updated on a short debounce, so each keystroke re-renders just this input.
+  const [inputValue, setInputValue] = useState(searchQuery);
+  const pendingSearchRef = useRef(searchQuery);
   const desktopListboxId = useId();
   const mobileListboxId = useId();
 
@@ -363,6 +369,18 @@ export default function Header({
   }, []);
 
   useEffect(() => () => clearTimeout(debounceRef.current), []);
+  useEffect(() => () => clearTimeout(liftRef.current), []);
+
+  // Reflect external changes to searchQuery (navigation resets, welcome
+  // dismiss, "clear filters") into the local input, and cancel any stale
+  // pending lift so it can't resurrect an old term.
+  useEffect(() => {
+    if (searchQuery !== pendingSearchRef.current) {
+      clearTimeout(liftRef.current);
+      pendingSearchRef.current = searchQuery;
+      setInputValue(searchQuery);
+    }
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchOpen) return undefined;
@@ -396,10 +414,28 @@ export default function Header({
     openSearch();
   }, [openSearch]);
 
-  const handleInput = (val) => {
+  // Debounced lift to the parent so typing doesn't re-render App + every
+  // ProductCard (and re-fire the catalogue fetch) on each keystroke.
+  const liftSearch = useCallback((val) => {
+    pendingSearchRef.current = val;
+    clearTimeout(liftRef.current);
+    liftRef.current = setTimeout(() => setSearchQuery(val), 200);
+  }, [setSearchQuery]);
+
+  // Immediate commit (Enter, suggestion/category pick, clear): cancel any
+  // pending debounce and sync the local box + parent together.
+  const setSearchImmediate = useCallback((val) => {
+    clearTimeout(liftRef.current);
+    pendingSearchRef.current = val;
+    setInputValue(val);
     setSearchQuery(val);
+  }, [setSearchQuery]);
+
+  const handleInput = (val) => {
+    setInputValue(val);
     setActiveIdx(-1);
     scheduleSuggestions(val);
+    liftSearch(val);
   };
 
   const keyboardItems = [
@@ -425,8 +461,8 @@ export default function Header({
         const activeItem = items[activeIdx];
         if (activeItem.type === 'cat') pickCategory(activeItem.cat.path);
         else pickProduct(activeItem.product);
-      } else if (searchQuery.trim()) {
-        commitSearch(searchQuery.trim());
+      } else if (inputValue.trim()) {
+        commitSearch(inputValue.trim());
       }
     }
   };
@@ -443,7 +479,7 @@ export default function Header({
 
   const pickProduct = (p) => {
     saveRecent(p.name);
-    setSearchQuery(p.name);
+    setSearchImmediate(p.name);
     navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
@@ -453,14 +489,14 @@ export default function Header({
 
   const pickCategory = (catPath) => {
     navigateForSearch?.(catPath);
-    setSearchQuery('');
+    setSearchImmediate('');
     closeSearch();
   };
 
   const commitSearch = (term) => {
     if (!term) return;
     saveRecent(term);
-    setSearchQuery(term);
+    setSearchImmediate(term);
     navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
@@ -488,7 +524,7 @@ export default function Header({
   };
   const handleMobileInput = (val) => {
     setMobileInput(val);
-    setSearchQuery(val);
+    liftSearch(val);
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
@@ -574,7 +610,7 @@ export default function Header({
               type="text"
               className="header-search-premium__input"
               placeholder="Search products, SKU or barcode..."
-              value={searchQuery}
+              value={inputValue}
               onFocus={focusSearch}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -590,7 +626,7 @@ export default function Header({
           {searchOpen && (
             <div className="header-search-dropdown">
               <SearchPanel
-                query={searchQuery}
+                query={inputValue}
                 suggestions={suggestions}
                 catMatches={catMatches}
                 activeItemId={activeDesktopItemId}
@@ -735,7 +771,7 @@ export default function Header({
           aria-activedescendant={activeMobileItemId}
         />
         {mobileInput && (
-          <button type="button" onClick={() => { setMobileInput(''); setSearchQuery(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
+          <button type="button" onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
             <X size={15} />
           </button>
         )}
