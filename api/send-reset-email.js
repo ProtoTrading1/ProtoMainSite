@@ -15,7 +15,7 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td style="padding:24px 34px 28px;background:#111111;">
   <table cellpadding="0" cellspacing="0" style="margin-bottom:22px;"><tr>
-    <td style="vertical-align:middle;padding-right:13px;"><img src="https://protoportal-main.vercel.app/proto-logo.png" width="42" height="42" alt="Proto Trading" style="display:block;border-radius:8px;"></td>
+    <td style="vertical-align:middle;padding-right:13px;"><img src="https://site.proto.co.za/proto-logo.png" width="42" height="42" alt="Proto Trading" style="display:block;border-radius:8px;"></td>
     <td style="vertical-align:middle;"><span style="font-size:25px;font-weight:900;color:#ffffff;letter-spacing:0.5px;">PROTO</span><span style="font-size:25px;font-weight:900;color:#dc2626;letter-spacing:0.5px;"> TRADING</span></td>
   </tr></table>
   <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">Reset your password</h1>
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
   }
 
   const token = makeToken(email.trim(), secret);
-  const siteUrl = (process.env.SITE_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
+  const siteUrl = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
   const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
 
   try {

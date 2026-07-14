@@ -144,7 +144,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 </td></tr>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review it shortly.</p>
+  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review and approve your request within 24 hours.</p>
   <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm, and we'll notify you the moment Proto Trading Online launches so you can access our full wholesale catalogue, live stock availability, and trade pricing.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
     <tr><td style="padding:22px 24px;">

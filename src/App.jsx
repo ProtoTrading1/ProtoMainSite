@@ -170,6 +170,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  // `searchQuery` is the COMMITTED search term. The Header keeps the live input
+  // value locally and only pushes here after a short debounce, so typing never
+  // re-renders this component (and the whole product grid) per keystroke — that
+  // was the "typing is extremely slow" cause.
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
