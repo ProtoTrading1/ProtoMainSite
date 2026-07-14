@@ -197,6 +197,76 @@ function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes
   `;
 }
 
+// Email 5 — customer acknowledgement sent the moment an order is placed.
+// Confirms receipt; the team follows up with confirmed stock/pricing/delivery.
+function buildCustomerAckHtml({ customer, itemCount }) {
+  const name = escapeHtml(cleanText(customer?.name, 'there'));
+  const lines = itemCount
+    ? `<p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We have received your order (${itemCount} item${itemCount === 1 ? '' : 's'}) and our team will be in touch shortly to confirm stock, pricing and delivery.</p>`
+    : `<p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We have received your order and our team will be in touch shortly to confirm stock, pricing and delivery.</p>`;
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>We received your order</title></head>
+<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
+<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
+  <div style="display:inline-block;background:#ffffff;padding:14px 22px;border-radius:8px;margin-bottom:26px;">
+    <span style="font-size:30px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
+    <span style="font-size:20px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
+  </div>
+  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">Order received</h1>
+  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Thank you — we're on it</p>
+</td></tr>
+<tr><td style="padding:42px 38px 34px;background:#ffffff;">
+  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${name},</p>
+  ${lines}
+  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions in the meantime? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
+</td></tr>
+<tr><td align="center" style="padding:30px 34px;background:#181818;border-top:1px solid #292929;">
+  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
+  <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+async function sendCustomerOrderAck({ customer, itemCount, toEmail }) {
+  // Recipient is the AUTHENTICATED account email, never the client-supplied
+  // customer.email — otherwise a logged-in user could make Proto's Brevo send
+  // "order received" mail to any address they type. Name is cosmetic only.
+  const to = cleanText(toEmail);
+  if (!to || !to.includes('@')) return;
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: {
+          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
+          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+        },
+        to: [{ email: to, name: cleanText(customer?.name) || to }],
+        subject: 'We have received your order — Proto Trading Online',
+        htmlContent: buildCustomerAckHtml({ customer, itemCount }),
+      }),
+      // Bounded so a hung Brevo connection can't stall the order response.
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      console.error('send-order: customer ack email error:', resp.status, JSON.stringify(body));
+    }
+  } catch (err) {
+    console.error('send-order: customer ack email failed:', err?.message || err);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -360,6 +430,11 @@ export default async function handler(req, res) {
       console.error('send-order: premium tier check failed:', err.message);
     }
   }
+
+  // Email 5 — acknowledge the customer (to their verified account email) after
+  // all order-critical work. Best-effort + bounded, so it never blocks/fails
+  // the order.
+  await sendCustomerOrderAck({ customer, itemCount: items.length, toEmail: user?.email });
 
   return res.status(200).json({
     success: true,

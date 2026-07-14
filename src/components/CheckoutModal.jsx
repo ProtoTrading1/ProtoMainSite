@@ -103,14 +103,14 @@ export default function CheckoutModal({
           <>
             <h2 id="checkout-modal-title" className="checkout-modal-title">Ready to submit your order?</h2>
             <p className="checkout-modal-sub">
-              Would you like to add more items before we send your quote request?
+              Submit your quote request now, or keep shopping to add more items.
             </p>
             <div className="checkout-modal-actions">
-              <button type="button" className="checkout-modal-btn checkout-modal-btn--secondary" onClick={onKeepShopping}>
-                Yes, keep shopping
+              <button type="button" className="checkout-modal-btn checkout-modal-btn--confirm" onClick={() => setStep('details')}>
+                Yes, submit
               </button>
-              <button type="button" className="checkout-modal-btn checkout-modal-btn--primary" onClick={() => setStep('details')}>
-                No, continue
+              <button type="button" className="checkout-modal-btn checkout-modal-btn--danger" onClick={onKeepShopping}>
+                No, keep shopping
               </button>
             </div>
           </>
