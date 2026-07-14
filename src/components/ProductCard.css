@@ -338,6 +338,31 @@
   visibility: hidden;
 }
 
+/* "You're ordering more than we have in stock" advisory (backorder request). */
+.product-card .pc-stock-advisory {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #92400e;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+/* Same advisory inside the zoom/preview modal buy bar (portalled to body). */
+.pz-stock-advisory {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #92400e;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
 @media (max-width: 768px) {
   .product-card {
     min-height: unset;

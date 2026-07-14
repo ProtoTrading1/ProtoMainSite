@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
+import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 
 const MIN_ORDER = 1000;
 
@@ -20,7 +21,9 @@ function formatCartExpiry(remainingMs) {
 }
 
 function QuantityInput({ item, updateQty }) {
-  const maxQty = item.product.stockQty || 9999;
+  // Over-ordering is allowed (backorder request); the shortfall is surfaced by
+  // the per-line advisory below, so the input only enforces a sane ceiling.
+  const maxQty = 9999;
   const [draftQty, setDraftQty] = useState(() => String(item.qty));
   const commitQty = () => {
     const nextQty = Math.max(1, Math.min(maxQty, Number(draftQty) || 1));
@@ -213,6 +216,12 @@ export default function Drawer({
                   <Trash2 size={14} />
                 </button>
               </div>
+              {(() => {
+                const adv = stockAdvisoryForQty(item.product, item.qty);
+                return adv.isOverOrder ? (
+                  <p className="drawer-line-stock-note">{adv.availableStock} in stock &middot; {adv.shortfall} to confirm</p>
+                ) : null;
+              })()}
             </div>
           </div>
         ))}

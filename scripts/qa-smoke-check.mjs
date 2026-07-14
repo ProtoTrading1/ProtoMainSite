@@ -224,4 +224,14 @@ assert.match(catNavSrc, /Object\.keys\(counts\)\.length === 1 && Number\(counts\
 assert.match(drawerSrc, /document\.body\.style\.overflow = 'hidden'/, 'delivery modal locks body scroll while open');
 console.log('✓ Phase two: submit dialog colours, search debounce, delivery modal, category skeleton');
 
+// Cart over-order advisory: ordering beyond stock is allowed (backorder request)
+// but a clear warning is shown; the cart no longer silently clamps to stock.
+const stockAdvisorySrc = readFileSync(join(root, 'src/lib/stockAdvisory.js'), 'utf8');
+assert.match(stockAdvisorySrc, /export function stockAdvisoryForQty/, 'stockAdvisory helper is exported');
+assert.match(stockAdvisorySrc, /isOverOrder/, 'advisory reports the over-order state + shortfall');
+assert.doesNotMatch(appSrc, /if \(qty > 0\) return Math\.floor\(qty\);/, 'cart no longer silently clamps an in-stock line to available stock');
+assert.match(cardSrc, /stockAdvisoryForQty/, 'product card surfaces the stock advisory');
+assert.match(drawerSrc, /stockAdvisoryForQty/, 'cart drawer surfaces the stock advisory per line');
+console.log('✓ Cart over-order advisory: allow backorder + clear warning (no silent clamp)');
+
 console.log('\nAll portal smoke checks passed.');

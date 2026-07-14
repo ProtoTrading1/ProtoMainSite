@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
+import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
@@ -309,6 +310,8 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
   const inCart = cartQty > 0;
   const { canOrder: cardCanOrder } = catalogStockState(product);
   const { canOrder: modalCanOrder } = catalogStockState(activeProduct);
+  const cardAdvisory = stockAdvisoryForQty(product, qty);
+  const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 
   useEffect(() => {
     setSelectedVariant(null);
@@ -475,6 +478,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
               {isVariantGroup ? 'View options' : 'Add to Cart'}
             </button>
           </div>
+          {cardAdvisory.isOverOrder && (
+            <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
+          )}
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
             {inCart ? `In Your Order: ${cartQty}` : '\u00A0'}
           </span>
@@ -626,6 +632,9 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                     </button>
                   </div>
                 </div>
+                {modalAdvisory.isOverOrder && (
+                  <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
+                )}
                 {isVariantGroup && !selectedVariant ? (
                   <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', margin: 0 }}>
                     Select a variant above to add to order

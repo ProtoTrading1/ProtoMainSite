@@ -3091,6 +3091,16 @@ textarea:focus-visible,
   margin-top: 5px;
 }
 .drawer-line-footer strong { color: #111827; font-size: 12px; font-weight: 700; }
+.drawer-line-stock-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #92400e;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
 .mini-stepper { height: 26px; }
 .mini-stepper button { width: 22px; font-size: 13px; }
 .mini-stepper span { width: 20px; font-size: 11px; }
