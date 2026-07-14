@@ -109,9 +109,12 @@ function cartQtyCapForProduct(product) {
 
   const qty = productStockQtyForCart(product);
   if (qty === null) return product.inStock === false ? 0 : CART_QTY_UNLIMITED;
-  if (qty > 0) return Math.floor(qty);
+  // Zero stock (non-"to order") is not orderable. Everything else may be
+  // over-ordered as a backorder request — we no longer silently clamp an
+  // in-stock line to available stock; instead a clear advisory is shown at the
+  // quantity inputs (see src/lib/stockAdvisory.js). Negative SOH lines are
+  // valid backorders and likewise uncapped.
   if (qty === 0) return 0;
-  // Negative SOH lines are valid backorders; do not clamp to a negative max.
   return CART_QTY_UNLIMITED;
 }
 
