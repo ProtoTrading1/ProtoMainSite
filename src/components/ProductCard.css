@@ -299,7 +299,55 @@
 
 .product-card .qty-stepper {
   width: 100%;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+  justify-content: stretch;
+}
+
+/* The full left and right halves are real controls, not just empty space
+   around two narrow icon buttons. This keeps quantity changes fast and
+   forgiving on touch screens. */
+.product-card .qty-stepper button {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.product-card .qty-stepper button:first-child {
+  border-radius: 9px 0 0 9px;
+}
+
+.product-card .qty-stepper button:last-child {
+  border-radius: 0 9px 9px 0;
+}
+
+.product-card .qty-stepper button:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #991b1b;
+}
+
+.product-card .qty-stepper button:active:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.product-card .qty-stepper button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #991b1b;
+  outline-offset: -2px;
+}
+
+.product-card .qty-stepper button:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.product-card .qty-stepper input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .product-card .add-button {
@@ -405,7 +453,8 @@
   }
 
   .product-card .qty-stepper button {
-    min-width: 40px;
+    width: 100%;
+    min-width: 0;
     min-height: 44px;
   }
 

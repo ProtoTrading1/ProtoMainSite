@@ -234,4 +234,17 @@ assert.match(cardSrc, /stockAdvisoryForQty/, 'product card surfaces the stock ad
 assert.match(drawerSrc, /stockAdvisoryForQty/, 'cart drawer surfaces the stock advisory per line');
 console.log('✓ Cart over-order advisory: allow backorder + clear warning (no silent clamp)');
 
+// Product-card quantity control: the visible left/right sections must also be
+// the real click targets, rather than narrow icon buttons surrounded by space.
+const cardCssSrc = readFileSync(join(root, 'src/components/ProductCard.css'), 'utf8');
+assert.match(
+  cardCssSrc,
+  /grid-template-columns:\s*minmax\(0, 1fr\)\s+52px\s+minmax\(0, 1fr\)/,
+  'quantity stepper gives decrease and increase equal full-width sections',
+);
+assert.match(cardCssSrc, /\.product-card \.qty-stepper button\s*\{[^}]*width:\s*100%/, 'quantity buttons fill their grid sections');
+assert.match(cardSrc, /disabled=\{qty <= \(product\.minQty \|\| 1\)\}/, 'decrease disables at the minimum quantity');
+assert.match(cardSrc, /Math\.min\(9999, current \+ 1\)/, 'increase respects the existing maximum quantity');
+console.log('✓ Full-width quantity controls: equal click targets + safe limits');
+
 console.log('\nAll portal smoke checks passed.');

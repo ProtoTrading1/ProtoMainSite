@@ -459,11 +459,21 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <div className="buy-row">
             <div className="qty-stepper" aria-label="Quantity">
-              <button onClick={() => setQty(Math.max(product.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+              <button
+                onClick={() => setQty((current) => Math.max(product.minQty || 1, current - 1))}
+                type="button"
+                aria-label={`Decrease quantity from ${qty}`}
+                disabled={qty <= (product.minQty || 1)}
+              >
                 <Minus size={14} />
               </button>
               <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-              <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+              <button
+                onClick={() => setQty((current) => Math.min(9999, current + 1))}
+                type="button"
+                aria-label={`Increase quantity from ${qty}`}
+                disabled={qty >= 9999}
+              >
                 <Plus size={14} />
               </button>
             </div>
