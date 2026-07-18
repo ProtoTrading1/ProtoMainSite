@@ -80,6 +80,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState(false);
+  const [instantAccess, setInstantAccess] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
   const [standaloneStep, setStandaloneStep] = useState(0);
 
@@ -277,10 +278,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
-        instantApproval: true,
         company_fax: companyFax,
       });
       setCustomerCode(result?.customerCode || result?.profile?.customerCode || '');
+      setInstantAccess(Boolean(result?.instantAccess));
       setDone(true);
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
@@ -294,15 +295,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
-                <h3>You&apos;re approved</h3>
+                <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
                 <p>
-                  Welcome, {contactName.trim()}. Your trade account is live
-                  {customerCode ? ` (customer code ${customerCode})` : ''}.
-                  {standalone
-                    ? ' We’ll notify you as soon as the site is launched.'
-                    : ` Log in with ${email.trim()} to start ordering.`}
+                  {instantAccess
+                    ? <>Welcome back, {contactName.trim()}. Your trade account is live{customerCode ? ` (customer code ${customerCode})` : ''}.{standalone ? ' We’ll notify you as soon as the site is launched.' : ` Log in with ${email.trim()} to start ordering.`}</>
+                    : <>Thank you, {contactName.trim()}. We’ll review your trade account application and contact you about access.</>}
                 </p>
-                {!standalone && (
+                {!standalone && instantAccess && (
                   <button type="button" onClick={onLogin}>
                     Log in now
                   </button>
