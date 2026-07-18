@@ -18,7 +18,13 @@ export async function lookupProtoActiveByEmail(supabase, email) {
   return data;
 }
 
-/** Email lookup with optional customer-code fallback (updates proto-active email when matched by code). */
+/**
+ * Resolve a possible existing customer match.
+ *
+ * Only an exact email match is identity-verified enough to grant immediate
+ * access. A customer code can still help the team reconcile an application,
+ * but it must never update a legacy record or approve an account on its own.
+ */
 export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const normalizedCode = customerCode
@@ -27,7 +33,7 @@ export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
 
   if (normalizedEmail) {
     const row = await lookupProtoActiveByEmail(supabase, normalizedEmail);
-    if (row) return { row, emailUpdated: false };
+    if (row) return { row, matchType: 'email' };
   }
 
   if (normalizedCode && /^[A-Z0-9]{6}$/.test(normalizedCode)) {
@@ -38,23 +44,16 @@ export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
       .order('sales_last_12_months', { ascending: false })
       .limit(1);
     const data = matches?.[0] ?? null;
-    if (!data) return { row: null, emailUpdated: false };
-
-    if (normalizedEmail && data.email !== normalizedEmail) {
-      const { error } = await supabase
-        .from('proto_active_customers')
-        .update({ email: normalizedEmail })
-        .eq('id', data.id);
-      if (error) {
-        console.warn('proto_active email update failed:', error.message);
-        return { row: data, emailUpdated: false };
-      }
-      return { row: { ...data, email: normalizedEmail }, emailUpdated: true };
-    }
-    return { row: data, emailUpdated: false };
+    if (!data) return { row: null, matchType: null };
+    return { row: data, matchType: 'customer_code' };
   }
 
-  return { row: null, emailUpdated: false };
+  return { row: null, matchType: null };
+}
+
+/** True only when the customer's identity was verified by their registered email. */
+export function isVerifiedProtoActiveMatch(match) {
+  return Boolean(match?.matchType === 'email' && match?.row?.account_code);
 }
 
 async function isCustomerCodeTaken(supabase, code) {
