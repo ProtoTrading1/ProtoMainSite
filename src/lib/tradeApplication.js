@@ -22,7 +22,6 @@ export async function submitTradeApplication({
   website,
   acceptWhatsapp,
   customerCode,
-  instantApproval,
   company_fax,
 }) {
   const res = await fetch('/api/register-trade', {
@@ -52,7 +51,6 @@ export async function submitTradeApplication({
       website,
       acceptWhatsapp,
       customerCode,
-      instantApproval,
       company_fax,
     }),
   });
