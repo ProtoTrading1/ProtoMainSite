@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
 import {
+  isVerifiedProtoActiveMatch,
   lookupProtoActiveCustomer,
   sendWelcomeWhatsapp,
 } from './_customer-onboard.js';
@@ -222,7 +223,6 @@ export default async function handler(req, res) {
     website,
     acceptWhatsapp,
     customerCode,
-    instantApproval,
     company_fax,
     streetName,
     suburb,
@@ -240,15 +240,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
-  const wantsInstantApproval = instantApproval === true;
-
-  if (wantsInstantApproval) {
-    if (!confirmPassword) {
-      return res.status(400).json({ error: 'Please confirm your password.' });
-    }
-    if (String(password) !== String(confirmPassword)) {
-      return res.status(400).json({ error: 'Passwords do not match.' });
-    }
+  if (confirmPassword && String(password) !== String(confirmPassword)) {
+    return res.status(400).json({ error: 'Passwords do not match.' });
   }
 
   const emailCheck = validateEmail(email);
@@ -279,17 +272,15 @@ export default async function handler(req, res) {
   const normalizedUnitNumber = caps(unitNumber);
   const normalizedVatNumber = vatNumber?.trim() || null;
 
+  let protoActiveMatch = null;
   let protoActive = null;
   try {
-    const match = await lookupProtoActiveCustomer(supabase, normalizedEmail, customerCode);
-    protoActive = match.row;
-    if (match.emailUpdated) {
-      console.info('proto_active email updated for code', protoActive?.account_code, '→', normalizedEmail);
-    }
+    protoActiveMatch = await lookupProtoActiveCustomer(supabase, normalizedEmail, customerCode);
+    protoActive = protoActiveMatch.row;
   } catch (lookupErr) {
     console.warn('proto_active_customers lookup:', lookupErr?.message || lookupErr);
   }
-  const isProtoActive = Boolean(protoActive?.account_code);
+  const isProtoActive = isVerifiedProtoActiveMatch(protoActiveMatch);
 
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
@@ -320,7 +311,10 @@ export default async function handler(req, res) {
   let profileVerification = null;
   let allocatedCustomerCode = null;
 
-  const shouldApprove = wantsInstantApproval || isProtoActive;
+  // Immediate access is a server decision: only a customer's registered email
+  // may match the historic Proto customer register. A submitted customer code
+  // can support later reconciliation but cannot grant access by itself.
+  const shouldApprove = isProtoActive;
 
   if (userId) {
     // Customer codes are NEVER auto-generated — they are allocated manually in
@@ -362,10 +356,6 @@ export default async function handler(req, res) {
     };
 
     const {
-      accept_whatsapp: _wa,
-      whatsapp_opt_in_at: _waAt,
-      monthly_spend: _ms,
-      website: _wb,
       company_address: _ca,
       street_name: _sn,
       suburb: _su,
@@ -384,8 +374,34 @@ export default async function handler(req, res) {
       last_purchase_date: _lp,
       contact_name: _cn,
       first_name: _fn,
-      ...basePayload
     } = fullPayload;
+
+    const basePayload = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => ![
+        'accept_whatsapp',
+        'whatsapp_opt_in_at',
+        'monthly_spend',
+        'website',
+        'company_address',
+        'street_name',
+        'suburb',
+        'postal_code',
+        'building_type',
+        'unit_number',
+        'vat_number',
+        'business_name',
+        'country',
+        'province',
+        'city',
+        'business_type',
+        'customer_code',
+        'sales_last_12_months',
+        'invoice_count',
+        'last_purchase_date',
+        'contact_name',
+        'first_name',
+      ].includes(key)),
+    );
 
     const upsertAttempts = [
       fullPayload,
