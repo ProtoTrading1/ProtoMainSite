@@ -8,5 +8,6 @@ export function displayProductText(value) {
     .replaceAll('*', 'x')
     .replace(/\+\s*\/?\s*[-−]/g, '±')
     .replace(/\s+[-–—]\s+/g, ' | ')
-    .replace(/\s*,\s*/g, ' | ');
+    .replace(/\s*,\s*/g, ' | ')
+    .replace(/(\d)\s*[xX]\s*(\d)/g, '$1 x $2');
 }
