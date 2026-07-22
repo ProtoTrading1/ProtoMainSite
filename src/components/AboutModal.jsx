@@ -34,24 +34,25 @@ export default function AboutModal({ onClose }) {
 
           <div className="about-modal-visit">
             <h3 className="about-modal-section-title">Find us</h3>
-            <div className="about-modal-map-frame">
-              <iframe
-                className="about-modal-map-embed"
-                title="Map showing Proto Trading in District Six, Cape Town"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=18.4214%2C-33.9312%2C18.4358%2C-33.9249&layer=mapnik&marker=-33.9280367%2C18.4286137"
+            <a
+              className="about-modal-map-frame"
+              href={PROTO_OFFICE_ADDRESS.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Get directions to PROTO TRADING CC in Google Maps"
+            >
+              <img
+                className="about-modal-map-image"
+                src={PROTO_OFFICE_ADDRESS.mapImage}
+                alt="Stylised location map for Proto Trading"
                 loading="lazy"
               />
-              <a
-                className="about-modal-map-label"
-                href={PROTO_OFFICE_ADDRESS.mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open PROTO TRADING CC in Google Maps"
-              >
+              <span className="about-modal-map-label">
                 <MapPin size={15} />
                 Proto Trading
-              </a>
-            </div>
+              </span>
+              <span className="about-modal-map-directions">Get directions</span>
+            </a>
             <p className="about-modal-visit-address">
               <strong>{PROTO_OFFICE_ADDRESS.label}</strong>
               {PROTO_OFFICE_ADDRESS.company}
