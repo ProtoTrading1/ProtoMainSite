@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
 import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
+import { loadPlacementMapIfEnabled } from './_placements.js';
+import { mergeCategoryPaths } from '../lib/placements.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -114,7 +116,14 @@ function parseSkuQuery(raw) {
   return [...new Set(list)];
 }
 
-function adapt(row, tree, salesByBarcode = new Map()) {
+/**
+ * Adapt a stock row for the storefront.
+ *
+ * `placementPaths` are the product's ADDITIONAL category locations. When there
+ * are none the returned object is byte-identical to before, so the payload is
+ * unchanged while the feature is off.
+ */
+function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [
     row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
@@ -167,7 +176,18 @@ function adapt(row, tree, salesByBarcode = new Map()) {
     createdAt: row.created_at,
     supplier: '',
   };
-  return enrichMotarroCategoryFields(base, row, tree, categoryPath);
+  const enriched = enrichMotarroCategoryFields(base, row, tree, categoryPath);
+  const extras = Array.isArray(placementPaths) ? placementPaths : [];
+  if (!extras.length) return enriched;
+
+  // productMatchesNavPath already tests every entry in categoryPaths, so
+  // appending placements is all the storefront needs to list the product under
+  // each one. Merge rather than replace: Mottaro owns a second path here too.
+  return {
+    ...enriched,
+    categoryPaths: mergeCategoryPaths(categoryPath, [...(enriched.categoryPaths || []), ...extras]),
+    placementPaths: extras,
+  };
 }
 
 export default async function handler(req, res) {
@@ -182,7 +202,7 @@ export default async function handler(req, res) {
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
-    const [rows, tree, salesByBarcode] = await Promise.all([
+    const [rows, tree, salesByBarcode, placements] = await Promise.all([
       fetchAllRows(
         supabase,
         'website_stock',
@@ -191,10 +211,16 @@ export default async function handler(req, res) {
       ),
       loadTaxonomyTree(),
       loadSalesByBarcode(supabase, requestedSkus),
+      // null when the feature is off — no extra query, payload unchanged.
+      loadPlacementMapIfEnabled(supabase),
     ]);
     const products = rows
-      .map((row) => adapt(row, tree, salesByBarcode))
-      .filter((p) => p.category || (p.isMultiCategory && p.alternateCategoryPath?.length));
+      .map((row) => adapt(row, tree, salesByBarcode, placements ? (placements.get(row.sku) || []) : null))
+      // A product filed ONLY via a placement has no primary category label, so
+      // it must survive this filter or multi-placement would silently drop it.
+      .filter((p) => p.category
+        || (p.isMultiCategory && p.alternateCategoryPath?.length)
+        || p.placementPaths?.length);
 
     // Short edge cache so product membership / new products reflect quickly.
     res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=60');
