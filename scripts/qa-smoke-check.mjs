@@ -78,6 +78,16 @@ assert.equal(
 );
 console.log('✓ Shared Mottaro module in sync with protoportal-admin');
 
+// Shared placements module — must stay byte-identical to the admin copy
+const PLACEMENTS_SHARED_HASH = 'a73d1bb627f01442';
+const placementsShared = readFileSync(join(root, 'lib/placements.mjs'), 'utf8');
+assert.equal(
+  createHash('sha256').update(placementsShared).digest('hex').slice(0, 16),
+  PLACEMENTS_SHARED_HASH,
+  'lib/placements.mjs must stay byte-identical to protoportal-admin/lib/placements.mjs — edit both copies together and update the pinned hash in both qa-smoke-check.mjs files',
+);
+console.log('✓ Shared placements module in sync with protoportal-admin');
+
 // mottaro_path persistence — stored snapshot keeps placement when labels vanish
 assert.deepEqual(
   inferMotarroPathFromRow({ title: 'MOTTARO brush', category: null, mottaro_path: '["mottaro","mottaro-art-supplies"]' }, tree),
