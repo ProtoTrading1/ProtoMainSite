@@ -29,7 +29,7 @@ export const PROTO_OFFICE_ADDRESS = {
   phoneTel: '+27214615883',
   email: 'online@proto.co.za',
   mapsUrl: 'https://maps.app.goo.gl/jJXqv3TveqACkbyr9',
-  mapImage: '/proto-office-map.jpg',
+  mapImage: '/proto-office-map-premium.jpg',
   lat: -33.9280367,
   lng: 18.4286137,
 };
