@@ -4,5 +4,7 @@
  * show a clear multiplication x instead.
  */
 export function displayProductText(value) {
-  return String(value ?? '').replaceAll('*', 'x');
+  return String(value ?? '')
+    .replaceAll('*', 'x')
+    .replace(/\s+[-–—]\s+/g, ' | ');
 }
