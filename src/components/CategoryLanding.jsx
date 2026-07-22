@@ -3,6 +3,7 @@ import { ChevronRight, Flame, ImageOff, ShoppingCart, Sparkles } from 'lucide-re
 import { DEPT_COLORS, LUCIDE_ICON_MAP, USE_CASES } from '../lib/navConfig';
 import { buildImageCandidates } from '../lib/imageUrl';
 import { lookupProductCount, filterNavChildrenByCount } from '../lib/taxonomy';
+import { displayProductText } from '../lib/productText';
 
 // ─── Product strip card ───────────────────────────────────────
 function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPreview }) {
@@ -31,7 +32,7 @@ function StripCard({ product, addToCart, cartQty, onCartQtyChange, onProductPrev
           className="strip-card-name-btn"
           onClick={() => onProductPreview?.(product)}
         >
-          <p className="strip-card-name">{product.name}</p>
+          <p className="strip-card-name">{displayProductText(product.name)}</p>
         </button>
         <div className="strip-card-footer">
           {product.price > 0 && <strong className="strip-card-price">R{product.price.toFixed(2)}</strong>}
