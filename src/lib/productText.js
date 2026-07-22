@@ -6,6 +6,7 @@
 export function displayProductText(value) {
   return String(value ?? '')
     .replaceAll('*', 'x')
+    .replace(/\+\s*\/?\s*[-−]/g, '±')
     .replace(/\s+[-–—]\s+/g, ' | ')
     .replace(/\s*,\s*/g, ' | ');
 }
