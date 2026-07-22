@@ -4,6 +4,7 @@ import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn 
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
+import { displayProductText } from '../lib/productText';
 import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
@@ -433,7 +434,7 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
         {/* Body */}
         <div className="product-body">
           <button className="product-title-button" onClick={openPreview} type="button">
-            <h3>{product.name}</h3>
+            <h3>{displayProductText(product.name)}</h3>
           </button>
 
           <div className="pc-sku">
@@ -561,10 +562,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                   <span className="pz-code">{productSkuLabel(activeProduct)}</span>
                   <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>
                 </div>
-                <h2 className="pz-name" id={`pz-name-${activeProduct.id || product.id}`}>{activeProduct.name}</h2>
+                <h2 className="pz-name" id={`pz-name-${activeProduct.id || product.id}`}>{displayProductText(activeProduct.name)}</h2>
 
                 {activeProduct.originalDescription && (
-                  <p className="pz-desc">{activeProduct.originalDescription}</p>
+                  <p className="pz-desc">{displayProductText(activeProduct.originalDescription)}</p>
                 )}
 
                 {/* Specs */}
