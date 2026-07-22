@@ -46,6 +46,13 @@ function productBarcodeLabel(product, compact = false) {
   return compact ? `Barcode ${barcode}` : `Barcode: ${barcode}`;
 }
 
+function productReferenceLabel(product) {
+  const sku = productSku(product);
+  const barcode = productBarcode(product);
+  if (!barcode || barcode === sku) return `SKU: ${sku || '—'}`;
+  return `SKU: ${sku || '—'} | BARCODE: ${barcode}`;
+}
+
 function catalogStockQty(product) {
   if (!product) return null;
   const raw = product.stockOnHand ?? product.stockQty;
@@ -439,12 +446,11 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
 
           <div className="pc-sku">
             <div className="pc-sku-top">
-              <span className="pc-sku-code">{productSkuLabel(product)}</span>
+              <span className="pc-sku-code">{productReferenceLabel(product)}</span>
               {isVariantGroup && variantCount > 1 && (
                 <span className="pc-variant-count">{variantCount} options</span>
               )}
             </div>
-            <span className="pc-barcode-code">{productBarcodeLabel(product)}</span>
           </div>
 
           <div className="pc-price-block">
