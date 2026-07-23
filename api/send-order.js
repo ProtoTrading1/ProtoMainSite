@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 import { escapeHtml } from './_escape-html.js';
@@ -66,6 +67,77 @@ function computeSubtotal(items) {
     const product = item.product || {};
     return sum + Number(product.price || 0) * Number(item.qty || 0);
   }, 0);
+}
+
+function getStockClient() {
+  return createClient(
+    process.env.VITE_STOCK_SUPABASE_URL,
+    process.env.VITE_STOCK_SUPABASE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+/**
+ * Resolve authoritative unit prices from website_stock (Stock DB), keyed by sku
+ * with a barcode fallback, so promo eligibility and stored totals don't trust
+ * the client-supplied product.price.
+ *
+ * Returns:
+ *  - authItems: items with product.price replaced by the server price when the
+ *    product was found (client price kept otherwise, so a rare unlisted item
+ *    still shows a sane estimate the team confirms).
+ *  - gateSubtotal: sum over ONLY server-priced items — used for the promo
+ *    minimum-order check so a client can't inflate a price (or invent a sku) to
+ *    clear a minOrder threshold.
+ *  - resolved: false if the Stock DB lookup errored, so the caller can fall back
+ *    to the client subtotal for the gate rather than block a legitimate promo.
+ */
+async function resolveAuthoritativePrices(items) {
+  const skus = [...new Set(items
+    .map((i) => String(i.product?.sku || i.product?.id || '').trim().toUpperCase())
+    .filter(Boolean))];
+  const barcodes = [...new Set(items
+    .map((i) => String(i.product?.code || i.product?.barcode || '').trim())
+    .filter(Boolean))];
+  const priceBySku = new Map();
+  const priceByBarcode = new Map();
+  let resolved = true;
+  try {
+    const sb = getStockClient();
+    if (skus.length) {
+      const { data, error } = await sb.from('website_stock').select('sku, price').in('sku', skus);
+      if (error) throw error;
+      for (const r of data || []) priceBySku.set(String(r.sku).trim().toUpperCase(), Number(r.price) || 0);
+    }
+    if (barcodes.length) {
+      const { data, error } = await sb.from('website_stock').select('barcode, price').in('barcode', barcodes);
+      if (error) throw error;
+      for (const r of data || []) {
+        if (r.barcode != null) priceByBarcode.set(String(r.barcode).trim(), Number(r.price) || 0);
+      }
+    }
+  } catch (err) {
+    console.error('send-order: authoritative price lookup failed, using client prices:', err?.message || err);
+    resolved = false;
+  }
+
+  let gateSubtotal = 0;
+  const authItems = items.map((item) => {
+    const product = item.product || {};
+    const sku = String(product.sku || product.id || '').trim().toUpperCase();
+    const barcode = String(product.code || product.barcode || '').trim();
+    const qty = Number(item.qty || 0);
+    let serverPrice;
+    if (priceBySku.has(sku)) serverPrice = priceBySku.get(sku);
+    else if (barcode && priceByBarcode.has(barcode)) serverPrice = priceByBarcode.get(barcode);
+    if (serverPrice != null) {
+      gateSubtotal += serverPrice * qty;
+      return { ...item, product: { ...product, price: serverPrice } };
+    }
+    return item;
+  });
+
+  return { authItems, gateSubtotal, resolved };
 }
 
 function estimatedTotal(subtotal, discountAmount) {
@@ -389,11 +461,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Delivery method is required' });
   }
 
-  const subtotal = computeSubtotal(items);
+  // Prices are re-derived from the Stock DB — never trusted from the client — so
+  // the promo minimum-order gate and the stored totals can't be gamed by sending
+  // an inflated product.price.
+  const { authItems: orderItems, gateSubtotal, resolved: pricesResolved } = await resolveAuthoritativePrices(items);
+  const subtotal = computeSubtotal(orderItems);
+  // Gate the promo on authoritative prices when we could resolve them; if the
+  // Stock DB was unreachable, fall back to the client subtotal so a legitimate
+  // promo isn't blocked by an outage.
+  const promoGateSubtotal = pricesResolved ? gateSubtotal : subtotal;
   let promo = null;
   const promoCode = cleanText(rawPromoCode).toUpperCase();
   if (promoCode) {
-    const promoResult = await validatePromoCode(promoCode, subtotal);
+    const promoResult = await validatePromoCode(promoCode, promoGateSubtotal);
     if (!promoResult.valid) {
       return res.status(400).json({ error: promoResult.error || 'Invalid promo code.' });
     }
@@ -436,7 +516,7 @@ export default async function handler(req, res) {
     const captured = await captureOrderRow({
       supabase: getPortalAdminClient(),
       userId: user.id,
-      items,
+      items: orderItems,
       subtotal,
       deliveryMethod,
       customerNotes,
@@ -455,7 +535,7 @@ export default async function handler(req, res) {
   // still send the email — without the attachment — so the team is notified.
   let pdfBuffer = null;
   try {
-    const preparedItems = await prepareItems(items);
+    const preparedItems = await prepareItems(orderItems);
     pdfBuffer = await buildPdfBuffer({
       items: preparedItems,
       customer,
@@ -494,7 +574,7 @@ export default async function handler(req, res) {
           : `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
         htmlContent: (dbCaptureFailed
           ? '<div style="background:#c40000;color:#ffffff;padding:16px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;">⚠️ DATABASE CAPTURE FAILED — this order exists only in this email. Capture it manually in the admin portal, then investigate the orders insert failure in the logs.</div>'
-          : '') + buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }),
+          : '') + buildEmailHtml({ items: orderItems, customer, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
     });
