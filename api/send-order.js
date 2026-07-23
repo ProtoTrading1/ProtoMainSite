@@ -330,6 +330,14 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
       insertRow = withoutRef;
       ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
     }
+    if (error && error.code === '23503') {
+      // Foreign-key violation: no customers row for this auth user — the exact
+      // "missing profile" case this failsafe exists for. customer_id is
+      // nullable, so persist the order unlinked rather than losing it entirely.
+      console.warn('send-order: no customer profile for user, capturing order unlinked:', userId);
+      insertRow = { ...insertRow, customer_id: null };
+      ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
+    }
     if (error && error.code === '23505' && clientRef) {
       const { data: existing } = await supabase
         .from('orders')

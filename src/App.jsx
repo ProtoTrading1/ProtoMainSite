@@ -236,6 +236,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const lastSearchLogKeyRef = useRef('');
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
+  // Idempotency key for the CURRENT cart's checkout. Persists across retries of
+  // the same cart (so a resubmit after an email/network error recovers the
+  // existing order instead of double-inserting) and resets when the cart
+  // changes (a genuinely different order) or after a successful submit clears it.
+  const checkoutRefRef = useRef(null);
+  useEffect(() => { checkoutRefRef.current = null; }, [cartItems]);
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
@@ -813,10 +819,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setModalOpen(true);
 
     try {
-      // Idempotency key for this checkout attempt: the browser insert and the
-      // server-side fallback capture in /api/send-order share it, so retries
-      // can never double-insert the same order.
-      const clientRef = makeClientRef();
+      // Idempotency key for this checkout: generated once per cart and reused
+      // across retries (reset on cart change / successful submit below), so a
+      // human "try again" after an error recovers the existing order rather than
+      // inserting a duplicate. Shared by the browser insert and the server
+      // fallback capture in /api/send-order.
+      if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
+      const clientRef = checkoutRefRef.current;
       let savedOrder = null;
       if (customer?.id) {
         try {

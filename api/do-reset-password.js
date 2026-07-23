@@ -1,5 +1,4 @@
 import {
-  bumpResetTokenVersion,
   findUserByEmail,
   getResetSecret,
   getResetTokenVersion,
@@ -47,11 +46,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'This reset link has already been used or replaced. Request a new one.' });
     }
 
-    const { error } = await supabase.auth.admin.updateUserById(user.id, { password });
+    // Atomic single-use: rotate the password AND bump reset_token_version in the
+    // SAME write, so a partial failure can never leave the link replayable (a
+    // separate bump could fail after the password changed, keeping the link
+    // valid for the rest of its TTL).
+    const nextVersion = getResetTokenVersion(user) + 1;
+    const { error } = await supabase.auth.admin.updateUserById(user.id, {
+      password,
+      app_metadata: { ...(user.app_metadata || {}), reset_token_version: nextVersion },
+    });
     if (error) return res.status(400).json({ error: error.message });
 
-    // Invalidate outstanding links, then log out every existing session.
-    await bumpResetTokenVersion(supabase, user);
+    // Then force-logout every existing session.
     await revokeUserSessions(supabase, user.id);
 
     return res.status(200).json({ ok: true });
