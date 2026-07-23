@@ -24,6 +24,10 @@ export default function CheckoutModal({
 
   const showWhatsapp = customer && customer.accept_whatsapp !== true;
 
+  // Reset the modal to its first step only when it OPENS. Depending on
+  // appliedPromo?.code here was a bug: applying a valid code changed that value,
+  // re-ran this effect, and bounced the user back to the "add-more" step — so the
+  // discount confirmation vanished and it looked like nothing happened.
   useEffect(() => {
     if (!isOpen) return;
     setStep('add-more');
@@ -31,7 +35,8 @@ export default function CheckoutModal({
     setPromoError('');
     setWhatsappChoice(null);
     setContinuing(false);
-  }, [isOpen, appliedPromo?.code]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -146,9 +151,16 @@ export default function CheckoutModal({
               </div>
               {promoError && <p className="checkout-modal-error">{promoError}</p>}
               {appliedPromo && !promoError && (
-                <p className="checkout-modal-success">
-                  {appliedPromo.discountPct}% discount applied — saves R{appliedPromo.discountAmount.toFixed(2)}
-                </p>
+                <div className="checkout-modal-promo-applied">
+                  <p className="checkout-modal-success">
+                    ✓ {appliedPromo.code} applied — {appliedPromo.discountPct}% off, you save R{appliedPromo.discountAmount.toFixed(2)}
+                  </p>
+                  {typeof appliedPromo.total === 'number' && (
+                    <p className="checkout-modal-promo-total">
+                      Estimated total: <strong>R{appliedPromo.total.toFixed(2)}</strong>
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 

@@ -32,9 +32,12 @@ export function makeResetToken(email, secret, tokenVersion = 0, ttlMs = DEFAULT_
   return signResetToken({ email, v: tokenVersion, scope: 'customer' }, secret, ttlMs);
 }
 
-/** Returns { email, v }; throws on tamper/expiry/format failure. */
+/** Returns { email, v }; throws on tamper/expiry/scope/format failure. */
 export function verifyResetToken(token, secret) {
   const data = verifyResetTokenRaw(token, secret);
+  // Scope isolation: a customer link must not be redeemable via an admin token
+  // (or vice-versa) if the two surfaces ever share RESET_TOKEN_SECRET.
+  if (data.scope !== 'customer') throw new Error('Invalid or expired reset link.');
   const email = String(data.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) throw new Error('Invalid or expired reset link.');
   return { email, v: Number(data.v) || 0 };

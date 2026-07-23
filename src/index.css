@@ -3366,6 +3366,34 @@ textarea:focus-visible,
   display: flex;
   gap: 8px;
 }
+.checkout-modal-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #dc2626;
+  font-weight: 600;
+}
+.checkout-modal-promo-applied {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: 10px;
+}
+.checkout-modal-success {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #16a34a;
+}
+.checkout-modal-promo-total {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #0f172a;
+}
+.checkout-modal-promo-total strong {
+  font-size: 15px;
+  color: #16a34a;
+}
 .checkout-modal-input {
   flex: 1;
   min-width: 0;
