@@ -18,7 +18,7 @@ import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProdu
 import { preloadProductImages } from './lib/imageUrl';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
-import { saveOrder, fetchLastOrder } from './lib/orders';
+import { saveOrder, fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
@@ -813,19 +813,31 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setModalOpen(true);
 
     try {
+      // Idempotency key for this checkout attempt: the browser insert and the
+      // server-side fallback capture in /api/send-order share it, so retries
+      // can never double-insert the same order.
+      const clientRef = makeClientRef();
       let savedOrder = null;
       if (customer?.id) {
-        savedOrder = await saveOrder(customer.id, cartItems, cartTotal, {
-          deliveryMethod,
-          customerNotes,
-          promoCode: promo?.code || null,
-          discountPct: promo?.discountPct ?? null,
-          discountAmount: promo?.discountAmount ?? null,
-        });
-        fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+        try {
+          savedOrder = await saveOrder(customer.id, cartItems, cartTotal, {
+            deliveryMethod,
+            customerNotes,
+            promoCode: promo?.code || null,
+            discountPct: promo?.discountPct ?? null,
+            discountAmount: promo?.discountAmount ?? null,
+            clientRef,
+          });
+          fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+        } catch (saveErr) {
+          // Don't abort: /api/send-order captures the order server-side when no
+          // orderId is supplied, so a failed browser insert is not a lost order.
+          console.error('order insert failed, deferring to server capture:', saveErr?.message || saveErr);
+        }
       }
 
       const payload = {
+        clientRef,
         customer: customerDetails,
         totals: {
           subtotal: cartTotal,
@@ -870,7 +882,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (searchTrackRef.current.rowId) {
         void logSearchOrder({
           searchRowId: searchTrackRef.current.rowId,
-          orderNumber: savedOrder?.id || payload.orderId || '',
+          orderNumber: result.orderId || savedOrder?.id || '',
           orderValue: cartTotal,
         });
       }
