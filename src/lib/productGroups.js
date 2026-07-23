@@ -72,8 +72,9 @@ export function groupProductsByBarcode(products) {
     // Card identity (code/barcode) must come from a real member, never the group
     // key — for an admin group the key is `g:<uuid>`. Prefer the designated
     // primary member; fall back to the image-preferring rep.
+    const primarySkuKey = String(rep.groupPrimarySku || '').trim().toUpperCase();
     const primaryMember = isAdminGroup
-      ? (variants.find((v) => String(v.sku || v.id) === String(rep.groupPrimarySku)) || rep)
+      ? (variants.find((v) => String(v.sku || v.id || '').trim().toUpperCase() === primarySkuKey) || rep)
       : rep;
     const adminTitle = isAdminGroup ? String(rep.groupTitle || '').trim() : '';
     const groupTitle = adminTitle || deriveGroupTitle(variants) || primaryMember.name || primaryMember.title || entry.key;

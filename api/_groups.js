@@ -24,7 +24,12 @@ export async function loadGroupInfoMapIfEnabled(supabase, { force = false } = {}
     .from('product_groups')
     .select('id,title,primary_website_sku,active')
     .eq('active', true);
-  if (gErr) throw gErr;
+  if (gErr) {
+    // Flag on but migration 052 not applied yet — degrade to "off" rather than
+    // 500-ing the whole storefront product feed.
+    if (gErr.code === '42P01') return null;
+    throw gErr;
+  }
   if (!groups?.length) return new Map();
 
   const ids = groups.map((g) => g.id);
