@@ -1,10 +1,11 @@
-import { createHmac } from 'crypto';
-
-function makeToken(email, secret) {
-  const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + 3600000 })).toString('base64url');
-  const sig = createHmac('sha256', secret).update(payload).digest('base64url');
-  return `${payload}.${sig}`;
-}
+import {
+  findUserByEmail,
+  getResetSecret,
+  getResetTokenVersion,
+  getServiceClient,
+  makeResetToken,
+} from './_password-reset.js';
+import { checkRateLimit, clientIp } from './_rate-limit.js';
 
 const RESET_HTML = (link) => `<!DOCTYPE html>
 <html lang="en">
@@ -24,7 +25,7 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;font-weight:700;">Hi there,</p>
   <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We received a request to reset the password for your Proto Trading Online account.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Click the button below to create a new password. This link expires in 1 hour.</p>
+  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Click the button below to create a new password. This link expires in 15 minutes and can be used once.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td align="center">
     <a href="${link}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:16px 42px;border-radius:10px;">Reset Password</a>
   </td></tr></table>
@@ -50,51 +51,75 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
 </td></tr></table>
 </body></html>`;
 
+// Identical response for every input — no account-existence oracle.
+const GENERIC_OK = { ok: true };
+
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Email required' });
+  const email = String(req.body?.email || '').trim().toLowerCase();
 
-  const secret = process.env.RESET_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = getResetSecret();
   if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
-
   if (!process.env.BREVO_API_KEY) {
     console.error('BREVO_API_KEY not configured');
     return res.status(500).json({ error: 'Email service not configured' });
   }
 
-  const token = makeToken(email.trim(), secret);
-  const siteUrl = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
-  const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
-
-  try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'api-key': process.env.BREVO_API_KEY,
-      },
-      body: JSON.stringify({
-        sender: {
-          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
-          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
-        },
-        to: [{ email: email.trim() }],
-        subject: 'Reset your Proto Trading password',
-        htmlContent: RESET_HTML(resetLink),
-      }),
-    });
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      console.error('Brevo API error:', resp.status, JSON.stringify(body));
-      return res.status(500).json({ error: 'Failed to send email. Please try again.' });
-    }
-  } catch (err) {
-    console.error('Brevo fetch error:', err.message);
-    return res.status(500).json({ error: 'Failed to send email. Please try again.' });
+  // Rate limit per IP and per email (fixed 1h window). Generic 429 either way.
+  const ip = clientIp(req);
+  const ipLimit = await checkRateLimit({ bucket: `reset:ip:${ip}`, max: 10, windowSeconds: 3600 });
+  const emailLimit = email
+    ? await checkRateLimit({ bucket: `reset:email:${email}`, max: 5, windowSeconds: 3600 })
+    : { allowed: true };
+  if (!ipLimit.allowed || !emailLimit.allowed) {
+    const retryAfter = Math.max(ipLimit.retryAfter || 0, emailLimit.retryAfter || 0);
+    if (retryAfter) res.setHeader('Retry-After', String(retryAfter));
+    return res.status(429).json({ error: 'Too many reset requests. Please wait and try again.' });
   }
 
-  return res.status(200).json({ ok: true });
+  // Only send a reset link to an address that actually has an account (stops
+  // this endpoint from being used to mail arbitrary third parties), and bind the
+  // link to that user's current token version. Always return the same generic
+  // 200 so the response never reveals whether the account exists.
+  try {
+    if (email) {
+      const supabase = getServiceClient();
+      const user = await findUserByEmail(supabase, email);
+      if (user) {
+        const token = makeResetToken(email, secret, getResetTokenVersion(user));
+        const siteUrl = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
+        const resetLink = `${siteUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
+
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'api-key': process.env.BREVO_API_KEY,
+          },
+          body: JSON.stringify({
+            sender: {
+              name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
+              email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+            },
+            to: [{ email }],
+            subject: 'Reset your Proto Trading password',
+            htmlContent: RESET_HTML(resetLink),
+          }),
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          console.error('Brevo API error:', resp.status, JSON.stringify(body));
+        }
+      }
+    }
+  } catch (err) {
+    // Log but still return generic success — internal errors must not become an
+    // account-existence side-channel.
+    console.error('send-reset-email:', err.message);
+  }
+
+  return res.status(200).json(GENERIC_OK);
 }
