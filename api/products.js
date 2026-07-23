@@ -5,6 +5,7 @@ import { readSiteConfigJson } from './_site-config.js';
 import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
 import { loadPlacementMapIfEnabled } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
+import { loadGroupInfoMapIfEnabled } from './_groups.js';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -123,7 +124,7 @@ function parseSkuQuery(raw) {
  * are none the returned object is byte-identical to before, so the payload is
  * unchanged while the feature is off.
  */
-function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null) {
+function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, groupInfo = null) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [
     row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
@@ -138,6 +139,14 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null) {
     websiteSku: row.sku,
     sku: row.sku,
     parentSku: row.barcode || null,
+    // Variant grouping (migration 052) — null unless catalogGrouping is on AND
+    // this sku is a group member. Client-side variantGroupKey collapses on it.
+    ...(groupInfo ? {
+      groupId: groupInfo.groupId,
+      groupPrimarySku: groupInfo.groupPrimarySku,
+      variantLabel: groupInfo.variantLabel,
+      groupTitle: groupInfo.groupTitle,
+    } : {}),
     name: row.title,
     title: row.title,
     description: row.original_description || '',
@@ -202,7 +211,7 @@ export default async function handler(req, res) {
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
-    const [rows, tree, salesByBarcode, placements] = await Promise.all([
+    const [rows, tree, salesByBarcode, placements, groupInfo] = await Promise.all([
       fetchAllRows(
         supabase,
         'website_stock',
@@ -213,9 +222,16 @@ export default async function handler(req, res) {
       loadSalesByBarcode(supabase, requestedSkus),
       // null when the feature is off — no extra query, payload unchanged.
       loadPlacementMapIfEnabled(supabase),
+      loadGroupInfoMapIfEnabled(supabase),
     ]);
     const products = rows
-      .map((row) => adapt(row, tree, salesByBarcode, placements ? (placements.get(row.sku) || []) : null))
+      .map((row) => adapt(
+        row,
+        tree,
+        salesByBarcode,
+        placements ? (placements.get(row.sku) || []) : null,
+        groupInfo ? (groupInfo.get(row.sku) || null) : null,
+      ))
       // A product filed ONLY via a placement has no primary category label, so
       // it must survive this filter or multi-placement would silently drop it.
       .filter((p) => p.category

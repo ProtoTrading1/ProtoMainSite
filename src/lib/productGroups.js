@@ -1,7 +1,15 @@
-/** Shared source SKU — multiple website_stock rows share the same barcode. */
+/**
+ * Grouping key for a product row. An explicit admin variant group (migration
+ * 052, attached as `groupId` when catalogGrouping is on) wins over the legacy
+ * shared-barcode grouping. Prefixes (`g:` / `b:`) keep the two keyspaces from
+ * colliding. When no groupId is present the result is barcode-based exactly as
+ * before, so disabled behaviour is unchanged.
+ */
 export function variantGroupKey(product) {
-  const key = String(product?.barcode || product?.code || '').trim();
-  return key || null;
+  const adminGroup = String(product?.groupId || '').trim();
+  if (adminGroup) return `g:${adminGroup}`;
+  const barcode = String(product?.barcode || product?.code || '').trim();
+  return barcode ? `b:${barcode}` : null;
 }
 
 function deriveGroupTitle(variants) {
@@ -60,15 +68,29 @@ export function groupProductsByBarcode(products) {
     }
 
     const rep = variants.find((v) => v.image || v.localImage) || variants[0];
-    const groupTitle = deriveGroupTitle(variants) || rep.name || rep.title || entry.key;
+    const isAdminGroup = Boolean(rep.groupId);
+    // Card identity (code/barcode) must come from a real member, never the group
+    // key — for an admin group the key is `g:<uuid>`. Prefer the designated
+    // primary member; fall back to the image-preferring rep.
+    const primarySkuKey = String(rep.groupPrimarySku || '').trim().toUpperCase();
+    const primaryMember = isAdminGroup
+      ? (variants.find((v) => String(v.sku || v.id || '').trim().toUpperCase() === primarySkuKey) || rep)
+      : rep;
+    const adminTitle = isAdminGroup ? String(rep.groupTitle || '').trim() : '';
+    const groupTitle = adminTitle || deriveGroupTitle(variants) || primaryMember.name || primaryMember.title || entry.key;
     const groupImages = variants.flatMap((v) => v.images || (v.image ? [v.image] : [])).filter(Boolean);
+    // Keep barcode-group ids byte-identical to before (`group_<barcode>`); admin
+    // groups get a stable, distinct id.
+    const idKey = isAdminGroup
+      ? `g_${rep.groupId}`
+      : String(primaryMember.barcode || primaryMember.code || entry.key.replace(/^b:/, ''));
 
     out.push({
       ...rep,
-      id: `group_${entry.key}`,
-      code: entry.key,
-      barcode: entry.key,
-      parentSku: entry.key,
+      id: `group_${idKey}`,
+      code: primaryMember.code || rep.code || '',
+      barcode: primaryMember.barcode || rep.barcode || '',
+      parentSku: primaryMember.barcode || rep.barcode || primaryMember.code || '',
       name: groupTitle,
       title: groupTitle,
       image: rep.image || rep.localImage || groupImages[0] || '',
