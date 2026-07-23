@@ -1,11 +1,61 @@
 import { supabase } from './supabase';
 
+/** Idempotency key for one checkout attempt (crypto.randomUUID with fallback). */
+export function makeClientRef() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `ref-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function isMissingClientRefColumn(error) {
+  const msg = String(error?.message || '');
+  return error?.code === 'PGRST204' || error?.code === '42703'
+    ? msg.includes('client_ref')
+    : /client_ref/.test(msg) && /column|schema/i.test(msg);
+}
+
+function isUniqueViolation(error) {
+  return error?.code === '23505' || /duplicate key/i.test(String(error?.message || ''));
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function insertOrderWithRetry(insertRow, clientRef) {
+  let row = { ...insertRow, ...(clientRef ? { client_ref: clientRef } : {}) };
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) await sleep(attempt === 1 ? 500 : 1500);
+    const { data, error } = await supabase.from('orders').insert([row]).select().single();
+    if (!error) return data;
+    lastError = error;
+    // Migration 030 not applied yet — drop the key and continue (same
+    // duplicate-protection as before the column existed, i.e. none).
+    if (isMissingClientRefColumn(error)) {
+      const withoutRef = { ...row };
+      delete withoutRef.client_ref;
+      row = withoutRef;
+      continue;
+    }
+    // A previous attempt actually landed — recover the existing row instead of
+    // double-inserting the same checkout.
+    if (clientRef && isUniqueViolation(error)) {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('client_ref', clientRef)
+        .maybeSingle();
+      if (existing) return existing;
+    }
+  }
+  throw lastError;
+}
+
 export async function saveOrder(customerId, cartItems, totalExVat, {
   deliveryMethod = null,
   customerNotes = '',
   promoCode = null,
   discountPct = null,
   discountAmount = null,
+  clientRef = null,
 } = {}) {
   const items = cartItems.map((i) => ({
     productId: i.product.id,
@@ -33,12 +83,7 @@ export async function saveOrder(customerId, cartItems, totalExVat, {
     ...(discountAmount != null ? { discount_amount: discountAmount } : {}),
   };
 
-  const { data, error } = await supabase
-    .from('orders')
-    .insert([insertRow])
-    .select()
-    .single();
-  if (error) throw error;
+  const data = await insertOrderWithRetry(insertRow, clientRef);
 
   // Fallback update if insert didn't persist delivery/notes (older schema or RLS).
   if (data?.id && (deliveryMethod || notes)) {

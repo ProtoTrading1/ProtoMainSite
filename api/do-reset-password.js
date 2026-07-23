@@ -1,53 +1,62 @@
-import { createClient } from '@supabase/supabase-js';
-import { createHmac } from 'crypto';
-
-function verifyToken(token, secret) {
-  const parts = token.split('.');
-  if (parts.length !== 2) throw new Error('Invalid token format');
-  const [payload, sig] = parts;
-  const expectedSig = createHmac('sha256', secret).update(payload).digest('base64url');
-  if (sig !== expectedSig) throw new Error('Invalid token');
-  const { email, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
-  if (Date.now() > exp) throw new Error('Reset link has expired. Please request a new one.');
-  return email;
-}
+import {
+  bumpResetTokenVersion,
+  findUserByEmail,
+  getResetSecret,
+  getResetTokenVersion,
+  getServiceClient,
+  revokeUserSessions,
+  verifyResetToken,
+} from './_password-reset.js';
+import { checkRateLimit, clientIp } from './_rate-limit.js';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, password } = req.body || {};
   if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-  const secret = process.env.RESET_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = getResetSecret();
+  if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
 
-  let email;
+  // Throttle brute-forcing of the token endpoint (per IP, fixed 1h window).
+  const ip = clientIp(req);
+  const ipLimit = await checkRateLimit({ bucket: `reset-do:ip:${ip}`, max: 20, windowSeconds: 3600 });
+  if (!ipLimit.allowed) {
+    if (ipLimit.retryAfter) res.setHeader('Retry-After', String(ipLimit.retryAfter));
+    return res.status(429).json({ error: 'Too many attempts. Please wait and try again.' });
+  }
+
+  let claim;
   try {
-    email = verifyToken(token, secret);
+    claim = verifyResetToken(token, secret); // { email, v }
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
-  // Strict format check before using email in a PostgREST filter string
-  if (!/^[^\s@,()]+@[^\s@,()]+\.[^\s@,()]+$/.test(String(email || ''))) {
-    return res.status(400).json({ error: 'Invalid reset token' });
+  try {
+    const supabase = getServiceClient();
+    const user = await findUserByEmail(supabase, claim.email);
+    // Generic message whether or not the account exists — no enumeration oracle.
+    if (!user) return res.status(400).json({ error: 'This reset link is no longer valid.' });
+
+    // Single-use: the link carries the token version at issue time. A completed
+    // reset (or a newer link) bumps it, so a replayed or superseded link fails.
+    if (getResetTokenVersion(user) !== claim.v) {
+      return res.status(400).json({ error: 'This reset link has already been used or replaced. Request a new one.' });
+    }
+
+    const { error } = await supabase.auth.admin.updateUserById(user.id, { password });
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Invalidate outstanding links, then log out every existing session.
+    await bumpResetTokenVersion(supabase, user);
+    await revokeUserSessions(supabase, user.id);
+
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('do-reset-password:', err.message);
+    return res.status(500).json({ error: 'Password reset failed' });
   }
-
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    secret,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-
-  // Find user by email
-  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers({ filter: `email.eq.${email}` });
-  if (listError) return res.status(500).json({ error: 'Server error' });
-
-  const user = users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-  if (!user) return res.status(404).json({ error: 'Account not found' });
-
-  const { error } = await supabase.auth.admin.updateUserById(user.id, { password });
-  if (error) return res.status(400).json({ error: error.message });
-
-  return res.status(200).json({ ok: true });
 }

@@ -267,6 +267,88 @@ async function sendCustomerOrderAck({ customer, itemCount, toEmail }) {
   }
 }
 
+function isMissingClientRefColumn(error) {
+  const msg = String(error?.message || '');
+  return (error?.code === 'PGRST204' || error?.code === '42703' || /column|schema/i.test(msg))
+    && msg.includes('client_ref');
+}
+
+/**
+ * Server-side order capture — the failsafe for P0-2. Runs when the browser
+ * insert failed or was skipped (no orderId in the payload), using the verified
+ * auth user's id as customer_id (customers.id === auth user id). Idempotent on
+ * client_ref (migration 030), so a retried checkout can never double-insert.
+ * Returns the order row or null; never throws.
+ */
+async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
+  try {
+    if (clientRef) {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('client_ref', clientRef)
+        .maybeSingle();
+      if (existing) return existing;
+    }
+
+    const rows = items.map((item) => {
+      const product = item.product || {};
+      const qty = Number(item.qty || 0);
+      const unitPrice = Number(product.price || 0);
+      return {
+        productId: product.id,
+        code: product.code,
+        name: product.name,
+        qty,
+        unitPrice,
+        lineTotal: unitPrice * qty,
+        image: product.remoteImage || product.image || '',
+      };
+    });
+
+    let insertRow = {
+      customer_id: userId,
+      items: rows,
+      original_items: rows,
+      final_items: rows,
+      order_match: 'order-match',
+      total_ex_vat: subtotal,
+      delivery_method: deliveryMethod,
+      ...(customerNotes ? { customer_notes: customerNotes } : {}),
+      ...(promo?.code ? {
+        promo_code: promo.code,
+        discount_pct: promo.discountPct,
+        discount_amount: promo.discountAmount,
+      } : {}),
+      ...(clientRef ? { client_ref: clientRef } : {}),
+    };
+
+    let { data, error } = await supabase.from('orders').insert([insertRow]).select().single();
+    if (error && isMissingClientRefColumn(error)) {
+      const withoutRef = { ...insertRow };
+      delete withoutRef.client_ref;
+      insertRow = withoutRef;
+      ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
+    }
+    if (error && error.code === '23505' && clientRef) {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('client_ref', clientRef)
+        .maybeSingle();
+      if (existing) return existing;
+    }
+    if (error) {
+      console.error('send-order: server-side order capture failed:', error.message);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error('send-order: server-side order capture failed:', err?.message || err);
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -284,6 +366,7 @@ export default async function handler(req, res) {
     items = [],
     customer = {},
     orderId: rawOrderId,
+    clientRef: rawClientRef,
     deliveryMethod: rawDeliveryMethod,
     customerNotes: rawCustomerNotes,
     promoCode: rawPromoCode,
@@ -320,6 +403,29 @@ export default async function handler(req, res) {
   };
 
   const notifyEmails = resolveOrderNotifyRecipients();
+
+  // Failsafe: if the browser insert didn't land (no orderId), capture the order
+  // here with the service-role client before anything is emailed. If even this
+  // fails, the team email below becomes the dead-letter and is flagged loudly.
+  let orderId = String(rawOrderId || '').trim();
+  let dbCaptureFailed = false;
+  if (!orderId) {
+    const captured = await captureOrderRow({
+      supabase: getPortalAdminClient(),
+      userId: user.id,
+      items,
+      subtotal,
+      deliveryMethod,
+      customerNotes,
+      promo,
+      clientRef: cleanText(rawClientRef),
+    });
+    if (captured?.id) {
+      orderId = String(captured.id);
+    } else {
+      dbCaptureFailed = true;
+    }
+  }
 
   // PDF generation must never block the order email. pdfkit can fail on
   // serverless (e.g. missing AFM font data); if it does, log the real error and
@@ -360,8 +466,12 @@ export default async function handler(req, res) {
         },
         to: notifyEmails.map((email) => ({ email })),
         replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
-        subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }),
+        subject: dbCaptureFailed
+          ? `⚠️ MANUAL CAPTURE NEEDED — Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`
+          : `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
+        htmlContent: (dbCaptureFailed
+          ? '<div style="background:#c40000;color:#ffffff;padding:16px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;">⚠️ DATABASE CAPTURE FAILED — this order exists only in this email. Capture it manually in the admin portal, then investigate the orders insert failure in the logs.</div>'
+          : '') + buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
     });
@@ -378,7 +488,6 @@ export default async function handler(req, res) {
     emailFailReason = err?.message || 'Network error';
   }
 
-  const orderId = String(rawOrderId || '').trim();
   let notifyResult = null;
   if (orderId) {
     try {
@@ -431,6 +540,15 @@ export default async function handler(req, res) {
     }
   }
 
+  // Both capture channels lost: no DB row AND no team email. The order does not
+  // exist anywhere durable, so this must surface as a failure — the customer
+  // keeps their cart and can retry (the clientRef makes the retry idempotent).
+  if (dbCaptureFailed && emailDeliveryFailed) {
+    return res.status(500).json({
+      error: 'Your order could not be submitted. Nothing was lost from your cart — please try again.',
+    });
+  }
+
   // Email 5 — acknowledge the customer (to their verified account email) after
   // all order-critical work. Best-effort + bounded, so it never blocks/fails
   // the order.
@@ -439,6 +557,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     success: true,
     orderId: orderId || null,
+    dbCaptureFailed,
     emailDeliveryFailed,
     emailFailReason: emailDeliveryFailed ? emailFailReason : null,
     notify: notifyResult,
