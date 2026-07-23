@@ -1,4 +1,5 @@
 import { escapeHtml } from './_escape-html.js';
+import { checkRateLimit, clientIp } from './_rate-limit.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '8mb' } },
@@ -9,6 +10,15 @@ const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'i
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+
+  // Public, unauthenticated, and sends an email with a multi-MB attachment on
+  // every call — throttle per IP so it can't be used to flood the sales inbox
+  // or burn Brevo quota.
+  const rl = await checkRateLimit({ bucket: `product-request:${clientIp(req)}`, max: 5, windowSeconds: 600 });
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfter || 60));
+    return res.status(429).json({ error: 'Too many requests. Please try again shortly.' });
+  }
 
   const { description, qty, imageBase64, imageName, imageType, customerEmail, customerName } = req.body || {};
 

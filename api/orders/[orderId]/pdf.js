@@ -4,6 +4,7 @@ import {
 } from '../../_order-pdf.js';
 import { verifyOrderToken } from '../../_order-token.js';
 import { requireAuth } from '../../_auth.js';
+import { getPortalAdminClient } from '../../_site-config.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,6 +25,19 @@ export default async function handler(req, res) {
   if (!verifyOrderToken(orderId, token)) {
     const user = await requireAuth(req, res);
     if (!user) return;
+    // A valid session is not enough: the order PDF holds full customer PII, so
+    // session access is limited to the order's owner or an admin. Without this
+    // any logged-in customer could pull another order's PDF by guessing its id.
+    const sb = getPortalAdminClient();
+    const [{ data: order }, { data: me }] = await Promise.all([
+      sb.from('orders').select('customer_id').eq('id', orderId).maybeSingle(),
+      sb.from('customers').select('role').eq('id', user.id).maybeSingle(),
+    ]);
+    const isOwner = order && order.customer_id === user.id;
+    const isAdmin = me?.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
   }
 
   try {

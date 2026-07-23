@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, clientIp } from './_rate-limit.js';
 
 function getAdminClient() {
   return createClient(
@@ -38,6 +39,11 @@ export default async function handler(req, res) {
       const sid = String(sessionId || '').trim();
       if (!term || !sid) return res.status(400).json({ error: 'searchTerm and sessionId required' });
       if (term.length < 3) return res.status(200).json({ ok: true, skipped: true });
+
+      // Unauthenticated insert — throttle per IP so the table can't be spammed.
+      // Generous: real searching never approaches this rate.
+      const rl = await checkRateLimit({ bucket: `search-log:${clientIp(req)}`, max: 60, windowSeconds: 60 });
+      if (!rl.allowed) return res.status(200).json({ ok: true, skipped: true });
 
       const { data, error } = await supabase
         .from('search_analytics')

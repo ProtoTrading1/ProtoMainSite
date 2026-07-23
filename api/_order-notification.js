@@ -1,11 +1,19 @@
-import { requireAuth } from './_auth.js';
+import crypto from 'node:crypto';
+import { requireAdmin } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
+
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 export function isOrderNotificationAuthorized(req) {
   const secret = process.env.ORDER_NOTIFY_SECRET;
   if (!secret) return false;
   const header = req.headers['x-order-notify-secret'];
-  return Boolean(header && header === secret);
+  return Boolean(header && safeEqual(header, secret));
 }
 
 /** POST handler for team WhatsApp + status advance after an order email. */
@@ -17,8 +25,12 @@ export async function handleOrderNotification(req, res) {
   }
 
   if (!isOrderNotificationAuthorized(req)) {
-    const user = await requireAuth(req, res);
-    if (!user) return;
+    // This advances fulfillment status and fires team notifications — a
+    // system/admin action, not something a customer triggers. Fall back to an
+    // admin session (not any authenticated user), so a logged-in customer
+    // cannot notify/advance an arbitrary order by id.
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
   }
 
   const orderId = String(req.body?.orderId || '').trim();

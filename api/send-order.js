@@ -417,7 +417,22 @@ export default async function handler(req, res) {
   // fails, the team email below becomes the dead-letter and is flagged loudly.
   let orderId = String(rawOrderId || '').trim();
   let dbCaptureFailed = false;
-  if (!orderId) {
+  if (orderId) {
+    // A client-supplied order id MUST belong to the caller. The update/notify/
+    // tier block below uses the service-role client (which bypasses RLS), so
+    // without this check any authenticated user could point send-order at
+    // another customer's order and overwrite its fields or re-notify the team
+    // (IDOR). Orders always carry customer_id = auth uid (see captureOrderRow /
+    // saveOrder); a 404 avoids leaking whether the id exists.
+    const { data: owner } = await getPortalAdminClient()
+      .from('orders')
+      .select('customer_id')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (!owner || owner.customer_id !== user.id) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+  } else {
     const captured = await captureOrderRow({
       supabase: getPortalAdminClient(),
       userId: user.id,
