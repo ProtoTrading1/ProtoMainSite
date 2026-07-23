@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
+import { checkRateLimit, clientIp } from './_rate-limit.js';
 import {
   isVerifiedProtoActiveMatch,
   lookupProtoActiveCustomer,
@@ -240,6 +241,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
+  // Throttle per IP: registration creates an auth account and sends welcome +
+  // admin emails, so it must not be scriptable into mass account / email abuse.
+  const rl = await checkRateLimit({ bucket: `register-trade:${clientIp(req)}`, max: 5, windowSeconds: 3600 });
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfter || 60));
+    return res.status(429).json({ error: 'Too many registration attempts. Please try again later.' });
+  }
+
   if (confirmPassword && String(password) !== String(confirmPassword)) {
     return res.status(400).json({ error: 'Passwords do not match.' });
   }
@@ -304,7 +313,10 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error('createUser error:', error);
-    return res.status(400).json({ error: error.message });
+    // Do not echo Supabase's message: a duplicate-email error ("already
+    // registered") turns this into an account-existence oracle. Return a
+    // generic failure and log the detail server-side.
+    return res.status(400).json({ error: 'We could not complete your registration. Please check your details and try again.' });
   }
 
   const userId = data.user?.id;

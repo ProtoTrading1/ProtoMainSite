@@ -1,6 +1,5 @@
 import { normalizeWhatsapp, watiConfig, watiEnsureContact } from './_wati-notify.js';
 
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const WELCOME_TEMPLATE = 'proto_welcome_';
 
 export const PROTO_ACTIVE_SELECT =
@@ -54,43 +53,6 @@ export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
 /** True only when the customer's identity was verified by their registered email. */
 export function isVerifiedProtoActiveMatch(match) {
   return Boolean(match?.matchType === 'email' && match?.row?.account_code);
-}
-
-async function isCustomerCodeTaken(supabase, code) {
-  const upper = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z0-9]{6}$/.test(upper)) return true;
-
-  const [{ data: customerHit }, { data: protoHit }] = await Promise.all([
-    supabase.from('customers').select('id').eq('customer_code', upper).maybeSingle(),
-    supabase.from('proto_active_customers').select('id').eq('account_code', upper).maybeSingle(),
-  ]);
-  return Boolean(customerHit || protoHit);
-}
-
-function randomCustomerCode() {
-  let out = '';
-  for (let i = 0; i < 6; i += 1) {
-    out += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
-  return out;
-}
-
-/** Allocate a unique 6-char customer code; prefer preferredCode when available. */
-export async function allocateCustomerCode(supabase, preferredCode) {
-  const preferred = preferredCode
-    ? String(preferredCode).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
-    : '';
-
-  if (preferred && /^[A-Z0-9]{6}$/.test(preferred) && !(await isCustomerCodeTaken(supabase, preferred))) {
-    return preferred;
-  }
-
-  for (let attempt = 0; attempt < 64; attempt += 1) {
-    const code = randomCustomerCode();
-    if (!(await isCustomerCodeTaken(supabase, code))) return code;
-  }
-
-  throw new Error('Failed to allocate a unique customer code');
 }
 
 /** Send the WATI proto_welcome_ template after signup opt-in. */
