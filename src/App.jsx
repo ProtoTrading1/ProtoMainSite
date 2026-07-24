@@ -877,10 +877,18 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       // in the background. Only when the browser insert didn't land do we wait
       // for the server to capture + notify before confirming.
       const sendHeaders = await authHeaders();
+      const body = JSON.stringify(payload);
+      // keepalive guarantees the browser finishes this request even if the
+      // customer closes the tab or navigates away right after seeing "Order
+      // confirmed" — without it a backgrounded request can be dropped and the
+      // team never gets notified. keepalive caps the body at 64 KB, so fall back
+      // to a normal request for unusually large carts.
+      const canKeepalive = body.length < 60000;
       const submitOrder = () => fetch('/api/send-order', {
         method: 'POST',
         headers: sendHeaders,
-        body: JSON.stringify(payload),
+        body,
+        ...(canKeepalive ? { keepalive: true } : {}),
       }).then(async (response) => {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'Order could not be sent');
