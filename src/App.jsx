@@ -870,31 +870,60 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         })),
       };
 
-      const response = await fetch('/api/send-order', {
+      // Fire the notification pipeline (authoritative pricing, order-request PDF,
+      // team + customer emails, WhatsApp). It can take a few seconds and the
+      // customer must not wait for it: when the browser already captured the
+      // order (savedOrder.id), we confirm success immediately and let this run
+      // in the background. Only when the browser insert didn't land do we wait
+      // for the server to capture + notify before confirming.
+      const sendHeaders = await authHeaders();
+      const submitOrder = () => fetch('/api/send-order', {
         method: 'POST',
-        headers: await authHeaders(),
+        headers: sendHeaders,
         body: JSON.stringify(payload),
+      }).then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Order could not be sent');
+        return result;
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Order could not be sent');
 
-      if (result.emailDeliveryFailed) {
-        setOrderStatus('saved');
-      } else {
+      const logConversion = (result) => {
+        if (searchTrackRef.current.rowId) {
+          void logSearchOrder({
+            searchRowId: searchTrackRef.current.rowId,
+            orderNumber: result?.orderId || savedOrder?.id || '',
+            orderValue: cartTotal,
+          });
+        }
+      };
+
+      if (savedOrder?.id) {
+        // Order is durably saved — acknowledge the customer now, notify in the
+        // background. A failed notification is recoverable from the admin portal,
+        // so it never surfaces as an error to the customer.
         setOrderStatus('sent');
+        clearCart();
+        setMobileCartOpen(false);
+        setCartDrawerOpen(false);
+        submitOrder()
+          .then((result) => {
+            if (result?.emailDeliveryFailed) setOrderStatus((s) => (s === 'sent' ? 'saved' : s));
+            logConversion(result);
+          })
+          .catch((err) => {
+            console.error('send-order background notify failed:', err?.message || err);
+          });
+        return;
       }
 
+      // No browser insert landed — the server must capture + notify before we
+      // can confirm to the customer.
+      const result = await submitOrder();
+      setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
       clearCart();
       setMobileCartOpen(false);
       setCartDrawerOpen(false);
-
-      if (searchTrackRef.current.rowId) {
-        void logSearchOrder({
-          searchRowId: searchTrackRef.current.rowId,
-          orderNumber: result.orderId || savedOrder?.id || '',
-          orderValue: cartTotal,
-        });
-      }
+      logConversion(result);
     } catch (err) {
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');

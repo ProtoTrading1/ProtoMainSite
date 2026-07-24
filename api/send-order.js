@@ -6,7 +6,7 @@ import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
 
-const DEFAULT_NOTIFY_EMAILS = ['online@proto.co.za', 'danieljoffeinfo@gmail.com'];
+const DEFAULT_NOTIFY_EMAILS = ['george@proto.co.za', 'online@proto.co.za', 'danieljoffeinfo@gmail.com'];
 
 function resolveOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS || process.env.ORDER_TO_EMAIL || '';
@@ -215,87 +215,153 @@ function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes
   });
 }
 
-function buildEmailHtml({ items, customer, totals, deliveryMethod, customerNotes, promo }) {
-  const rows = items.map((item) => {
-    const product = item.product || {};
-    const qty = Number(item.qty || 0);
-    const price = Number(product.price || 0);
-    return `
-      <tr>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.code))}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;">${escapeHtml(cleanText(product.name))}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${qty}</td>
-        <td style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;">${money(price * qty)}</td>
-      </tr>
-    `;
-  }).join('');
-
-  const deliveryLine = deliveryMethod
-    ? `<strong>Delivery method:</strong> ${escapeHtml(cleanText(deliveryMethod))}<br/>`
-    : '';
-  const notesLine = customerNotes
-    ? `<strong>Customer notes:</strong> ${escapeHtml(cleanText(customerNotes))}<br/>`
-    : '';
-
-  const promoLines = promo?.code
-    ? `<p style="font-size:14px;color:#64748b;">Promo <strong>${escapeHtml(promo.code)}</strong> (${promo.discountPct}%): -${money(promo.discountAmount)}<br/>
-      <strong style="font-size:16px;color:#111827;">Est. total incl. VAT: ${money(totals?.total)}</strong><br/>
-      <span style="font-size:12px;">Estimated discount — final pricing confirmed by reply.</span></p>`
-    : '';
-
-  return `
-    <div style="font-family:Arial,sans-serif;color:#111827;">
-      <h2>Proto Trading wholesale order request</h2>
-      <p>A customer submitted a quote request through the trade portal. The PDF order request is attached.</p>
-      <p><strong>Customer:</strong> ${escapeHtml(cleanText(customer?.name, 'Not provided'))}<br/>
-      <strong>Email:</strong> ${escapeHtml(cleanText(customer?.email, 'Not provided'))}<br/>
-      <strong>Phone:</strong> ${escapeHtml(cleanText(customer?.phone, 'Not provided'))}<br/>
-      <strong>Delivery region:</strong> ${escapeHtml(cleanText(customer?.region, 'To confirm'))}<br/>
-      ${deliveryLine}${notesLine}</p>
-      <table style="border-collapse:collapse;width:100%;font-size:13px;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:10px;border-bottom:2px solid #e5e7eb;">Code</th>
-            <th style="text-align:left;padding:10px;border-bottom:2px solid #e5e7eb;">Product</th>
-            <th style="text-align:right;padding:10px;border-bottom:2px solid #e5e7eb;">Qty</th>
-            <th style="text-align:right;padding:10px;border-bottom:2px solid #e5e7eb;">Line total</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <p style="font-size:16px;"><strong>Subtotal incl. VAT: ${money(totals?.subtotal)}</strong></p>
-      ${promoLines}
-    </div>
-  `;
+function orderDateLabel(value) {
+  const d = value ? new Date(value) : new Date();
+  try {
+    return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
 }
 
-// Email 5 — customer acknowledgement sent the moment an order is placed.
-// Confirms receipt; the team follows up with confirmed stock/pricing/delivery.
-function buildCustomerAckHtml({ customer, itemCount }) {
+// Product table rows shared by both order emails. Mirrors the packing slip:
+// #, image, code, product, qty.
+function buildOrderEmailRows(items) {
+  return items.map((item, i) => {
+    const product = item.product || {};
+    const qty = Number(item.qty || 0);
+    const code = escapeHtml(cleanText(product.code, '—'));
+    const name = escapeHtml(cleanText(product.name, 'Product'));
+    const img = cleanText(product.image || product.remoteImage || '');
+    const imgCell = /^https:\/\//i.test(img)
+      ? `<img src="${escapeHtml(img)}" alt="" width="46" height="46" style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
+      : `<div style="width:46px;height:46px;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;"></div>`;
+    return `
+      <tr>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:16px;font-weight:800;text-align:center;">${qty}</td>
+      </tr>`;
+  }).join('');
+}
+
+// Single dark, PROTO-branded order email used for BOTH the internal team
+// notification and the customer acknowledgement. Structured like the packing
+// slip: order meta header, contact/delivery, product table, note, estimate.
+function buildOrderEmailHtml({
+  audience = 'team',
+  orderNumber,
+  orderDate,
+  customer,
+  deliveryMethod,
+  customerNotes,
+  items = [],
+  totals,
+  promo,
+}) {
+  const isTeam = audience === 'team';
   const name = escapeHtml(cleanText(customer?.name, 'there'));
-  const lines = itemCount
-    ? `<p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We have received your order (${itemCount} item${itemCount === 1 ? '' : 's'}) and our team will be in touch shortly to confirm stock, pricing and delivery.</p>`
-    : `<p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We have received your order and our team will be in touch shortly to confirm stock, pricing and delivery.</p>`;
+  const rows = buildOrderEmailRows(items);
+  const itemCount = items.length;
+  const ref = escapeHtml(cleanText(orderNumber, ''));
+  const dateLabel = escapeHtml(orderDateLabel(orderDate));
+  const delivery = escapeHtml(cleanText(deliveryMethod, 'To confirm'));
+
+  const heading = isTeam ? 'New wholesale order' : 'Order received';
+  const subheading = isTeam ? 'Straight from the trade portal' : "Thank you — we're on it";
+
+  const metaCell = (label, value) => `
+    <td style="padding:0 8px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:3px;">${label}</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;">${value}</div>
+    </td>`;
+
+  const metaRow = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-collapse:collapse;background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;">
+      <tr>
+        ${ref ? metaCell('Order', ref) : ''}
+        ${metaCell('Order date', dateLabel)}
+        ${metaCell('Shipping', delivery)}
+      </tr>
+    </table>`;
+
+  const intro = isTeam
+    ? `<p style="margin:0 0 22px;color:#334155;font-size:15px;line-height:1.6;">A new quote request just came in through the trade portal. The order-request PDF is attached. Customer, delivery and line items are below.</p>`
+    : `<p style="margin:0 0 6px;color:#0f172a;font-size:18px;line-height:1.6;font-weight:800;">Hi ${name},</p>
+       <p style="margin:0 0 22px;color:#334155;font-size:15px;line-height:1.6;">We've received your order${itemCount ? ` (${itemCount} item${itemCount === 1 ? '' : 's'})` : ''}. Our team will be in touch shortly to confirm stock, pricing and delivery. Here's your summary:</p>`;
+
+  const contactBlock = isTeam
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+        <tr>
+          <td style="vertical-align:top;padding-right:10px;width:50%;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Customer</div>
+            <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.5;">${escapeHtml(cleanText(customer?.name, 'Not provided'))}</div>
+            <div style="font-size:13px;color:#475569;line-height:1.6;">${escapeHtml(cleanText(customer?.email, 'No email'))}<br/>${escapeHtml(cleanText(customer?.phone, 'No phone'))}</div>
+          </td>
+          <td style="vertical-align:top;padding-left:10px;width:50%;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Delivery</div>
+            <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.5;">${delivery}</div>
+            <div style="font-size:13px;color:#475569;line-height:1.6;">${escapeHtml(cleanText(customer?.region, 'Region to confirm'))}</div>
+          </td>
+        </tr>
+      </table>`
+    : '';
+
+  const notesBlock = customerNotes
+    ? `<div style="margin:22px 0 0;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#c2410c;margin-bottom:4px;">Note from customer</div>
+        <div style="font-size:14px;color:#7c2d12;line-height:1.5;">${escapeHtml(cleanText(customerNotes))}</div>
+      </div>`
+    : '';
+
+  const promoLine = promo?.code
+    ? `<tr><td style="padding:2px 0;color:#15803d;font-size:13px;">Promo <strong>${escapeHtml(promo.code)}</strong>${promo.discountPct ? ` (${promo.discountPct}%)` : ''}</td><td style="padding:2px 0;text-align:right;color:#15803d;font-size:13px;font-weight:700;">−${money(promo.discountAmount)}</td></tr>`
+    : '';
+  const totalsBlock = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 0;">
+      <tr><td style="padding:2px 0;color:#475569;font-size:13px;">Subtotal (incl. VAT)</td><td style="padding:2px 0;text-align:right;color:#0f172a;font-size:13px;font-weight:700;">${money(totals?.subtotal)}</td></tr>
+      ${promoLine}
+      <tr><td style="padding:8px 0 0;color:#0f172a;font-size:15px;font-weight:800;">Estimated total</td><td style="padding:8px 0 0;text-align:right;color:#c40000;font-size:18px;font-weight:900;">${money(totals?.total ?? totals?.subtotal)}</td></tr>
+    </table>
+    <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">Estimated only — final pricing, stock and delivery are confirmed by our team on reply.</p>`;
+
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>We received your order</title></head>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title></head>
 <body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
+<table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
-  <div style="display:inline-block;background:#ffffff;padding:14px 22px;border-radius:8px;margin-bottom:26px;">
-    <span style="font-size:30px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:20px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
+<tr><td align="center" style="padding:34px 34px 28px;background:#141414;">
+  <div style="display:inline-block;background:#ffffff;padding:13px 20px;border-radius:8px;margin-bottom:22px;">
+    <span style="font-size:28px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
+    <span style="font-size:19px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
   </div>
-  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">Order received</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Thank you — we're on it</p>
+  <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
+  <p style="margin:10px 0 0;color:#cfcfcf;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#ff6a4d;font-weight:800;">${ref}</span>` : ''}</p>
 </td></tr>
-<tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${name},</p>
-  ${lines}
-  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions in the meantime? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
+<tr><td style="padding:34px 32px 30px;background:#ffffff;">
+  ${intro}
+  ${metaRow}
+  ${contactBlock}
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:center;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">#</th>
+        <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Image</th>
+        <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Code</th>
+        <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Product</th>
+        <th style="text-align:center;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Qty</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  ${totalsBlock}
+  ${notesBlock}
+  <p style="margin:26px 0 0;color:#666666;font-size:13px;line-height:1.6;">Questions? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
 </td></tr>
-<tr><td align="center" style="padding:30px 34px;background:#181818;border-top:1px solid #292929;">
+<tr><td align="center" style="padding:28px 34px;background:#181818;border-top:1px solid #292929;">
   <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
   <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
 </td></tr>
@@ -304,7 +370,7 @@ function buildCustomerAckHtml({ customer, itemCount }) {
 </body></html>`;
 }
 
-async function sendCustomerOrderAck({ customer, itemCount, toEmail }) {
+async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, totals, deliveryMethod, customerNotes, promo }) {
   // Recipient is the AUTHENTICATED account email, never the client-supplied
   // customer.email — otherwise a logged-in user could make Proto's Brevo send
   // "order received" mail to any address they type. Name is cosmetic only.
@@ -324,8 +390,19 @@ async function sendCustomerOrderAck({ customer, itemCount, toEmail }) {
           email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
         },
         to: [{ email: to, name: cleanText(customer?.name) || to }],
-        subject: 'We have received your order — Proto Trading Online',
-        htmlContent: buildCustomerAckHtml({ customer, itemCount }),
+        subject: orderNumber
+          ? `Order received ${orderNumber} — Proto Trading Online`
+          : 'We have received your order — Proto Trading Online',
+        htmlContent: buildOrderEmailHtml({
+          audience: 'customer',
+          orderNumber,
+          customer,
+          items: Array.isArray(items) ? items : [],
+          totals,
+          deliveryMethod,
+          customerNotes,
+          promo,
+        }),
       }),
       // Bounded so a hung Brevo connection can't stall the order response.
       signal: AbortSignal.timeout(5000),
@@ -496,6 +573,7 @@ export default async function handler(req, res) {
   // here with the service-role client before anything is emailed. If even this
   // fails, the team email below becomes the dead-letter and is flagged loudly.
   let orderId = String(rawOrderId || '').trim();
+  let orderNumber = '';
   let dbCaptureFailed = false;
   if (orderId) {
     // A client-supplied order id MUST belong to the caller. The update/notify/
@@ -506,12 +584,13 @@ export default async function handler(req, res) {
     // saveOrder); a 404 avoids leaking whether the id exists.
     const { data: owner } = await getPortalAdminClient()
       .from('orders')
-      .select('customer_id')
+      .select('customer_id, order_number')
       .eq('id', orderId)
       .maybeSingle();
     if (!owner || owner.customer_id !== user.id) {
       return res.status(404).json({ error: 'Order not found' });
     }
+    orderNumber = cleanText(owner.order_number);
   } else {
     const captured = await captureOrderRow({
       supabase: getPortalAdminClient(),
@@ -525,6 +604,7 @@ export default async function handler(req, res) {
     });
     if (captured?.id) {
       orderId = String(captured.id);
+      orderNumber = cleanText(captured.order_number);
     } else {
       dbCaptureFailed = true;
     }
@@ -574,7 +654,7 @@ export default async function handler(req, res) {
           : `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
         htmlContent: (dbCaptureFailed
           ? '<div style="background:#c40000;color:#ffffff;padding:16px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;">⚠️ DATABASE CAPTURE FAILED — this order exists only in this email. Capture it manually in the admin portal, then investigate the orders insert failure in the logs.</div>'
-          : '') + buildEmailHtml({ items: orderItems, customer, totals, deliveryMethod, customerNotes, promo }),
+          : '') + buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
     });
@@ -655,7 +735,16 @@ export default async function handler(req, res) {
   // Email 5 — acknowledge the customer (to their verified account email) after
   // all order-critical work. Best-effort + bounded, so it never blocks/fails
   // the order.
-  await sendCustomerOrderAck({ customer, itemCount: items.length, toEmail: user?.email });
+  await sendCustomerOrderAck({
+    customer,
+    toEmail: user?.email,
+    orderNumber,
+    items: orderItems,
+    totals,
+    deliveryMethod,
+    customerNotes,
+    promo,
+  });
 
   return res.status(200).json({
     success: true,
