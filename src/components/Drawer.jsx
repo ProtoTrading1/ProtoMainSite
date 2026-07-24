@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
+import { Loader2, Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
@@ -351,9 +351,10 @@ export default function Drawer({
               type="button"
               onClick={handleConfirmCourier}
               disabled={!courierChoice || submitting}
-              style={{ width: '100%', padding: '13px', background: (!courierChoice || submitting) ? '#e2e8f0' : '#0f172a', color: (!courierChoice || submitting) ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: (!courierChoice || submitting) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s' }}
+              style={{ width: '100%', padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: !courierChoice ? '#e2e8f0' : '#0f172a', color: !courierChoice ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: !courierChoice ? 'not-allowed' : submitting ? 'wait' : 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s' }}
             >
-              {submitting ? 'Submitting…' : 'Confirm & Submit Quote'}
+              {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
+              {submitting ? 'Sending your order…' : 'Confirm & Submit Quote'}
             </button>
             <button type="button" onClick={closeCourierPicker} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
               Cancel
