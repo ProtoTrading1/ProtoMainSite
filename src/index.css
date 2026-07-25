@@ -1181,6 +1181,7 @@ textarea:focus-visible,
   border-bottom: 1px solid #F8FAFC;
 }
 .sp-section:last-child { border-bottom: none; }
+.sp-section--exact { background: linear-gradient(90deg, #fff7f7 0%, #fff 76%); border-bottom-color: #f5d7da; }
 
 .sp-section-head {
   display: flex;
@@ -1194,6 +1195,7 @@ textarea:focus-visible,
   margin-bottom: 10px;
 }
 .sp-section-head span { flex: 1; }
+.sp-exact-badge { flex: unset !important; padding: 3px 7px; color: #a81222; background: #ffe5e7; border-radius: 999px; font-size: 9px; letter-spacing: .04em; }
 .sp-clear {
   font-size: 10px;
   font-weight: 600;
@@ -1349,6 +1351,9 @@ textarea:focus-visible,
 }
 .sp-product-row:hover,
 .sp-product-row.active { background: #F8FAFC; }
+.sp-product-row--exact { background: rgba(255,255,255,.72); }
+.sp-product-row--exact:hover,
+.sp-product-row--exact.active { background: #fff; }
 .sp-product-row--dark { padding: 10px 16px; }
 .sp-product-row--dark:hover { background: rgba(255,255,255,0.06); }
 .sp-product-row--dark.active { background: rgba(255,255,255,0.1); }
