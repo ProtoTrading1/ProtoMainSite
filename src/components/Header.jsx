@@ -358,6 +358,7 @@ export default function Header({
   const inputRef = useRef(null);
   const searchWrapRef = useRef(null);
   const debounceRef = useRef(null);
+  const suggestionRequestRef = useRef(0);
   const liftRef = useRef(null);
   // Local mirror of the search box text. The parent's `searchQuery` (which
   // drives the catalogue query and re-renders the whole product grid) is only
@@ -435,6 +436,7 @@ export default function Header({
 
   const scheduleSuggestions = useCallback((query) => {
     clearTimeout(debounceRef.current);
+    const requestId = ++suggestionRequestRef.current;
     if (!query.trim()) {
       setSuggestions([]);
       setCatMatches([]);
@@ -444,6 +446,7 @@ export default function Header({
     debounceRef.current = setTimeout(() => {
       if (identifier) {
         void fetchIdentifierSuggestions(query).then((matches) => {
+          if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setSuggestions(matches.slice(0, 10));
             setCatMatches([]);
@@ -451,13 +454,20 @@ export default function Header({
           }
           // If the code is not found, retain the existing local matcher as a
           // fallback for historical/variant identifiers.
-          void loadProductsOnce().then((products) => updateSuggestions(query, products));
+          void loadProductsOnce().then((products) => {
+            if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+          });
         }).catch(() => {
-          void loadProductsOnce().then((products) => updateSuggestions(query, products));
+          if (requestId !== suggestionRequestRef.current) return;
+          void loadProductsOnce().then((products) => {
+            if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+          });
         });
         return;
       }
-      void loadProductsOnce().then((products) => updateSuggestions(query, products));
+      void loadProductsOnce().then((products) => {
+        if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+      });
     }, identifier ? 45 : 120);
   }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
 
@@ -586,31 +596,40 @@ export default function Header({
     liftSearch(val);
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
+    const requestId = ++suggestionRequestRef.current;
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
     const identifier = isIdentifierQuery(val);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
         void fetchIdentifierSuggestions(val).then((matches) => {
+          if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setMobileSuggestions(matches.slice(0, 10));
             setMobileCatMatches([]);
             return;
           }
           void loadProductsOnce().then((products) => {
-            setMobileSuggestions(getSuggestions(products, val, 12));
-            setMobileCatMatches(matchCategories(val));
+            if (requestId === suggestionRequestRef.current) {
+              setMobileSuggestions(getSuggestions(products, val, 12));
+              setMobileCatMatches(matchCategories(val));
+            }
           });
         }).catch(() => {
+          if (requestId !== suggestionRequestRef.current) return;
           void loadProductsOnce().then((products) => {
-            setMobileSuggestions(getSuggestions(products, val, 12));
-            setMobileCatMatches(matchCategories(val));
+            if (requestId === suggestionRequestRef.current) {
+              setMobileSuggestions(getSuggestions(products, val, 12));
+              setMobileCatMatches(matchCategories(val));
+            }
           });
         });
         return;
       }
       void loadProductsOnce().then((products) => {
-        setMobileSuggestions(getSuggestions(products, val, 12));
-        setMobileCatMatches(matchCategories(val));
+        if (requestId === suggestionRequestRef.current) {
+          setMobileSuggestions(getSuggestions(products, val, 12));
+          setMobileCatMatches(matchCategories(val));
+        }
       });
     }, identifier ? 45 : 120);
   };
