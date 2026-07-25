@@ -117,6 +117,24 @@ function parseSkuQuery(raw) {
   return [...new Set(list)];
 }
 
+function parseIdentifierQuery(raw) {
+  const value = String(raw || '').trim().toUpperCase();
+  if (!value || value.length < 4 || value.length > 64) return null;
+  // Identifier search is intentionally strict before interpolating into a
+  // PostgREST filter. Product codes are letters, digits and simple separators.
+  if (!/^[A-Z0-9_-]+$/.test(value)) return null;
+  return value;
+}
+
+function applyIdentifierFilter(query, identifier) {
+  if (!identifier) return query;
+  // Exact SKU/barcode wins. Prefix matching makes scanner fragments and a
+  // partially typed supplier code useful without turning this into text search.
+  return query.or(
+    `sku.eq.${identifier},barcode.eq.${identifier},sku.ilike.${identifier}%,barcode.ilike.${identifier}%`,
+  ).order('sku', { ascending: true });
+}
+
 /**
  * Adapt a stock row for the storefront.
  *
@@ -206,6 +224,7 @@ export default async function handler(req, res) {
 
   try {
     const requestedSkus = parseSkuQuery(req.query?.skus);
+    const identifier = requestedSkus ? null : parseIdentifierQuery(req.query?.identifier);
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
@@ -216,10 +235,14 @@ export default async function handler(req, res) {
         supabase,
         'website_stock',
         STOCK_SELECT,
-        requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
+        requestedSkus?.length
+          ? (q) => q.in('sku', requestedSkus)
+          : identifier ? (q) => applyIdentifierFilter(q, identifier) : null,
       ),
       loadTaxonomyTree(),
-      loadSalesByBarcode(supabase, requestedSkus),
+      // A direct code lookup should stay direct: only fetch sales for the
+      // returned codes instead of scanning the entire sales catalogue.
+      loadSalesByBarcode(supabase, requestedSkus || (identifier ? [identifier] : null)),
       // null when the feature is off — no extra query, payload unchanged.
       loadPlacementMapIfEnabled(supabase),
       loadGroupInfoMapIfEnabled(supabase),
