@@ -1,4 +1,5 @@
 import { fuzzyFilter } from './fuzzySearch';
+import { isIdentifierQuery } from './identifierNormalize';
 import {
   getActiveTaxonomy,
   productCountKey,
@@ -393,6 +394,21 @@ export async function fetchProducts() {
   return getAllCached();
 }
 
+async function fetchIdentifierProducts(query) {
+  const identifier = String(query || '').trim();
+  if (!isIdentifierQuery(identifier)) return [];
+  try {
+    const products = await fetchJsonWithTimeout(
+      `/api/products?identifier=${encodeURIComponent(identifier)}`,
+      4500,
+      { cache: 'no-store' },
+    );
+    return Array.isArray(products) ? products : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchProductPage({
   page = 1,
   pageSize = 60,
@@ -424,6 +440,23 @@ export async function fetchProductPage({
       pageSize,
       hasMore: total > from + pageSize,
     };
+  }
+
+  // A stock code or barcode is an operational lookup, not a catalogue browse.
+  // Resolve it before loading the full product dataset, then fall back to the
+  // local relevance index only when the code cannot be found.
+  if (hasSearch && isIdentifierQuery(searchQuery)) {
+    const matches = await fetchIdentifierProducts(searchQuery);
+    if (matches.length) {
+      let products = applyInStockFilter(matches, inStockOnly);
+      products = groupProductsByBarcode(products);
+      const total = products.length;
+      const from = (page - 1) * pageSize;
+      return {
+        products: products.slice(from, from + pageSize), total, page, pageSize,
+        hasMore: total > from + pageSize,
+      };
+    }
   }
 
   let products = await getAllCached();
