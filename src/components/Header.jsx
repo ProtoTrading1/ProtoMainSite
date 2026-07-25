@@ -4,6 +4,7 @@ import {
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
+import { isIdentifierQuery } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
@@ -361,6 +362,13 @@ export default function Header({
     setCatMatches(matchCategories(query));
   }, []);
 
+  const fetchIdentifierSuggestions = useCallback(async (query) => {
+    const response = await fetch(`/api/products?identifier=${encodeURIComponent(query)}`, { cache: 'no-store' });
+    if (!response.ok) return [];
+    const products = await response.json();
+    return Array.isArray(products) ? products : [];
+  }, []);
+
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setSuggestions([]);
@@ -400,10 +408,26 @@ export default function Header({
       setCatMatches([]);
       return;
     }
+    const identifier = isIdentifierQuery(query);
     debounceRef.current = setTimeout(() => {
+      if (identifier) {
+        void fetchIdentifierSuggestions(query).then((matches) => {
+          if (matches.length) {
+            setSuggestions(matches.slice(0, 20));
+            setCatMatches([]);
+            return;
+          }
+          // If the code is not found, retain the existing local matcher as a
+          // fallback for historical/variant identifiers.
+          void loadProductsOnce().then((products) => updateSuggestions(query, products));
+        }).catch(() => {
+          void loadProductsOnce().then((products) => updateSuggestions(query, products));
+        });
+        return;
+      }
       void loadProductsOnce().then((products) => updateSuggestions(query, products));
-    }, 120);
-  }, [loadProductsOnce, updateSuggestions]);
+    }, identifier ? 45 : 120);
+  }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
@@ -528,12 +552,32 @@ export default function Header({
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
+    const identifier = isIdentifierQuery(val);
     debounceRef.current = setTimeout(() => {
+      if (identifier) {
+        void fetchIdentifierSuggestions(val).then((matches) => {
+          if (matches.length) {
+            setMobileSuggestions(matches.slice(0, 12));
+            setMobileCatMatches([]);
+            return;
+          }
+          void loadProductsOnce().then((products) => {
+            setMobileSuggestions(getSuggestions(products, val, 12));
+            setMobileCatMatches(matchCategories(val));
+          });
+        }).catch(() => {
+          void loadProductsOnce().then((products) => {
+            setMobileSuggestions(getSuggestions(products, val, 12));
+            setMobileCatMatches(matchCategories(val));
+          });
+        });
+        return;
+      }
       void loadProductsOnce().then((products) => {
         setMobileSuggestions(getSuggestions(products, val, 12));
         setMobileCatMatches(matchCategories(val));
       });
-    }, 120);
+    }, identifier ? 45 : 120);
   };
   const mobileKeyboardItems = [
     ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
