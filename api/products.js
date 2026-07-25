@@ -31,16 +31,17 @@ function parseSubcategoryExtra(raw) {
   }
 }
 
-async function fetchAllRows(supabase, table, selectCols = '*', filter = null) {
+async function fetchAllRows(supabase, table, selectCols = '*', filter = null, maxRows = Infinity) {
   const rows = [];
   let from = 0;
   while (true) {
-    let q = supabase.from(table).select(selectCols).range(from, from + PAGE_SIZE - 1);
+    const to = Math.min(from + PAGE_SIZE - 1, maxRows - 1);
+    let q = supabase.from(table).select(selectCols).range(from, to);
     if (filter) q = filter(q);
     const { data, error } = await q;
     if (error) throw error;
     rows.push(...(data || []));
-    if ((data || []).length < PAGE_SIZE) break;
+    if ((data || []).length < PAGE_SIZE || rows.length >= maxRows) break;
     from += PAGE_SIZE;
   }
   return rows;
@@ -238,6 +239,7 @@ export default async function handler(req, res) {
         requestedSkus?.length
           ? (q) => q.in('sku', requestedSkus)
           : identifier ? (q) => applyIdentifierFilter(q, identifier) : null,
+        identifier ? 10 : Infinity,
       ),
       loadTaxonomyTree(),
       // A direct code lookup should stay direct: only fetch sales for the
