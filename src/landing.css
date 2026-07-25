@@ -338,7 +338,8 @@
   /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
   object-position: 72% center;
   z-index: 0;
-  filter: brightness(0.68) saturate(0.58) contrast(1);
+  /* Keep the headline zone controlled, but let the showroom read clearly. */
+  filter: brightness(0.78) saturate(0.68) contrast(1.03);
   transform: scale(1.02);
   animation: vhero-bg-in 820ms ease-out forwards;
 }
@@ -349,13 +350,14 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.26)),
+    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
     linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.92) 0%,
-      rgba(0, 0, 0, 0.78) 24%,
-      rgba(0, 0, 0, 0.58) 48%,
-      rgba(0, 0, 0, 0.28) 72%
+      rgba(0, 0, 0, 0.76) 24%,
+      rgba(0, 0, 0, 0.50) 48%,
+      rgba(0, 0, 0, 0.18) 72%,
+      rgba(0, 0, 0, 0.08) 100%
     );
   opacity: 1;
   animation: vhero-scrim-in 820ms ease-out forwards;
