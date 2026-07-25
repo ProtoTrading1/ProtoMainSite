@@ -4,14 +4,14 @@ import {
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
-import { isIdentifierQuery } from '../lib/identifierNormalize';
+import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
 import AboutModal from './AboutModal';
 import './Header.css';
 
-// ─── Recent searches (localStorage) ─────────────────────────
+// âââ Recent searches (localStorage) âââââââââââââââââââââââââ
 const RS_KEY = 'proto_recent_searches';
 function loadRecent() {
   try { return JSON.parse(localStorage.getItem(RS_KEY) || '[]'); } catch { return []; }
@@ -25,7 +25,7 @@ function clearRecent() {
   try { localStorage.removeItem(RS_KEY); } catch {}
 }
 
-// ─── Flatten categories tree for search matching ─────────────
+// âââ Flatten categories tree for search matching âââââââââââââ
 const FLAT_CATS = (() => {
   const out = [];
   function walk(nodes, path) {
@@ -136,12 +136,12 @@ function ProductRequestModal({ onClose, customer }) {
               <PackageSearch size={20} style={{ color: '#8B1A1A', flexShrink: 0, marginTop: 2 }} />
               <div>
                 <h2 style={{ margin: 0, fontSize: 18 }}>Can't find what you're looking for?</h2>
-                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 13 }}>Describe the product and attach a reference image — we'll source it for you.</p>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 13 }}>Describe the product and attach a reference image â we'll source it for you.</p>
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Product description <span style={{ color: '#e11d48' }}>*</span></label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe what you're looking for — size, colour, material, use case…" rows={3} style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, color: '#0f172a', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe what you're looking for â size, colour, material, use caseâ¦" rows={3} style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, color: '#0f172a', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Quantity <span style={{ color: '#9ca3af', fontWeight: 500, textTransform: 'none', fontSize: 11 }}>(optional)</span></label>
@@ -161,7 +161,7 @@ function ProductRequestModal({ onClose, customer }) {
             </div>
             {error && <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#7f1d1d', fontSize: 13 }}>{error}</div>}
             <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', padding: 13, background: '#8B1A1A', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'inherit', fontWeight: 800, fontSize: 14, cursor: submitting ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? 0.7 : 1 }}>
-              {submitting ? <><Loader2 size={16} className="spin-icon" /> Sending…</> : <><PackageSearch size={16} /> Send Request</>}
+              {submitting ? <><Loader2 size={16} className="spin-icon" /> Sendingâ¦</> : <><PackageSearch size={16} /> Send Request</>}
             </button>
           </>
         )}
@@ -170,7 +170,7 @@ function ProductRequestModal({ onClose, customer }) {
   );
 }
 
-// ─── Search overlay panel ─────────────────────────────────────
+// âââ Search overlay panel âââââââââââââââââââââââââââââââââââââ
 function SearchPanel({
   query,
   suggestions,
@@ -184,10 +184,19 @@ function SearchPanel({
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty" id={listboxId} role="listbox" aria-label="Search suggestions">
-        <p className="sp-empty-hint">Start typing to search products…</p>
+        <p className="sp-empty-hint">Start typing to search productsâ¦</p>
       </div>
     );
   }
+
+  const codeSearch = isIdentifierQuery(query);
+  const queryIdentifier = normalizeIdentifier(query);
+  const exactProduct = codeSearch ? suggestions.find((product) => [
+    product.code, product.barcode, product.sku, product.websiteSku, product.parentSku,
+  ].some((value) => normalizeIdentifier(value) === queryIdentifier)) : null;
+  const relatedProducts = exactProduct
+    ? suggestions.filter((product) => product.id !== exactProduct.id)
+    : suggestions;
 
   return (
     <div className="search-panel" id={listboxId} role="listbox" aria-label="Search suggestions">
@@ -213,28 +222,51 @@ function SearchPanel({
               >
                 {Icon && <span className="sp-cat-icon" style={{ background: `${color}18`, color }}><Icon size={13} /></span>}
                 <span className="sp-cat-label">{cat.label}</span>
-                <span className="sp-cat-arrow">Browse →</span>
+                <span className="sp-cat-arrow">Browse â</span>
               </button>
             );
           })}
         </div>
       )}
 
+      {/* Exact identifier result â put it above broad product matches. */}
+      {exactProduct && (
+        <div className="sp-section sp-section--exact">
+          <div className="sp-section-head"><span>Exact code match</span><span className="sp-exact-badge">Ready to order</span></div>
+          <button
+            key={exactProduct.id}
+            id={`${listboxId}-product-${exactProduct.id}`}
+            type="button"
+            className={`sp-product-row sp-product-row--exact${activeItemId === `${listboxId}-product-${exactProduct.id}` ? ' active' : ''}`}
+            role="option"
+            aria-selected={activeItemId === `${listboxId}-product-${exactProduct.id}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onPickProduct(exactProduct)}
+          >
+            <div className="sp-product-img">
+              {exactProduct.image ? <img src={exactProduct.image} alt={exactProduct.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
+            </div>
+            <div className="sp-product-info"><span className="sp-product-code">{exactProduct.code || exactProduct.sku}</span><span className="sp-product-name">{exactProduct.name}</span></div>
+            {exactProduct.price > 0 && <span className="sp-product-price">R{exactProduct.price.toFixed(2)}</span>}
+          </button>
+        </div>
+      )}
+
       {/* Product results */}
-      {suggestions.length > 0 && (
+      {relatedProducts.length > 0 && (
         <div className="sp-section">
           <div className="sp-section-head">
-            <span>Products</span>
+            <span>{codeSearch ? 'Closest code matches' : 'Products'}</span>
             <button
               type="button"
               className="sp-view-all-link"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onCommitSearch(query)}
             >
-              View all results →
+              View all results â
             </button>
           </div>
-          {suggestions.map((p) => {
+          {relatedProducts.map((p) => {
             const optionId = `${listboxId}-product-${p.id}`;
             const isActive = activeItemId === optionId;
             return (
@@ -268,7 +300,7 @@ function SearchPanel({
         <div className="sp-empty">
           <Search size={24} />
           <p>No results for "<strong>{query}</strong>"</p>
-          <span>Try a different spelling or browse by department above</span>
+          <span>{codeSearch ? 'Check the code, or remove the last digit to see the closest product codes.' : 'Try a different spelling, product type or department.'}</span>
         </div>
       )}
     </div>
@@ -284,7 +316,7 @@ function moveActiveSuggestionIndex(currentIndex, totalItems, direction) {
   return next;
 }
 
-// ─── Cart progress fill icon ──────────────────────────────────
+// âââ Cart progress fill icon ââââââââââââââââââââââââââââââââââ
 const MIN_ORDER = 1000;
 
 function CartProgressIcon({ cartTotal, size = 22 }) {
@@ -304,7 +336,7 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
 
 export { AboutModal };
 
-// ─── Header ──────────────────────────────────────────────────
+// âââ Header ââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, onHome, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
@@ -502,8 +534,11 @@ export default function Header({
   }, [searchOpen, activeDesktopItemId]);
 
   const pickProduct = (p) => {
-    saveRecent(p.name);
-    setSearchImmediate(p.name);
+    const directCode = isIdentifierQuery(inputValue)
+      ? (p.websiteSku || p.sku || p.code || inputValue)
+      : p.name;
+    saveRecent(directCode);
+    setSearchImmediate(directCode);
     navigateForSearch?.([]);
     setSuggestions([]);
     setCatMatches([]);
@@ -528,7 +563,7 @@ export default function Header({
     setSearchOpen(false);
   };
 
-  // Mobile search — mobileInput is the transient typed text, separate from the
+  // Mobile search â mobileInput is the transient typed text, separate from the
   // committed searchQuery so the input clears after a search without losing results.
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
@@ -751,7 +786,7 @@ export default function Header({
         </div>
       </header>
 
-      {/* Mobile bottom tab bar — primary navigation */}
+      {/* Mobile bottom tab bar â primary navigation */}
       <nav className="mobile-tab-bar" aria-label="Mobile navigation">
         <button type="button" className="mobile-tab-bar-btn" onClick={onHome}>
           <Home size={20} />
@@ -840,7 +875,7 @@ export default function Header({
                 onClick={() => { pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
               >
                 <span className="sp-cat-label">{cat.label}</span>
-                <span className="sp-cat-arrow">→</span>
+                <span className="sp-cat-arrow">â</span>
               </button>
             );
           })}
