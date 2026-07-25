@@ -413,7 +413,7 @@ export default function Header({
       if (identifier) {
         void fetchIdentifierSuggestions(query).then((matches) => {
           if (matches.length) {
-            setSuggestions(matches.slice(0, 20));
+            setSuggestions(matches.slice(0, 10));
             setCatMatches([]);
             return;
           }
@@ -557,7 +557,7 @@ export default function Header({
       if (identifier) {
         void fetchIdentifierSuggestions(val).then((matches) => {
           if (matches.length) {
-            setMobileSuggestions(matches.slice(0, 12));
+            setMobileSuggestions(matches.slice(0, 10));
             setMobileCatMatches([]);
             return;
           }
