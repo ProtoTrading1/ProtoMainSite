@@ -12,6 +12,9 @@ export default function LandingApplySection({ children }) {
       >
         <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
         <h2>Get access to Proto Trading&apos;s catalogue.</h2>
+        <p className="lp-apply-reassurance">
+          Four quick steps. Applications are reviewed within one business day.
+        </p>
       </motion.div>
 
       <motion.div
