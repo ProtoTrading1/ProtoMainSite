@@ -4691,8 +4691,8 @@ a.lp-register-login { text-decoration: none; }
 }
 
 /* ── Proto Journey Rail ─────────────────────────────────────────
-   A quiet, section-aware page progress control. It wakes while the
-   customer scrolls, identifies meaningful sections, then recedes. */
+   The original order story — customer, basket, warehouse, delivery,
+   destination — with event-driven movement and a quiet idle state. */
 html.proto-journey-active {
   scrollbar-width: none;
 }
@@ -4752,100 +4752,21 @@ html.proto-journey-active::-webkit-scrollbar {
 
 .proto-journey-thumb-icon {
   position: absolute;
-  display: grid;
-  place-items: center;
-  transform: translate(-50%, -50%);
+  inset: 0;
   filter: drop-shadow(0 3px 8px rgba(86, 8, 8, 0.58));
-  animation: proto-journey-icon-in 220ms ease-out both;
 }
 
 .proto-journey-rail.is-scrolling .proto-journey-thumb-icon {
-  animation:
-    proto-journey-icon-in 220ms ease-out both,
-    proto-journey-working 680ms ease-in-out 220ms infinite alternate;
+  animation: proto-journey-working 680ms ease-in-out infinite alternate;
 }
 
-.proto-journey-current-label {
+.proto-journey-thumb-icon-layer {
   position: absolute;
-  right: 17px;
-  padding: 6px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 7px;
-  background: rgba(10, 10, 10, 0.88);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(6px, -50%);
-  transition: opacity 160ms ease, transform 160ms ease;
-  white-space: nowrap;
-}
-
-.proto-journey-rail.show-label .proto-journey-current-label {
-  opacity: 1;
-  transform: translate(0, -50%);
-}
-
-.proto-journey-stages {
-  position: absolute;
-  inset: var(--journey-pad) 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  pointer-events: none;
-}
-
-.proto-journey-stages li {
+  inset: 0 auto auto 0;
   display: grid;
   place-items: center;
-}
-
-.proto-journey-stages button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.proto-journey-stages button span {
-  width: 7px;
-  height: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 50%;
-  background: #171717;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16);
-  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
-}
-
-.proto-journey-stages button:hover span,
-.proto-journey-stages button:focus-visible span,
-.proto-journey-stages button.is-current span {
-  border-color: #ff7884;
-  background: #a91d2a;
-  transform: scale(1.35);
-}
-
-.proto-journey-stages button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
-}
-
-@keyframes proto-journey-icon-in {
-  from { opacity: 0; scale: 0.82; }
-  to { opacity: 1; scale: 1; }
+  transition: opacity 260ms ease;
+  transform-origin: 0 0;
 }
 
 @keyframes proto-journey-working {
