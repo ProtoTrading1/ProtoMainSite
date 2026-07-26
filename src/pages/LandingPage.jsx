@@ -788,9 +788,9 @@ export default function LandingPage({ onLogin, onApply }) {
                   key={hash}
                   href={hash}
                   onClick={(e) => { e.preventDefault(); window.location.hash = hash.slice(1); }}
-                  style={{ color: '#475569', fontSize: '12px', fontWeight: 700, textDecoration: 'none', transition: 'color 0.15s' }}
+                  style={{ color: '#64748b', fontSize: '12px', fontWeight: 700, textDecoration: 'none', transition: 'color 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; }}
                 >
                   {label}
                 </a>
