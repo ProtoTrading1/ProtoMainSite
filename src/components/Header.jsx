@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useId } from 'react';
 import {
-  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
+  Home, Info, LayoutDashboard, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
@@ -19,10 +19,36 @@ function loadRecent() {
 function saveRecent(term) {
   const prev = loadRecent().filter((t) => t.toLowerCase() !== term.toLowerCase());
   const next = [term, ...prev].slice(0, 6);
-  try { localStorage.setItem(RS_KEY, JSON.stringify(next)); } catch {}
+  try { localStorage.setItem(RS_KEY, JSON.stringify(next)); } catch { /* Browsing storage is optional. */ }
 }
 function clearRecent() {
-  try { localStorage.removeItem(RS_KEY); } catch {}
+  try { localStorage.removeItem(RS_KEY); } catch { /* Browsing storage is optional. */ }
+}
+
+function searchStockMeta(product) {
+  const raw = product?.stockOnHand
+    ?? product?.stockQty
+    ?? product?.available_stock
+    ?? product?.stock_qty;
+  const toOrder = product?.toOrder === true
+    || product?.to_order === true
+    || product?.orderableWhenOutOfStock === true
+    || product?.orderable_when_out_of_stock === true;
+
+  if (raw === undefined || raw === null || raw === '') {
+    return product?.inStock === false
+      ? { label: 'Out of stock', tone: 'out' }
+      : { label: 'Stock check', tone: 'unknown' };
+  }
+
+  const qty = Number(raw);
+  if (!Number.isFinite(qty)) return { label: 'Stock check', tone: 'unknown' };
+  if (qty < 0) return { label: 'Backorder', tone: 'backorder' };
+  if (qty === 0) return toOrder
+    ? { label: 'Available to order', tone: 'toorder' }
+    : { label: 'Out of stock', tone: 'out' };
+  if (qty <= 5) return { label: `${qty} left`, tone: 'low' };
+  return { label: 'In stock', tone: 'in' };
 }
 
 // âââ Flatten categories tree for search matching âââââââââââââ
@@ -175,16 +201,55 @@ function SearchPanel({
   query,
   suggestions,
   catMatches,
+  recentSearches,
   activeItemId,
   listboxId,
   onPickProduct,
   onPickCategory,
+  onPickRecent,
+  onClearRecent,
   onCommitSearch,
+  onRequestProduct,
 }) {
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty" id={listboxId} role="listbox" aria-label="Search suggestions">
-        <p className="sp-empty-hint">Start typing to search productsâ¦</p>
+        {recentSearches.length > 0 && (
+          <div className="sp-section sp-section--recent">
+            <div className="sp-section-head">
+              <span>Recent searches</span>
+              <button type="button" className="sp-clear" onClick={onClearRecent}>Clear history</button>
+            </div>
+            <div className="sp-pills">
+              {recentSearches.map((term) => {
+                const optionId = `${listboxId}-recent-${encodeURIComponent(term)}`;
+                const isActive = activeItemId === optionId;
+                return (
+                  <button
+                    key={term}
+                    id={optionId}
+                    type="button"
+                    className={`sp-pill sp-pill--recent${isActive ? ' active' : ''}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onPickRecent(term)}
+                  >
+                    <RotateCcw size={12} aria-hidden="true" />
+                    {term}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div className="sp-search-guide">
+          <Search size={18} aria-hidden="true" />
+          <div>
+            <strong>Find any product fast</strong>
+            <span>Search by product name, SKU, barcode or department.</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -222,7 +287,7 @@ function SearchPanel({
               >
                 {Icon && <span className="sp-cat-icon" style={{ background: `${color}18`, color }}><Icon size={13} /></span>}
                 <span className="sp-cat-label">{cat.label}</span>
-                <span className="sp-cat-arrow">Browse â</span>
+                <span className="sp-cat-arrow">Browse →</span>
               </button>
             );
           })}
@@ -246,8 +311,18 @@ function SearchPanel({
             <div className="sp-product-img">
               {exactProduct.image ? <img src={exactProduct.image} alt={exactProduct.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
             </div>
-            <div className="sp-product-info"><span className="sp-product-code">{exactProduct.code || exactProduct.sku}</span><span className="sp-product-name">{exactProduct.name}</span></div>
-            {exactProduct.price > 0 && <span className="sp-product-price">R{exactProduct.price.toFixed(2)}</span>}
+            <div className="sp-product-info">
+              <span className="sp-product-code">{exactProduct.code || exactProduct.sku}</span>
+              <span className="sp-product-name">{exactProduct.name}</span>
+              {(() => {
+                const stock = searchStockMeta(exactProduct);
+                return <span className={`sp-stock sp-stock--${stock.tone}`}>{stock.label}</span>;
+              })()}
+            </div>
+            <div className="sp-product-buy-meta">
+              {exactProduct.price > 0 && <span className="sp-product-price">R{exactProduct.price.toFixed(2)}</span>}
+              <span className="sp-product-open">Open →</span>
+            </div>
           </button>
         </div>
       )}
@@ -263,7 +338,7 @@ function SearchPanel({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onCommitSearch(query)}
             >
-              View all results â
+              View all results →
             </button>
           </div>
           {relatedProducts.map((p) => {
@@ -288,8 +363,15 @@ function SearchPanel({
                 <div className="sp-product-info">
                   <span className="sp-product-code">{p.code}</span>
                   <span className="sp-product-name">{p.name}</span>
+                  {(() => {
+                    const stock = searchStockMeta(p);
+                    return <span className={`sp-stock sp-stock--${stock.tone}`}>{stock.label}</span>;
+                  })()}
                 </div>
-                {p.price > 0 && <span className="sp-product-price">R{p.price.toFixed(2)}</span>}
+                <div className="sp-product-buy-meta">
+                  {p.price > 0 && <span className="sp-product-price">R{p.price.toFixed(2)}</span>}
+                  <span className="sp-product-open">Open →</span>
+                </div>
               </button>
             );
           })}
@@ -301,6 +383,10 @@ function SearchPanel({
           <Search size={24} />
           <p>No results for "<strong>{query}</strong>"</p>
           <span>{codeSearch ? 'Check the code, or remove the last digit to see the closest product codes.' : 'Try a different spelling, product type or department.'}</span>
+          <button type="button" className="sp-request-product" onClick={onRequestProduct}>
+            <PackageSearch size={15} aria-hidden="true" />
+            Request this product
+          </button>
         </div>
       )}
     </div>
@@ -339,7 +425,7 @@ export { AboutModal };
 // âââ Header ââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function Header({
   cartItemCount, cartTotal,
-  onMenuClick, onHome, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
+  onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick,
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
 }) {
@@ -351,6 +437,7 @@ export default function Header({
   const [showRequest, setShowRequest] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
+  const [recentSearches, setRecentSearches] = useState(() => loadRecent());
   const [activeIdx, setActiveIdx] = useState(-1);
   const [mobileActiveIdx, setMobileActiveIdx] = useState(-1);
   const productsCache = useRef(null);
@@ -472,6 +559,7 @@ export default function Header({
   }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
+    setRecentSearches(loadRecent());
     setSearchOpen(true);
     void loadProductsOnce();
   }, [loadProductsOnce]);
@@ -504,10 +592,12 @@ export default function Header({
     liftSearch(val);
   };
 
-  const keyboardItems = [
-    ...catMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
-    ...suggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
-  ];
+  const keyboardItems = inputValue.trim()
+    ? [
+      ...catMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
+      ...suggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+    ]
+    : recentSearches.map((term) => ({ type: 'recent', id: `recent-${encodeURIComponent(term)}`, term }));
   const activeDesktopItem = activeIdx >= 0 ? keyboardItems[activeIdx] : null;
   const activeDesktopItemId = activeDesktopItem ? `${desktopListboxId}-${activeDesktopItem.id}` : undefined;
 
@@ -526,7 +616,8 @@ export default function Header({
       if (activeIdx >= 0 && items[activeIdx]) {
         const activeItem = items[activeIdx];
         if (activeItem.type === 'cat') pickCategory(activeItem.cat.path);
-        else pickProduct(activeItem.product);
+        else if (activeItem.type === 'product') pickProduct(activeItem.product);
+        else commitSearch(activeItem.term);
       } else if (inputValue.trim()) {
         commitSearch(inputValue.trim());
       }
@@ -548,6 +639,7 @@ export default function Header({
       ? (p.websiteSku || p.sku || p.code || inputValue)
       : p.name;
     saveRecent(directCode);
+    setRecentSearches(loadRecent());
     setSearchImmediate(directCode);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -565,6 +657,7 @@ export default function Header({
   const commitSearch = (term) => {
     if (!term) return;
     saveRecent(term);
+    setRecentSearches(loadRecent());
     setSearchImmediate(term);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -573,24 +666,44 @@ export default function Header({
     setSearchOpen(false);
   };
 
+  const clearSearch = () => {
+    setSearchImmediate('');
+    setSuggestions([]);
+    setCatMatches([]);
+    setActiveIdx(-1);
+    inputRef.current?.focus();
+  };
+
+  const clearRecentSearches = () => {
+    clearRecent();
+    setRecentSearches([]);
+    setActiveIdx(-1);
+  };
+
   // Mobile search â mobileInput is the transient typed text, separate from the
   // committed searchQuery so the input clears after a search without losing results.
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
   const [mobileInput, setMobileInput] = useState('');
-  const openMobileSearch = () => {
+  const openMobileSearch = useCallback(() => {
     setMobileSearchOpen(true);
+    setRecentSearches(loadRecent());
     setMobileInput('');
     setMobileActiveIdx(-1);
     void loadProductsOnce();
-  };
-  const closeMobileSearch = () => {
+  }, [loadProductsOnce, setMobileSearchOpen]);
+  const closeMobileSearch = useCallback(() => {
     setMobileSearchOpen(false);
     setMobileSuggestions([]);
     setMobileCatMatches([]);
     setMobileInput('');
     setMobileActiveIdx(-1);
-  };
+  }, [setMobileSearchOpen]);
+  const requestProductFromSearch = useCallback(() => {
+    closeSearch();
+    closeMobileSearch();
+    setShowRequest(true);
+  }, [closeSearch, closeMobileSearch]);
   const handleMobileInput = (val) => {
     setMobileInput(val);
     liftSearch(val);
@@ -634,8 +747,12 @@ export default function Header({
     }, identifier ? 45 : 120);
   };
   const mobileKeyboardItems = [
-    ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
-    ...mobileSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+    ...(mobileInput.trim()
+      ? [
+        ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
+        ...mobileSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+      ]
+      : recentSearches.map((term) => ({ type: 'recent', id: `recent-${encodeURIComponent(term)}`, term }))),
   ];
   const activeMobileItem = mobileActiveIdx >= 0 ? mobileKeyboardItems[mobileActiveIdx] : null;
   const activeMobileItemId = activeMobileItem ? `${mobileListboxId}-${activeMobileItem.id}` : undefined;
@@ -672,6 +789,25 @@ export default function Header({
     document.addEventListener('keydown', onGlobalEscape);
     return () => document.removeEventListener('keydown', onGlobalEscape);
   }, [searchOpen, mobileSearchOpen, closeSearch, closeMobileSearch]);
+
+  useEffect(() => {
+    const onSearchShortcut = (event) => {
+      const target = event.target;
+      const isTyping = target instanceof HTMLElement && (
+        target.isContentEditable
+        || target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.tagName === 'SELECT'
+      );
+      const isShortcut = event.key === '/' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k');
+      if (!isShortcut || isTyping) return;
+      event.preventDefault();
+      openSearch();
+      requestAnimationFrame(() => inputRef.current?.focus());
+    };
+    document.addEventListener('keydown', onSearchShortcut);
+    return () => document.removeEventListener('keydown', onSearchShortcut);
+  }, [openSearch]);
 
   const orderTargetMet = cartTotal >= MIN_ORDER;
 
@@ -720,6 +856,18 @@ export default function Header({
               aria-controls={desktopListboxId}
               aria-activedescendant={activeDesktopItemId}
             />
+            {inputValue ? (
+              <button
+                type="button"
+                className="header-search-premium__clear"
+                onClick={clearSearch}
+                aria-label="Clear search"
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            ) : (
+              <kbd className="header-search-premium__shortcut" aria-hidden="true">/</kbd>
+            )}
           </div>
           {searchOpen && (
             <div className="header-search-dropdown">
@@ -727,11 +875,15 @@ export default function Header({
                 query={inputValue}
                 suggestions={suggestions}
                 catMatches={catMatches}
+                recentSearches={recentSearches}
                 activeItemId={activeDesktopItemId}
                 listboxId={desktopListboxId}
                 onPickProduct={pickProduct}
                 onPickCategory={pickCategory}
+                onPickRecent={commitSearch}
+                onClearRecent={clearRecentSearches}
                 onCommitSearch={commitSearch}
+                onRequestProduct={requestProductFromSearch}
               />
             </div>
           )}
@@ -850,8 +1002,10 @@ export default function Header({
               if (activeMobileItem) {
                 if (activeMobileItem.type === 'cat') {
                   pickCategory(activeMobileItem.cat.path);
-                } else {
+                } else if (activeMobileItem.type === 'product') {
                   pickProduct(activeMobileItem.product);
+                } else {
+                  commitMobileSearch(activeMobileItem.term);
                 }
                 setMobileInput('');
                 closeMobileSearch();
@@ -863,7 +1017,7 @@ export default function Header({
           aria-label="Search products, SKU or barcode"
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={mobileSearchOpen && Boolean(mobileInput.trim())}
+          aria-expanded={mobileSearchOpen}
           aria-haspopup="listbox"
           aria-controls={mobileListboxId}
           aria-activedescendant={activeMobileItemId}
@@ -877,9 +1031,46 @@ export default function Header({
       </div>
 
       {/* Mobile category + product results */}
-      {mobileSearchOpen && mobileInput.trim() && (
+      {mobileSearchOpen && (
         <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
-          {mobileCatMatches.map((cat) => {
+          {!mobileInput.trim() && recentSearches.length > 0 && (
+            <div className="sp-section sp-section--recent">
+              <div className="sp-section-head">
+                <span>Recent searches</span>
+                <button type="button" className="sp-clear" onClick={clearRecentSearches}>Clear history</button>
+              </div>
+              <div className="sp-pills">
+                {recentSearches.map((term) => {
+                  const optionId = `${mobileListboxId}-recent-${encodeURIComponent(term)}`;
+                  const isActive = activeMobileItemId === optionId;
+                  return (
+                    <button
+                      key={term}
+                      id={optionId}
+                      type="button"
+                      className={`sp-pill sp-pill--recent${isActive ? ' active' : ''}`}
+                      role="option"
+                      aria-selected={isActive}
+                      onClick={() => commitMobileSearch(term)}
+                    >
+                      <RotateCcw size={12} aria-hidden="true" />
+                      {term}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {!mobileInput.trim() && (
+            <div className="sp-search-guide sp-search-guide--mobile">
+              <Search size={18} aria-hidden="true" />
+              <div>
+                <strong>Find any product fast</strong>
+                <span>Search by product name, SKU, barcode or department.</span>
+              </div>
+            </div>
+          )}
+          {mobileInput.trim() && mobileCatMatches.map((cat) => {
             const optionId = `${mobileListboxId}-cat-${cat.id}`;
             const isActive = activeMobileItemId === optionId;
             return (
@@ -894,11 +1085,11 @@ export default function Header({
                 onClick={() => { pickCategory(cat.path); setMobileInput(''); closeMobileSearch(); }}
               >
                 <span className="sp-cat-label">{cat.label}</span>
-                <span className="sp-cat-arrow">â</span>
+                <span className="sp-cat-arrow">→</span>
               </button>
             );
           })}
-          {mobileSuggestions.map((p) => {
+          {mobileInput.trim() && mobileSuggestions.map((p) => {
             const optionId = `${mobileListboxId}-product-${p.id}`;
             const isActive = activeMobileItemId === optionId;
             return (
@@ -918,16 +1109,24 @@ export default function Header({
                 <div className="sp-product-info">
                   <span className="sp-product-code">{p.code}</span>
                   <span className="sp-product-name">{p.name}</span>
+                  {(() => {
+                    const stock = searchStockMeta(p);
+                    return <span className={`sp-stock sp-stock--${stock.tone}`}>{stock.label}</span>;
+                  })()}
                 </div>
                 {p.price > 0 && <span className="sp-product-price" style={{ color: '#fff' }}>R{p.price.toFixed(2)}</span>}
               </button>
             );
           })}
-          {mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
+          {mobileInput.trim() && mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
             <div className="sp-empty sp-empty--mobile">
               <Search size={24} />
               <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>
               <span>Try a different spelling or browse by department</span>
+              <button type="button" className="sp-request-product" onClick={requestProductFromSearch}>
+                <PackageSearch size={15} aria-hidden="true" />
+                Request this product
+              </button>
             </div>
           )}
         </div>
