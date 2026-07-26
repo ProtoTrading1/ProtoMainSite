@@ -53,19 +53,6 @@ const MONTHLY_SPEND_BANDS = [
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 
-function CustomerIcon() {
-  return (
-    <svg width="28" height="30" viewBox="0 0 28 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Head */}
-      <circle cx="14" cy="8" r="7" fill="#8B1A1A"/>
-      {/* Inner highlight */}
-      <circle cx="14" cy="8" r="3.5" fill="#c0392b" opacity="0.6"/>
-      {/* Body/shoulders */}
-      <path d="M0 30C0 20.611 6.268 14 14 14C21.732 14 28 20.611 28 30Z" fill="#8B1A1A"/>
-    </svg>
-  );
-}
-
 function BoxIcon() {
   return (
     <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -124,158 +111,153 @@ function PinIcon() {
 }
 
 const SCROLL_STAGES = [
-  { threshold: 0,   Icon: CustomerIcon, transform: 'translate(-50%, -50%)'           },
-  { threshold: 0.2, Icon: BoxIcon,      transform: 'translate(-50%, -50%)'           },
-  { threshold: 0.4, Icon: WarehouseIcon,transform: 'translate(-50%, -50%)'           },
-  { threshold: 0.6, Icon: TruckIcon,    transform: 'translate(-50%, -50%) rotate(90deg)' },
-  { threshold: 0.8, Icon: PinIcon,      transform: 'translate(-50%, -100%)'          },
+  { id: 'journey-stock', label: 'Stock', target: '.vhero-section', Icon: BoxIcon },
+  { id: 'journey-delivery', label: 'Delivery', target: '.lp-map-wrapper', Icon: TruckIcon },
+  { id: 'journey-catalogue', label: 'Catalogue', target: '#lp-departments', Icon: WarehouseIcon },
+  { id: 'journey-apply', label: 'Apply', target: '#lp-apply', Icon: PinIcon },
 ];
-const FADE_ZONE = 0.07;
 
 function TruckScrollbar() {
   const [progress, setProgress] = useState(0);
-  const [visible, setVisible] = useState(false);
-  const [vw, setVw] = useState(() => window.innerWidth);
-  const targetRef = useRef(0);
-  const currentRef = useRef(0);
+  const [activeStage, setActiveStage] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [isIdle, setIsIdle] = useState(true);
+  const [showLabel, setShowLabel] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [trackHeight, setTrackHeight] = useState(0);
   const rafRef = useRef(null);
+  const scrollStopTimerRef = useRef(null);
+  const idleTimerRef = useRef(null);
+  const labelTimerRef = useRef(null);
+  const activeStageRef = useRef(0);
 
   useEffect(() => {
-    function getTarget() {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const docH = document.documentElement.scrollHeight - window.innerHeight;
-      if (docH <= 0) return null;
-      return Math.min(scrollTop / docH, 1);
-    }
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const desktop = window.matchMedia('(min-width: 900px)');
 
-    function tick() {
-      const target = targetRef.current;
-      const current = currentRef.current;
-      const next = current + (target - current) * 0.07;
-      const snapped = Math.abs(next - target) < 0.0005 ? target : next;
-      currentRef.current = snapped;
-      setProgress(snapped);
-      rafRef.current = requestAnimationFrame(tick);
-    }
+    const syncEnabled = () => {
+      setIsEnabled(desktop.matches && !reducedMotion.matches);
+    };
 
-    function onScroll() {
-      const t = getTarget();
-      if (t === null) { setVisible(false); return; }
-      setVisible(true);
-      targetRef.current = t;
-    }
-
-    function onResize() {
-      setVw(window.innerWidth);
-      onScroll();
-    }
-
-    const t = getTarget();
-    if (t !== null) { setVisible(true); targetRef.current = t; }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize, { passive: true });
-    rafRef.current = requestAnimationFrame(tick);
+    syncEnabled();
+    reducedMotion.addEventListener?.('change', syncEnabled);
+    desktop.addEventListener?.('change', syncEnabled);
 
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onResize);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      reducedMotion.removeEventListener?.('change', syncEnabled);
+      desktop.removeEventListener?.('change', syncEnabled);
     };
   }, []);
 
   useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'hide-native-scrollbar';
-    style.textContent = `::-webkit-scrollbar{display:none}*{scrollbar-width:none;-ms-overflow-style:none}`;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
+    if (!isEnabled) {
+      document.documentElement.classList.remove('proto-journey-active');
+      return undefined;
+    }
 
-  // Responsive sizing
-  const isMobile = vw < 640;
-  const right    = isMobile ? 5 : 10;
-  const PAD      = isMobile ? 18 : 24;
-  const dotSize  = isMobile ? 6  : 8;
-  const trackW   = isMobile ? 2  : 3;
-  const scale    = isMobile ? 0.65 : 1;
+    document.documentElement.classList.add('proto-journey-active');
 
-  // Which stage are we in?
-  let curIdx = 0;
-  for (let i = 0; i < SCROLL_STAGES.length; i++) {
-    if (progress >= SCROLL_STAGES[i].threshold) curIdx = i;
-  }
-  const nextIdx = Math.min(curIdx + 1, SCROLL_STAGES.length - 1);
-  const nextThresh = SCROLL_STAGES[nextIdx].threshold;
-  const blend = curIdx === nextIdx
-    ? 0
-    : Math.max(0, Math.min(1, (progress - (nextThresh - FADE_ZONE)) / FADE_ZONE));
+    function measure() {
+      rafRef.current = null;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(docH > 0 ? Math.min(Math.max(scrollTop / docH, 0), 1) : 0);
+      setTrackHeight(Math.max(window.innerHeight - 88, 0));
 
-  const { Icon: CurIcon, transform: curTransform } = SCROLL_STAGES[curIdx];
-  const { Icon: NxtIcon, transform: nxtTransform } = SCROLL_STAGES[nextIdx];
+      const viewportAnchor = window.innerHeight * 0.42;
+      let nextStage = 0;
+      SCROLL_STAGES.forEach((stage, index) => {
+        const element = document.querySelector(stage.target);
+        if (element && element.getBoundingClientRect().top <= viewportAnchor) {
+          nextStage = index;
+        }
+      });
 
-  const trackH = window.innerHeight - PAD * 2 - 40;
-  const thumbTop = PAD + progress * trackH;
+      if (nextStage !== activeStageRef.current) {
+        activeStageRef.current = nextStage;
+        setActiveStage(nextStage);
+        setShowLabel(true);
+        window.clearTimeout(labelTimerRef.current);
+        labelTimerRef.current = window.setTimeout(() => setShowLabel(false), 1200);
+      }
+    }
 
-  if (!visible) return null;
+    function scheduleMeasure() {
+      if (rafRef.current === null) {
+        rafRef.current = window.requestAnimationFrame(measure);
+      }
+    }
+
+    function onScroll() {
+      setIsScrolling(true);
+      setIsIdle(false);
+      window.clearTimeout(scrollStopTimerRef.current);
+      window.clearTimeout(idleTimerRef.current);
+      scrollStopTimerRef.current = window.setTimeout(() => setIsScrolling(false), 160);
+      idleTimerRef.current = window.setTimeout(() => setIsIdle(true), 1500);
+      scheduleMeasure();
+    }
+
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', scheduleMeasure, { passive: true });
+
+    return () => {
+      document.documentElement.classList.remove('proto-journey-active');
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', scheduleMeasure);
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+      window.clearTimeout(scrollStopTimerRef.current);
+      window.clearTimeout(idleTimerRef.current);
+      window.clearTimeout(labelTimerRef.current);
+    };
+  }, [isEnabled]);
+
+  if (!isEnabled || trackHeight <= 0) return null;
+
+  const { Icon: ActiveIcon, label: activeLabel } = SCROLL_STAGES[activeStage];
+  const thumbTop = 44 + (progress * trackHeight);
+
+  const navigateToStage = (stage) => {
+    document.querySelector(stage.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
-    <div style={{ position: 'fixed', right, top: 0, height: '100vh', width: isMobile ? 32 : 48, zIndex: 9999, pointerEvents: 'none' }}>
-      {/* Track */}
-      <div style={{ position: 'absolute', top: PAD, bottom: PAD, left: '50%', transform: 'translateX(-50%)', width: trackW, background: '#111', borderRadius: '2px' }}>
-        {/* Progress fill */}
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${progress * 100}%`, background: 'linear-gradient(to bottom, #8B1A1A, #c0392b)', borderRadius: '2px' }} />
-        {/* Stage waypoint dots */}
-        {[0.2, 0.4, 0.6, 0.8].map(p => {
-          const passed = progress >= p - 0.01;
-          return (
-            <div key={p} style={{
-              position: 'absolute',
-              top: `${p * 100}%`,
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: dotSize, height: dotSize,
-              borderRadius: '50%',
-              background: passed ? '#8B1A1A' : '#1e1e1e',
-              border: `1.5px solid ${passed ? '#c0392b' : '#2a2a2a'}`,
-              boxShadow: passed ? '0 0 5px rgba(139,26,26,0.55)' : 'none',
-              transition: 'background 0.4s, box-shadow 0.4s, border-color 0.4s',
-            }} />
-          );
-        })}
+    <nav
+      className={`proto-journey-rail${isIdle ? ' is-idle' : ''}${isScrolling ? ' is-scrolling' : ''}${showLabel ? ' show-label' : ''}`}
+      aria-label="Page journey"
+    >
+      <div className="proto-journey-track" aria-hidden="true">
+        <span className="proto-journey-progress" style={{ height: `${progress * 100}%` }} />
       </div>
 
-      {/* Thumb — crossfade between stage icons.
-          Each icon is independently positioned so the drop-shadow
-          filter is applied to the actual painted area, not a zero-size box. */}
-      <div style={{ position: 'absolute', top: `${thumbTop}px`, left: '50%', width: 0, height: 0 }}>
-        <div style={{
-          position: 'absolute',
-          transform: curTransform,
-          opacity: 1 - blend,
-          transition: 'opacity 0.35s ease',
-          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
-          transformOrigin: '0 0',
-          ...(isMobile ? { scale: '0.7' } : {}),
-        }}>
-          <CurIcon />
-        </div>
-        <div style={{
-          position: 'absolute',
-          transform: nxtTransform,
-          opacity: blend,
-          transition: 'opacity 0.35s ease',
-          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
-          transformOrigin: '0 0',
-          ...(isMobile ? { scale: '0.7' } : {}),
-        }}>
-          <NxtIcon />
-        </div>
+      <div
+        className="proto-journey-thumb"
+        style={{ transform: `translate3d(-50%, ${thumbTop}px, 0)` }}
+        aria-hidden="true"
+      >
+        <span className="proto-journey-thumb-icon" key={SCROLL_STAGES[activeStage].id}>
+          <ActiveIcon />
+        </span>
+        <span className="proto-journey-current-label">{activeLabel}</span>
       </div>
 
-      {/* Start glow dot */}
-      <div style={{ position: 'absolute', top: PAD, left: '50%', transform: 'translate(-50%, -50%)', width: dotSize, height: dotSize, borderRadius: '50%', background: '#8B1A1A', boxShadow: '0 0 8px rgba(139,26,26,0.9)' }} />
-    </div>
+      <ol className="proto-journey-stages">
+        {SCROLL_STAGES.map((stage, index) => (
+          <li key={stage.id}>
+            <button
+              type="button"
+              className={index === activeStage ? 'is-current' : ''}
+              aria-current={index === activeStage ? 'step' : undefined}
+              aria-label={`Go to ${stage.label}`}
+              onClick={() => navigateToStage(stage)}
+            >
+              <span aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }
 
