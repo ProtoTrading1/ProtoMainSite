@@ -2156,6 +2156,15 @@
   margin-bottom: 22px;
 }
 
+.lp-apply-copy .lp-apply-reassurance {
+  max-width: 520px;
+  margin: 0;
+  color: #7890af;
+  font-size: clamp(15px, 1.15vw, 18px);
+  line-height: 1.55;
+  font-weight: 650;
+}
+
 .lp-apply-note {
   display: flex;
   align-items: center;
@@ -2260,7 +2269,7 @@
 .lp-quiz-field label {
   font-size: 11px;
   font-weight: 800;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.72);
   text-transform: uppercase;
   letter-spacing: 0.9px;
 }
@@ -2288,7 +2297,7 @@
 
 .lp-quiz-field input::placeholder,
 .lp-quiz-field textarea::placeholder {
-  color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.42);
 }
 
 .lp-quiz-field input:focus,
@@ -2469,8 +2478,8 @@
 }
 
 .lp-quiz-next:disabled {
-  background: rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.52);
   cursor: not-allowed;
 }
 
@@ -2577,7 +2586,7 @@
 }
 
 .lp-footer p {
-  color: #475569;
+  color: #64748b;
   font-size: 13px;
   font-weight: 700;
 }
@@ -4687,5 +4696,103 @@ a.lp-register-login { text-decoration: none; }
   }
   .access-brand .proto-logo-wordmark__top {
     gap: 3px;
+  }
+}
+
+/* ── Proto Journey Rail ─────────────────────────────────────────
+   The original order story — customer, basket, warehouse, delivery,
+   destination — with event-driven movement and a quiet idle state. */
+html.proto-journey-active {
+  scrollbar-width: none;
+}
+
+html.proto-journey-active::-webkit-scrollbar {
+  display: none;
+}
+
+.proto-journey-rail {
+  --journey-pad: 44px;
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  right: 10px;
+  width: 48px;
+  height: 100dvh;
+  opacity: 1;
+  transition: opacity 360ms ease;
+}
+
+.proto-journey-rail.is-idle {
+  opacity: 0.5;
+}
+
+.proto-journey-track {
+  position: absolute;
+  top: var(--journey-pad);
+  bottom: var(--journey-pad);
+  left: 50%;
+  width: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  transform: translateX(-50%);
+}
+
+.proto-journey-progress {
+  position: absolute;
+  inset: 0 0 auto;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #8b1a1a 0%, #e11d2e 100%);
+  transition: height 110ms linear;
+}
+
+.proto-journey-thumb {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  width: 0;
+  height: 0;
+  will-change: transform;
+  transition: transform 110ms linear;
+}
+
+.proto-journey-thumb-icon {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 3px 8px rgba(86, 8, 8, 0.58));
+}
+
+.proto-journey-rail.is-scrolling .proto-journey-thumb-icon {
+  animation: proto-journey-working 680ms ease-in-out infinite alternate;
+}
+
+.proto-journey-thumb-icon-layer {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: grid;
+  place-items: center;
+  transition: opacity 260ms ease;
+  transform-origin: 0 0;
+}
+
+@keyframes proto-journey-working {
+  from { margin-top: -1px; }
+  to { margin-top: 2px; }
+}
+
+@media (max-width: 899px), (prefers-reduced-motion: reduce) {
+  .proto-journey-rail {
+    display: none;
+  }
+
+  html.proto-journey-active {
+    scrollbar-width: auto;
+  }
+
+  html.proto-journey-active::-webkit-scrollbar {
+    display: initial;
   }
 }
