@@ -53,6 +53,16 @@ const MONTHLY_SPEND_BANDS = [
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 
+function CustomerIcon() {
+  return (
+    <svg width="28" height="30" viewBox="0 0 28 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="8" r="7" fill="#8B1A1A"/>
+      <circle cx="14" cy="8" r="3.5" fill="#c0392b" opacity="0.6"/>
+      <path d="M0 30C0 20.611 6.268 14 14 14C21.732 14 28 20.611 28 30Z" fill="#8B1A1A"/>
+    </svg>
+  );
+}
+
 function BoxIcon() {
   return (
     <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -111,25 +121,23 @@ function PinIcon() {
 }
 
 const SCROLL_STAGES = [
-  { id: 'journey-stock', label: 'Stock', target: '.vhero-section', Icon: BoxIcon },
-  { id: 'journey-delivery', label: 'Delivery', target: '.lp-map-wrapper', Icon: TruckIcon },
-  { id: 'journey-catalogue', label: 'Catalogue', target: '#lp-departments', Icon: WarehouseIcon },
-  { id: 'journey-apply', label: 'Apply', target: '#lp-apply', Icon: PinIcon },
+  { id: 'journey-customer', threshold: 0, Icon: CustomerIcon, transform: 'translate(-50%, -50%)' },
+  { id: 'journey-basket', threshold: 0.2, Icon: BoxIcon, transform: 'translate(-50%, -50%)' },
+  { id: 'journey-warehouse', threshold: 0.4, Icon: WarehouseIcon, transform: 'translate(-50%, -50%)' },
+  { id: 'journey-delivery', threshold: 0.6, Icon: TruckIcon, transform: 'translate(-50%, -50%) rotate(90deg)' },
+  { id: 'journey-complete', threshold: 0.8, Icon: PinIcon, transform: 'translate(-50%, -100%)' },
 ];
+const JOURNEY_FADE_ZONE = 0.07;
 
 function TruckScrollbar() {
   const [progress, setProgress] = useState(0);
-  const [activeStage, setActiveStage] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isIdle, setIsIdle] = useState(true);
-  const [showLabel, setShowLabel] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [trackHeight, setTrackHeight] = useState(0);
   const rafRef = useRef(null);
   const scrollStopTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
-  const labelTimerRef = useRef(null);
-  const activeStageRef = useRef(0);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -163,23 +171,6 @@ function TruckScrollbar() {
       const docH = document.documentElement.scrollHeight - window.innerHeight;
       setProgress(docH > 0 ? Math.min(Math.max(scrollTop / docH, 0), 1) : 0);
       setTrackHeight(Math.max(window.innerHeight - 88, 0));
-
-      const viewportAnchor = window.innerHeight * 0.42;
-      let nextStage = 0;
-      SCROLL_STAGES.forEach((stage, index) => {
-        const element = document.querySelector(stage.target);
-        if (element && element.getBoundingClientRect().top <= viewportAnchor) {
-          nextStage = index;
-        }
-      });
-
-      if (nextStage !== activeStageRef.current) {
-        activeStageRef.current = nextStage;
-        setActiveStage(nextStage);
-        setShowLabel(true);
-        window.clearTimeout(labelTimerRef.current);
-        labelTimerRef.current = window.setTimeout(() => setShowLabel(false), 1200);
-      }
     }
 
     function scheduleMeasure() {
@@ -209,23 +200,42 @@ function TruckScrollbar() {
       if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
       window.clearTimeout(scrollStopTimerRef.current);
       window.clearTimeout(idleTimerRef.current);
-      window.clearTimeout(labelTimerRef.current);
     };
   }, [isEnabled]);
 
   if (!isEnabled || trackHeight <= 0) return null;
 
-  const { Icon: ActiveIcon, label: activeLabel } = SCROLL_STAGES[activeStage];
+  let currentStageIndex = 0;
+  for (let index = SCROLL_STAGES.length - 1; index >= 0; index -= 1) {
+    if (progress >= SCROLL_STAGES[index].threshold) {
+      currentStageIndex = index;
+      break;
+    }
+  }
+
+  const nextStageIndex = Math.min(currentStageIndex + 1, SCROLL_STAGES.length - 1);
+  const nextThreshold = SCROLL_STAGES[nextStageIndex].threshold;
+  const blend = currentStageIndex === nextStageIndex
+    ? 0
+    : Math.max(0, Math.min(1, (progress - (nextThreshold - JOURNEY_FADE_ZONE)) / JOURNEY_FADE_ZONE));
+  const {
+    Icon: CurrentIcon,
+    transform: currentTransform,
+  } = SCROLL_STAGES[currentStageIndex];
+  const {
+    Icon: NextIcon,
+    transform: nextTransform,
+  } = SCROLL_STAGES[nextStageIndex];
   const thumbTop = 44 + (progress * trackHeight);
 
-  const navigateToStage = (stage) => {
-    document.querySelector(stage.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
-    <nav
-      className={`proto-journey-rail${isIdle ? ' is-idle' : ''}${isScrolling ? ' is-scrolling' : ''}${showLabel ? ' show-label' : ''}`}
-      aria-label="Page journey"
+    <div
+      className={`proto-journey-rail${isIdle ? ' is-idle' : ''}${isScrolling ? ' is-scrolling' : ''}`}
+      role="progressbar"
+      aria-label="Customer order journey"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={Math.round(progress * 100)}
     >
       <div className="proto-journey-track" aria-hidden="true">
         <span className="proto-journey-progress" style={{ height: `${progress * 100}%` }} />
@@ -236,28 +246,22 @@ function TruckScrollbar() {
         style={{ transform: `translate3d(-50%, ${thumbTop}px, 0)` }}
         aria-hidden="true"
       >
-        <span className="proto-journey-thumb-icon" key={SCROLL_STAGES[activeStage].id}>
-          <ActiveIcon />
+        <span className="proto-journey-thumb-icon">
+          <span
+            className="proto-journey-thumb-icon-layer"
+            style={{ opacity: 1 - blend, transform: currentTransform }}
+          >
+            <CurrentIcon />
+          </span>
+          <span
+            className="proto-journey-thumb-icon-layer"
+            style={{ opacity: blend, transform: nextTransform }}
+          >
+            <NextIcon />
+          </span>
         </span>
-        <span className="proto-journey-current-label">{activeLabel}</span>
       </div>
-
-      <ol className="proto-journey-stages">
-        {SCROLL_STAGES.map((stage, index) => (
-          <li key={stage.id}>
-            <button
-              type="button"
-              className={index === activeStage ? 'is-current' : ''}
-              aria-current={index === activeStage ? 'step' : undefined}
-              aria-label={`Go to ${stage.label}`}
-              onClick={() => navigateToStage(stage)}
-            >
-              <span aria-hidden="true" />
-            </button>
-          </li>
-        ))}
-      </ol>
-    </nav>
+    </div>
   );
 }
 
