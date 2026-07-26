@@ -2156,6 +2156,15 @@
   margin-bottom: 22px;
 }
 
+.lp-apply-copy .lp-apply-reassurance {
+  max-width: 520px;
+  margin: 0;
+  color: #7890af;
+  font-size: clamp(15px, 1.15vw, 18px);
+  line-height: 1.55;
+  font-weight: 650;
+}
+
 .lp-apply-note {
   display: flex;
   align-items: center;
@@ -2260,7 +2269,7 @@
 .lp-quiz-field label {
   font-size: 11px;
   font-weight: 800;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.72);
   text-transform: uppercase;
   letter-spacing: 0.9px;
 }
@@ -2288,7 +2297,7 @@
 
 .lp-quiz-field input::placeholder,
 .lp-quiz-field textarea::placeholder {
-  color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.42);
 }
 
 .lp-quiz-field input:focus,
@@ -2469,8 +2478,8 @@
 }
 
 .lp-quiz-next:disabled {
-  background: rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.52);
   cursor: not-allowed;
 }
 
@@ -2577,7 +2586,7 @@
 }
 
 .lp-footer p {
-  color: #475569;
+  color: #64748b;
   font-size: 13px;
   font-weight: 700;
 }
@@ -4714,7 +4723,7 @@ html.proto-journey-active::-webkit-scrollbar {
 }
 
 .proto-journey-rail.is-idle {
-  opacity: 0.35;
+  opacity: 0.5;
 }
 
 .proto-journey-track {
