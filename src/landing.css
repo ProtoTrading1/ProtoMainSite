@@ -339,7 +339,7 @@
   object-position: 72% center;
   z-index: 0;
   /* Keep the headline zone controlled, but let the showroom read clearly. */
-  filter: brightness(0.78) saturate(0.68) contrast(1.03);
+  filter: brightness(0.83) saturate(0.68) contrast(1.03);
   transform: scale(1.02);
   animation: vhero-bg-in 820ms ease-out forwards;
 }
