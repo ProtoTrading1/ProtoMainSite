@@ -38,3 +38,27 @@ export async function requireAdmin(req, res) {
   }
   return user;
 }
+
+export async function requireApprovedCustomer(req, res) {
+  const user = await requireAuth(req, res);
+  if (!user) return null;
+
+  const { data: customer, error } = await getServiceClient()
+    .from('customers')
+    .select('id, role, is_approved')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('approved-customer lookup failed:', error.message);
+    res.status(503).json({ error: 'Account verification is temporarily unavailable' });
+    return null;
+  }
+
+  if (!customer || (customer.role !== 'admin' && customer.is_approved !== true)) {
+    res.status(403).json({ error: 'Approved trade account required' });
+    return null;
+  }
+
+  return { user, customer };
+}
