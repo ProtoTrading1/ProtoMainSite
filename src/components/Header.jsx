@@ -11,6 +11,7 @@ import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
 import AboutModal from './AboutModal';
 import { openIntercom } from '../lib/intercom';
+import { authHeaders } from '../lib/authHeaders';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -75,7 +76,7 @@ function matchCategories(query) {
     .map(({ cat }) => cat);
 }
 
-function ProductRequestModal({ onClose, customer }) {
+function ProductRequestModal({ onClose }) {
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState('');
   const [image, setImage] = useState(null);
@@ -113,8 +114,8 @@ function ProductRequestModal({ onClose, customer }) {
     try {
       const res = await fetch('/api/product-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type, customerEmail: customer?.email || '', customerName: customer?.name || '' }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to send request.');
@@ -1248,7 +1249,7 @@ export default function Header({
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
+      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} />}
     </>
   );
 }
