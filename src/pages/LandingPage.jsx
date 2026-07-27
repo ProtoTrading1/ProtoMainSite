@@ -420,13 +420,13 @@ function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success">
         <CheckCircle2 size={48} />
-        <h3>{instantAccess ? 'You\'re approved — log in now' : 'Application received'}</h3>
+        <h3>{instantAccess ? 'You\'re approved — verify your email' : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. Your email is on our active trade list — your account is live. Log in with ${email.trim()} to access the catalogue.`
-            : `Thank you, ${contactName}. Proto Trading will review your application and contact you about trade access. A confirmation email has been sent to ${email.trim()}.`}
+            ? `Welcome back, ${contactName}. Your email is on our active trade list. We sent a secure verification link to ${email.trim()}; click it before logging in to access the catalogue.`
+            : `Thank you, ${contactName}. A verification email has been sent to ${email.trim()}. Please verify the address while Proto Trading reviews your application.`}
         </p>
-        <button type="button" onClick={onLogin}>{instantAccess ? 'Log in now' : 'Already approved? Log in'}</button>
+        <button type="button" onClick={onLogin}>Go to login</button>
       </div>
     );
   }
