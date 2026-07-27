@@ -257,16 +257,26 @@
 }
 
 .header-search-dropdown .sp-view-all-link {
-  color: #E2BE72;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(226, 190, 114, 0.52);
+  border-radius: 8px;
+  background: rgba(226, 190, 114, 0.11);
+  color: #F0CC7D;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.01em;
+  line-height: 1;
 }
 .header-search-dropdown .sp-view-all-link:hover,
 .header-search-dropdown .sp-view-all-link:focus-visible {
-  color: #FFF2D2;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  border-color: #F0CC7D;
+  background: rgba(226, 190, 114, 0.2);
+  color: #FFF4D7;
+  text-decoration: none;
 }
 
 /* Search start screen */
