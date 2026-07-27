@@ -280,9 +280,12 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             </button>
             <button
               onClick={() => { onClose(); openIntercom(); }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid rgba(139,26,26,0.3)', borderRadius: 10, background: '#fff8f8', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#7f1d1d', cursor: 'pointer' }}
+              aria-label="Ask Proto — online"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1px solid rgba(212,173,86,0.6)', borderRadius: 10, background: '#101010', boxShadow: '0 5px 14px rgba(0,0,0,0.14)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#fff', cursor: 'pointer' }}
             >
-              <MessageCircle size={15} style={{ color: '#8B1A1A' }} /> Ask Proto
+              <MessageCircle size={15} style={{ color: '#D4AD56' }} />
+              Ask Proto
+              <span aria-hidden="true" style={{ width: 6, height: 6, marginLeft: 2, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 3px rgba(34,197,94,0.14)' }} />
             </button>
           </div>
         )}
