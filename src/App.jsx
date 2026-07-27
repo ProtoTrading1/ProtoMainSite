@@ -996,8 +996,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onViewAdmin={onViewAdmin}
         onReorder={() => setReorderModal(true)}
         hasLastOrder={!!lastOrder}
+        previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={() => { if (window.innerWidth > 1200) setCartDrawerOpen(true); else setMobileCartOpen(true); }}
       />
 
