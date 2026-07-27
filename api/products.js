@@ -47,6 +47,16 @@ let catalogMemo = { key: null, payload: null, builtAt: 0 };
 // Safety net: even if a writer ever forgets to bump updated_at, never serve a
 // memoized payload for longer than this.
 const CATALOG_MEMO_MAX_MS = 60_000;
+// The version stamp below is derived from website_stock, but the payload is ALSO
+// built from taxonomy JSON, feature flags, product_placements, product_groups
+// and products.yearly_sales — none of which touch website_stock. Changing one of
+// those (e.g. flipping the multiPlacement kill switch to withdraw products)
+// would otherwise leave the stamp identical and pin clients on a 304 forever.
+// Folding a coarse time bucket into the stamp bounds staleness from ANY input to
+// this window, while still letting every request inside the window share a 304 /
+// the memo. 60s also matches the freshness the previous s-maxage=10 +
+// stale-while-revalidate=60 actually delivered.
+const CATALOG_MAX_STALE_MS = 60_000;
 
 async function loadCatalogVersion(supabase) {
   const { data, count, error } = await supabase
@@ -56,7 +66,8 @@ async function loadCatalogVersion(supabase) {
     .limit(1);
   if (error) throw error;
   const newest = data?.[0]?.updated_at || '0';
-  return { stamp: `${newest}|${count ?? 0}`, newest, count: count ?? 0 };
+  const bucket = Math.floor(Date.now() / CATALOG_MAX_STALE_MS);
+  return { stamp: `${newest}|${count ?? 0}|${bucket}`, newest, count: count ?? 0 };
 }
 
 function etagMatches(req, etag) {

@@ -150,11 +150,13 @@ textarea:focus-visible,
 }
 
 /* ── Scrollbar ──
-   Transparent track so the bar blends into whatever section is behind it
-   (the old solid light track showed as a pale strip down the dark pages and
-   read as the page being "cut off" at the right edge). Reserving the gutter
-   keeps the layout from shifting when a page grows tall enough to scroll. */
-html { scrollbar-gutter: stable; }
+   Transparent track so the bar blends into whatever section is behind it. The
+   old solid light track (#f1f5f9) painted a pale strip down the right edge of
+   the dark pages, which read as the page being "cut off" before the scrollbar.
+   NOTE: do NOT put `scrollbar-gutter: stable` on html — it propagates to the
+   viewport and reserves a gutter even on non-scrolling screens, and because
+   `html` is #050505 that gutter paints as a near-black strip down the right of
+   every portal page (the exact artefact this rule is meant to remove). */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -171,10 +173,10 @@ html { scrollbar-gutter: stable; }
   display: flex;
   overflow: hidden;
   overflow-anchor: none;
-  /* 100vw INCLUDES the vertical scrollbar, so on a scrolling page this shell
-     was ~10px wider than the space actually available and `overflow:hidden`
-     clipped the right edge — the content looked cut off just before the
-     scrollbar. 100% is the true content width. */
+  /* 100% rather than 100vw: 100vw includes the vertical scrollbar, so it can
+     overflow by the scrollbar width on a scrolling page. (Here it resolves the
+     same either way — .main-layout is a stretch flex item of .app-root — but
+     100% is the correct expression of the intent.) */
   max-width: 100%;
   position: relative;
 }

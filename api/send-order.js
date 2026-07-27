@@ -711,7 +711,7 @@ export default async function handler(req, res) {
     // network fan-outs to the slowest one — which is what protects serverless
     // concurrency during a burst of checkouts. Each is individually best-effort:
     // a failure is logged and never fails the order.
-    const [notifySettled] = await Promise.allSettled([
+    const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
       // 1) Team WhatsApp notification (+ stored fulfilment PDF).
       runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed }),
 
@@ -756,6 +756,14 @@ export default async function handler(req, res) {
       notifyResult = notifySettled.value;
     } else {
       console.error('send-order: team notify failed:', notifySettled.reason?.message || notifySettled.reason);
+    }
+    // Keep a server-side trace for the other two as well — allSettled would
+    // otherwise swallow them, leaving a missing acknowledgement email or a
+    // silently-skipped tier upgrade with no evidence in the logs.
+    for (const [label, settled] of [['premium tier check', tierSettled], ['customer ack email', ackSettled]]) {
+      if (settled.status === 'rejected') {
+        console.error(`send-order: ${label} failed:`, settled.reason?.message || settled.reason);
+      }
     }
   }
 
