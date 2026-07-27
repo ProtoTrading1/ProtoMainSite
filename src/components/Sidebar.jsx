@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
+import { openIntercom } from '../lib/intercom';
 let megaMenuPreloadPromise = null;
 
 export function preloadMegaMenu() {
@@ -216,13 +217,13 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
           </button>
           <button
             type="button"
-            onClick={() => { window.location.href = 'mailto:online@proto.co.za'; }}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid #e8eaed', borderRadius: 10, background: '#fafafa', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; e.currentTarget.style.color = '#0f172a'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8eaed'; e.currentTarget.style.color = '#374151'; }}
+            onClick={openIntercom}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid rgba(139,26,26,0.28)', borderRadius: 10, background: '#fff8f8', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#7f1d1d', cursor: 'pointer' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8B1A1A'; e.currentTarget.style.background = '#fff1f2'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(139,26,26,0.28)'; e.currentTarget.style.background = '#fff8f8'; }}
           >
-            <MessageCircle size={15} style={{ flexShrink: 0 }} />
-            Email us
+            <MessageCircle size={15} style={{ flexShrink: 0, color: '#8B1A1A' }} />
+            Ask Proto
           </button>
         </div>
       </div>
