@@ -149,18 +149,35 @@ textarea:focus-visible,
   padding: 100px 0;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+/* ── Scrollbar ──
+   Transparent track so the bar blends into whatever section is behind it. The
+   old solid light track (#f1f5f9) painted a pale strip down the right edge of
+   the dark pages, which read as the page being "cut off" before the scrollbar.
+   NOTE: do NOT put `scrollbar-gutter: stable` on html — it propagates to the
+   viewport and reserves a gutter even on non-scrolling screens, and because
+   `html` is #050505 that gutter paints as a near-black strip down the right of
+   every portal page (the exact artefact this rule is meant to remove). */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.55);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.9); background-clip: content-box; }
 
 /* ── Portal Layout Shell ── */
 .main-layout {
   display: flex;
   overflow: hidden;
   overflow-anchor: none;
-  max-width: 100vw;
+  /* 100% rather than 100vw: 100vw includes the vertical scrollbar, so it can
+     overflow by the scrollbar width on a scrolling page. (Here it resolves the
+     same either way — .main-layout is a stretch flex item of .app-root — but
+     100% is the correct expression of the intent.) */
+  max-width: 100%;
   position: relative;
 }
 

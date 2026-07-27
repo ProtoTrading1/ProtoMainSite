@@ -40,7 +40,11 @@ const SORT_ORDERS_TTL = 15_000;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
-const LS_TTL = 24 * 60 * 60 * 1000;
+// Bounds how stale the FIRST paint can be on a repeat visit. The background
+// revalidate (now a cheap 304 when unchanged) corrects it within a moment, but
+// this caps the window in which a shopper could see yesterday's price. Kept
+// long enough to still give instant repeat loads within a session.
+const LS_TTL = 60 * 60 * 1000;
 
 const _refreshListeners = new Set();
 
@@ -105,7 +109,11 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticate
 // speed up an approved customer's repeat visit, but no public static catalogue
 // is shipped because it would expose trade pricing outside the login gate.
 function startCatalogFetch() {
-  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store', authenticated: true })
+  // 'no-cache' (not 'no-store'): always revalidate with the server, but send
+  // If-None-Match so an unchanged catalogue answers 304 with no body and no
+  // server-side rebuild. Prices/stock stay authoritative; the 6 MB payload is
+  // only transferred when the catalogue has actually changed.
+  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
     .catch(() => {
       const local = loadFromLocalCache();
       if (local) return local;

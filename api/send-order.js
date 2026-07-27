@@ -39,7 +39,9 @@ async function fetchImageBuffer(url) {
     const parsed = new URL(url);
     if (!['https:'].includes(parsed.protocol)) return null;
     if (!ALLOWED_IMAGE_HOSTS.some((host) => parsed.host === host)) return null;
-    const response = await fetch(url);
+    // Bounded: a slow/hung image host must never hold the checkout function
+    // open. Without the image the PDF simply renders that line without a thumb.
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!response.ok) return null;
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
@@ -667,6 +669,9 @@ export default async function handler(req, res) {
         htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
+      // Bounded: a hung Brevo connection must not hold the checkout function
+      // open (it previously had no timeout at all).
+      signal: AbortSignal.timeout(10000),
     });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
@@ -700,52 +705,67 @@ export default async function handler(req, res) {
       console.error('send-order: delivery/notes update failed:', err.message);
     }
 
-    try {
-      notifyResult = await runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed });
-    } catch (err) {
-      console.error('send-order: team notify failed:', err.message);
-    }
+    // The order is already durably saved at this point, and these three tasks
+    // are independent of one another. Running them CONCURRENTLY (instead of
+    // serially) cuts the time this function is held open from the sum of three
+    // network fan-outs to the slowest one — which is what protects serverless
+    // concurrency during a burst of checkouts. Each is individually best-effort:
+    // a failure is logged and never fails the order.
+    const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
+      // 1) Team WhatsApp notification (+ stored fulfilment PDF).
+      runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed }),
 
-    // Premium tier upgrade — recomputed server-side from the stored order row,
-    // never from client-sent totals.
-    try {
-      const supabase = getPortalAdminClient();
-      const { data: order } = await supabase
-        .from('orders')
-        .select('customer_id, items')
-        .eq('id', orderId)
-        .maybeSingle();
-      const orderItems = Array.isArray(order?.items) ? order.items : [];
-      const serverTotal = orderItems.reduce(
-        (sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0),
-        0,
-      );
-      const qualifies = serverTotal > 4000 && orderItems.some((it) => Number(it.qty || 0) > 10);
-      if (qualifies && order?.customer_id) {
-        await supabase
-          .from('customers')
-          .update({ tier: 'premium' })
-          .eq('id', order.customer_id)
-          .eq('tier', 'regular');
+      // 2) Premium tier upgrade — recomputed server-side from the stored order
+      //    row, never from client-sent totals.
+      (async () => {
+        const supabase = getPortalAdminClient();
+        const { data: order } = await supabase
+          .from('orders')
+          .select('customer_id, items')
+          .eq('id', orderId)
+          .maybeSingle();
+        const storedItems = Array.isArray(order?.items) ? order.items : [];
+        const serverTotal = storedItems.reduce(
+          (sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0),
+          0,
+        );
+        const qualifies = serverTotal > 4000 && storedItems.some((it) => Number(it.qty || 0) > 10);
+        if (qualifies && order?.customer_id) {
+          await supabase
+            .from('customers')
+            .update({ tier: 'premium' })
+            .eq('id', order.customer_id)
+            .eq('tier', 'regular');
+        }
+      })(),
+
+      // 3) Customer acknowledgement email (to their verified account email).
+      sendCustomerOrderAck({
+        customer,
+        toEmail: user?.email,
+        orderNumber,
+        items: orderItems,
+        totals,
+        deliveryMethod,
+        customerNotes,
+        promo,
+      }),
+    ]);
+
+    if (notifySettled.status === 'fulfilled') {
+      notifyResult = notifySettled.value;
+    } else {
+      console.error('send-order: team notify failed:', notifySettled.reason?.message || notifySettled.reason);
+    }
+    // Keep a server-side trace for the other two as well — allSettled would
+    // otherwise swallow them, leaving a missing acknowledgement email or a
+    // silently-skipped tier upgrade with no evidence in the logs.
+    for (const [label, settled] of [['premium tier check', tierSettled], ['customer ack email', ackSettled]]) {
+      if (settled.status === 'rejected') {
+        console.error(`send-order: ${label} failed:`, settled.reason?.message || settled.reason);
       }
-    } catch (err) {
-      console.error('send-order: premium tier check failed:', err.message);
     }
   }
-
-  // Email 5 — acknowledge the customer (to their verified account email) after
-  // all order-critical work. Best-effort + bounded, so it never blocks/fails
-  // the order.
-  await sendCustomerOrderAck({
-    customer,
-    toEmail: user?.email,
-    orderNumber,
-    items: orderItems,
-    totals,
-    deliveryMethod,
-    customerNotes,
-    promo,
-  });
 
   return res.status(200).json({
     success: true,
