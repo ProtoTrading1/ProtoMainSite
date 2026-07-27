@@ -218,12 +218,17 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
           <button
             type="button"
             onClick={openIntercom}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid rgba(139,26,26,0.28)', borderRadius: 10, background: '#fff8f8', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#7f1d1d', cursor: 'pointer' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8B1A1A'; e.currentTarget.style.background = '#fff1f2'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(139,26,26,0.28)'; e.currentTarget.style.background = '#fff8f8'; }}
+            aria-label="Ask Proto — online"
+            style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: '1px solid rgba(212,173,86,0.55)', borderRadius: 10, background: '#101010', boxShadow: '0 6px 16px rgba(0,0,0,0.14)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#fff', cursor: 'pointer', transition: 'background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#D4AD56'; e.currentTarget.style.background = '#181818'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(139,26,26,0.2)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(212,173,86,0.55)'; e.currentTarget.style.background = '#101010'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.14)'; e.currentTarget.style.transform = 'translateY(0)'; }}
           >
-            <MessageCircle size={15} style={{ flexShrink: 0, color: '#8B1A1A' }} />
-            Ask Proto
+            <MessageCircle size={16} style={{ flexShrink: 0, color: '#D4AD56' }} />
+            <span>Ask Proto</span>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, color: '#A7F3D0', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em' }}>
+              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 3px rgba(34,197,94,0.14)' }} />
+              Online
+            </span>
           </button>
         </div>
       </div>
