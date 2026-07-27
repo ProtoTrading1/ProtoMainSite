@@ -78,14 +78,6 @@ function readInitialShowWelcome() {
   return !hashHasCategoryPath();
 }
 
-function getProductImageUrl(product, siteOrigin = '') {
-  const src = product.localImage || product.image || '';
-  if (!src) return '';
-  if (/^https?:\/\//i.test(src)) return src;
-  if (!siteOrigin) return src;
-  return `${siteOrigin}${src.startsWith('/') ? src : `/${src}`}`;
-}
-
 function productStockQtyForCart(product) {
   const qtyRaw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
   if (qtyRaw === undefined || qtyRaw === null || qtyRaw === '') return null;
@@ -121,38 +113,6 @@ function normalizeCartQtyInput(qty) {
   const numeric = Number(qty);
   if (!Number.isFinite(numeric) || numeric <= 0) return 1;
   return Math.max(1, Math.floor(numeric));
-}
-
-function buildOrderText(cartItems, cartTotal, promo = null) {
-  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const divider = '-'.repeat(52);
-  const lines = cartItems.map((item, n) => {
-    const lineTotal = `R${(item.product.price * item.qty).toFixed(2)}`;
-    const label = `${n + 1}. ${item.product.name} (${item.product.code}) x ${item.qty}`;
-    const pad = Math.max(1, 52 - label.length - lineTotal.length);
-    return label + ' '.repeat(pad) + lineTotal;
-  });
-  const footer = [`SUBTOTAL (incl. VAT):${' '.repeat(29)}R${cartTotal.toFixed(2)}`];
-  if (promo?.code) {
-    footer.push(`PROMO (${promo.code}, ${promo.discountPct}%):${' '.repeat(Math.max(1, 52 - 20 - promo.code.length))}-R${promo.discountAmount.toFixed(2)}`);
-    footer.push(`EST. TOTAL (incl. VAT):${' '.repeat(22)}R${(promo.total ?? cartTotal - promo.discountAmount).toFixed(2)}`);
-    footer.push('(Estimated — final pricing confirmed by reply.)');
-  }
-  return [
-    'Hi Proto Trading,',
-    '',
-    'Please process the following wholesale order request:',
-    `Date: ${date}`,
-    '',
-    divider,
-    ...lines,
-    divider,
-    ...footer,
-    '',
-    'Please confirm availability, pricing, and delivery.',
-    '',
-    'Thank you',
-  ].join('\n');
 }
 
 function collectionLabel(collection) {
@@ -598,24 +558,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [path]);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [orderText, setOrderText] = useState('');
   const [orderStatus, setOrderStatus] = useState('idle');
   const [orderError, setOrderError] = useState('');
-  const [customerDetails, setCustomerDetails] = useState({
-    name: customer?.name || 'Trade Customer',
-    email: customer?.email || '',
-    phone: customer?.phone || '+27',
-    region: customer?.delivery_address || 'To confirm',
-  });
-
-  useEffect(() => {
-    setCustomerDetails({
-      name: customer?.name || 'Trade Customer',
-      email: customer?.email || '',
-      phone: customer?.phone || '+27',
-      region: customer?.delivery_address || 'To confirm',
-    });
-  }, [customer?.name, customer?.email, customer?.phone, customer?.delivery_address]);
 
   useEffect(() => () => {
     if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
@@ -787,8 +731,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       return;
     }
 
-    const text = buildOrderText(cartItems, cartTotal, promo);
-    setOrderText(text);
     setOrderStatus('sending');
     setOrderError('');
     setModalOpen(true);
