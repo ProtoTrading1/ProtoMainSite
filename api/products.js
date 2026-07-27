@@ -32,6 +32,43 @@ function parseSubcategoryExtra(raw) {
   }
 }
 
+// ── Catalogue version + warm-instance memo ────────────────────────────────
+// Building the full catalogue is expensive (paginated scan of website_stock +
+// a sales lookup). It is identical for every approved customer, so we key it on
+// a cheap version stamp: the newest updated_at plus the row count. Every writer
+// bumps updated_at — admin edits and the ERP price/stock sync both set
+// `updated_at = now()` (migrations 016 / 031) — and archive/create changes the
+// count, so the stamp moves whenever the catalogue actually changes.
+//
+// That gives two big wins under load: repeat requests revalidate with an ETag
+// and get a 304 (no rebuild, no body), and a warm lambda reuses the built
+// payload instead of re-scanning for every request.
+let catalogMemo = { key: null, payload: null, builtAt: 0 };
+// Safety net: even if a writer ever forgets to bump updated_at, never serve a
+// memoized payload for longer than this.
+const CATALOG_MEMO_MAX_MS = 60_000;
+
+async function loadCatalogVersion(supabase) {
+  const { data, count, error } = await supabase
+    .from('website_stock')
+    .select('updated_at', { count: 'exact' })
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (error) throw error;
+  const newest = data?.[0]?.updated_at || '0';
+  return { stamp: `${newest}|${count ?? 0}`, newest, count: count ?? 0 };
+}
+
+function etagMatches(req, etag) {
+  const raw = req.headers['if-none-match'];
+  if (!raw || !etag) return false;
+  // Compare weak validators: a proxy may strip/add the W/ prefix.
+  const norm = (v) => String(v).trim().replace(/^W\//, '').replace(/^"|"$/g, '');
+  return String(raw)
+    .split(',')
+    .some((candidate) => norm(candidate) === norm(etag));
+}
+
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null, maxRows = Infinity) {
   const rows = [];
   let from = 0;
@@ -235,6 +272,44 @@ export default async function handler(req, res) {
       process.env.VITE_STOCK_SUPABASE_KEY,
     );
 
+    // This response is per-customer authorized, so it must never be stored by a
+    // SHARED cache (Vercel's CDN keys on URL, not on the Authorization header —
+    // an s-maxage here could hand the protected catalogue to an unauthenticated
+    // request). Private + revalidate keeps it in the user's own browser cache
+    // only, and the ETag below makes that revalidation cheap.
+    res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+    res.setHeader('Vary', 'Authorization');
+
+    // Full-catalogue request: the expensive path, and the one worth versioning.
+    const isFullCatalog = !requestedSkus?.length && !identifier;
+    let version = null;
+    if (isFullCatalog) {
+      version = await loadCatalogVersion(supabase);
+      const etag = `W/"cat-${version.stamp}"`;
+      res.setHeader('ETag', etag);
+      // Freshness signal: how old the newest catalogue row is, so staleness
+      // (e.g. a stalled ERP sync) is observable rather than silent.
+      if (version.newest && version.newest !== '0') {
+        res.setHeader('X-Catalog-As-Of', String(version.newest));
+        const ageMs = Date.now() - new Date(version.newest).getTime();
+        if (Number.isFinite(ageMs) && ageMs > 6 * 60 * 60 * 1000) {
+          console.warn(`products api: catalogue stale — newest updated_at is ${Math.round(ageMs / 60000)} min old (ERP sync may be down)`);
+        }
+      }
+
+      if (etagMatches(req, etag)) {
+        return res.status(304).end();
+      }
+      if (
+        catalogMemo.key === etag
+        && catalogMemo.payload
+        && Date.now() - catalogMemo.builtAt < CATALOG_MEMO_MAX_MS
+      ) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(200).json(catalogMemo.payload);
+      }
+    }
+
     const [rows, tree, salesByBarcode, placements, groupInfo] = await Promise.all([
       fetchAllRows(
         supabase,
@@ -267,8 +342,9 @@ export default async function handler(req, res) {
         || (p.isMultiCategory && p.alternateCategoryPath?.length)
         || p.placementPaths?.length);
 
-    // Short edge cache so product membership / new products reflect quickly.
-    res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=60');
+    if (isFullCatalog && version) {
+      catalogMemo = { key: `W/"cat-${version.stamp}"`, payload: products, builtAt: Date.now() };
+    }
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
   } catch (err) {

@@ -149,18 +149,33 @@ textarea:focus-visible,
   padding: 100px 0;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+/* ── Scrollbar ──
+   Transparent track so the bar blends into whatever section is behind it
+   (the old solid light track showed as a pale strip down the dark pages and
+   read as the page being "cut off" at the right edge). Reserving the gutter
+   keeps the layout from shifting when a page grows tall enough to scroll. */
+html { scrollbar-gutter: stable; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.55);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.9); background-clip: content-box; }
 
 /* ── Portal Layout Shell ── */
 .main-layout {
   display: flex;
   overflow: hidden;
   overflow-anchor: none;
-  max-width: 100vw;
+  /* 100vw INCLUDES the vertical scrollbar, so on a scrolling page this shell
+     was ~10px wider than the space actually available and `overflow:hidden`
+     clipped the right edge — the content looked cut off just before the
+     scrollbar. 100% is the true content width. */
+  max-width: 100%;
   position: relative;
 }
 

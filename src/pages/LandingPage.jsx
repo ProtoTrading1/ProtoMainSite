@@ -456,7 +456,7 @@ function Questionnaire({ onLogin }) {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="name"
+                  placeholder="Name"
                 />
               </div>
               <div className="lp-quiz-field">

@@ -462,7 +462,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       <input
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
-                        placeholder="name"
+                        placeholder="Name"
                         required
                       />
                     </div>
