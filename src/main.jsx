@@ -41,7 +41,13 @@ createRoot(document.getElementById('root')).render(
 // Boot Intercom after render and isolate any failure so the chat widget can
 // never block the app from mounting.
 try {
-  Intercom({ app_id: 'qk0xorsx', alignment: 'left' });
+  Intercom({
+    app_id: 'qk0xorsx',
+    alignment: 'right',
+    horizontal_padding: 20,
+    vertical_padding: 20,
+    hide_default_launcher: true,
+  });
 } catch (err) {
   console.error('Intercom init failed:', err);
 }
