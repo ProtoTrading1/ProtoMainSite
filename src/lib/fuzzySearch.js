@@ -21,6 +21,27 @@ const SCORE = {
 };
 
 const searchIndex = new WeakMap();
+const suggestionCache = new WeakMap();
+const datasetIndex = new WeakMap();
+
+// Proto-specific language customers commonly use. The canonical term is added
+// to the query; the original words remain, so this expands rather than replaces
+// what the customer typed.
+const SEARCH_SYNONYMS = new Map([
+  ['purse', ['wallet', 'handbag']],
+  ['purses', ['wallet', 'handbag']],
+  ['teddy', ['soft toy']],
+  ['teddies', ['soft toy']],
+  ['stationary', ['stationery']],
+  ['earring back', ['butterfly']],
+  ['earring backs', ['butterfly']],
+  ['gift bag', ['paper bag', 'carrier bag']],
+  ['gift bags', ['paper bag', 'carrier bag']],
+  ['cellphone', ['mobile phone']],
+  ['cell phone', ['mobile phone']],
+  ['colouring', ['coloring']],
+  ['jewellery', ['jewelry']],
+]);
 
 function normalize(value) {
   return String(value || '')
@@ -34,6 +55,28 @@ function normalize(value) {
 
 function compact(value) {
   return normalize(value).replace(/\s+/g, '');
+}
+
+function queryVariants(value) {
+  const normalized = normalize(value);
+  if (!normalized) return [];
+  const variants = [normalized];
+  for (const [phrase, synonyms] of SEARCH_SYNONYMS) {
+    if (!normalized.includes(phrase)) continue;
+    for (const synonym of synonyms) {
+      variants.push(normalized.replace(phrase, synonym));
+    }
+  }
+  return [...new Set(variants)];
+}
+
+export function getRelatedSearchTerm(value) {
+  const normalized = normalize(value);
+  if (!normalized) return null;
+  for (const [phrase, synonyms] of SEARCH_SYNONYMS) {
+    if (normalized.includes(phrase)) return synonyms[0] || null;
+  }
+  return null;
 }
 
 function words(text) {
@@ -182,6 +225,89 @@ function getSearchIndex(product) {
   return index;
 }
 
+export function prepareSearchIndex(products) {
+  if (!Array.isArray(products) || datasetIndex.has(products)) return;
+  const tokenMap = new Map();
+  const add = (token, product) => {
+    if (!token) return;
+    let matches = tokenMap.get(token);
+    if (!matches) {
+      matches = new Set();
+      tokenMap.set(token, matches);
+    }
+    matches.add(product);
+  };
+
+  for (const product of products) {
+    const index = getSearchIndex(product);
+    const tokens = new Set([
+      ...index.nameWords,
+      ...index.descWords,
+      ...words(index.keywordText),
+      index.nameCompact,
+      ...index.skus.flatMap((value) => [value.norm, value.compact, value.idNorm]),
+      ...index.barcodes.flatMap((value) => [value.norm, value.compact, value.idNorm]),
+    ]);
+    for (const token of tokens) add(token, product);
+  }
+  datasetIndex.set(products, { tokenMap, vocabulary: [...tokenMap.keys()] });
+}
+
+function intersectSets(left, right) {
+  if (!left) return new Set(right);
+  const result = new Set();
+  const [small, large] = left.size <= right.size ? [left, right] : [right, left];
+  for (const value of small) {
+    if (large.has(value)) result.add(value);
+  }
+  return result;
+}
+
+function candidateProducts(products, query) {
+  prepareSearchIndex(products);
+  const prepared = datasetIndex.get(products);
+  if (!prepared) return products;
+  if (isIdentifierQuery(query)) return products;
+
+  const tokens = normalize(query).split(/\s+/).filter((token) => token.length >= 2);
+  if (tokens.length === 0) return products;
+
+  let candidates = null;
+  for (const token of tokens) {
+    let tokenMatches = prepared.tokenMap.get(token);
+    if (!tokenMatches) {
+      tokenMatches = new Set();
+      for (const word of prepared.vocabulary) {
+        const prefixMatch = word.startsWith(token) || token.startsWith(word);
+        const typoMatch = token.length >= 4
+          && word.length >= 4
+          && /^[a-z]+$/.test(token)
+          && /^[a-z]+$/.test(word)
+          && Math.abs(token.length - word.length) <= 1
+          && typoDistance(token, word) === 1;
+        if (!prefixMatch && !typoMatch) continue;
+        for (const product of prepared.tokenMap.get(word)) tokenMatches.add(product);
+      }
+    }
+    candidates = intersectSets(candidates, tokenMatches);
+    if (candidates.size === 0) break;
+  }
+  return candidates ? [...candidates] : products;
+}
+
+function isAvailable(product) {
+  const raw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const qty = Number(raw);
+    if (Number.isFinite(qty) && qty !== 0) return true;
+    return product?.toOrder === true
+      || product?.to_order === true
+      || product?.orderableWhenOutOfStock === true
+      || product?.orderable_when_out_of_stock === true;
+  }
+  return product?.inStock !== false;
+}
+
 function scoreExactSku(index, token, tokenCompact) {
   for (const sku of index.skus) {
     if (sku.norm === token || sku.compact === tokenCompact) return SCORE.EXACT_SKU;
@@ -310,18 +436,40 @@ function scoreProduct(product, query) {
 }
 
 export function fuzzyFilter(products, query) {
-  const q = normalize(query);
-  if (!q) return products;
+  const variants = queryVariants(query);
+  if (variants.length === 0) return products;
 
-  const scored = products
-    .map((product) => ({ product, score: scoreProduct(product, query) }))
+  const candidateSet = new Set();
+  for (const variant of variants) {
+    for (const product of candidateProducts(products, variant)) candidateSet.add(product);
+  }
+
+  const scored = [...candidateSet]
+    .map((product) => ({
+      product,
+      score: Math.max(...variants.map((variant) => scoreProduct(product, variant))),
+    }))
     .filter((item) => item.score >= SEARCH_MIN_CONFIDENCE)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      const scoreDelta = b.score - a.score;
+      if (scoreDelta !== 0) return scoreDelta;
+      return Number(isAvailable(b.product)) - Number(isAvailable(a.product));
+    });
 
   return scored.map((item) => item.product);
 }
 
 export function getSuggestions(products, query, limit = 8) {
   if (!query || !query.trim()) return [];
-  return fuzzyFilter(products, query).slice(0, limit);
+  let cache = suggestionCache.get(products);
+  if (!cache) {
+    cache = new Map();
+    suggestionCache.set(products, cache);
+  }
+  const key = `${normalize(query)}::${limit}`;
+  if (cache.has(key)) return cache.get(key);
+  const result = fuzzyFilter(products, query).slice(0, limit);
+  cache.set(key, result);
+  if (cache.size > 80) cache.delete(cache.keys().next().value);
+  return result;
 }
