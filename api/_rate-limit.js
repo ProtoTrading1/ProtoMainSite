@@ -64,8 +64,18 @@ export async function checkRateLimit({ bucket, max, windowSeconds, supabase }) {
   return memoryCheck(bucket, max, windowSeconds);
 }
 
-/** Best-effort client IP for keying rate limits (behind Vercel's proxy). */
+/** Trusted client IP for keying rate limits (behind Vercel's proxy).
+ * The LEFTMOST x-forwarded-for entry is client-supplied and spoofable, so an
+ * attacker could rotate it to get a fresh bucket every request. Prefer the
+ * proxy-set headers (x-real-ip / x-vercel-forwarded-for) and, only as a last
+ * resort, the CLOSEST (rightmost) x-forwarded-for hop rather than the leftmost. */
 export function clientIp(req) {
-  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return xff || String(req.headers['x-real-ip'] || '').trim() || req.socket?.remoteAddress || 'unknown';
+  const realIp = String(req.headers['x-real-ip'] || '').trim();
+  if (realIp) return realIp;
+  const vercelIp = String(req.headers['x-vercel-forwarded-for'] || '').split(',')[0].trim();
+  if (vercelIp) return vercelIp;
+  const xffChain = String(req.headers['x-forwarded-for'] || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  if (xffChain.length) return xffChain[xffChain.length - 1];
+  return req.socket?.remoteAddress || 'unknown';
 }
