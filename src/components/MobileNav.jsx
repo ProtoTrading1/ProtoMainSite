@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
+import { openIntercom } from '../lib/intercom';
 
 function MobileProductRequest({ onClose: closeAll, customer }) {
   const [description, setDescription] = useState('');
@@ -278,10 +279,10 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               <PackageSearch size={15} style={{ color: '#8B1A1A' }} /> Can't find it?
             </button>
             <button
-              onClick={() => { window.location.href = 'mailto:online@proto.co.za'; onClose(); }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
+              onClick={() => { onClose(); openIntercom(); }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid rgba(139,26,26,0.3)', borderRadius: 10, background: '#fff8f8', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#7f1d1d', cursor: 'pointer' }}
             >
-              <MessageCircle size={15} style={{ color: '#374151' }} /> Email us
+              <MessageCircle size={15} style={{ color: '#8B1A1A' }} /> Ask Proto
             </button>
           </div>
         )}
