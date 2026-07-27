@@ -10,10 +10,20 @@ const DEFAULT_NOTIFY_EMAILS = ['george@proto.co.za', 'online@proto.co.za', 'dani
 
 function resolveOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS || process.env.ORDER_TO_EMAIL || '';
-  const emails = raw
-    ? raw.split(',').map((part) => part.trim()).filter(Boolean)
-    : DEFAULT_NOTIFY_EMAILS;
-  return [...new Set(emails)];
+  const extra = raw.split(',').map((part) => part.trim()).filter(Boolean);
+  // Always include the core team addresses — an env override may only ADD
+  // recipients, never silently drop online@/george@ from order notifications
+  // (case-insensitive dedupe so a differently-cased env entry isn't duplicated).
+  const merged = [...DEFAULT_NOTIFY_EMAILS, ...extra];
+  const seen = new Set();
+  const out = [];
+  for (const email of merged) {
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(email);
+  }
+  return out;
 }
 
 function money(value) {
