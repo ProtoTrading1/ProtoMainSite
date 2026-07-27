@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
+import { requireApprovedCustomer } from './_auth.js';
 
 function getAdminClient() {
   return createClient(
@@ -18,6 +19,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const access = await requireApprovedCustomer(req, res);
+  if (!access) return;
+
   const supabase = getAdminClient();
   const body = req.body || {};
   const { action } = body;
@@ -28,8 +32,6 @@ export default async function handler(req, res) {
         searchTerm,
         resultsFound,
         sessionId,
-        customerId = null,
-        customerEmail = null,
         filtersApplied = [],
         refinementOfSearchId = null,
         normalizedSearchTerm,
@@ -40,9 +42,11 @@ export default async function handler(req, res) {
       if (!term || !sid) return res.status(400).json({ error: 'searchTerm and sessionId required' });
       if (term.length < 3) return res.status(200).json({ ok: true, skipped: true });
 
-      // Unauthenticated insert — throttle per IP so the table can't be spammed.
-      // Generous: real searching never approaches this rate.
-      const rl = await checkRateLimit({ bucket: `search-log:${clientIp(req)}`, max: 60, windowSeconds: 60 });
+      const rl = await checkRateLimit({
+        bucket: `search-log:${access.user.id}:${clientIp(req)}`,
+        max: 60,
+        windowSeconds: 60,
+      });
       if (!rl.allowed) return res.status(200).json({ ok: true, skipped: true });
 
       const { data, error } = await supabase
@@ -52,8 +56,8 @@ export default async function handler(req, res) {
           normalized_search_term: String(normalizedSearchTerm || term).slice(0, 200),
           results_found: Math.max(0, Number(resultsFound) || 0),
           session_id: sid,
-          customer_id: customerId || null,
-          customer_email: customerEmail ? String(customerEmail).slice(0, 320) : null,
+          customer_id: access.user.id,
+          customer_email: access.user.email || null,
           search_filter_applied: Array.isArray(filtersApplied) && filtersApplied.length ? filtersApplied : null,
           refinement_of_search_id: refinementOfSearchId || null,
         })
@@ -80,7 +84,8 @@ export default async function handler(req, res) {
           search_position_clicked: position != null ? Math.max(1, Number(position) || 1) : null,
           time_to_click_ms: timeToClickMs != null ? Math.max(0, Number(timeToClickMs) || 0) : null,
         })
-        .eq('id', searchRowId);
+        .eq('id', searchRowId)
+        .eq('customer_id', access.user.id);
 
       if (error && error.code !== '42P01') throw error;
       return res.status(200).json({ ok: true });
@@ -92,7 +97,8 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from('search_analytics')
         .update({ added_to_cart: true })
-        .eq('id', searchRowId);
+        .eq('id', searchRowId)
+        .eq('customer_id', access.user.id);
       if (error && error.code !== '42P01') throw error;
       return res.status(200).json({ ok: true });
     }
@@ -107,7 +113,8 @@ export default async function handler(req, res) {
           order_number: orderNumber ? String(orderNumber).slice(0, 80) : null,
           order_value: orderValue != null ? Number(orderValue) : null,
         })
-        .eq('id', searchRowId);
+        .eq('id', searchRowId)
+        .eq('customer_id', access.user.id);
       if (error && error.code !== '42P01') throw error;
       return res.status(200).json({ ok: true });
     }
