@@ -68,7 +68,6 @@ function hashHasCategoryPath() {
   const pathStr = (raw.split('?')[0] || '').trim();
   if (!pathStr) return false;
   const segments = pathStr.split('/').filter(Boolean);
-  if (segments[0] === 'portal-preview') return segments.length > 1;
   return segments.length > 0;
 }
 
@@ -522,37 +521,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         warmPageImages(pageData.products);
         void countsPromise;
       } catch {
-        // If primary catalogue load fails, keep fallback counts source authoritative.
-        // This avoids a late async counts write racing over fallback UI state.
+        // Never fall back to a public catalogue file: trade pricing and stock
+        // are available only through the approved-customer API.
         allowCountsUpdate = false;
-        // products.json is regenerated on every deploy; stockProducts.json was a frozen stale snapshot.
-        const response = await fetch('/products.json');
-        const fallback = await response.json();
         if (cancelled) return;
-        let rows = Array.isArray(fallback) ? fallback : [];
-        if (activeCollection === 'hot') rows = rows.filter((item) => (item.badges || []).includes('Hot seller'));
-        if (activeCollection === 'specials') rows = rows.filter((item) => item.isNew);
-        if (activeCollection === 'clearance') rows = rows.filter((item) => item.isSpecial);
-        const hasSearch = Boolean(searchQuery.trim());
-        if (!hasSearch && path.length) {
-          const resolved = resolveNavPathForProducts(path, categories);
-          rows = rows.filter((item) => resolved.every((seg, index) => item.categoryPath?.[index] === seg));
-        }
-        if (hasSearch) rows = fuzzyFilter(rows, searchQuery);
-        if (inStockOnly) rows = rows.filter(isProductAvailable);
-        rows = sortCatalogProducts(rows, sort, { hasSearch });
-        rows = groupProductsByBarcode(rows);
-        if (rows.length > 0) {
-          const maxPage = Math.max(1, Math.ceil(rows.length / CATALOG_PAGE_SIZE));
-          if (page > maxPage) {
-            setPage(maxPage);
-            return;
-          }
-        }
-        setUsingFallback(true);
-        setCatalogTotal(rows.length);
-        setCatalogProducts(rows.slice((page - 1) * CATALOG_PAGE_SIZE, page * CATALOG_PAGE_SIZE));
-        setCounts({ '': rows.length });
+        setUsingFallback(false);
+        setCatalogTotal(0);
+        setCatalogProducts([]);
+        setCounts({ '': 0 });
       } finally {
         if (!cancelled) setLoading(false);
       }
