@@ -10,20 +10,10 @@ const DEFAULT_NOTIFY_EMAILS = ['george@proto.co.za', 'online@proto.co.za', 'dani
 
 function resolveOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS || process.env.ORDER_TO_EMAIL || '';
-  const extra = raw.split(',').map((part) => part.trim()).filter(Boolean);
-  // Always include the core team addresses — an env override may only ADD
-  // recipients, never silently drop online@/george@ from order notifications
-  // (case-insensitive dedupe so a differently-cased env entry isn't duplicated).
-  const merged = [...DEFAULT_NOTIFY_EMAILS, ...extra];
-  const seen = new Set();
-  const out = [];
-  for (const email of merged) {
-    const key = email.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(email);
-  }
-  return out;
+  const emails = raw
+    ? raw.split(',').map((part) => part.trim()).filter(Boolean)
+    : DEFAULT_NOTIFY_EMAILS;
+  return [...new Set(emails)];
 }
 
 function money(value) {
@@ -87,67 +77,86 @@ function getStockClient() {
   );
 }
 
-/**
- * Resolve authoritative unit prices from website_stock (Stock DB), keyed by sku
- * with a barcode fallback, so promo eligibility and stored totals don't trust
- * the client-supplied product.price.
- *
- * Returns:
- *  - authItems: items with product.price replaced by the server price when the
- *    product was found (client price kept otherwise, so a rare unlisted item
- *    still shows a sane estimate the team confirms).
- *  - gateSubtotal: sum over ONLY server-priced items — used for the promo
- *    minimum-order check so a client can't inflate a price (or invent a sku) to
- *    clear a minOrder threshold.
- *  - resolved: false if the Stock DB lookup errored, so the caller can fall back
- *    to the client subtotal for the gate rather than block a legitimate promo.
- */
+const MAX_ORDER_LINES = 250;
+const MAX_QTY_PER_LINE = 100000;
+
 async function resolveAuthoritativePrices(items) {
+  if (items.length > MAX_ORDER_LINES) {
+    const error = new Error(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
+    error.status = 400;
+    throw error;
+  }
+
   const skus = [...new Set(items
     .map((i) => String(i.product?.sku || i.product?.id || '').trim().toUpperCase())
     .filter(Boolean))];
   const barcodes = [...new Set(items
     .map((i) => String(i.product?.code || i.product?.barcode || '').trim())
     .filter(Boolean))];
-  const priceBySku = new Map();
-  const priceByBarcode = new Map();
-  let resolved = true;
+  const productBySku = new Map();
+  const productByBarcode = new Map();
   try {
     const sb = getStockClient();
     if (skus.length) {
-      const { data, error } = await sb.from('website_stock').select('sku, price').in('sku', skus);
+      const { data, error } = await sb
+        .from('website_stock')
+        .select('sku, barcode, title, price, image_url_one')
+        .in('sku', skus);
       if (error) throw error;
-      for (const r of data || []) priceBySku.set(String(r.sku).trim().toUpperCase(), Number(r.price) || 0);
+      for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
     }
     if (barcodes.length) {
-      const { data, error } = await sb.from('website_stock').select('barcode, price').in('barcode', barcodes);
+      const { data, error } = await sb
+        .from('website_stock')
+        .select('sku, barcode, title, price, image_url_one')
+        .in('barcode', barcodes);
       if (error) throw error;
-      for (const r of data || []) {
-        if (r.barcode != null) priceByBarcode.set(String(r.barcode).trim(), Number(r.price) || 0);
+      for (const row of data || []) {
+        if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
       }
     }
   } catch (err) {
-    console.error('send-order: authoritative price lookup failed, using client prices:', err?.message || err);
-    resolved = false;
+    console.error('send-order: authoritative product lookup failed:', err?.message || err);
+    const unavailable = new Error('Current product pricing could not be verified. Please try again.');
+    unavailable.status = 503;
+    throw unavailable;
   }
 
-  let gateSubtotal = 0;
-  const authItems = items.map((item) => {
+  const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
     const barcode = String(product.code || product.barcode || '').trim();
-    const qty = Number(item.qty || 0);
-    let serverPrice;
-    if (priceBySku.has(sku)) serverPrice = priceBySku.get(sku);
-    else if (barcode && priceByBarcode.has(barcode)) serverPrice = priceByBarcode.get(barcode);
-    if (serverPrice != null) {
-      gateSubtotal += serverPrice * qty;
-      return { ...item, product: { ...product, price: serverPrice } };
+    const qty = Number(item.qty);
+    if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) {
+      const error = new Error(`Invalid quantity on order line ${index + 1}.`);
+      error.status = 400;
+      throw error;
     }
-    return item;
+    const row = productBySku.get(sku) || (barcode ? productByBarcode.get(barcode) : null);
+    const price = Number(row?.price);
+    if (!row || !Number.isFinite(price) || price < 0) {
+      const error = new Error(`Product on order line ${index + 1} is unavailable.`);
+      error.status = 400;
+      throw error;
+    }
+    const authoritativeSku = cleanText(row.sku);
+    const authoritativeBarcode = cleanText(row.barcode);
+    return {
+      qty,
+      product: {
+        id: authoritativeSku,
+        sku: authoritativeSku,
+        code: authoritativeBarcode,
+        barcode: authoritativeBarcode,
+        name: cleanText(row.title, authoritativeSku),
+        price,
+        image: cleanText(row.image_url_one),
+        remoteImage: cleanText(row.image_url_one),
+      },
+    };
   });
 
-  return { authItems, gateSubtotal, resolved };
+  return authItems;
 }
 
 function estimatedTotal(subtotal, discountAmount) {
@@ -244,18 +253,15 @@ function buildOrderEmailRows(items) {
     const name = escapeHtml(cleanText(product.name, 'Product'));
     const img = cleanText(product.image || product.remoteImage || '');
     const imgCell = /^https:\/\//i.test(img)
-      ? `<img src="${escapeHtml(img)}" alt="" width="92" height="92" style="width:92px;height:92px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
-      : `<div style="width:92px;height:92px;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;"></div>`;
-    // Force a page break after every 10th line so a printout never crams more
-    // than 10 items onto a page (rows also never split across a page).
-    const pageBreak = ((i + 1) % 10 === 0 && i + 1 < items.length) ? ' ord-break' : '';
+      ? `<img src="${escapeHtml(img)}" alt="" width="46" height="46" style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
+      : `<div style="width:46px;height:46px;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;"></div>`;
     return `
-      <tr class="ord-row${pageBreak}">
-        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:14px;font-weight:700;text-align:center;">${i + 1}</td>
-        <td style="padding:14px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
-        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
-        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:600;line-height:1.4;">${name}</td>
-        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:17px;font-weight:800;text-align:center;">${qty}</td>
+      <tr>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:16px;font-weight:800;text-align:center;">${qty}</td>
       </tr>`;
   }).join('');
 }
@@ -341,31 +347,20 @@ function buildOrderEmailHtml({
     <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">Estimated only — final pricing, stock and delivery are confirmed by our team on reply.</p>`;
 
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title>
-<style>
-  @media print {
-    html, body { background:#ffffff !important; }
-    .ord-shell { padding:0 !important; background:#ffffff !important; }
-    .ord-card { box-shadow:none !important; border:none !important; border-radius:0 !important; }
-    tr.ord-row { page-break-inside: avoid; }
-    tr.ord-break { page-break-after: always; }
-    thead { display: table-header-group; }
-  }
-</style>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" class="ord-shell" style="background:#f4f4f5;padding:32px 12px;"><tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" class="ord-card" style="width:100%;max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 6px 24px rgba(15,23,42,0.08);">
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title></head>
+<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:28px 34px 22px;background:#ffffff;border-bottom:1px solid #eef2f7;">
-  <div style="margin-bottom:14px;">
+<tr><td align="center" style="padding:34px 34px 28px;background:#141414;">
+  <div style="display:inline-block;background:#ffffff;padding:13px 20px;border-radius:8px;margin-bottom:22px;">
     <span style="font-size:28px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:0.5px;"> TRADING</span>
+    <span style="font-size:19px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
   </div>
-  <h1 style="margin:0;color:#0f172a;font-size:26px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
-  <p style="margin:8px 0 0;color:#64748b;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#c40000;font-weight:800;">${ref}</span>` : ''}</p>
+  <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
+  <p style="margin:10px 0 0;color:#cfcfcf;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#ff6a4d;font-weight:800;">${ref}</span>` : ''}</p>
 </td></tr>
-<tr><td style="padding:30px 32px 28px;background:#ffffff;">
+<tr><td style="padding:34px 32px 30px;background:#ffffff;">
   ${intro}
   ${metaRow}
   ${contactBlock}
@@ -385,9 +380,9 @@ function buildOrderEmailHtml({
   ${notesBlock}
   <p style="margin:26px 0 0;color:#666666;font-size:13px;line-height:1.6;">Questions? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
 </td></tr>
-<tr><td align="center" style="padding:22px 34px;background:#ffffff;border-top:1px solid #eef2f7;">
-  <p style="margin:0 0 6px;color:#0f172a;font-size:17px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+<tr><td align="center" style="padding:28px 34px;background:#181818;border-top:1px solid #292929;">
+  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
+  <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -446,13 +441,7 @@ function isMissingClientRefColumn(error) {
     && msg.includes('client_ref');
 }
 
-/**
- * Server-side order capture — the failsafe for P0-2. Runs when the browser
- * insert failed or was skipped (no orderId in the payload), using the verified
- * auth user's id as customer_id (customers.id === auth user id). Idempotent on
- * client_ref (migration 030), so a retried checkout can never double-insert.
- * Returns the order row or null; never throws.
- */
+/** Persist a verified order. Idempotency is scoped to the authenticated user. */
 async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
   try {
     if (clientRef) {
@@ -460,6 +449,7 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
         .from('orders')
         .select('*')
         .eq('client_ref', clientRef)
+        .eq('customer_id', userId)
         .maybeSingle();
       if (existing) return existing;
     }
@@ -503,19 +493,12 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
       insertRow = withoutRef;
       ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
     }
-    if (error && error.code === '23503') {
-      // Foreign-key violation: no customers row for this auth user — the exact
-      // "missing profile" case this failsafe exists for. customer_id is
-      // nullable, so persist the order unlinked rather than losing it entirely.
-      console.warn('send-order: no customer profile for user, capturing order unlinked:', userId);
-      insertRow = { ...insertRow, customer_id: null };
-      ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
-    }
     if (error && error.code === '23505' && clientRef) {
       const { data: existing } = await supabase
         .from('orders')
         .select('*')
         .eq('client_ref', clientRef)
+        .eq('customer_id', userId)
         .maybeSingle();
       if (existing) return existing;
     }
@@ -546,8 +529,6 @@ export default async function handler(req, res) {
 
   const {
     items = [],
-    customer = {},
-    orderId: rawOrderId,
     clientRef: rawClientRef,
     deliveryMethod: rawDeliveryMethod,
     customerNotes: rawCustomerNotes,
@@ -559,23 +540,33 @@ export default async function handler(req, res) {
 
   const deliveryMethod = cleanText(rawDeliveryMethod);
   const customerNotes = cleanText(rawCustomerNotes);
-  if (!deliveryMethod) {
+  const allowedDeliveryMethods = new Set([
+    "Customer's own courier",
+    'Proto Trading delivers',
+    'In store pick up',
+  ]);
+  if (!allowedDeliveryMethods.has(deliveryMethod)) {
     return res.status(400).json({ error: 'Delivery method is required' });
   }
+  if (customerNotes.length > 2000) {
+    return res.status(400).json({ error: 'Customer notes are too long.' });
+  }
+  const clientRef = cleanText(rawClientRef);
+  if (!/^(?:[0-9a-f]{8}-[0-9a-f-]{27}|ref-[A-Za-z0-9-]{12,80})$/i.test(clientRef)) {
+    return res.status(400).json({ error: 'Invalid checkout reference.' });
+  }
 
-  // Prices are re-derived from the Stock DB — never trusted from the client — so
-  // the promo minimum-order gate and the stored totals can't be gamed by sending
-  // an inflated product.price.
-  const { authItems: orderItems, gateSubtotal, resolved: pricesResolved } = await resolveAuthoritativePrices(items);
+  let orderItems;
+  try {
+    orderItems = await resolveAuthoritativePrices(items);
+  } catch (err) {
+    return res.status(err?.status || 500).json({ error: err?.message || 'Order items could not be verified.' });
+  }
   const subtotal = computeSubtotal(orderItems);
-  // Gate the promo on authoritative prices when we could resolve them; if the
-  // Stock DB was unreachable, fall back to the client subtotal so a legitimate
-  // promo isn't blocked by an outage.
-  const promoGateSubtotal = pricesResolved ? gateSubtotal : subtotal;
   let promo = null;
   const promoCode = cleanText(rawPromoCode).toUpperCase();
   if (promoCode) {
-    const promoResult = await validatePromoCode(promoCode, promoGateSubtotal);
+    const promoResult = await validatePromoCode(promoCode, subtotal);
     if (!promoResult.valid) {
       return res.status(400).json({ error: promoResult.error || 'Invalid promo code.' });
     }
@@ -594,46 +585,44 @@ export default async function handler(req, res) {
 
   const notifyEmails = resolveOrderNotifyRecipients();
 
-  // Failsafe: if the browser insert didn't land (no orderId), capture the order
-  // here with the service-role client before anything is emailed. If even this
-  // fails, the team email below becomes the dead-letter and is flagged loudly.
-  let orderId = String(rawOrderId || '').trim();
-  let orderNumber = '';
-  let dbCaptureFailed = false;
-  if (orderId) {
-    // A client-supplied order id MUST belong to the caller. The update/notify/
-    // tier block below uses the service-role client (which bypasses RLS), so
-    // without this check any authenticated user could point send-order at
-    // another customer's order and overwrite its fields or re-notify the team
-    // (IDOR). Orders always carry customer_id = auth uid (see captureOrderRow /
-    // saveOrder); a 404 avoids leaking whether the id exists.
-    const { data: owner } = await getPortalAdminClient()
-      .from('orders')
-      .select('customer_id, order_number')
-      .eq('id', orderId)
-      .maybeSingle();
-    if (!owner || owner.customer_id !== user.id) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    orderNumber = cleanText(owner.order_number);
-  } else {
-    const captured = await captureOrderRow({
-      supabase: getPortalAdminClient(),
-      userId: user.id,
-      items: orderItems,
-      subtotal,
-      deliveryMethod,
-      customerNotes,
-      promo,
-      clientRef: cleanText(rawClientRef),
-    });
-    if (captured?.id) {
-      orderId = String(captured.id);
-      orderNumber = cleanText(captured.order_number);
-    } else {
-      dbCaptureFailed = true;
-    }
+  const portal = getPortalAdminClient();
+  const { data: profile, error: profileError } = await portal
+    .from('customers')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  if (profileError || !profile) {
+    console.error('send-order: customer profile lookup failed:', profileError?.message);
+    return res.status(503).json({ error: 'Your customer profile could not be verified. Please try again.' });
   }
+  const customer = {
+    name: cleanText(profile.name || profile.business_name, 'Trade customer'),
+    email: cleanText(user.email),
+    phone: cleanText(profile.phone),
+    region: cleanText(
+      profile.delivery_address
+      || [profile.city, profile.province, profile.country].filter(Boolean).join(', '),
+      'To confirm',
+    ),
+  };
+
+  const captured = await captureOrderRow({
+    supabase: portal,
+    userId: user.id,
+    items: orderItems,
+    subtotal,
+    deliveryMethod,
+    customerNotes,
+    promo,
+    clientRef,
+  });
+  if (!captured?.id) {
+    return res.status(500).json({
+      error: 'Your order could not be submitted. Nothing was lost from your cart — please try again.',
+    });
+  }
+  const orderId = String(captured.id);
+  const orderNumber = cleanText(captured.order_number);
 
   // PDF generation must never block the order email. pdfkit can fail on
   // serverless (e.g. missing AFM font data); if it does, log the real error and
@@ -673,13 +662,9 @@ export default async function handler(req, res) {
           email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
         },
         to: notifyEmails.map((email) => ({ email })),
-        replyTo: customer.email ? { email: cleanText(customer.email) } : undefined,
-        subject: dbCaptureFailed
-          ? `⚠️ MANUAL CAPTURE NEEDED — Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`
-          : `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: (dbCaptureFailed
-          ? '<div style="background:#c40000;color:#ffffff;padding:16px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;">⚠️ DATABASE CAPTURE FAILED — this order exists only in this email. Capture it manually in the admin portal, then investigate the orders insert failure in the logs.</div>'
-          : '') + buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
+        replyTo: customer.email ? { email: customer.email } : undefined,
+        subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
+        htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
         attachment,
       }),
     });
@@ -748,15 +733,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Both capture channels lost: no DB row AND no team email. The order does not
-  // exist anywhere durable, so this must surface as a failure — the customer
-  // keeps their cart and can retry (the clientRef makes the retry idempotent).
-  if (dbCaptureFailed && emailDeliveryFailed) {
-    return res.status(500).json({
-      error: 'Your order could not be submitted. Nothing was lost from your cart — please try again.',
-    });
-  }
-
   // Email 5 — acknowledge the customer (to their verified account email) after
   // all order-critical work. Best-effort + bounded, so it never blocks/fails
   // the order.
@@ -773,8 +749,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     success: true,
-    orderId: orderId || null,
-    dbCaptureFailed,
+    orderId,
+    dbCaptureFailed: false,
     emailDeliveryFailed,
     emailFailReason: emailDeliveryFailed ? emailFailReason : null,
     notify: notifyResult,
