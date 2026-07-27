@@ -464,6 +464,14 @@
   color: #C89A3C;
 }
 
+.app-header--premium .header-nav-ask-proto {
+  color: #E5E5E5;
+}
+
+.app-header--premium .header-nav-ask-proto svg {
+  color: #D4AD56;
+}
+
 .app-header--premium .header-nav-specials:hover {
   background: transparent;
   color: #D4AD56;
@@ -562,6 +570,12 @@
 
 .app-header--premium .header-icon-mobile {
   transition: opacity 180ms ease;
+}
+
+.app-header--premium .header-icon-mobile--ask-proto {
+  color: #D4AD56;
+  border-color: rgba(212, 173, 86, 0.42);
+  background: rgba(212, 173, 86, 0.08);
 }
 
 .app-header--premium .header-action span {
