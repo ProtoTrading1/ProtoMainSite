@@ -1,5 +1,6 @@
 import { escapeHtml } from './_escape-html.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
+import { requireApprovedCustomer } from './_auth.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '8mb' } },
@@ -8,19 +9,49 @@ export const config = {
 const MAX_IMAGE_BASE64 = 7 * 1024 * 1024; // ~5MB decoded
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
+function detectedImageType(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'))) return 'image/gif';
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return null;
+}
+
+export function validateImagePayload(imageBase64, claimedType) {
+  const encoded = String(imageBase64 || '').trim();
+  if (!encoded || encoded.length > MAX_IMAGE_BASE64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    return { ok: false, error: 'Image is invalid or too large.' };
+  }
+  const buffer = Buffer.from(encoded, 'base64');
+  if (!buffer.length || buffer.length > 5 * 1024 * 1024) {
+    return { ok: false, error: 'Image is invalid or too large.' };
+  }
+  const detectedType = detectedImageType(buffer);
+  if (!detectedType || (claimedType && detectedType !== String(claimedType).toLowerCase())) {
+    return { ok: false, error: 'The uploaded file is not a valid JPG, PNG, WEBP or GIF image.' };
+  }
+  return { ok: true, detectedType };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Public, unauthenticated, and sends an email with a multi-MB attachment on
-  // every call — throttle per IP so it can't be used to flood the sales inbox
-  // or burn Brevo quota.
-  const rl = await checkRateLimit({ bucket: `product-request:${clientIp(req)}`, max: 5, windowSeconds: 600 });
+  const access = await requireApprovedCustomer(req, res);
+  if (!access) return;
+
+  // This sends an email with a multi-MB attachment, so keep both an account and
+  // IP limit even though only approved trade customers may call it.
+  const rl = await checkRateLimit({
+    bucket: `product-request:${access.user.id}:${clientIp(req)}`,
+    max: 5,
+    windowSeconds: 600,
+  });
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter || 60));
     return res.status(429).json({ error: 'Too many requests. Please try again shortly.' });
   }
 
-  const { description, qty, imageBase64, imageName, imageType, customerEmail, customerName } = req.body || {};
+  const { description, qty, imageBase64, imageName, imageType } = req.body || {};
 
   if (!description || !imageBase64) {
     return res.status(400).json({ error: 'Description and image are required.' });
@@ -30,20 +61,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Description is too long.' });
   }
 
-  if (String(imageBase64).length > MAX_IMAGE_BASE64) {
-    return res.status(400).json({ error: 'Image is too large — please use an image under 5MB.' });
-  }
-
   if (imageType && !ALLOWED_IMAGE_TYPES.has(String(imageType).toLowerCase())) {
     return res.status(400).json({ error: 'Only JPG, PNG, WEBP or GIF images are accepted.' });
   }
+  const imageCheck = validateImagePayload(imageBase64, imageType);
+  if (!imageCheck.ok) return res.status(400).json({ error: imageCheck.error });
 
   if (!process.env.BREVO_API_KEY) {
     return res.status(500).json({ error: 'Email service not configured.' });
   }
 
-  const safeName = escapeHtml(customerName, 'Unknown');
-  const safeEmail = escapeHtml(customerEmail, 'No email');
+  const safeName = escapeHtml(access.customer.name || access.customer.business_name, 'Trade customer');
+  const safeEmail = escapeHtml(access.user.email, 'No email');
   const safeDescription = escapeHtml(description);
   const safeQty = escapeHtml(qty);
 
@@ -75,7 +104,7 @@ export default async function handler(req, res) {
           email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
         },
         to: [{ email: process.env.ORDER_TO_EMAIL || 'online@proto.co.za', name: 'Proto Trading' }],
-        replyTo: customerEmail ? { email: String(customerEmail).trim() } : undefined,
+        replyTo: access.user.email ? { email: access.user.email } : undefined,
         subject: `Product Request — ${String(description).slice(0, 60)}`,
         htmlContent: bodyHtml,
         attachment,
