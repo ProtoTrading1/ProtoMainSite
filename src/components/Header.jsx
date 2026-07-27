@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useId } from 'react';
 import {
-  Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
+  Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
   Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getSuggestions } from '../lib/fuzzySearch';
@@ -37,6 +37,8 @@ const FLAT_CATS = (() => {
   walk(categoriesData, []);
   return out;
 })();
+
+const SEARCH_STARTER_DEPTS = FLAT_CATS.filter((cat) => cat.path.length === 1).slice(0, 6);
 
 function scoreCategoryMatch(label, query) {
   const l = label.toLowerCase();
@@ -180,11 +182,70 @@ function SearchPanel({
   onPickProduct,
   onPickCategory,
   onCommitSearch,
+  recentSearches,
+  onClearRecent,
 }) {
   if (!query.trim()) {
     return (
       <div className="search-panel search-panel--empty" id={listboxId} role="listbox" aria-label="Search suggestions">
-        <p className="sp-empty-hint">Start typing to search products…</p>
+        <div className="sp-search-intro">
+          <span className="sp-search-intro-icon"><Search size={18} /></span>
+          <div>
+            <strong>Find anything in seconds</strong>
+            <span>Search by product name, SKU or barcode.</span>
+          </div>
+        </div>
+
+        {recentSearches.length > 0 && (
+          <div className="sp-start-section">
+            <div className="sp-start-heading">
+              <span><Clock3 size={13} /> Recent searches</span>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClearRecent}>Clear</button>
+            </div>
+            <div className="sp-start-chips">
+              {recentSearches.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  className="sp-start-chip"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onCommitSearch(term)}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="sp-start-section">
+          <div className="sp-start-heading"><span>Browse a department</span></div>
+          <div className="sp-start-depts">
+            {SEARCH_STARTER_DEPTS.map((cat) => {
+              const color = DEPT_COLORS[cat.path[0]] || '#C89A3C';
+              const Icon = cat.icon ? LUCIDE_ICON_MAP[cat.icon] : LayoutGrid;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className="sp-start-dept"
+                  style={{ '--dept-accent': color }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onPickCategory(cat.path)}
+                >
+                  <Icon size={15} />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="sp-search-help">
+          <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+          <span><kbd>Enter</kbd> select</span>
+          <span><kbd>Esc</kbd> close</span>
+        </div>
       </div>
     );
   }
@@ -353,6 +414,7 @@ export default function Header({
   const [catMatches, setCatMatches] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [mobileActiveIdx, setMobileActiveIdx] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState(loadRecent);
   const productsCache = useRef(null);
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
@@ -472,12 +534,28 @@ export default function Header({
   }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
+    setRecentSearches(loadRecent());
     setSearchOpen(true);
     void loadProductsOnce();
   }, [loadProductsOnce]);
 
   const focusSearch = useCallback(() => {
     openSearch();
+  }, [openSearch]);
+
+  useEffect(() => {
+    const focusWithShortcut = (event) => {
+      const target = event.target;
+      const isTyping = target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target?.isContentEditable;
+      if (event.key !== '/' || isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+      openSearch();
+    };
+    document.addEventListener('keydown', focusWithShortcut);
+    return () => document.removeEventListener('keydown', focusWithShortcut);
   }, [openSearch]);
 
   // Debounced lift to the parent so typing doesn't re-render App + every
@@ -548,6 +626,7 @@ export default function Header({
       ? (p.websiteSku || p.sku || p.code || inputValue)
       : p.name;
     saveRecent(directCode);
+    setRecentSearches(loadRecent());
     setSearchImmediate(directCode);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -565,6 +644,7 @@ export default function Header({
   const commitSearch = (term) => {
     if (!term) return;
     saveRecent(term);
+    setRecentSearches(loadRecent());
     setSearchImmediate(term);
     navigateForSearch?.([]);
     setSuggestions([]);
@@ -720,6 +800,25 @@ export default function Header({
               aria-controls={desktopListboxId}
               aria-activedescendant={activeDesktopItemId}
             />
+            {inputValue ? (
+              <button
+                type="button"
+                className="header-search-premium__clear"
+                aria-label="Clear search"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setSearchImmediate('');
+                  setSuggestions([]);
+                  setCatMatches([]);
+                  setActiveIdx(-1);
+                  inputRef.current?.focus();
+                }}
+              >
+                <X size={15} />
+              </button>
+            ) : (
+              <kbd className="header-search-premium__shortcut">/</kbd>
+            )}
           </div>
           {searchOpen && (
             <div className="header-search-dropdown">
@@ -732,6 +831,11 @@ export default function Header({
                 onPickProduct={pickProduct}
                 onPickCategory={pickCategory}
                 onCommitSearch={commitSearch}
+                recentSearches={recentSearches}
+                onClearRecent={() => {
+                  clearRecent();
+                  setRecentSearches([]);
+                }}
               />
             </div>
           )}
