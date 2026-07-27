@@ -256,6 +256,19 @@
   color: #9A9A9A;
 }
 
+.header-search-dropdown .sp-view-all-link {
+  color: #E2BE72;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.header-search-dropdown .sp-view-all-link:hover,
+.header-search-dropdown .sp-view-all-link:focus-visible {
+  color: #FFF2D2;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Search start screen */
 .header-search-dropdown .search-panel--empty {
   padding: 0;
