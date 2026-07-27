@@ -142,13 +142,13 @@ function typoDistance(a, b) {
 }
 
 function skuValues(product) {
-  return [product.code, product.websiteSku, product.sku, product.parentSku]
+  return [product.websiteSku, product.sku, product.id, product.groupPrimarySku]
     .filter(Boolean)
     .map((v) => String(v));
 }
 
 function barcodeValues(product) {
-  return [product.barcode, product.code]
+  return [product.barcode, product.code, product.parentSku]
     .filter(Boolean)
     .map((v) => String(v));
 }
