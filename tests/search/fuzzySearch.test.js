@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { getSuggestions, prepareSearchIndex } from '../../src/lib/fuzzySearch.js';
 
 const products = [
-  { id: 'wallet', code: 'WA100', name: 'Ladies Wallet', stockOnHand: 20 },
+  { id: 'wallet', code: '60010001', barcode: '60010001', sku: 'WA100', websiteSku: 'WA100', name: 'Ladies Wallet', stockOnHand: 20 },
   { id: 'bear', code: 'ST200', name: 'Soft Toy Bear', stockOnHand: 12 },
   { id: 'stationery', code: 'PN300', name: 'Stationery Pen Set', stockOnHand: 8 },
   { id: 'oos-bag', code: 'BG400', name: 'Gift Bag', stockOnHand: 0 },
@@ -21,6 +21,11 @@ test('expands Proto-specific customer language', () => {
 
 test('keeps exact identifier lookup ahead of fuzzy text matches', () => {
   assert.equal(getSuggestions(products, 'BG400', 5)[0]?.id, 'oos-bag');
+});
+
+test('searches website SKU and barcode as equal first-class identifiers', () => {
+  assert.equal(getSuggestions(products, 'WA100', 5)[0]?.id, 'wallet');
+  assert.equal(getSuggestions(products, '60010001', 5)[0]?.id, 'wallet');
 });
 
 test('ranks available stock ahead when relevance is equal', () => {
