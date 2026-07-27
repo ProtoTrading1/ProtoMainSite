@@ -234,15 +234,18 @@ function buildOrderEmailRows(items) {
     const name = escapeHtml(cleanText(product.name, 'Product'));
     const img = cleanText(product.image || product.remoteImage || '');
     const imgCell = /^https:\/\//i.test(img)
-      ? `<img src="${escapeHtml(img)}" alt="" width="46" height="46" style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
-      : `<div style="width:46px;height:46px;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;"></div>`;
+      ? `<img src="${escapeHtml(img)}" alt="" width="92" height="92" style="width:92px;height:92px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
+      : `<div style="width:92px;height:92px;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;"></div>`;
+    // Force a page break after every 10th line so a printout never crams more
+    // than 10 items onto a page (rows also never split across a page).
+    const pageBreak = ((i + 1) % 10 === 0 && i + 1 < items.length) ? ' ord-break' : '';
     return `
-      <tr>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:16px;font-weight:800;text-align:center;">${qty}</td>
+      <tr class="ord-row${pageBreak}">
+        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:14px;font-weight:700;text-align:center;">${i + 1}</td>
+        <td style="padding:14px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
+        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
+        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:600;line-height:1.4;">${name}</td>
+        <td style="padding:14px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:17px;font-weight:800;text-align:center;">${qty}</td>
       </tr>`;
   }).join('');
 }
@@ -328,20 +331,31 @@ function buildOrderEmailHtml({
     <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">Estimated only — final pricing, stock and delivery are confirmed by our team on reply.</p>`;
 
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title>
+<style>
+  @media print {
+    html, body { background:#ffffff !important; }
+    .ord-shell { padding:0 !important; background:#ffffff !important; }
+    .ord-card { box-shadow:none !important; border:none !important; border-radius:0 !important; }
+    tr.ord-row { page-break-inside: avoid; }
+    tr.ord-break { page-break-after: always; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" class="ord-shell" style="background:#f4f4f5;padding:32px 12px;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" class="ord-card" style="width:100%;max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 6px 24px rgba(15,23,42,0.08);">
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:34px 34px 28px;background:#141414;">
-  <div style="display:inline-block;background:#ffffff;padding:13px 20px;border-radius:8px;margin-bottom:22px;">
+<tr><td align="center" style="padding:28px 34px 22px;background:#ffffff;border-bottom:1px solid #eef2f7;">
+  <div style="margin-bottom:14px;">
     <span style="font-size:28px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:19px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
+    <span style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:0.5px;"> TRADING</span>
   </div>
-  <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
-  <p style="margin:10px 0 0;color:#cfcfcf;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#ff6a4d;font-weight:800;">${ref}</span>` : ''}</p>
+  <h1 style="margin:0;color:#0f172a;font-size:26px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
+  <p style="margin:8px 0 0;color:#64748b;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#c40000;font-weight:800;">${ref}</span>` : ''}</p>
 </td></tr>
-<tr><td style="padding:34px 32px 30px;background:#ffffff;">
+<tr><td style="padding:30px 32px 28px;background:#ffffff;">
   ${intro}
   ${metaRow}
   ${contactBlock}
@@ -361,9 +375,9 @@ function buildOrderEmailHtml({
   ${notesBlock}
   <p style="margin:26px 0 0;color:#666666;font-size:13px;line-height:1.6;">Questions? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
 </td></tr>
-<tr><td align="center" style="padding:28px 34px;background:#181818;border-top:1px solid #292929;">
-  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+<tr><td align="center" style="padding:22px 34px;background:#ffffff;border-top:1px solid #eef2f7;">
+  <p style="margin:0 0 6px;color:#0f172a;font-size:17px;font-weight:900;">Proto Trading Online</p>
+  <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
 </td></tr>
 </table>
 </td></tr></table>
