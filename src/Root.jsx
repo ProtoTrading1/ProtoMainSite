@@ -6,6 +6,7 @@ import { isAdminHost } from './lib/isAdminHost';
 import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
+import { setIntercomLauncherVisibility } from './lib/intercom';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -110,6 +111,18 @@ export default function Root() {
   useEffect(() => {
     scrollToTop();
   }, [view]);
+
+  useEffect(() => {
+    const isCatalogueSurface = view === 'portal'
+      || view === 'profile'
+      || view === 'admin'
+      || route.startsWith('#/portal-preview');
+    const showPublicLauncher = session !== undefined
+      && !adminHost
+      && !preRegisterHost
+      && !isCatalogueSurface;
+    setIntercomLauncherVisibility(showPublicLauncher);
+  }, [adminHost, preRegisterHost, route, session, view]);
 
   const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {
     const nonce = ++loadNonce.current;
