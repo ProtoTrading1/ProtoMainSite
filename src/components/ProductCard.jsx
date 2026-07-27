@@ -5,6 +5,7 @@ import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
+import { authHeaders } from '../lib/authHeaders';
 import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
@@ -136,7 +137,10 @@ function StockCheck({ sku }) {
     if (!sku) return;
     setState({ status: 'loading', qty: null, toOrder: false });
     try {
-      const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, { cache: 'no-store' });
+      const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, {
+        cache: 'no-store',
+        headers: await authHeaders(),
+      });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
       setState({
