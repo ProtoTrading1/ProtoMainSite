@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, MessageCircle, PackageSearch, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import { openIntercom } from '../lib/intercom';
+import { authHeaders } from '../lib/authHeaders';
 let megaMenuPreloadPromise = null;
 
 export function preloadMegaMenu() {
@@ -16,7 +17,7 @@ preloadMegaMenu();
 const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
-function ProductRequestModal({ onClose, customer }) {
+function ProductRequestModal({ onClose }) {
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState('');
   const [image, setImage] = useState(null);
@@ -51,8 +52,8 @@ function ProductRequestModal({ onClose, customer }) {
     try {
       const res = await fetch('/api/product-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type, customerEmail: customer?.email || '', customerName: customer?.name || '' }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to send.');
@@ -118,7 +119,7 @@ function MegaMenuSkeleton() {
   );
 }
 
-export default function Sidebar({ categories, path, navigate, onAllProducts, counts, customer }) {
+export default function Sidebar({ categories, path, navigate, onAllProducts, counts }) {
   const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
   const [menuTopOffset, setMenuTopOffset] = useState(0);
   const [showRequest, setShowRequest] = useState(false);
@@ -247,7 +248,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
         </Suspense>
       )}
 
-      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} customer={customer} />}
+      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} />}
     </div>
   );
 }
