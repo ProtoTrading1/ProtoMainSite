@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth } from './_auth.js';
+import { requireApprovedCustomer } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
@@ -536,8 +536,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const user = await requireAuth(req, res);
-  if (!user) return;
+  const access = await requireApprovedCustomer(req, res);
+  if (!access) return;
+  const { user } = access;
 
   if (!process.env.BREVO_API_KEY) {
     return res.status(500).json({ error: 'Brevo API key not configured' });
