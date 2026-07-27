@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useId, useMemo } from 'react';
 import {
   Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
-  Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
+  MessageCircle, Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
@@ -9,6 +9,7 @@ import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
 import ProtoLogo from './ProtoLogo';
 import AboutModal from './AboutModal';
+import { openIntercom } from '../lib/intercom';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -1028,6 +1029,11 @@ export default function Header({
               About Us
             </button>
 
+            <button className="header-nav-btn header-nav-ask-proto" type="button" onClick={openIntercom}>
+              <MessageCircle size={14} />
+              Ask Proto
+            </button>
+
             <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
               <Star size={14} className="spinning-star" />
               Specials
@@ -1054,6 +1060,15 @@ export default function Header({
           )}
 
           {/* Mobile-only icon buttons */}
+          <button
+            className="header-icon-mobile header-icon-mobile--ask-proto"
+            type="button"
+            onClick={openIntercom}
+            aria-label="Ask Proto"
+            title="Ask Proto"
+          >
+            <MessageCircle size={17} />
+          </button>
           <button className="header-icon-mobile header-icon-mobile--profile" type="button" onClick={onViewProfile} aria-label="My profile">
             <User size={17} />
           </button>
