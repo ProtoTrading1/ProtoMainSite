@@ -17,9 +17,10 @@ function getSessionId() {
 
 async function postAnalytics(payload) {
   try {
+    const { authHeaders } = await import('./authHeaders');
     const res = await fetch('/api/search-analytics', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) return null;
