@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireApprovedCustomer } from './_auth.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
 // Always hits the DB fresh (no-store) so a click never serves a cached number.
@@ -18,6 +19,9 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const access = await requireApprovedCustomer(req, res);
+  if (!access) return;
 
   const sku = String(req.query.sku || '').trim().toUpperCase();
   if (!sku || !SKU_RE.test(sku)) {
