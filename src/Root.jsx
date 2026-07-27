@@ -69,7 +69,6 @@ export default function Root() {
       if (!hash) return true;
       return hash.startsWith('#/policies')
         || hash.startsWith('#/worldclass')
-        || hash.startsWith('#/portal-preview')
         || hash.startsWith('#/reset-password');
     };
 
@@ -115,8 +114,7 @@ export default function Root() {
   useEffect(() => {
     const isCatalogueSurface = view === 'portal'
       || view === 'profile'
-      || view === 'admin'
-      || route.startsWith('#/portal-preview');
+      || view === 'admin';
     const showPublicLauncher = session !== undefined
       && !adminHost
       && !preRegisterHost
@@ -232,6 +230,8 @@ export default function Root() {
   const handleLogout = async () => {
     const { signOut } = await import('./lib/auth');
     await signOut();
+    const { invalidateProductCache } = await import('./lib/products');
+    invalidateProductCache();
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);
@@ -325,8 +325,6 @@ export default function Root() {
 
   if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
   if (!adminHost && route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
-  if (!adminHost && route.startsWith('#/portal-preview')) return <Suspense fallback={authSurfaceFallback}><App customer={null} onLogout={handleLogout} /></Suspense>;
-
   if (passwordRecovery) {
     return (
       <Suspense fallback={authSurfaceFallback}>
