@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { scrollToTop } from '../lib/scrollToTop';
 
-const ROUTE_PREFIXES = new Set(['portal-preview']);
-
 /** Parse window.location.hash into path + refinements */
 function parseHash() {
   const raw = window.location.hash.replace(/^#\/?/, '');
   const [pathStr = '', queryStr = ''] = raw.split('?');
   const segments = pathStr ? pathStr.split('/').filter(Boolean) : [];
-  const routePrefix = ROUTE_PREFIXES.has(segments[0]) ? segments[0] : '';
+  const routePrefix = '';
   const decode = (s) => { try { return decodeURIComponent(s).trim(); } catch { return s.trim(); } };
   const path = (routePrefix ? segments.slice(1) : segments).map(decode);
   const refinements = {};
