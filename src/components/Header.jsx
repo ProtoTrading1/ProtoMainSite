@@ -4,6 +4,7 @@ import {
   MessageCircle, Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
+import { fetchProducts } from '../lib/products';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
@@ -561,15 +562,9 @@ export default function Header({
     if (productsLoading.current) return productsLoading.current;
     productsLoading.current = (async () => {
       try {
-        const res = await fetch('/api/products');
-        productsCache.current = res.ok ? await res.json() : [];
+        productsCache.current = await fetchProducts();
       } catch {
-        try {
-          const res = await fetch('/products.json');
-          productsCache.current = res.ok ? await res.json() : [];
-        } catch {
-          productsCache.current = [];
-        }
+        productsCache.current = [];
       }
       const products = productsCache.current;
       const warmIndex = () => prepareSearchIndex(products);
