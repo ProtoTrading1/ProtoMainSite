@@ -9,6 +9,7 @@ const products = [
   { id: 'stationery', code: 'PN300', name: 'Stationery Pen Set', stockOnHand: 8 },
   { id: 'oos-bag', code: 'BG400', name: 'Gift Bag', stockOnHand: 0 },
   { id: 'live-bag', code: 'BG401', name: 'Gift Bag', stockOnHand: 10 },
+  { id: 'mkt-item', code: '70010002', barcode: '70010002', sku: 'MKT250', websiteSku: 'MKT250', name: 'Display Hooks', stockOnHand: 15 },
 ];
 
 prepareSearchIndex(products);
@@ -26,6 +27,10 @@ test('keeps exact identifier lookup ahead of fuzzy text matches', () => {
 test('searches website SKU and barcode as equal first-class identifiers', () => {
   assert.equal(getSuggestions(products, 'WA100', 5)[0]?.id, 'wallet');
   assert.equal(getSuggestions(products, '60010001', 5)[0]?.id, 'wallet');
+});
+
+test('searches from a three-letter SKU prefix', () => {
+  assert.equal(getSuggestions(products, 'mkt', 5)[0]?.id, 'mkt-item');
 });
 
 test('ranks available stock ahead when relevance is equal', () => {
