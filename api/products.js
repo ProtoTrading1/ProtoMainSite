@@ -284,7 +284,17 @@ export default async function handler(req, res) {
     const isFullCatalog = !requestedSkus?.length && !identifier;
     let version = null;
     if (isFullCatalog) {
-      version = await loadCatalogVersion(supabase);
+      // Defensive: the version stamp is an OPTIMISATION. If it can't be read we
+      // must still serve the catalogue — degrade to the previous always-rebuild
+      // behaviour rather than failing the request.
+      try {
+        version = await loadCatalogVersion(supabase);
+      } catch (err) {
+        console.warn('products api: catalogue version unavailable, serving uncached:', err?.message || err);
+        version = null;
+      }
+    }
+    if (isFullCatalog && version) {
       const etag = `W/"cat-${version.stamp}"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
