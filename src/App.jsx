@@ -18,7 +18,7 @@ import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProdu
 import { preloadProductImages } from './lib/imageUrl';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
-import { saveOrder, fetchLastOrder, makeClientRef } from './lib/orders';
+import { fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
@@ -787,7 +787,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       return;
     }
 
-    const siteOrigin = window.location.origin;
     const text = buildOrderText(cartItems, cartTotal, promo);
     setOrderText(text);
     setOrderStatus('sending');
@@ -796,75 +795,35 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     try {
       // Idempotency key for this checkout: generated once per cart and reused
-      // across retries (reset on cart change / successful submit below), so a
-      // human "try again" after an error recovers the existing order rather than
-      // inserting a duplicate. Shared by the browser insert and the server
-      // fallback capture in /api/send-order.
+      // across retries, so a human "try again" after an error recovers the
+      // customer's existing server-side order rather than inserting a duplicate.
       if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
       const clientRef = checkoutRefRef.current;
-      let savedOrder = null;
-      if (customer?.id) {
-        try {
-          savedOrder = await saveOrder(customer.id, cartItems, cartTotal, {
-            deliveryMethod,
-            customerNotes,
-            promoCode: promo?.code || null,
-            discountPct: promo?.discountPct ?? null,
-            discountAmount: promo?.discountAmount ?? null,
-            clientRef,
-          });
-          fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
-        } catch (saveErr) {
-          // Don't abort: /api/send-order captures the order server-side when no
-          // orderId is supplied, so a failed browser insert is not a lost order.
-          console.error('order insert failed, deferring to server capture:', saveErr?.message || saveErr);
-        }
-      }
 
       const payload = {
         clientRef,
-        customer: customerDetails,
-        totals: {
-          subtotal: cartTotal,
-          discountAmount: promo?.discountAmount || 0,
-          total: promo?.total ?? cartTotal,
-        },
         promoCode: promo?.code || null,
         deliveryMethod,
         customerNotes,
-        orderId: savedOrder?.id || null,
         items: cartItems.map((item) => ({
           qty: item.qty,
           product: {
             id: item.product.id,
+            sku: item.product.sku,
             code: item.product.code,
             name: item.product.name,
-            price: item.product.price,
-            image: getProductImageUrl(item.product, siteOrigin),
-            remoteImage: item.product.image,
           },
         })),
       };
 
-      // Fire the notification pipeline (authoritative pricing, order-request PDF,
-      // team + customer emails, WhatsApp). It can take a few seconds and the
-      // customer must not wait for it: when the browser already captured the
-      // order (savedOrder.id), we confirm success immediately and let this run
-      // in the background. Only when the browser insert didn't land do we wait
-      // for the server to capture + notify before confirming.
+      // The secure API resolves the signed-in customer and every product price
+      // from server-side data, then saves the order before confirming success.
       const sendHeaders = await authHeaders();
       const body = JSON.stringify(payload);
-      // keepalive guarantees the browser finishes this request even if the
-      // customer closes the tab or navigates away right after seeing "Order
-      // confirmed" — without it a backgrounded request can be dropped and the
-      // team never gets notified. keepalive caps the body at 64 KB, so fall back
-      // to a normal request for unusually large carts.
-      const canKeepalive = body.length < 60000;
       const submitOrder = () => fetch('/api/send-order', {
         method: 'POST',
         headers: sendHeaders,
         body,
-        ...(canKeepalive ? { keepalive: true } : {}),
       }).then(async (response) => {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'Order could not be sent');
@@ -875,39 +834,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         if (searchTrackRef.current.rowId) {
           void logSearchOrder({
             searchRowId: searchTrackRef.current.rowId,
-            orderNumber: result?.orderId || savedOrder?.id || '',
+            orderNumber: result?.orderId || '',
             orderValue: cartTotal,
           });
         }
       };
 
-      if (savedOrder?.id) {
-        // Order is durably saved — acknowledge the customer now, notify in the
-        // background. A failed notification is recoverable from the admin portal,
-        // so it never surfaces as an error to the customer.
-        setOrderStatus('sent');
-        clearCart();
-        setMobileCartOpen(false);
-        setCartDrawerOpen(false);
-        submitOrder()
-          .then((result) => {
-            if (result?.emailDeliveryFailed) setOrderStatus((s) => (s === 'sent' ? 'saved' : s));
-            logConversion(result);
-          })
-          .catch((err) => {
-            console.error('send-order background notify failed:', err?.message || err);
-          });
-        return;
-      }
-
-      // No browser insert landed — the server must capture + notify before we
-      // can confirm to the customer.
       const result = await submitOrder();
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
       clearCart();
       setMobileCartOpen(false);
       setCartDrawerOpen(false);
       logConversion(result);
+      if (customer?.id) fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
     } catch (err) {
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');
