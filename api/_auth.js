@@ -45,7 +45,7 @@ export async function requireApprovedCustomer(req, res) {
 
   const { data: customer, error } = await getServiceClient()
     .from('customers')
-    .select('id, role, is_approved')
+    .select('id, role, is_approved, name, business_name')
     .eq('id', user.id)
     .maybeSingle();
 
