@@ -15,6 +15,7 @@ import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
+import { authHeaders } from './authHeaders';
 
 export const DEFAULT_SORT = 'featured';
 const FEATURED_PRODUCTS_BATCH_SIZE = 80;
@@ -82,13 +83,15 @@ function loadFromLocalCache() {
   } catch { return null; }
 }
 
-async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache } = {}) {
+async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const headers = authenticated ? await authHeaders() : undefined;
     const response = await fetch(url, {
       signal: controller.signal,
       credentials: 'same-origin',
+      ...(headers ? { headers } : {}),
       ...(cache ? { cache } : {}),
     });
     if (!response.ok) throw new Error(`${url} ${response.status}`);
@@ -98,11 +101,11 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache } = {}) {
   }
 }
 
-// Customer catalogue: live /api/products first (includes admin price edits).
-// Fallbacks: static products.json, then localStorage.
+// Customer catalogue: authenticated live API only. A stale local cache may
+// speed up an approved customer's repeat visit, but no public static catalogue
+// is shipped because it would expose trade pricing outside the login gate.
 function startCatalogFetch() {
-  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store' })
-    .catch(() => fetchJsonWithTimeout('/products.json', 12000))
+  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-store', authenticated: true })
     .catch(() => {
       const local = loadFromLocalCache();
       if (local) return local;
