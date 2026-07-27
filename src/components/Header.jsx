@@ -1,9 +1,9 @@
-import { useRef, useState, useEffect, useCallback, useId } from 'react';
+import { useRef, useState, useEffect, useCallback, useId, useMemo } from 'react';
 import {
-  Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, MessageCircle, PackageSearch, RotateCcw,
-  Search, ShoppingCart, Star, Upload, User, X,
+  Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
+  Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
-import { getSuggestions } from '../lib/fuzzySearch';
+import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
@@ -19,10 +19,10 @@ function loadRecent() {
 function saveRecent(term) {
   const prev = loadRecent().filter((t) => t.toLowerCase() !== term.toLowerCase());
   const next = [term, ...prev].slice(0, 6);
-  try { localStorage.setItem(RS_KEY, JSON.stringify(next)); } catch {}
+  try { localStorage.setItem(RS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
 }
 function clearRecent() {
-  try { localStorage.removeItem(RS_KEY); } catch {}
+  try { localStorage.removeItem(RS_KEY); } catch { /* storage unavailable */ }
 }
 
 // ─── Flatten categories tree for search matching ─────────────
@@ -172,6 +172,114 @@ function ProductRequestModal({ onClose, customer }) {
   );
 }
 
+function productStockState(product) {
+  const raw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
+  const qty = raw === undefined || raw === null || raw === '' ? null : Number(raw);
+  const toOrder = product?.toOrder === true
+    || product?.to_order === true
+    || product?.orderableWhenOutOfStock === true
+    || product?.orderable_when_out_of_stock === true;
+  if (qty === 0 && toOrder) return { tone: 'order', label: 'To order', canOrder: true };
+  if (qty === 0 || product?.inStock === false) return { tone: 'out', label: 'Out of stock', canOrder: false };
+  if (Number.isFinite(qty) && qty > 0 && qty <= 5) return { tone: 'low', label: 'Low stock', canOrder: true };
+  return { tone: 'in', label: 'In stock', canOrder: true };
+}
+
+function HighlightedText({ text, query }) {
+  const source = String(text || '');
+  const terms = String(query || '').trim().split(/\s+/).filter((term) => term.length > 1);
+  if (!source || terms.length === 0) return source;
+  const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const matcher = new RegExp(`(${escaped.join('|')})`, 'ig');
+  const exactMatcher = new RegExp(`^(${escaped.join('|')})$`, 'i');
+  return source.split(matcher).map((part, index) => (
+    exactMatcher.test(part) ? <mark key={`${part}-${index}`}>{part}</mark> : part
+  ));
+}
+
+function SearchProductResult({
+  product,
+  query,
+  optionId,
+  active,
+  exact = false,
+  dark = false,
+  previouslyOrdered = false,
+  onPick,
+  onAdd,
+}) {
+  const [added, setAdded] = useState(false);
+  const addedTimerRef = useRef(null);
+  const stock = productStockState(product);
+  const packLabel = product.casePack || (Number(product.minQty) > 1 ? `Min ${product.minQty}` : '');
+
+  const addProduct = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!stock.canOrder || !onAdd) return;
+    onAdd(product, Math.max(1, Number(product.minQty) || 1));
+    setAdded(true);
+    window.clearTimeout(addedTimerRef.current);
+    addedTimerRef.current = window.setTimeout(() => setAdded(false), 1400);
+  };
+
+  useEffect(() => () => window.clearTimeout(addedTimerRef.current), []);
+
+  return (
+    <div
+      id={optionId}
+      className={`sp-product-row${exact ? ' sp-product-row--exact' : ''}${dark ? ' sp-product-row--dark' : ''}${active ? ' active' : ''}`}
+      role="option"
+      aria-selected={active}
+    >
+      <button
+        type="button"
+        className="sp-product-main"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => onPick(product)}
+      >
+        <div className="sp-product-img">
+          {product.image
+            ? <img src={product.image} alt="" loading="lazy" />
+            : <div className="sp-product-img-empty" />}
+        </div>
+        <div className="sp-product-info">
+          <span className="sp-product-code">
+            <HighlightedText text={product.code || product.sku} query={query} />
+          </span>
+          <span className="sp-product-name">
+            <HighlightedText text={product.name} query={query} />
+          </span>
+          <span className="sp-product-meta">
+            <span className={`sp-stock-badge sp-stock-badge--${stock.tone}`}>{stock.label}</span>
+            {packLabel && <span>{packLabel}</span>}
+            {product.isNew && <span className="sp-new-badge">New</span>}
+            {previouslyOrdered && <span className="sp-reorder-badge">Previously ordered</span>}
+          </span>
+        </div>
+        {Number(product.price) > 0 && (
+          <span className="sp-product-price">
+            R{Number(product.price).toFixed(2)}
+            <small>incl. VAT</small>
+          </span>
+        )}
+      </button>
+      {onAdd && (
+        <button
+          type="button"
+          className={`sp-quick-add${added ? ' is-added' : ''}`}
+          disabled={!stock.canOrder}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={addProduct}
+          aria-label={stock.canOrder ? `Add ${product.name} to order` : `${product.name} is out of stock`}
+        >
+          {added ? 'Added ✓' : <><Plus size={14} /> Add</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Search overlay panel ─────────────────────────────────────
 function SearchPanel({
   query,
@@ -184,6 +292,9 @@ function SearchPanel({
   onCommitSearch,
   recentSearches,
   onClearRecent,
+  onAddProduct,
+  onRequestProduct,
+  previousOrderCodes,
 }) {
   if (!query.trim()) {
     return (
@@ -258,9 +369,15 @@ function SearchPanel({
   const relatedProducts = exactProduct
     ? suggestions.filter((product) => product.id !== exactProduct.id)
     : suggestions;
+  const relatedSearchTerm = getRelatedSearchTerm(query);
 
   return (
     <div className="search-panel" id={listboxId} role="listbox" aria-label="Search suggestions">
+      {relatedSearchTerm && suggestions.length > 0 && (
+        <div className="sp-related-search">
+          We also searched for <strong>{relatedSearchTerm}</strong>
+        </div>
+      )}
       {/* Category matches */}
       {catMatches.length > 0 && (
         <div className="sp-section">
@@ -294,22 +411,17 @@ function SearchPanel({
       {exactProduct && (
         <div className="sp-section sp-section--exact">
           <div className="sp-section-head"><span>Exact code match</span><span className="sp-exact-badge">Ready to order</span></div>
-          <button
+          <SearchProductResult
             key={exactProduct.id}
-            id={`${listboxId}-product-${exactProduct.id}`}
-            type="button"
-            className={`sp-product-row sp-product-row--exact${activeItemId === `${listboxId}-product-${exactProduct.id}` ? ' active' : ''}`}
-            role="option"
-            aria-selected={activeItemId === `${listboxId}-product-${exactProduct.id}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onPickProduct(exactProduct)}
-          >
-            <div className="sp-product-img">
-              {exactProduct.image ? <img src={exactProduct.image} alt={exactProduct.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
-            </div>
-            <div className="sp-product-info"><span className="sp-product-code">{exactProduct.code || exactProduct.sku}</span><span className="sp-product-name">{exactProduct.name}</span></div>
-            {exactProduct.price > 0 && <span className="sp-product-price">R{exactProduct.price.toFixed(2)}</span>}
-          </button>
+            product={exactProduct}
+            query={query}
+            optionId={`${listboxId}-product-${exactProduct.id}`}
+            active={activeItemId === `${listboxId}-product-${exactProduct.id}`}
+            exact
+            previouslyOrdered={previousOrderCodes.has(String(exactProduct.code || exactProduct.sku || '').toUpperCase())}
+            onPick={onPickProduct}
+            onAdd={onAddProduct}
+          />
         </div>
       )}
 
@@ -331,27 +443,16 @@ function SearchPanel({
             const optionId = `${listboxId}-product-${p.id}`;
             const isActive = activeItemId === optionId;
             return (
-              <button
+              <SearchProductResult
                 key={p.id}
-                id={optionId}
-                type="button"
-                className={`sp-product-row${isActive ? ' active' : ''}`}
-                role="option"
-                aria-selected={isActive}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onPickProduct(p)}
-              >
-                <div className="sp-product-img">
-                  {p.image
-                    ? <img src={p.image} alt={p.name} loading="lazy" />
-                    : <div className="sp-product-img-empty" />}
-                </div>
-                <div className="sp-product-info">
-                  <span className="sp-product-code">{p.code}</span>
-                  <span className="sp-product-name">{p.name}</span>
-                </div>
-                {p.price > 0 && <span className="sp-product-price">R{p.price.toFixed(2)}</span>}
-              </button>
+                product={p}
+                query={query}
+                optionId={optionId}
+                active={isActive}
+                previouslyOrdered={previousOrderCodes.has(String(p.code || p.sku || '').toUpperCase())}
+                onPick={onPickProduct}
+                onAdd={onAddProduct}
+              />
             );
           })}
         </div>
@@ -362,6 +463,9 @@ function SearchPanel({
           <Search size={24} />
           <p>No results for "<strong>{query}</strong>"</p>
           <span>{codeSearch ? 'Check the code, or remove the last digit to see the closest product codes.' : 'Try a different spelling, product type or department.'}</span>
+          <button type="button" className="sp-request-product" onClick={onRequestProduct}>
+            <PackageSearch size={15} /> Request this product
+          </button>
         </div>
       )}
     </div>
@@ -400,8 +504,9 @@ export { AboutModal };
 // ─── Header ──────────────────────────────────────────────────
 export default function Header({
   cartItemCount, cartTotal,
-  onMenuClick, onHome, customer, onViewProfile, onViewAdmin, onReorder, hasLastOrder, onLogout,
-  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick,
+  onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
+  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick, onSearchAddToCart,
+  previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -419,6 +524,7 @@ export default function Header({
   const productsLoading = useRef(null);
   const inputRef = useRef(null);
   const searchWrapRef = useRef(null);
+  const barcodeFileRef = useRef(null);
   const debounceRef = useRef(null);
   const suggestionRequestRef = useRef(0);
   const liftRef = useRef(null);
@@ -426,9 +532,17 @@ export default function Header({
   // drives the catalogue query and re-renders the whole product grid) is only
   // updated on a short debounce, so each keystroke re-renders just this input.
   const [inputValue, setInputValue] = useState(searchQuery);
+  const [barcodeSupported] = useState(() => typeof window !== 'undefined' && 'BarcodeDetector' in window);
+  const [scanError, setScanError] = useState('');
   const pendingSearchRef = useRef(searchQuery);
   const desktopListboxId = useId();
   const mobileListboxId = useId();
+  const previousOrderCodes = useMemo(() => new Set(
+    previousOrderItems
+      .map((item) => item.code || item.sku)
+      .filter(Boolean)
+      .map((code) => String(code).toUpperCase()),
+  ), [previousOrderItems]);
 
   const loadProductsOnce = useCallback(async () => {
     if (productsCache.current) return productsCache.current;
@@ -445,6 +559,13 @@ export default function Header({
           productsCache.current = [];
         }
       }
+      const products = productsCache.current;
+      const warmIndex = () => prepareSearchIndex(products);
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(warmIndex, { timeout: 1500 });
+      } else {
+        window.setTimeout(warmIndex, 0);
+      }
       productsLoading.current = null;
       return productsCache.current;
     })();
@@ -453,9 +574,13 @@ export default function Header({
 
   const updateSuggestions = useCallback((query, products) => {
     if (!query.trim()) { setSuggestions([]); setCatMatches([]); return; }
-    setSuggestions(getSuggestions(products, query, 20));
+    const matches = getSuggestions(products, query, 20);
+    setSuggestions([...matches].sort((a, b) => (
+      Number(previousOrderCodes.has(String(b.code || b.sku || '').toUpperCase()))
+      - Number(previousOrderCodes.has(String(a.code || a.sku || '').toUpperCase()))
+    )));
     setCatMatches(matchCategories(query));
-  }, []);
+  }, [previousOrderCodes]);
 
   const fetchIdentifierSuggestions = useCallback(async (query) => {
     const response = await fetch(`/api/products?identifier=${encodeURIComponent(query)}`, { cache: 'no-store' });
@@ -530,7 +655,7 @@ export default function Header({
       void loadProductsOnce().then((products) => {
         if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
       });
-    }, identifier ? 45 : 120);
+    }, identifier ? 45 : 85);
   }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
@@ -542,6 +667,16 @@ export default function Header({
   const focusSearch = useCallback(() => {
     openSearch();
   }, [openSearch]);
+
+  useEffect(() => {
+    const prefetch = () => { void loadProductsOnce(); };
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 2200 });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+    const timer = window.setTimeout(prefetch, 900);
+    return () => window.clearTimeout(timer);
+  }, [loadProductsOnce]);
 
   useEffect(() => {
     const focusWithShortcut = (event) => {
@@ -563,7 +698,7 @@ export default function Header({
   const liftSearch = useCallback((val) => {
     pendingSearchRef.current = val;
     clearTimeout(liftRef.current);
-    liftRef.current = setTimeout(() => setSearchQuery(val), 200);
+    liftRef.current = setTimeout(() => setSearchQuery(val), 350);
   }, [setSearchQuery]);
 
   // Immediate commit (Enter, suggestion/category pick, clear): cancel any
@@ -661,16 +796,18 @@ export default function Header({
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
     setMobileInput('');
+    setScanError('');
     setMobileActiveIdx(-1);
     void loadProductsOnce();
   };
-  const closeMobileSearch = () => {
+  const closeMobileSearch = useCallback(() => {
     setMobileSearchOpen(false);
     setMobileSuggestions([]);
     setMobileCatMatches([]);
     setMobileInput('');
+    setScanError('');
     setMobileActiveIdx(-1);
-  };
+  }, [setMobileSearchOpen]);
   const handleMobileInput = (val) => {
     setMobileInput(val);
     liftSearch(val);
@@ -711,7 +848,7 @@ export default function Header({
           setMobileCatMatches(matchCategories(val));
         }
       });
-    }, identifier ? 45 : 120);
+    }, identifier ? 45 : 85);
   };
   const mobileKeyboardItems = [
     ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
@@ -723,6 +860,25 @@ export default function Header({
     commitSearch(term);
     setMobileInput('');
     closeMobileSearch();
+  };
+
+  const scanBarcodeImage = async (file) => {
+    if (!file || !barcodeSupported) return;
+    setScanError('');
+    try {
+      const bitmap = await createImageBitmap(file);
+      const detector = new window.BarcodeDetector();
+      const matches = await detector.detect(bitmap);
+      bitmap.close?.();
+      const value = matches[0]?.rawValue?.trim();
+      if (!value) {
+        setScanError('Barcode not detected. Try again with the code filling the frame.');
+        return;
+      }
+      handleMobileInput(value);
+    } catch {
+      setScanError('Could not read that barcode image. Please type the code instead.');
+    }
   };
 
   useEffect(() => {
@@ -836,6 +992,12 @@ export default function Header({
                   clearRecent();
                   setRecentSearches([]);
                 }}
+                onAddProduct={onSearchAddToCart}
+                onRequestProduct={() => {
+                  closeSearch();
+                  setShowRequest(true);
+                }}
+                previousOrderCodes={previousOrderCodes}
               />
             </div>
           )}
@@ -977,8 +1139,33 @@ export default function Header({
             <X size={15} />
           </button>
         )}
+        {barcodeSupported && (
+          <>
+            <input
+              ref={barcodeFileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void scanBarcodeImage(file);
+                event.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              className="mobile-search-scan"
+              onClick={() => barcodeFileRef.current?.click()}
+              aria-label="Scan barcode with camera"
+            >
+              <ScanBarcode size={18} />
+            </button>
+          </>
+        )}
         <button type="button" onClick={closeMobileSearch} aria-label="Close"><X size={15} /></button>
       </div>
+      {mobileSearchOpen && scanError && <div className="mobile-search-scan-error">{scanError}</div>}
 
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
@@ -1006,25 +1193,17 @@ export default function Header({
             const optionId = `${mobileListboxId}-product-${p.id}`;
             const isActive = activeMobileItemId === optionId;
             return (
-              <button
+              <SearchProductResult
                 key={p.id}
-                id={optionId}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                className={`sp-product-row sp-product-row--dark${isActive ? ' active' : ''}`}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
-              >
-                <div className="sp-product-img">
-                  {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <div className="sp-product-img-empty" />}
-                </div>
-                <div className="sp-product-info">
-                  <span className="sp-product-code">{p.code}</span>
-                  <span className="sp-product-name">{p.name}</span>
-                </div>
-                {p.price > 0 && <span className="sp-product-price" style={{ color: '#fff' }}>R{p.price.toFixed(2)}</span>}
-              </button>
+                product={p}
+                query={mobileInput}
+                optionId={optionId}
+                active={isActive}
+                dark
+                previouslyOrdered={previousOrderCodes.has(String(p.code || p.sku || '').toUpperCase())}
+                onPick={() => { setMobileInput(''); pickProduct(p); closeMobileSearch(); }}
+                onAdd={onSearchAddToCart}
+              />
             );
           })}
           {mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
@@ -1032,6 +1211,16 @@ export default function Header({
               <Search size={24} />
               <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>
               <span>Try a different spelling or browse by department</span>
+              <button
+                type="button"
+                className="sp-request-product"
+                onClick={() => {
+                  closeMobileSearch();
+                  setShowRequest(true);
+                }}
+              >
+                <PackageSearch size={15} /> Request this product
+              </button>
             </div>
           )}
         </div>
