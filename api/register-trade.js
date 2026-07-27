@@ -4,7 +4,6 @@ import { checkRateLimit, clientIp } from './_rate-limit.js';
 import {
   isVerifiedProtoActiveMatch,
   lookupProtoActiveCustomer,
-  sendWelcomeWhatsapp,
 } from './_customer-onboard.js';
 
 const BREVO_SENDER = {
@@ -294,7 +293,10 @@ export default async function handler(req, res) {
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
     password,
-    email_confirm: true,
+    // Never trust possession of a known customer email merely because someone
+    // typed it into this public form. Supabase blocks password sign-in until
+    // the mailbox owner follows the confirmation link sent below.
+    email_confirm: false,
     user_metadata: {
       name: normalizedContactName,
       phone: normalizedPhone,
@@ -456,6 +458,21 @@ export default async function handler(req, res) {
       allocatedCustomerCode = savedProfile.customer_code;
     }
 
+    const siteUrl = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
+    const { error: confirmationError } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: { emailRedirectTo: `${siteUrl}/#/login?email-confirmed=1` },
+    });
+    if (confirmationError) {
+      console.error('signup confirmation email failed:', confirmationError.message, '| userId:', userId);
+      await supabase.from('customers').delete().eq('id', userId);
+      await supabase.auth.admin.deleteUser(userId);
+      return res.status(502).json({
+        error: 'We could not send your verification email. Please try registering again.',
+      });
+    }
+
     await sendAdminSignupEmail({
       contactName: normalizedContactName,
       businessName: normalizedBusinessName,
@@ -478,14 +495,6 @@ export default async function handler(req, res) {
       website: website || null,
       acceptWhatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
     });
-
-    if (fullPayload.accept_whatsapp === true && normalizedPhone && shouldApprove) {
-      await sendWelcomeWhatsapp({
-        phone: normalizedPhone,
-        contactName: normalizedContactName,
-        businessName: normalizedBusinessName,
-      });
-    }
   }
 
   if (process.env.BREVO_API_KEY) {
@@ -501,7 +510,7 @@ export default async function handler(req, res) {
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
           subject: shouldApprove
-            ? 'Your Proto Trading Online trade account is approved'
+            ? 'Your trade account is approved — verify your email to continue'
             : 'We have received your request — you will hear from us within 24 hours',
           htmlContent: shouldApprove
             ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
@@ -520,6 +529,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     instantAccess: shouldApprove,
+    emailVerificationRequired: true,
     customerCode: allocatedCustomerCode || null,
     profile: profileVerification
       ? {
