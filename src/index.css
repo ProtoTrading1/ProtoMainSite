@@ -1431,6 +1431,12 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 2px;
 }
+.sp-product-identifiers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
 .sp-product-code {
   font-size: 9px;
   font-weight: 800;
@@ -1439,6 +1445,13 @@ textarea:focus-visible,
   letter-spacing: 0.08em;
 }
 .sp-product-row--dark .sp-product-code { color: #f87171; }
+.sp-product-barcode {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+.sp-product-row--dark .sp-product-barcode { color: #9ca3af; }
 .sp-product-name {
   font-size: 13px;
   font-weight: 600;
@@ -1448,7 +1461,8 @@ textarea:focus-visible,
   text-overflow: ellipsis;
 }
 .sp-product-name mark,
-.sp-product-code mark {
+.sp-product-code mark,
+.sp-product-barcode mark {
   padding: 0;
   border-radius: 2px;
   background: rgba(200, 154, 60, 0.22);
