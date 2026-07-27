@@ -10,6 +10,8 @@ const SCORE = {
   EXACT_SKU: 100,
   EXACT_BARCODE: 99,
   SKU_VARIANT: 98,
+  SKU_PREFIX: 94,
+  BARCODE_PREFIX: 93,
   EXACT_NAME: 95,
   HEAD_NOUN_NAME: 92,
   NAME_PREFIX: 90,
@@ -322,6 +324,17 @@ function scoreExactBarcode(index, token, tokenCompact) {
   return 0;
 }
 
+function scoreIdentifierPrefix(index, token, tokenCompact) {
+  if (tokenCompact.length < 3) return 0;
+  for (const sku of index.skus) {
+    if (sku.compact.startsWith(tokenCompact)) return SCORE.SKU_PREFIX;
+  }
+  for (const barcode of index.barcodes) {
+    if (barcode.compact.startsWith(tokenCompact)) return SCORE.BARCODE_PREFIX;
+  }
+  return 0;
+}
+
 function scoreNameMatch(index, token, tokenCompact) {
   if (index.name === token || index.nameCompact === tokenCompact) return SCORE.EXACT_NAME;
 
@@ -367,6 +380,7 @@ function scoreToken(index, token) {
   return (
     scoreExactSku(index, t, tCompact)
     || scoreExactBarcode(index, t, tCompact)
+    || scoreIdentifierPrefix(index, t, tCompact)
     || scoreNameMatch(index, t, tCompact)
     || scoreDescriptionMatch(index, t)
     || scoreKeywordMatch(index, t)
