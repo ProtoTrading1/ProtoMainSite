@@ -212,6 +212,8 @@ function SearchProductResult({
   const addedTimerRef = useRef(null);
   const stock = productStockState(product);
   const packLabel = product.casePack || (Number(product.minQty) > 1 ? `Min ${product.minQty}` : '');
+  const sku = product.websiteSku || product.sku || product.id || '';
+  const barcode = product.barcode || product.code || '';
 
   const addProduct = (event) => {
     event.preventDefault();
@@ -244,8 +246,17 @@ function SearchProductResult({
             : <div className="sp-product-img-empty" />}
         </div>
         <div className="sp-product-info">
-          <span className="sp-product-code">
-            <HighlightedText text={product.code || product.sku} query={query} />
+          <span className="sp-product-identifiers">
+            {sku && (
+              <span className="sp-product-code">
+                SKU <HighlightedText text={sku} query={query} />
+              </span>
+            )}
+            {barcode && String(barcode).toUpperCase() !== String(sku).toUpperCase() && (
+              <span className="sp-product-barcode">
+                Barcode <HighlightedText text={barcode} query={query} />
+              </span>
+            )}
           </span>
           <span className="sp-product-name">
             <HighlightedText text={product.name} query={query} />
@@ -943,7 +954,7 @@ export default function Header({
               ref={inputRef}
               type="text"
               className="header-search-premium__input"
-              placeholder="Search products, SKU or barcode..."
+              placeholder="Search products, SKU or barcode…"
               value={inputValue}
               onFocus={focusSearch}
               onChange={(e) => handleInput(e.target.value)}
@@ -1098,7 +1109,7 @@ export default function Header({
         <input
           autoFocus={mobileSearchOpen}
           type="search"
-          placeholder="Search products, SKU or barcode..."
+          placeholder="Search products, SKU or barcode…"
           value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
