@@ -3,8 +3,9 @@ import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, Packa
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
 import { openIntercom } from '../lib/intercom';
+import { authHeaders } from '../lib/authHeaders';
 
-function MobileProductRequest({ onClose: closeAll, customer }) {
+function MobileProductRequest({ onClose: closeAll }) {
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState('');
   const [image, setImage] = useState(null);
@@ -25,7 +26,7 @@ function MobileProductRequest({ onClose: closeAll, customer }) {
     if (!image) { setError('Please attach a reference image.'); return; }
     setSubmitting(true); setError('');
     try {
-      const res = await fetch('/api/product-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type, customerEmail: customer?.email || '', customerName: customer?.name || '' }) });
+      const res = await fetch('/api/product-request', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ description: description.trim(), qty: qty.trim() || null, imageBase64: image.base64, imageName: image.name, imageType: image.type }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed.');
       setDone(true);
@@ -298,7 +299,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
                 <ChevronLeft size={16} /> Back
               </button>
             </div>
-            <MobileProductRequest onClose={() => { setShowProductRequest(false); onClose(); }} customer={customer} />
+            <MobileProductRequest onClose={() => { setShowProductRequest(false); onClose(); }} />
           </div>
         )}
 
