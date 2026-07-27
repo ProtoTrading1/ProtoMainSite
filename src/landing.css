@@ -465,10 +465,10 @@
 
 @keyframes vhero-bg-in {
   from {
-    filter: brightness(0.48) saturate(0.46) contrast(0.92);
+    filter: brightness(0.62) saturate(0.54) contrast(0.96);
   }
   to {
-    filter: brightness(0.52) saturate(0.52) contrast(0.94);
+    filter: brightness(0.83) saturate(0.68) contrast(1.03);
   }
 }
 
