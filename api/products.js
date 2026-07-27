@@ -6,6 +6,7 @@ import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-c
 import { loadPlacementMapIfEnabled } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
+import { requireApprovedCustomer } from './_auth.js';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -222,6 +223,9 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const access = await requireApprovedCustomer(req, res);
+  if (!access) return;
 
   try {
     const requestedSkus = parseSkuQuery(req.query?.skus);
