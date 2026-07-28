@@ -77,6 +77,81 @@ function buildAdminSignupHtml({
   `;
 }
 
+function buildVerificationHtml({ contactName, confirmationLink }) {
+  const name = escapeHtml(String(contactName || '').trim() || 'there');
+  const href = escapeHtml(confirmationLink);
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Confirm your email — Proto Trading</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 12px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td align="center" style="padding:28px 34px 20px;border-bottom:1px solid #eef2f7;">
+  <div><span style="font-size:28px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span><span style="font-size:20px;font-weight:800;color:#0f172a;"> TRADING</span></div>
+  <h1 style="margin:14px 0 0;color:#0f172a;font-size:24px;font-weight:900;">Confirm your email</h1>
+</td></tr>
+<tr><td style="padding:30px 32px 28px;">
+  <p style="margin:0 0 14px;color:#0f172a;font-size:17px;font-weight:800;">Hi ${name},</p>
+  <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6;">Thanks for applying for a Proto Trading account. Please confirm your email address to complete your application — our team reviews new applications within one business day.</p>
+  <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;"><tr><td align="center" style="border-radius:10px;background:#c40000;">
+    <a href="${href}" style="display:inline-block;padding:14px 34px;color:#ffffff;font-size:16px;font-weight:800;text-decoration:none;border-radius:10px;">Confirm my email</a>
+  </td></tr></table>
+  <p style="margin:0 0 6px;color:#64748b;font-size:12px;line-height:1.6;">If the button doesn't work, copy and paste this link into your browser:</p>
+  <p style="margin:0 0 20px;word-break:break-all;"><a href="${href}" style="color:#c40000;font-size:12px;">${href}</a></p>
+  <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.6;">If you didn't apply for a Proto Trading account, you can safely ignore this email.</p>
+</td></tr>
+<tr><td align="center" style="padding:20px 34px;border-top:1px solid #eef2f7;">
+  <p style="margin:0 0 6px;color:#0f172a;font-size:16px;font-weight:900;">Proto Trading Online</p>
+  <p style="margin:0;color:#64748b;font-size:12px;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+</td></tr>
+</table></td></tr></table>
+</body></html>`;
+}
+
+/**
+ * Deliver the signup confirmation link through BREVO — the same transport the
+ * rest of the app uses — instead of relying on Supabase Auth's built-in SMTP
+ * (which has its own separate configuration and hourly cap, and was the cause
+ * of "We could not send your verification email").
+ * Returns null on success, or an error string.
+ */
+async function sendVerificationEmail({ supabase, email, contactName, confirmationLink, siteUrl }) {
+  if (process.env.BREVO_API_KEY && confirmationLink) {
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'api-key': process.env.BREVO_API_KEY,
+        },
+        body: JSON.stringify({
+          sender: BREVO_SENDER,
+          to: [{ email }],
+          subject: 'Confirm your email — Proto Trading Online',
+          htmlContent: buildVerificationHtml({ contactName, confirmationLink }),
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (resp.ok) return null;
+      const body = await resp.json().catch(() => ({}));
+      console.error('Verification email Brevo error:', resp.status, JSON.stringify(body));
+      // fall through to the Supabase fallback below
+    } catch (err) {
+      console.error('Verification email Brevo request failed:', err?.message || err);
+    }
+  }
+
+  // Fallback: let Supabase send it (used when BREVO_API_KEY is absent, or if
+  // the Brevo call above failed) so registration still works.
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: `${siteUrl}/#/login?email-confirmed=1` },
+  });
+  return error ? (error.message || 'Verification email could not be sent') : null;
+}
+
 async function sendAdminSignupEmail(payload) {
   if (!process.env.BREVO_API_KEY) return;
   try {
@@ -290,28 +365,38 @@ export default async function handler(req, res) {
   }
   const isProtoActive = isVerifiedProtoActiveMatch(protoActiveMatch);
 
-  const { data, error } = await supabase.auth.admin.createUser({
+  // generateLink({type:'signup'}) creates the unconfirmed user AND returns the
+  // confirmation URL WITHOUT asking Supabase to email it. We deliver it through
+  // Brevo ourselves (below), the same transport every other email in this app
+  // uses — so verification no longer depends on Supabase Auth's own SMTP
+  // configuration or its separate hourly email cap.
+  const siteUrlForLink = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: 'signup',
     email: normalizedEmail,
     password,
     // Never trust possession of a known customer email merely because someone
     // typed it into this public form. Supabase blocks password sign-in until
     // the mailbox owner follows the confirmation link sent below.
-    email_confirm: false,
-    user_metadata: {
-      name: normalizedContactName,
-      phone: normalizedPhone,
-      business_name: normalizedBusinessName,
-      company_address: normalizedCompanyAddress,
-      delivery_address: normalizedDeliveryAddress,
-      vat_number: normalizedVatNumber,
-      country: country || null,
-      province: province || null,
-      city: city || null,
-      business_type: businessType || null,
-      monthly_spend: monthlySpend || null,
-      website: website || null,
+    options: {
+      redirectTo: `${siteUrlForLink}/#/login?email-confirmed=1`,
+      data: {
+        name: normalizedContactName,
+        phone: normalizedPhone,
+        business_name: normalizedBusinessName,
+        company_address: normalizedCompanyAddress,
+        delivery_address: normalizedDeliveryAddress,
+        vat_number: normalizedVatNumber,
+        country: country || null,
+        province: province || null,
+        city: city || null,
+        business_type: businessType || null,
+        monthly_spend: monthlySpend || null,
+        website: website || null,
+      },
     },
   });
+  const confirmationLink = data?.properties?.action_link || '';
 
   if (error) {
     console.error('createUser error:', error);
@@ -459,13 +544,15 @@ export default async function handler(req, res) {
     }
 
     const siteUrl = (process.env.SITE_URL || 'https://site.proto.co.za').replace(/\/$/, '');
-    const { error: confirmationError } = await supabase.auth.resend({
-      type: 'signup',
+    const confirmationError = await sendVerificationEmail({
+      supabase,
       email: normalizedEmail,
-      options: { emailRedirectTo: `${siteUrl}/#/login?email-confirmed=1` },
+      contactName: normalizedContactName,
+      confirmationLink,
+      siteUrl,
     });
     if (confirmationError) {
-      console.error('signup confirmation email failed:', confirmationError.message, '| userId:', userId);
+      console.error('signup confirmation email failed:', confirmationError, '| userId:', userId);
       await supabase.from('customers').delete().eq('id', userId);
       await supabase.auth.admin.deleteUser(userId);
       return res.status(502).json({
