@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, ShieldAlert, X } from 'lucide-react';
 
 export default function OrderConfirmModal({
   isOpen,
   onClose,
   orderStatus = 'idle',
   orderError = '',
+  orderNumber = '',
 }) {
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -34,8 +35,11 @@ export default function OrderConfirmModal({
           <div>
             {isSuccess && (
               <>
-                <h2 className="ocm-title">Order confirmed. Thank you.</h2>
-                <p className="ocm-subtitle">Proto Trading has received your order and will be in touch.</p>
+                <h2 className="ocm-title">Order request received. Thank you.</h2>
+                <p className="ocm-subtitle">
+                  {orderNumber ? `${orderNumber} · ` : ''}
+                  Proto Trading will confirm stock, final pricing and delivery.
+                </p>
               </>
             )}
             {isSending && (
@@ -52,6 +56,16 @@ export default function OrderConfirmModal({
             )}
           </div>
         </div>
+
+        {isSuccess && (
+          <div className="ocm-payment-notice" role="note" aria-label="Payment instruction">
+            <ShieldAlert size={19} aria-hidden />
+            <div>
+              <strong>No payment is required yet.</strong>
+              <span>We will email your official pro-forma invoice before you make payment.</span>
+            </div>
+          </div>
+        )}
 
         {(isSuccess || isError) && (
           <div className="ocm-actions ocm-actions--simple">

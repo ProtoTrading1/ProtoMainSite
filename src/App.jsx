@@ -560,6 +560,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [modalOpen, setModalOpen] = useState(false);
   const [orderStatus, setOrderStatus] = useState('idle');
   const [orderError, setOrderError] = useState('');
+  const [submittedOrderNumber, setSubmittedOrderNumber] = useState('');
 
   useEffect(() => () => {
     if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
@@ -733,6 +734,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     setOrderStatus('sending');
     setOrderError('');
+    setSubmittedOrderNumber('');
     setModalOpen(true);
 
     try {
@@ -783,6 +785,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       };
 
       const result = await submitOrder();
+      setSubmittedOrderNumber(result.orderNumber || '');
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
       clearCart();
       setMobileCartOpen(false);
@@ -937,6 +940,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           onClose={() => setModalOpen(false)}
           orderStatus={orderStatus}
           orderError={orderError}
+          orderNumber={submittedOrderNumber}
         />
       </Suspense>
 

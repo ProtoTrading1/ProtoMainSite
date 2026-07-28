@@ -843,6 +843,53 @@ textarea:focus-visible,
   overflow-y: auto;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 }
+
+.checkout-payment-notice,
+.ocm-payment-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 15px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #c40000;
+  border-radius: 10px;
+  background: #fff7f7;
+  color: #7f1d1d;
+}
+
+.checkout-payment-notice {
+  margin-bottom: 14px;
+}
+
+.checkout-payment-notice > svg,
+.ocm-payment-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #c40000;
+}
+
+.checkout-payment-notice strong,
+.checkout-payment-notice span,
+.ocm-payment-notice strong,
+.ocm-payment-notice span {
+  display: block;
+}
+
+.checkout-payment-notice strong,
+.ocm-payment-notice strong {
+  margin-bottom: 3px;
+  color: #7f1d1d;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.checkout-payment-notice span,
+.ocm-payment-notice span {
+  font-size: 12px;
+  line-height: 1.5;
+}
 @media (max-width: 640px) {
   .courier-modal-backdrop {
     justify-content: flex-end;
@@ -3923,6 +3970,8 @@ textarea:focus-visible,
 .ocm-copy-btn:hover { border-color: #0f172a; background: #f8fafc; }
 .order-modal-v2--simple { max-width: 420px; }
 .ocm-actions--simple { padding: 0 24px 28px; border-top: none; display: flex; justify-content: center; }
+.ocm-payment-notice { margin: 0 24px 18px; }
+.ocm-payment-notice + .ocm-actions--simple { padding-top: 0; }
 .ocm-done-btn { min-width: 200px; padding: 0 44px; justify-content: center; background: #16a34a; color: #fff; border-color: #16a34a; font-weight: 800; }
 .ocm-done-btn:hover { background: #15803d; border-color: #15803d; color: #fff; }
 

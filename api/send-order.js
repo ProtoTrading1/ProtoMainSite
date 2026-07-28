@@ -627,7 +627,7 @@ export function buildOrderEmailHtml({
   const intro = isTeam
     ? `<p style="margin:0 0 22px;color:#334155;font-size:15px;line-height:1.6;">A new quote request just came in through the trade portal. The order-request PDF is attached. Customer, delivery and line items are below.</p>`
     : `<p style="margin:0 0 6px;color:#0f172a;font-size:18px;line-height:1.6;font-weight:800;">Hi ${name},</p>
-       <p style="margin:0 0 22px;color:#334155;font-size:15px;line-height:1.6;">We've received your order${itemCount ? ` (${itemCount} item${itemCount === 1 ? '' : 's'})` : ''}. Our team will be in touch shortly to confirm stock, pricing and delivery. Here's your summary:</p>`;
+       <p style="margin:0 0 22px;color:#334155;font-size:15px;line-height:1.6;">We've received your order request${itemCount ? ` (${itemCount} item${itemCount === 1 ? '' : 's'})` : ''}. Our team will be in touch shortly to confirm stock, final pricing and delivery. Here's your summary:</p>`;
 
   const contactBlock = isTeam
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
@@ -663,6 +663,12 @@ export function buildOrderEmailHtml({
       <tr><td style="padding:8px 0 0;color:#0f172a;font-size:15px;font-weight:800;">Estimated total</td><td style="padding:8px 0 0;text-align:right;color:#c40000;font-size:18px;font-weight:900;">${money(totals?.total ?? totals?.subtotal)}</td></tr>
     </table>
     <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">Estimated only — final pricing, stock and delivery are confirmed by our team on reply.</p>`;
+  const paymentNotice = isTeam
+    ? ''
+    : `<div style="margin:22px 0 0;padding:15px 17px;background:#fff7f7;border:1px solid #fecaca;border-left:4px solid #c40000;border-radius:10px;">
+        <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:4px;">Please do not pay this estimated amount.</div>
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.55;">Payment should only be made after you receive your official pro-forma invoice from Proto Trading.</div>
+      </div>`;
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title>
@@ -702,7 +708,8 @@ export function buildOrderEmailHtml({
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  ${totalsBlock}
+    ${paymentNotice}
+    ${totalsBlock}
   ${notesBlock}
   <p style="margin:26px 0 0;color:#666666;font-size:13px;line-height:1.6;">Questions? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
 </td></tr>
@@ -1159,6 +1166,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     success: true,
     orderId,
+    orderNumber,
     dbCaptureFailed: false,
     emailDeliveryFailed,
     emailFailReason: emailDeliveryFailed ? emailFailReason : null,

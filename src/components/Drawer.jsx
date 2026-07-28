@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, Lock, PackageCheck, ShoppingCart, Trash2, X } from 'lucide-react';
+import { Loader2, Lock, PackageCheck, ShieldAlert, ShoppingCart, Trash2, X } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
@@ -280,7 +280,7 @@ export default function Drawer({
         </button>
         <div className="drawer-trust">
           <PackageCheck size={14} />
-          Stock, VAT and delivery are confirmed by reply.
+          No payment is taken at checkout. We send a pro-forma after confirmation.
         </div>
         <ol className="quote-steps">
           <li>Add trade products</li>
@@ -347,6 +347,14 @@ export default function Drawer({
               />
             </label>
 
+            <div className="checkout-payment-notice" role="note" aria-label="Payment instruction">
+              <ShieldAlert size={19} aria-hidden />
+              <div>
+                <strong>This is an order request - not an invoice.</strong>
+                <span>Please do not make payment yet. We will confirm stock, final pricing and delivery, then email your pro-forma invoice with payment instructions.</span>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={handleConfirmCourier}
@@ -354,7 +362,7 @@ export default function Drawer({
               style={{ width: '100%', padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: !courierChoice ? '#e2e8f0' : '#0f172a', color: !courierChoice ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: !courierChoice ? 'not-allowed' : submitting ? 'wait' : 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s' }}
             >
               {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
-              {submitting ? 'Sending your order…' : 'Confirm & Submit Quote'}
+              {submitting ? 'Sending your order request…' : 'Submit order request'}
             </button>
             <button type="button" onClick={closeCourierPicker} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
               Cancel
