@@ -159,17 +159,17 @@ function estimatedTotal(subtotal, discountAmount) {
 }
 
 const ORDER_PDF_PAGE = { width: 595.28, height: 841.89, margin: 30 };
-const ORDER_PDF_ROW_HEIGHT = 53;
-const ORDER_PDF_CONTINUATION_LIMIT = 10;
+const ORDER_PDF_ROW_HEIGHT = 68;
+const ORDER_PDF_CONTINUATION_LIMIT = 9;
 const ORDER_PDF_COL = {
   number: 30,
-  image: 50,
-  code: 111,
-  product: 184,
-  qty: 360,
-  unit: 393,
-  total: 444,
-  added: 516,
+  image: 45,
+  code: 115,
+  product: 190,
+  qty: 365,
+  unit: 398,
+  total: 452,
+  added: 521,
 };
 
 export function paginateOrderItems(itemCount, firstPageLimit = 9) {
@@ -213,7 +213,7 @@ function drawInternalPdfLogo(doc) {
 function drawInternalPdfColumnHeader(doc, y) {
   const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
   doc.rect(ORDER_PDF_PAGE.margin, y, right - ORDER_PDF_PAGE.margin, 21).fill('#f8fafc');
-  doc.font('Helvetica-Bold').fontSize(7).fillColor('#64748b');
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#64748b');
   doc.text('#', ORDER_PDF_COL.number + 4, y + 7, { width: 14 });
   doc.text('IMAGE', ORDER_PDF_COL.image + 3, y + 7, { width: 52 });
   doc.text('CODE', ORDER_PDF_COL.code, y + 7, { width: 68 });
@@ -236,47 +236,48 @@ function drawInternalPdfProductRow(doc, item, rowNumber, y) {
   const sku = cleanText(product.sku || product.id);
   const productDescription = `${cleanText(product.name, 'Unnamed product')}${sku ? ` [SKU: ${sku}]` : ''}`;
 
-  doc.font('Helvetica').fontSize(8).fillColor('#64748b')
-    .text(String(rowNumber), ORDER_PDF_COL.number + 5, y + 23, { width: 12 });
+  doc.font('Helvetica').fontSize(9).fillColor('#64748b')
+    .text(String(rowNumber), ORDER_PDF_COL.number + 5, y + 30, { width: 12 });
 
-  doc.roundedRect(ORDER_PDF_COL.image, y + 2, 49, 49, 5)
+  doc.roundedRect(ORDER_PDF_COL.image, y + 2, 64, 64, 6)
     .fillAndStroke('#ffffff', '#e2e8f0');
   if (product.imageBuffer) {
     try {
-      doc.image(product.imageBuffer, ORDER_PDF_COL.image + 2, y + 4, {
-        fit: [45, 45],
+      doc.image(product.imageBuffer, ORDER_PDF_COL.image + 3, y + 5, {
+        fit: [58, 58],
         align: 'center',
         valign: 'center',
       });
     } catch {
-      doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#c40000')
-        .text('IMAGE', ORDER_PDF_COL.image + 9, y + 23);
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c40000')
+        .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30);
     }
   } else {
-    doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#c40000')
-      .text('IMAGE', ORDER_PDF_COL.image + 9, y + 23);
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c40000')
+      .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30);
   }
 
-  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#475569')
-    .text(cleanText(product.code, '—'), ORDER_PDF_COL.code, y + 20, {
+  doc.font('Helvetica-Bold').fontSize(8.7).fillColor('#334155')
+    .text(cleanText(product.code, '-'), ORDER_PDF_COL.code, y + 27, {
       width: ORDER_PDF_COL.product - ORDER_PDF_COL.code - 6,
-      height: 18,
+      height: 22,
       ellipsis: true,
     });
-  doc.font('Helvetica-Bold').fontSize(7.7).fillColor('#0f172a')
-    .text(productDescription, ORDER_PDF_COL.product, y + 8, {
+  doc.font('Helvetica-Bold').fontSize(9.4).fillColor('#0f172a')
+    .text(productDescription, ORDER_PDF_COL.product, y + 9, {
       width: ORDER_PDF_COL.qty - ORDER_PDF_COL.product - 7,
-      height: 38,
+      height: 50,
       ellipsis: true,
+      lineGap: 0.8,
     });
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
+    .text(String(qty), ORDER_PDF_COL.qty, y + 27, { width: 27, align: 'center' });
+  doc.font('Helvetica').fontSize(9).fillColor('#475569')
+    .text(money(price), ORDER_PDF_COL.unit, y + 27, { width: 47, align: 'right' });
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
-    .text(String(qty), ORDER_PDF_COL.qty, y + 20, { width: 27, align: 'center' });
-  doc.font('Helvetica').fontSize(8).fillColor('#475569')
-    .text(money(price), ORDER_PDF_COL.unit, y + 20, { width: 45, align: 'right' });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a')
-    .text(money(lineTotal), ORDER_PDF_COL.total, y + 20, { width: 54, align: 'right' });
+    .text(money(lineTotal), ORDER_PDF_COL.total, y + 27, { width: 58, align: 'right' });
 
-  doc.rect(ORDER_PDF_COL.added + 14, y + 18, 18, 18)
+  doc.rect(ORDER_PDF_COL.added + 12, y + 23, 22, 22)
     .strokeColor('#334155').lineWidth(1).stroke();
   doc.moveTo(ORDER_PDF_PAGE.margin, y + ORDER_PDF_ROW_HEIGHT)
     .lineTo(right, y + ORDER_PDF_ROW_HEIGHT)
@@ -373,7 +374,7 @@ export function buildPdfBuffer({
       .text('Order', 350, 51, { width: 70, align: 'right' });
     doc.font('Helvetica-Bold').fontSize(14).fillColor('#c40000')
       .text(ref, 425, 48, { width: 140, align: 'right' });
-    doc.font('Helvetica').fontSize(7.5).fillColor('#64748b')
+    doc.font('Helvetica').fontSize(8.5).fillColor('#64748b')
       .text(`${customerCode ? `Customer code: ${customerCode} · ` : ''}${dateLabel} · ${cleanText(deliveryMethod, 'Delivery to confirm')}`, 255, 69, {
         width: 310,
         align: 'right',
@@ -383,81 +384,81 @@ export function buildPdfBuffer({
       .strokeColor('#cbd5e1').lineWidth(0.8).stroke();
 
     const panelY = 92;
-    const panelHeight = 124;
+    const panelHeight = 138;
     doc.roundedRect(ORDER_PDF_PAGE.margin, panelY, contentWidth, panelHeight, 8)
       .fillAndStroke('#f8fafc', '#dbe2ea');
     const dividerX = 313;
     doc.moveTo(dividerX, panelY + 10).lineTo(dividerX, panelY + panelHeight - 10)
       .strokeColor('#d1d9e2').lineWidth(0.7).stroke();
 
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
       .text('Invoice To', ORDER_PDF_PAGE.margin + 12, panelY + 10);
-    let invoiceY = panelY + 25;
-    doc.font('Helvetica-Bold').fontSize(7.6).fillColor('#0f172a')
+    let invoiceY = panelY + 27;
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
       .text(business || customerName, ORDER_PDF_PAGE.margin + 12, invoiceY, {
         width: 245,
-        height: 11,
+        height: 12,
         ellipsis: true,
       });
-    invoiceY += 11;
+    invoiceY += 12;
     if (business && customerName.toLowerCase() !== business.toLowerCase()) {
-      doc.font('Helvetica').fontSize(7.3).fillColor('#334155')
+      doc.font('Helvetica').fontSize(8.3).fillColor('#334155')
         .text(customerName, ORDER_PDF_PAGE.margin + 12, invoiceY, {
           width: 245,
-          height: 10,
+          height: 11,
           ellipsis: true,
         });
-      invoiceY += 10;
+      invoiceY += 11;
     }
-    doc.font('Helvetica').fontSize(6.9).fillColor('#334155')
+    doc.font('Helvetica').fontSize(8).fillColor('#334155')
       .text(invoiceAddress, ORDER_PDF_PAGE.margin + 12, invoiceY, {
         width: 245,
-        height: 55,
+        height: 61,
         ellipsis: true,
-        lineGap: 0.2,
+        lineGap: 0.4,
       });
-    doc.font('Helvetica').fontSize(7).fillColor('#475569')
-      .text(`Phone: ${cleanText(customer?.phone, 'Not provided')}`, ORDER_PDF_PAGE.margin + 12, panelY + 105, {
+    doc.font('Helvetica').fontSize(8).fillColor('#475569')
+      .text(`Phone: ${cleanText(customer?.phone, 'Not provided')}`, ORDER_PDF_PAGE.margin + 12, panelY + 119, {
         width: 120,
         height: 10,
         ellipsis: true,
       });
-    doc.text(`Email: ${cleanText(customer?.email, 'Not provided')}`, ORDER_PDF_PAGE.margin + 133, panelY + 105, {
-      width: 124,
-      height: 10,
-      ellipsis: true,
-    });
+    doc.text(`Email: ${cleanText(customer?.email, 'Not provided')}`, ORDER_PDF_PAGE.margin + 133, panelY + 119, {
+        width: 124,
+        height: 10,
+        ellipsis: true,
+      });
 
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
       .text('Delivery Address', dividerX + 14, panelY + 10);
-    let deliveryY = panelY + 25;
-    doc.font('Helvetica-Bold').fontSize(7.6).fillColor('#0f172a')
+    let deliveryY = panelY + 27;
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
       .text(customerName, dividerX + 14, deliveryY, {
         width: 224,
-        height: 11,
+        height: 12,
         ellipsis: true,
       });
-    deliveryY += 11;
+    deliveryY += 12;
     if (business && customerName.toLowerCase() !== business.toLowerCase()) {
-      doc.font('Helvetica').fontSize(7.3).fillColor('#334155')
+      doc.font('Helvetica').fontSize(8.3).fillColor('#334155')
         .text(business, dividerX + 14, deliveryY, {
           width: 224,
-          height: 10,
+          height: 11,
           ellipsis: true,
         });
-      deliveryY += 10;
+      deliveryY += 11;
     }
-    doc.font('Helvetica').fontSize(6.9).fillColor('#334155')
+    doc.font('Helvetica').fontSize(8).fillColor('#334155')
       .text(deliveryAddress, dividerX + 14, deliveryY, {
         width: 224,
-        height: 55,
+        height: 61,
         ellipsis: true,
-        lineGap: 0.2,
+        lineGap: 0.4,
       });
     if (note) {
-      doc.font('Helvetica-Bold').fontSize(7).fillColor('#475569')
-        .text('Notes:', dividerX + 14, panelY + 105, { width: 34 });
-      doc.font('Helvetica').text(note, dividerX + 49, panelY + 105, {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#475569')
+        .text('Notes:', dividerX + 14, panelY + 119, { width: 38 });
+      doc.font('Helvetica').text(note, dividerX + 53, panelY + 119, {
         width: 189,
         height: 12,
         ellipsis: true,
@@ -467,10 +468,13 @@ export function buildPdfBuffer({
     const firstTableHeaderY = panelY + panelHeight + 11;
     const firstRowsStart = firstTableHeaderY + 21;
     const totalsReserve = promo?.code ? 102 : 84;
-    const firstPageLimit = Math.max(1, Math.min(
-      9,
+    const singlePageLimit = Math.max(1, Math.min(
+      7,
       Math.floor((ORDER_PDF_PAGE.height - 24 - totalsReserve - firstRowsStart) / ORDER_PDF_ROW_HEIGHT),
     ));
+    // When an order continues onto another page, page one does not need to
+    // reserve room for totals and staff notes. Eight larger rows fit cleanly.
+    const firstPageLimit = safeItems.length > singlePageLimit ? 8 : singlePageLimit;
     const pageSizes = paginateOrderItems(safeItems.length, firstPageLimit);
 
     let itemOffset = 0;
