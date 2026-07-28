@@ -121,146 +121,157 @@ function PinIcon() {
 }
 
 const SCROLL_STAGES = [
-  { id: 'journey-customer', threshold: 0, Icon: CustomerIcon, transform: 'translate(-50%, -50%)' },
-  { id: 'journey-basket', threshold: 0.2, Icon: BoxIcon, transform: 'translate(-50%, -50%)' },
-  { id: 'journey-warehouse', threshold: 0.4, Icon: WarehouseIcon, transform: 'translate(-50%, -50%)' },
-  { id: 'journey-delivery', threshold: 0.6, Icon: TruckIcon, transform: 'translate(-50%, -50%) rotate(90deg)' },
-  { id: 'journey-complete', threshold: 0.8, Icon: PinIcon, transform: 'translate(-50%, -100%)' },
+  { threshold: 0,   Icon: CustomerIcon, transform: 'translate(-50%, -50%)'           },
+  { threshold: 0.2, Icon: BoxIcon,      transform: 'translate(-50%, -50%)'           },
+  { threshold: 0.4, Icon: WarehouseIcon,transform: 'translate(-50%, -50%)'           },
+  { threshold: 0.6, Icon: TruckIcon,    transform: 'translate(-50%, -50%) rotate(90deg)' },
+  { threshold: 0.8, Icon: PinIcon,      transform: 'translate(-50%, -100%)'          },
 ];
-const JOURNEY_FADE_ZONE = 0.07;
+const FADE_ZONE = 0.07;
 
 function TruckScrollbar() {
   const [progress, setProgress] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [isIdle, setIsIdle] = useState(true);
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [trackHeight, setTrackHeight] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [vw, setVw] = useState(() => window.innerWidth);
+  const targetRef = useRef(0);
+  const currentRef = useRef(0);
   const rafRef = useRef(null);
-  const scrollStopTimerRef = useRef(null);
-  const idleTimerRef = useRef(null);
 
   useEffect(() => {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const desktop = window.matchMedia('(min-width: 900px)');
+    function getTarget() {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      if (docH <= 0) return null;
+      return Math.min(scrollTop / docH, 1);
+    }
 
-    const syncEnabled = () => {
-      setIsEnabled(desktop.matches && !reducedMotion.matches);
-    };
+    function tick() {
+      const target = targetRef.current;
+      const current = currentRef.current;
+      const next = current + (target - current) * 0.07;
+      const snapped = Math.abs(next - target) < 0.0005 ? target : next;
+      currentRef.current = snapped;
+      setProgress(snapped);
+      rafRef.current = requestAnimationFrame(tick);
+    }
 
-    syncEnabled();
-    reducedMotion.addEventListener?.('change', syncEnabled);
-    desktop.addEventListener?.('change', syncEnabled);
+    function onScroll() {
+      const t = getTarget();
+      if (t === null) { setVisible(false); return; }
+      setVisible(true);
+      targetRef.current = t;
+    }
+
+    function onResize() {
+      setVw(window.innerWidth);
+      onScroll();
+    }
+
+    const t = getTarget();
+    if (t !== null) { setVisible(true); targetRef.current = t; }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+    rafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      reducedMotion.removeEventListener?.('change', syncEnabled);
-      desktop.removeEventListener?.('change', syncEnabled);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
   useEffect(() => {
-    if (!isEnabled) {
-      document.documentElement.classList.remove('proto-journey-active');
-      return undefined;
-    }
+    const style = document.createElement('style');
+    style.id = 'hide-native-scrollbar';
+    style.textContent = `::-webkit-scrollbar{display:none}*{scrollbar-width:none;-ms-overflow-style:none}`;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
 
-    document.documentElement.classList.add('proto-journey-active');
+  // Responsive sizing
+  const isMobile = vw < 640;
+  const right    = isMobile ? 5 : 10;
+  const PAD      = isMobile ? 18 : 24;
+  const dotSize  = isMobile ? 6  : 8;
+  const trackW   = isMobile ? 2  : 3;
+  const scale    = isMobile ? 0.65 : 1;
 
-    function measure() {
-      rafRef.current = null;
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const docH = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(docH > 0 ? Math.min(Math.max(scrollTop / docH, 0), 1) : 0);
-      setTrackHeight(Math.max(window.innerHeight - 88, 0));
-    }
-
-    function scheduleMeasure() {
-      if (rafRef.current === null) {
-        rafRef.current = window.requestAnimationFrame(measure);
-      }
-    }
-
-    function onScroll() {
-      setIsScrolling(true);
-      setIsIdle(false);
-      window.clearTimeout(scrollStopTimerRef.current);
-      window.clearTimeout(idleTimerRef.current);
-      scrollStopTimerRef.current = window.setTimeout(() => setIsScrolling(false), 160);
-      idleTimerRef.current = window.setTimeout(() => setIsIdle(true), 1500);
-      scheduleMeasure();
-    }
-
-    measure();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', scheduleMeasure, { passive: true });
-
-    return () => {
-      document.documentElement.classList.remove('proto-journey-active');
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', scheduleMeasure);
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-      window.clearTimeout(scrollStopTimerRef.current);
-      window.clearTimeout(idleTimerRef.current);
-    };
-  }, [isEnabled]);
-
-  if (!isEnabled || trackHeight <= 0) return null;
-
-  let currentStageIndex = 0;
-  for (let index = SCROLL_STAGES.length - 1; index >= 0; index -= 1) {
-    if (progress >= SCROLL_STAGES[index].threshold) {
-      currentStageIndex = index;
-      break;
-    }
+  // Which stage are we in?
+  let curIdx = 0;
+  for (let i = 0; i < SCROLL_STAGES.length; i++) {
+    if (progress >= SCROLL_STAGES[i].threshold) curIdx = i;
   }
-
-  const nextStageIndex = Math.min(currentStageIndex + 1, SCROLL_STAGES.length - 1);
-  const nextThreshold = SCROLL_STAGES[nextStageIndex].threshold;
-  const blend = currentStageIndex === nextStageIndex
+  const nextIdx = Math.min(curIdx + 1, SCROLL_STAGES.length - 1);
+  const nextThresh = SCROLL_STAGES[nextIdx].threshold;
+  const blend = curIdx === nextIdx
     ? 0
-    : Math.max(0, Math.min(1, (progress - (nextThreshold - JOURNEY_FADE_ZONE)) / JOURNEY_FADE_ZONE));
-  const {
-    Icon: CurrentIcon,
-    transform: currentTransform,
-  } = SCROLL_STAGES[currentStageIndex];
-  const {
-    Icon: NextIcon,
-    transform: nextTransform,
-  } = SCROLL_STAGES[nextStageIndex];
-  const thumbTop = 44 + (progress * trackHeight);
+    : Math.max(0, Math.min(1, (progress - (nextThresh - FADE_ZONE)) / FADE_ZONE));
+
+  const { Icon: CurIcon, transform: curTransform } = SCROLL_STAGES[curIdx];
+  const { Icon: NxtIcon, transform: nxtTransform } = SCROLL_STAGES[nextIdx];
+
+  const trackH = window.innerHeight - PAD * 2 - 40;
+  const thumbTop = PAD + progress * trackH;
+
+  if (!visible) return null;
 
   return (
-    <div
-      className={`proto-journey-rail${isIdle ? ' is-idle' : ''}${isScrolling ? ' is-scrolling' : ''}`}
-      role="progressbar"
-      aria-label="Customer order journey"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow={Math.round(progress * 100)}
-    >
-      <div className="proto-journey-track" aria-hidden="true">
-        <span className="proto-journey-progress" style={{ height: `${progress * 100}%` }} />
+    <div style={{ position: 'fixed', right, top: 0, height: '100vh', width: isMobile ? 32 : 48, zIndex: 9999, pointerEvents: 'none' }}>
+      {/* Track */}
+      <div style={{ position: 'absolute', top: PAD, bottom: PAD, left: '50%', transform: 'translateX(-50%)', width: trackW, background: '#111', borderRadius: '2px' }}>
+        {/* Progress fill */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${progress * 100}%`, background: 'linear-gradient(to bottom, #8B1A1A, #c0392b)', borderRadius: '2px' }} />
+        {/* Stage waypoint dots */}
+        {[0.2, 0.4, 0.6, 0.8].map(p => {
+          const passed = progress >= p - 0.01;
+          return (
+            <div key={p} style={{
+              position: 'absolute',
+              top: `${p * 100}%`,
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: dotSize, height: dotSize,
+              borderRadius: '50%',
+              background: passed ? '#8B1A1A' : '#1e1e1e',
+              border: `1.5px solid ${passed ? '#c0392b' : '#2a2a2a'}`,
+              boxShadow: passed ? '0 0 5px rgba(139,26,26,0.55)' : 'none',
+              transition: 'background 0.4s, box-shadow 0.4s, border-color 0.4s',
+            }} />
+          );
+        })}
       </div>
 
-      <div
-        className="proto-journey-thumb"
-        style={{ transform: `translate3d(-50%, ${thumbTop}px, 0)` }}
-        aria-hidden="true"
-      >
-        <span className="proto-journey-thumb-icon">
-          <span
-            className="proto-journey-thumb-icon-layer"
-            style={{ opacity: 1 - blend, transform: currentTransform }}
-          >
-            <CurrentIcon />
-          </span>
-          <span
-            className="proto-journey-thumb-icon-layer"
-            style={{ opacity: blend, transform: nextTransform }}
-          >
-            <NextIcon />
-          </span>
-        </span>
+      {/* Thumb — crossfade between stage icons.
+          Each icon is independently positioned so the drop-shadow
+          filter is applied to the actual painted area, not a zero-size box. */}
+      <div style={{ position: 'absolute', top: `${thumbTop}px`, left: '50%', width: 0, height: 0 }}>
+        <div style={{
+          position: 'absolute',
+          transform: curTransform,
+          opacity: 1 - blend,
+          transition: 'opacity 0.35s ease',
+          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
+          transformOrigin: '0 0',
+          ...(isMobile ? { scale: '0.7' } : {}),
+        }}>
+          <CurIcon />
+        </div>
+        <div style={{
+          position: 'absolute',
+          transform: nxtTransform,
+          opacity: blend,
+          transition: 'opacity 0.35s ease',
+          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
+          transformOrigin: '0 0',
+          ...(isMobile ? { scale: '0.7' } : {}),
+        }}>
+          <NxtIcon />
+        </div>
       </div>
+
+      {/* Start glow dot */}
+      <div style={{ position: 'absolute', top: PAD, left: '50%', transform: 'translate(-50%, -50%)', width: dotSize, height: dotSize, borderRadius: '50%', background: '#8B1A1A', boxShadow: '0 0 8px rgba(139,26,26,0.9)' }} />
     </div>
   );
 }
