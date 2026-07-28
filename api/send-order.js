@@ -227,7 +227,7 @@ function drawInternalPdfColumnHeader(doc, y) {
   return y + 21;
 }
 
-function drawInternalPdfProductRow(doc, item, rowNumber, y) {
+function drawInternalPdfProductRow(doc, item, rowNumber, y, rowHeight = ORDER_PDF_ROW_HEIGHT) {
   const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
   const product = item.product || {};
   const qty = Number(item.qty || 0);
@@ -235,54 +235,55 @@ function drawInternalPdfProductRow(doc, item, rowNumber, y) {
   const lineTotal = qty * price;
   const sku = cleanText(product.sku || product.id);
   const productDescription = `${cleanText(product.name, 'Unnamed product')}${sku ? ` [SKU: ${sku}]` : ''}`;
+  const verticalOffset = Math.max(0, (rowHeight - ORDER_PDF_ROW_HEIGHT) / 2);
 
   doc.font('Helvetica').fontSize(9).fillColor('#64748b')
-    .text(String(rowNumber), ORDER_PDF_COL.number + 5, y + 30, { width: 12 });
+    .text(String(rowNumber), ORDER_PDF_COL.number + 5, y + 30 + verticalOffset, { width: 12 });
 
-  doc.roundedRect(ORDER_PDF_COL.image, y + 2, 64, 64, 6)
+  doc.roundedRect(ORDER_PDF_COL.image, y + 2 + verticalOffset, 64, 64, 6)
     .fillAndStroke('#ffffff', '#e2e8f0');
   if (product.imageBuffer) {
     try {
-      doc.image(product.imageBuffer, ORDER_PDF_COL.image + 3, y + 5, {
+      doc.image(product.imageBuffer, ORDER_PDF_COL.image + 3, y + 5 + verticalOffset, {
         fit: [58, 58],
         align: 'center',
         valign: 'center',
       });
     } catch {
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c40000')
-        .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30);
+        .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30 + verticalOffset);
     }
   } else {
     doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c40000')
-      .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30);
+      .text('IMAGE', ORDER_PDF_COL.image + 17, y + 30 + verticalOffset);
   }
 
   doc.font('Helvetica-Bold').fontSize(8.7).fillColor('#334155')
-    .text(cleanText(product.code, '-'), ORDER_PDF_COL.code, y + 27, {
+    .text(cleanText(product.code, '-'), ORDER_PDF_COL.code, y + 27 + verticalOffset, {
       width: ORDER_PDF_COL.product - ORDER_PDF_COL.code - 6,
       height: 22,
       ellipsis: true,
     });
   doc.font('Helvetica-Bold').fontSize(9.4).fillColor('#0f172a')
-    .text(productDescription, ORDER_PDF_COL.product, y + 9, {
+    .text(productDescription, ORDER_PDF_COL.product, y + 9 + verticalOffset, {
       width: ORDER_PDF_COL.qty - ORDER_PDF_COL.product - 7,
       height: 50,
       ellipsis: true,
       lineGap: 0.8,
     });
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
-    .text(String(qty), ORDER_PDF_COL.qty, y + 27, { width: 27, align: 'center' });
+    .text(String(qty), ORDER_PDF_COL.qty, y + 27 + verticalOffset, { width: 27, align: 'center' });
   doc.font('Helvetica').fontSize(9).fillColor('#475569')
-    .text(money(price), ORDER_PDF_COL.unit, y + 27, { width: 47, align: 'right' });
+    .text(money(price), ORDER_PDF_COL.unit, y + 27 + verticalOffset, { width: 47, align: 'right' });
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
-    .text(money(lineTotal), ORDER_PDF_COL.total, y + 27, { width: 58, align: 'right' });
+    .text(money(lineTotal), ORDER_PDF_COL.total, y + 27 + verticalOffset, { width: 58, align: 'right' });
 
-  doc.rect(ORDER_PDF_COL.added + 12, y + 23, 22, 22)
+  doc.rect(ORDER_PDF_COL.added + 12, y + 23 + verticalOffset, 22, 22)
     .strokeColor('#334155').lineWidth(1).stroke();
-  doc.moveTo(ORDER_PDF_PAGE.margin, y + ORDER_PDF_ROW_HEIGHT)
-    .lineTo(right, y + ORDER_PDF_ROW_HEIGHT)
+  doc.moveTo(ORDER_PDF_PAGE.margin, y + rowHeight)
+    .lineTo(right, y + rowHeight)
     .strokeColor('#e2e8f0').lineWidth(0.6).stroke();
-  return y + ORDER_PDF_ROW_HEIGHT;
+  return y + rowHeight;
 }
 
 function drawInternalPdfTotals(doc, y, totals, promo) {
@@ -480,6 +481,7 @@ export function buildPdfBuffer({
     let itemOffset = 0;
     let finalContentY = firstRowsStart;
     pageSizes.forEach((pageSize, pageIndex) => {
+      const isLastPage = pageIndex === pageSizes.length - 1;
       if (pageIndex > 0) {
         doc.addPage();
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
@@ -491,17 +493,31 @@ export function buildPdfBuffer({
         finalContentY = drawInternalPdfColumnHeader(doc, firstTableHeaderY);
       }
 
+      // Expand rows within sensible limits so continuation and short pages use
+      // the printable area instead of leaving an arbitrary block of whitespace.
+      // The final page reserves a fixed lower zone for totals and staff notes.
+      const tableBottomTarget = isLastPage
+        ? (promo?.code ? 700 : 718)
+        : 804;
+      const pageRowHeight = pageSize > 0
+        ? Math.max(
+            ORDER_PDF_ROW_HEIGHT,
+            Math.min(82, Math.floor((tableBottomTarget - finalContentY) / pageSize)),
+          )
+        : ORDER_PDF_ROW_HEIGHT;
+
       safeItems.slice(itemOffset, itemOffset + pageSize).forEach((item, index) => {
         finalContentY = drawInternalPdfProductRow(
           doc,
           item,
           itemOffset + index + 1,
           finalContentY,
+          pageRowHeight,
         );
       });
       itemOffset += pageSize;
 
-      if (pageIndex === pageSizes.length - 1) {
+      if (isLastPage) {
         finalContentY = drawInternalPdfTotals(doc, finalContentY + 4, totals, promo);
         drawInternalPdfStaffNotes(doc, finalContentY + 3);
       }
@@ -511,10 +527,19 @@ export function buildPdfBuffer({
     for (let page = range.start; page < range.start + range.count; page += 1) {
       doc.switchToPage(page);
       doc.page.margins.bottom = 0;
-      doc.font('Helvetica').fontSize(7).fillColor('#94a3b8')
-        .text(`${ref} · Page ${page - range.start + 1} of ${range.count}`, ORDER_PDF_PAGE.margin, 826, {
+      doc.rect(ORDER_PDF_PAGE.margin, 812, contentWidth, 24).fill('#f8fafc');
+      doc.moveTo(ORDER_PDF_PAGE.margin, 812)
+        .lineTo(ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin, 812)
+        .strokeColor('#cbd5e1').lineWidth(0.8).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+        .text(ref, ORDER_PDF_PAGE.margin + 8, 820, {
+          width: 140,
+          lineBreak: false,
+        });
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#334155')
+        .text(`Page ${page - range.start + 1} of ${range.count}`, ORDER_PDF_PAGE.margin, 818, {
           width: contentWidth,
-          align: 'right',
+          align: 'center',
           lineBreak: false,
         });
     }
