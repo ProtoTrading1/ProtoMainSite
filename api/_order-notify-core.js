@@ -99,7 +99,13 @@ async function notifyRecipient(baseUrl, token, recipient, ctx) {
 }
 
 /** Notify fulfilment team via WATI. Handed Over only when every team member receives WhatsApp. */
-export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
+export async function runOrderTeamNotify(orderId, {
+  emailSent = false,
+  emailRecipients = [],
+  emailMessageId = null,
+  pdfAttached = false,
+  pdfSource = null,
+} = {}) {
   let order;
   let items;
   let customer;
@@ -236,6 +242,10 @@ export async function runOrderTeamNotify(orderId, { emailSent = false } = {}) {
     statusAdvanced,
     statusBlockedReason,
     emailSent: Boolean(emailSent),
+    emailRecipients: Array.isArray(emailRecipients) ? emailRecipients.slice(0, 25) : [],
+    emailMessageId: emailMessageId || null,
+    emailPdfAttached: Boolean(pdfAttached),
+    emailPdfSource: pdfSource || null,
     at: new Date().toISOString(),
     ok: whatsappOk,
     skippedNoToken: !token,

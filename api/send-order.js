@@ -2,20 +2,12 @@ import PDFDocument from 'pdfkit';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
+import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
+import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
-
-const DEFAULT_NOTIFY_EMAILS = ['george@proto.co.za', 'online@proto.co.za', 'danieljoffeinfo@gmail.com'];
-
-function resolveOrderNotifyRecipients() {
-  const raw = process.env.ORDER_NOTIFY_EMAILS || process.env.ORDER_TO_EMAIL || '';
-  const emails = raw
-    ? raw.split(',').map((part) => part.trim()).filter(Boolean)
-    : DEFAULT_NOTIFY_EMAILS;
-  return [...new Set(emails)];
-}
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -959,10 +951,11 @@ export default async function handler(req, res) {
   const orderId = String(captured.id);
   const orderNumber = cleanText(captured.order_number);
 
-  // PDF generation must never block the order email. pdfkit can fail on
-  // serverless (e.g. missing AFM font data); if it does, log the real error and
-  // still send the email — without the attachment — so the team is notified.
+  // Generate the polished order sheet first. If that renderer fails, fall back
+  // to the independently maintained fulfilment PDF so the operational email is
+  // never silently sent without an attachment.
   let pdfBuffer = null;
+  let pdfSource = 'order-email';
   try {
     const preparedItems = await prepareItems(orderItems);
     pdfBuffer = await buildPdfBuffer({
@@ -977,6 +970,14 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
+    try {
+      const fallback = await generateAndStoreOrderPdf(orderId);
+      pdfBuffer = fallback?.buffer || null;
+      pdfSource = 'fulfilment-fallback';
+      console.warn('send-order: attached fulfilment PDF fallback:', orderNumber);
+    } catch (fallbackErr) {
+      console.error('send-order: fallback PDF generation failed:', fallbackErr?.stack || fallbackErr?.message || fallbackErr);
+    }
   }
 
   const attachment = pdfBuffer
@@ -988,7 +989,12 @@ export default async function handler(req, res) {
 
   let emailDeliveryFailed = false;
   let emailFailReason = null;
-  try {
+  let emailMessageId = null;
+  if (!attachment) {
+    emailDeliveryFailed = true;
+    emailFailReason = 'Order PDF could not be generated';
+    console.error('send-order: team email not sent because no PDF attachment was available:', orderNumber);
+  } else try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -1017,6 +1023,16 @@ export default async function handler(req, res) {
       console.error('Brevo API error:', resp.status, JSON.stringify(body));
       emailDeliveryFailed = true;
       emailFailReason = msg;
+    } else {
+      const body = await resp.json().catch(() => ({}));
+      emailMessageId = cleanText(body.messageId);
+      console.info('send-order: team email accepted by Brevo', {
+        orderNumber,
+        recipients: notifyEmails,
+        pdfAttached: true,
+        pdfSource,
+        messageId: emailMessageId || null,
+      });
     }
   } catch (err) {
     console.error('Brevo fetch error:', err?.stack || err?.message || err);
@@ -1051,7 +1067,13 @@ export default async function handler(req, res) {
     // a failure is logged and never fails the order.
     const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
       // 1) Team WhatsApp notification (+ stored fulfilment PDF).
-      runOrderTeamNotify(orderId, { emailSent: !emailDeliveryFailed }),
+      runOrderTeamNotify(orderId, {
+        emailSent: !emailDeliveryFailed,
+        emailRecipients: notifyEmails,
+        emailMessageId,
+        pdfAttached: Boolean(attachment),
+        pdfSource,
+      }),
 
       // 2) Premium tier upgrade — recomputed server-side from the stored order
       //    row, never from client-sent totals.
@@ -1111,6 +1133,8 @@ export default async function handler(req, res) {
     dbCaptureFailed: false,
     emailDeliveryFailed,
     emailFailReason: emailDeliveryFailed ? emailFailReason : null,
+    pdfAttached: Boolean(attachment),
+    emailMessageId,
     notify: notifyResult,
     notifyWarning: notifyResult && !notifyResult.ok
       ? notifyResult.statusBlockedReason || 'WhatsApp team notification did not reach everyone'
