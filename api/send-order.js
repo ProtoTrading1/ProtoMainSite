@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
@@ -165,73 +166,363 @@ function estimatedTotal(subtotal, discountAmount) {
   return Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
 }
 
-function buildPdfBuffer({ items, customer, totals, deliveryMethod, customerNotes, promo }) {
+const ORDER_PDF_PAGE = { width: 595.28, height: 841.89, margin: 30 };
+const ORDER_PDF_ROW_HEIGHT = 53;
+const ORDER_PDF_CONTINUATION_LIMIT = 10;
+const ORDER_PDF_COL = {
+  number: 30,
+  image: 50,
+  code: 111,
+  product: 184,
+  qty: 360,
+  unit: 393,
+  total: 444,
+  added: 516,
+};
+
+export function paginateOrderItems(itemCount, firstPageLimit = 9) {
+  const count = Math.max(0, Number(itemCount) || 0);
+  const firstLimit = Math.max(1, Math.min(9, Number(firstPageLimit) || 9));
+  if (count <= firstLimit) return [count];
+
+  const sizes = [firstLimit];
+  let remaining = count - firstLimit;
+  while (remaining > 0) {
+    const size = Math.min(ORDER_PDF_CONTINUATION_LIMIT, remaining);
+    sizes.push(size);
+    remaining -= size;
+  }
+
+  // Avoid a continuation page containing only one item while still keeping
+  // earlier pages usefully full.
+  if (sizes.length > 1 && sizes.at(-1) === 1 && sizes.at(-2) > 2) {
+    sizes[sizes.length - 2] -= 1;
+    sizes[sizes.length - 1] = 2;
+  }
+  return sizes;
+}
+
+function drawInternalPdfLogo(doc) {
+  const logoPath = path.join(process.cwd(), 'public', 'proto-trading-online-email.png');
+  try {
+    doc.image(logoPath, ORDER_PDF_PAGE.margin, 18, {
+      fit: [178, 49],
+      align: 'left',
+      valign: 'center',
+    });
+  } catch {
+    doc.rect(ORDER_PDF_PAGE.margin, 18, 178, 49).fill('#000000');
+    doc.font('Helvetica-Bold').fontSize(16).fillColor('#ffffff')
+      .text('PROTO ', ORDER_PDF_PAGE.margin + 12, 33, { continued: true });
+    doc.fillColor('#e02020').text('TRADING');
+  }
+}
+
+function drawInternalPdfColumnHeader(doc, y) {
+  const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
+  doc.rect(ORDER_PDF_PAGE.margin, y, right - ORDER_PDF_PAGE.margin, 21).fill('#f8fafc');
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#64748b');
+  doc.text('#', ORDER_PDF_COL.number + 4, y + 7, { width: 14 });
+  doc.text('IMAGE', ORDER_PDF_COL.image + 3, y + 7, { width: 52 });
+  doc.text('CODE', ORDER_PDF_COL.code, y + 7, { width: 68 });
+  doc.text('PRODUCT', ORDER_PDF_COL.product, y + 7, { width: 170 });
+  doc.text('QTY', ORDER_PDF_COL.qty, y + 7, { width: 27, align: 'center' });
+  doc.text('UNIT PRICE', ORDER_PDF_COL.unit - 5, y + 7, { width: 50, align: 'right' });
+  doc.text('TOTAL', ORDER_PDF_COL.total, y + 7, { width: 54, align: 'right' });
+  doc.text('ADDED', ORDER_PDF_COL.added, y + 7, { width: 48, align: 'center' });
+  doc.moveTo(ORDER_PDF_PAGE.margin, y + 21).lineTo(right, y + 21)
+    .strokeColor('#cbd5e1').lineWidth(0.8).stroke();
+  return y + 21;
+}
+
+function drawInternalPdfProductRow(doc, item, rowNumber, y) {
+  const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
+  const product = item.product || {};
+  const qty = Number(item.qty || 0);
+  const price = Number(product.price || 0);
+  const lineTotal = qty * price;
+  const sku = cleanText(product.sku || product.id);
+  const productDescription = `${cleanText(product.name, 'Unnamed product')}${sku ? ` [SKU: ${sku}]` : ''}`;
+
+  doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+    .text(String(rowNumber), ORDER_PDF_COL.number + 5, y + 23, { width: 12 });
+
+  doc.roundedRect(ORDER_PDF_COL.image, y + 2, 49, 49, 5)
+    .fillAndStroke('#ffffff', '#e2e8f0');
+  if (product.imageBuffer) {
+    try {
+      doc.image(product.imageBuffer, ORDER_PDF_COL.image + 2, y + 4, {
+        fit: [45, 45],
+        align: 'center',
+        valign: 'center',
+      });
+    } catch {
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#c40000')
+        .text('IMAGE', ORDER_PDF_COL.image + 9, y + 23);
+    }
+  } else {
+    doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#c40000')
+      .text('IMAGE', ORDER_PDF_COL.image + 9, y + 23);
+  }
+
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#475569')
+    .text(cleanText(product.code, '—'), ORDER_PDF_COL.code, y + 20, {
+      width: ORDER_PDF_COL.product - ORDER_PDF_COL.code - 6,
+      height: 18,
+      ellipsis: true,
+    });
+  doc.font('Helvetica-Bold').fontSize(7.7).fillColor('#0f172a')
+    .text(productDescription, ORDER_PDF_COL.product, y + 8, {
+      width: ORDER_PDF_COL.qty - ORDER_PDF_COL.product - 7,
+      height: 38,
+      ellipsis: true,
+    });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+    .text(String(qty), ORDER_PDF_COL.qty, y + 20, { width: 27, align: 'center' });
+  doc.font('Helvetica').fontSize(8).fillColor('#475569')
+    .text(money(price), ORDER_PDF_COL.unit, y + 20, { width: 45, align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a')
+    .text(money(lineTotal), ORDER_PDF_COL.total, y + 20, { width: 54, align: 'right' });
+
+  doc.rect(ORDER_PDF_COL.added + 14, y + 18, 18, 18)
+    .strokeColor('#334155').lineWidth(1).stroke();
+  doc.moveTo(ORDER_PDF_PAGE.margin, y + ORDER_PDF_ROW_HEIGHT)
+    .lineTo(right, y + ORDER_PDF_ROW_HEIGHT)
+    .strokeColor('#e2e8f0').lineWidth(0.6).stroke();
+  return y + ORDER_PDF_ROW_HEIGHT;
+}
+
+function drawInternalPdfTotals(doc, y, totals, promo) {
+  const left = ORDER_PDF_PAGE.margin;
+  const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
+
+  doc.font('Helvetica').fontSize(8.5).fillColor('#475569')
+    .text('Subtotal (incl. VAT)', left, y + 5);
+  doc.font('Helvetica-Bold').fillColor('#0f172a')
+    .text(money(totals?.subtotal), right - 90, y + 5, { width: 90, align: 'right' });
+  y += 20;
+
+  if (promo?.code) {
+    doc.font('Helvetica').fontSize(8).fillColor('#15803d')
+      .text(`Promo ${cleanText(promo.code)} (${Number(promo.discountPct || 0)}%)`, left, y + 3);
+    doc.font('Helvetica-Bold').fillColor('#15803d')
+      .text(`-${money(promo.discountAmount)}`, right - 90, y + 3, { width: 90, align: 'right' });
+    y += 18;
+  }
+
+  doc.moveTo(left, y).lineTo(right, y).strokeColor('#cbd5e1').lineWidth(0.8).stroke();
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a')
+    .text('Estimated total', left, y + 11);
+  doc.font('Helvetica-Bold').fontSize(14).fillColor('#c40000')
+    .text(money(totals?.total ?? totals?.subtotal), right - 120, y + 8, {
+      width: 120,
+      align: 'right',
+    });
+  return y + 35;
+}
+
+function drawInternalPdfStaffNotes(doc, y) {
+  const left = ORDER_PDF_PAGE.margin;
+  const right = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin;
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#334155').text('STAFF NOTES', left, y + 5);
+  for (let line = 0; line < 2; line += 1) {
+    const lineY = y + 20 + line * 16;
+    doc.moveTo(left, lineY).lineTo(right, lineY).strokeColor('#94a3b8').lineWidth(0.6).stroke();
+  }
+}
+
+function formatPdfAddress(value, fallback = 'To confirm') {
+  const text = cleanText(value, fallback);
+  const parts = text.split(/\s*,\s*/).map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts.join('\n') : text;
+}
+
+export function buildPdfBuffer({
+  items,
+  customer,
+  totals,
+  deliveryMethod,
+  customerNotes,
+  promo,
+  orderNumber,
+  orderDate,
+}) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 42 });
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: ORDER_PDF_PAGE.margin,
+      autoFirstPage: false,
+      bufferPages: true,
+    });
     const chunks = [];
 
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.font('Helvetica-Bold').fontSize(22).fillColor('#111827').text('PROTO TRADING');
-    doc.font('Helvetica').fontSize(10).fillColor('#dc2626').text('Wholesale order request', { continued: false });
-    doc.moveDown(0.8);
+    const safeItems = Array.isArray(items) ? items : [];
+    const ref = cleanText(orderNumber, 'Pending');
+    const customerCode = cleanText(customer?.customerCode);
+    const dateLabel = orderDateLabel(orderDate);
+    const deliveryAddress = formatPdfAddress(customer?.deliveryAddress || customer?.region);
+    const invoiceAddress = formatPdfAddress(
+      customer?.companyAddress || customer?.deliveryAddress || customer?.region,
+    );
+    const customerName = cleanText(customer?.name, 'Not provided');
+    const business = cleanText(customer?.business, '');
+    const note = cleanText(customerNotes, '');
+    const contentWidth = ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin * 2;
 
-    doc.fontSize(9).fillColor('#64748b');
-    doc.text(`Date: ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}`);
-    doc.text('All prices incl. VAT. Stock and delivery are confirmed by reply.');
-    doc.moveDown(1);
+    doc.addPage();
+    drawInternalPdfLogo(doc);
+    doc.font('Helvetica-Bold').fontSize(20).fillColor('#0f172a')
+      .text('INTERNAL ORDER SHEET', 255, 22, { width: 310, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a')
+      .text('Order', 350, 51, { width: 70, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#c40000')
+      .text(ref, 425, 48, { width: 140, align: 'right' });
+    doc.font('Helvetica').fontSize(7.5).fillColor('#64748b')
+      .text(`${customerCode ? `Customer code: ${customerCode} · ` : ''}${dateLabel} · ${cleanText(deliveryMethod, 'Delivery to confirm')}`, 255, 69, {
+        width: 310,
+        align: 'right',
+      });
+    doc.moveTo(ORDER_PDF_PAGE.margin, 82)
+      .lineTo(ORDER_PDF_PAGE.width - ORDER_PDF_PAGE.margin, 82)
+      .strokeColor('#cbd5e1').lineWidth(0.8).stroke();
 
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Customer details');
-    doc.font('Helvetica').fontSize(10).fillColor('#334155');
-    doc.text(`Name: ${cleanText(customer?.name, 'Not provided')}`);
-    doc.text(`Email: ${cleanText(customer?.email, 'Not provided')}`);
-    doc.text(`Phone: ${cleanText(customer?.phone, 'Not provided')}`);
-    doc.text(`Delivery region: ${cleanText(customer?.region, 'To confirm')}`);
-    if (deliveryMethod) doc.text(`Delivery method: ${cleanText(deliveryMethod)}`);
-    if (customerNotes) doc.text(`Customer notes: ${cleanText(customerNotes)}`);
-    doc.moveDown(1);
+    const panelY = 92;
+    const panelHeight = 124;
+    doc.roundedRect(ORDER_PDF_PAGE.margin, panelY, contentWidth, panelHeight, 8)
+      .fillAndStroke('#f8fafc', '#dbe2ea');
+    const dividerX = 313;
+    doc.moveTo(dividerX, panelY + 10).lineTo(dividerX, panelY + panelHeight - 10)
+      .strokeColor('#d1d9e2').lineWidth(0.7).stroke();
 
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Order items');
-    doc.moveDown(0.5);
-
-    items.forEach((item, index) => {
-      const product = item.product || {};
-      const qty = Number(item.qty || 0);
-      const price = Number(product.price || 0);
-      const lineTotal = qty * price;
-      const y = doc.y;
-
-      doc.roundedRect(42, y, 511, 78, 8).strokeColor('#e5e7eb').lineWidth(1).stroke();
-      if (product.imageBuffer) {
-        try {
-          doc.image(product.imageBuffer, 54, y + 10, { fit: [54, 54], align: 'center', valign: 'center' });
-        } catch {
-          doc.font('Helvetica-Bold').fontSize(8).fillColor('#94a3b8').text('IMAGE', 62, y + 32);
-        }
-      } else {
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#94a3b8').text('IMAGE', 62, y + 32);
-      }
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#64748b').text(`${index + 1}. ${cleanText(product.code, 'NO CODE')}`, 122, y + 12);
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(cleanText(product.name, 'Unnamed product'), 122, y + 28, { width: 250 });
-      doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Qty: ${qty}`, 390, y + 18);
-      doc.text(`Unit: ${money(price)}`, 390, y + 32);
-      doc.font('Helvetica-Bold').fillColor('#111827').text(`Total: ${money(lineTotal)}`, 390, y + 48);
-      doc.y = y + 92;
-
-      if (doc.y > 720 && index < items.length - 1) doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+      .text('Invoice To', ORDER_PDF_PAGE.margin + 12, panelY + 10);
+    let invoiceY = panelY + 25;
+    doc.font('Helvetica-Bold').fontSize(7.6).fillColor('#0f172a')
+      .text(business || customerName, ORDER_PDF_PAGE.margin + 12, invoiceY, {
+        width: 245,
+        height: 11,
+        ellipsis: true,
+      });
+    invoiceY += 11;
+    if (business && customerName.toLowerCase() !== business.toLowerCase()) {
+      doc.font('Helvetica').fontSize(7.3).fillColor('#334155')
+        .text(customerName, ORDER_PDF_PAGE.margin + 12, invoiceY, {
+          width: 245,
+          height: 10,
+          ellipsis: true,
+        });
+      invoiceY += 10;
+    }
+    doc.font('Helvetica').fontSize(6.9).fillColor('#334155')
+      .text(invoiceAddress, ORDER_PDF_PAGE.margin + 12, invoiceY, {
+        width: 245,
+        height: 55,
+        ellipsis: true,
+        lineGap: 0.2,
+      });
+    doc.font('Helvetica').fontSize(7).fillColor('#475569')
+      .text(`Phone: ${cleanText(customer?.phone, 'Not provided')}`, ORDER_PDF_PAGE.margin + 12, panelY + 105, {
+        width: 120,
+        height: 10,
+        ellipsis: true,
+      });
+    doc.text(`Email: ${cleanText(customer?.email, 'Not provided')}`, ORDER_PDF_PAGE.margin + 133, panelY + 105, {
+      width: 124,
+      height: 10,
+      ellipsis: true,
     });
 
-    doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Subtotal incl. VAT: ${money(totals?.subtotal)}`, { align: 'right' });
-    if (promo?.code) {
-      doc.font('Helvetica').fontSize(11).fillColor('#64748b').text(`Promo (${promo.code}, ${promo.discountPct}%): -${money(promo.discountAmount)}`, { align: 'right' });
-      doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827').text(`Est. total incl. VAT: ${money(totals?.total)}`, { align: 'right' });
-      doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Estimated discount — final pricing confirmed by reply.', { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+      .text('Delivery Address', dividerX + 14, panelY + 10);
+    let deliveryY = panelY + 25;
+    doc.font('Helvetica-Bold').fontSize(7.6).fillColor('#0f172a')
+      .text(customerName, dividerX + 14, deliveryY, {
+        width: 224,
+        height: 11,
+        ellipsis: true,
+      });
+    deliveryY += 11;
+    if (business && customerName.toLowerCase() !== business.toLowerCase()) {
+      doc.font('Helvetica').fontSize(7.3).fillColor('#334155')
+        .text(business, dividerX + 14, deliveryY, {
+          width: 224,
+          height: 10,
+          ellipsis: true,
+        });
+      deliveryY += 10;
     }
-    doc.moveDown(1.2);
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Please confirm stock availability, wholesale pricing and delivery estimate by reply.');
+    doc.font('Helvetica').fontSize(6.9).fillColor('#334155')
+      .text(deliveryAddress, dividerX + 14, deliveryY, {
+        width: 224,
+        height: 55,
+        ellipsis: true,
+        lineGap: 0.2,
+      });
+    if (note) {
+      doc.font('Helvetica-Bold').fontSize(7).fillColor('#475569')
+        .text('Notes:', dividerX + 14, panelY + 105, { width: 34 });
+      doc.font('Helvetica').text(note, dividerX + 49, panelY + 105, {
+        width: 189,
+        height: 12,
+        ellipsis: true,
+      });
+    }
+
+    const firstTableHeaderY = panelY + panelHeight + 11;
+    const firstRowsStart = firstTableHeaderY + 21;
+    const totalsReserve = promo?.code ? 102 : 84;
+    const firstPageLimit = Math.max(1, Math.min(
+      9,
+      Math.floor((ORDER_PDF_PAGE.height - 24 - totalsReserve - firstRowsStart) / ORDER_PDF_ROW_HEIGHT),
+    ));
+    const pageSizes = paginateOrderItems(safeItems.length, firstPageLimit);
+
+    let itemOffset = 0;
+    let finalContentY = firstRowsStart;
+    pageSizes.forEach((pageSize, pageIndex) => {
+      if (pageIndex > 0) {
+        doc.addPage();
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+          .text(`Order ${ref}`, ORDER_PDF_PAGE.margin, 22);
+        doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+          .text('Items continued', ORDER_PDF_PAGE.margin, 36);
+        finalContentY = drawInternalPdfColumnHeader(doc, 51);
+      } else {
+        finalContentY = drawInternalPdfColumnHeader(doc, firstTableHeaderY);
+      }
+
+      safeItems.slice(itemOffset, itemOffset + pageSize).forEach((item, index) => {
+        finalContentY = drawInternalPdfProductRow(
+          doc,
+          item,
+          itemOffset + index + 1,
+          finalContentY,
+        );
+      });
+      itemOffset += pageSize;
+
+      if (pageIndex === pageSizes.length - 1) {
+        finalContentY = drawInternalPdfTotals(doc, finalContentY + 4, totals, promo);
+        drawInternalPdfStaffNotes(doc, finalContentY + 3);
+      }
+    });
+
+    const range = doc.bufferedPageRange();
+    for (let page = range.start; page < range.start + range.count; page += 1) {
+      doc.switchToPage(page);
+      doc.page.margins.bottom = 0;
+      doc.font('Helvetica').fontSize(7).fillColor('#94a3b8')
+        .text(`${ref} · Page ${page - range.start + 1} of ${range.count}`, ORDER_PDF_PAGE.margin, 826, {
+          width: contentWidth,
+          align: 'right',
+          lineBreak: false,
+        });
+    }
+    doc.flushPages();
     doc.end();
   });
 }
@@ -251,6 +542,8 @@ function buildOrderEmailRows(items) {
   return items.map((item, i) => {
     const product = item.product || {};
     const qty = Number(item.qty || 0);
+    const unitPrice = Number(product.price || 0);
+    const lineTotal = qty * unitPrice;
     const code = escapeHtml(cleanText(product.code, '—'));
     const name = escapeHtml(cleanText(product.name, 'Product'));
     const img = cleanText(product.image || product.remoteImage || '');
@@ -263,15 +556,17 @@ function buildOrderEmailRows(items) {
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:16px;font-weight:800;text-align:center;">${qty}</td>
+        <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:800;text-align:center;">${qty}</td>
+        <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;text-align:right;white-space:nowrap;">${money(unitPrice)}</td>
+        <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:12px;font-weight:800;text-align:right;white-space:nowrap;">${money(lineTotal)}</td>
       </tr>`;
   }).join('');
 }
 
-// Single dark, PROTO-branded order email used for BOTH the internal team
-// notification and the customer acknowledgement. Structured like the packing
+// Single print-friendly, PROTO-branded order email used for BOTH the internal
+// team notification and customer acknowledgement. Structured like the packing
 // slip: order meta header, contact/delivery, product table, note, estimate.
-function buildOrderEmailHtml({
+export function buildOrderEmailHtml({
   audience = 'team',
   orderNumber,
   orderDate,
@@ -349,18 +644,24 @@ function buildOrderEmailHtml({
     <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">Estimated only — final pricing, stock and delivery are confirmed by our team on reply.</p>`;
 
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>${heading} — Proto Trading</title>
+<style>
+  @media print {
+    body, .page-wrap, .receipt-card { background:#ffffff !important; }
+    .page-wrap { padding:0 !important; }
+    .receipt-card { border-color:#e5e7eb !important; box-shadow:none !important; }
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+<table class="page-wrap" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:24px 12px;"><tr><td align="center">
+<table class="receipt-card" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:34px 34px 28px;background:#141414;">
-  <div style="display:inline-block;background:#ffffff;padding:13px 20px;border-radius:8px;margin-bottom:22px;">
-    <span style="font-size:28px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:19px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
+<tr><td align="center" style="padding:28px 34px 24px;background:#ffffff;border-bottom:1px solid #e5e7eb;">
+  <div style="display:inline-block;background:#000000;padding:4px 8px;border-radius:9px;margin-bottom:18px;line-height:0;overflow:hidden;">
+    <img src="https://site.proto.co.za/proto-trading-online-email.png" alt="Proto Trading Online" width="280" height="77" style="display:block;width:280px;max-width:100%;height:auto;border:0;" />
   </div>
-  <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
-  <p style="margin:10px 0 0;color:#cfcfcf;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#ff6a4d;font-weight:800;">${ref}</span>` : ''}</p>
+  <h1 style="margin:0;color:#0f172a;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
+  <p style="margin:10px 0 0;color:#475569;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#c40000;font-weight:800;">${ref}</span>` : ''}</p>
 </td></tr>
 <tr><td style="padding:34px 32px 30px;background:#ffffff;">
   ${intro}
@@ -373,7 +674,9 @@ function buildOrderEmailHtml({
         <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Image</th>
         <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Code</th>
         <th style="text-align:left;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Product</th>
-        <th style="text-align:center;padding:0 10px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Qty</th>
+        <th style="text-align:center;padding:0 7px 10px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;">Qty</th>
+        <th style="text-align:right;padding:0 7px 10px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;white-space:nowrap;">Unit price</th>
+        <th style="text-align:right;padding:0 7px 10px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #ececec;white-space:nowrap;">Line total</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -382,9 +685,9 @@ function buildOrderEmailHtml({
   ${notesBlock}
   <p style="margin:26px 0 0;color:#666666;font-size:13px;line-height:1.6;">Questions? Contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
 </td></tr>
-<tr><td align="center" style="padding:28px 34px;background:#181818;border-top:1px solid #292929;">
-  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+<tr><td align="center" style="padding:24px 34px;background:#ffffff;border-top:1px solid #e5e7eb;">
+  <p style="margin:0 0 8px;color:#0f172a;font-size:18px;font-weight:900;">Proto Trading Online</p>
+  <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -597,15 +900,45 @@ export default async function handler(req, res) {
     console.error('send-order: customer profile lookup failed:', profileError?.message);
     return res.status(503).json({ error: 'Your customer profile could not be verified. Please try again.' });
   }
+  // Prefer the trusted Positill account code once the customer has been created
+  // there and the active-customer register has synced. The website profile is a
+  // fallback for codes allocated manually in the portal. Matching is only by
+  // the authenticated user's verified email.
+  let customerCode = cleanText(profile.customer_code);
+  try {
+    const verifiedEmail = cleanText(user.email).toLowerCase();
+    if (verifiedEmail) {
+      const { data: positillCustomer } = await portal
+        .from('proto_active_customers')
+        .select('account_code')
+        .eq('email', verifiedEmail)
+        .maybeSingle();
+      customerCode = cleanText(positillCustomer?.account_code) || customerCode;
+    }
+  } catch (err) {
+    console.warn('send-order: Positill customer code lookup failed:', err?.message || err);
+  }
+
   const customer = {
-    name: cleanText(profile.name || profile.business_name, 'Trade customer'),
+    name: cleanText(
+      profile.contact_name || profile.name || profile.first_name || profile.business_name,
+      'Trade customer',
+    ),
+    business: cleanText(profile.business_name),
+    customerCode,
     email: cleanText(user.email),
     phone: cleanText(profile.phone),
-    region: cleanText(
-      profile.delivery_address
-      || [profile.city, profile.province, profile.country].filter(Boolean).join(', '),
-      'To confirm',
-    ),
+    companyAddress: cleanText(profile.company_address || profile.delivery_address, 'To confirm'),
+    deliveryAddress: cleanText(profile.delivery_address || [
+      profile.unit_number ? `Unit ${profile.unit_number}` : '',
+      profile.street_name,
+      profile.suburb,
+      profile.city,
+      profile.postal_code,
+      profile.province,
+      profile.country,
+    ].filter(Boolean).join(', '), 'To confirm'),
+    region: cleanText([profile.city, profile.province, profile.country].filter(Boolean).join(', '), 'To confirm'),
   };
 
   const captured = await captureOrderRow({
@@ -639,13 +972,18 @@ export default async function handler(req, res) {
       deliveryMethod,
       customerNotes,
       promo,
+      orderNumber,
+      orderDate: captured.created_at,
     });
   } catch (err) {
     console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
   }
 
   const attachment = pdfBuffer
-    ? [{ name: `proto-order-${Date.now()}.pdf`, content: pdfBuffer.toString('base64') }]
+    ? [{
+        name: `proto-order-${cleanText(orderNumber, String(Date.now()))}.pdf`,
+        content: pdfBuffer.toString('base64'),
+      }]
     : undefined;
 
   let emailDeliveryFailed = false;
