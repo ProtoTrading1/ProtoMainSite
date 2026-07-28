@@ -4706,8 +4706,20 @@ html.proto-journey-active {
   scrollbar-width: none;
 }
 
-html.proto-journey-active::-webkit-scrollbar {
-  display: none;
+/* Belt-and-braces: the TruckScrollbar rail IS the scrollbar on desktop, so the
+   native one must never also appear. `scrollbar-width: none` above covers
+   Chrome 121+/Safari 18.2+; these cover older WebKit, where the scrollbar can
+   also be attributed to <body> rather than <html>. !important so the global
+   ::-webkit-scrollbar width/thumb rules in index.css can never resurrect it. */
+html.proto-journey-active::-webkit-scrollbar,
+html.proto-journey-active body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html.proto-journey-active body {
+  scrollbar-width: none;
 }
 
 .proto-journey-rail {
