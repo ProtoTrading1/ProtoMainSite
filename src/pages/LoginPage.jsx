@@ -23,11 +23,17 @@ export default function LoginPage({ onLogin, onBack }) {
         if (session) onLogin(session);
       } else {
         await signUp(email, password, name);
-        setInfo('Account created. Please check your email to confirm, then log in.');
+        setInfo('Account created. Proto is reviewing your application — we will notify you when you have been approved.');
         setMode('login');
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed.');
+      const raw = err?.message || 'Authentication failed.';
+      // Email confirmation was removed — accounts are gated by admin approval
+      // instead. Any lingering "not confirmed" response from Supabase (e.g. an
+      // account created before that change) should read as pending review.
+      setError(/email not confirmed|not confirmed/i.test(raw)
+        ? 'Proto is still reviewing your application. We will notify you when you have been approved.'
+        : raw);
     } finally {
       setLoading(false);
     }

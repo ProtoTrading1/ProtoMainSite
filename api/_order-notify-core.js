@@ -17,11 +17,15 @@ import {
   buildSessionOrderMessage,
 } from './_wati-notify.js';
 import { orderToken } from './_order-token.js';
+import { PUBLIC_SITE_URL } from './_public-site-url.js';
 
 const USERS_FILE = 'fulfillment/users.json';
 const ORDER_TEMPLATE = process.env.WATI_ORDER_TEMPLATE || 'proto_order_notis';
 const ORDER_TEMPLATE_CATEGORY = (process.env.WATI_ORDER_TEMPLATE_CATEGORY || 'UTILITY').toUpperCase();
-const MAIN_PORTAL_URL = (process.env.MAIN_PORTAL_URL || process.env.VITE_APP_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
+// Links in outgoing mail must land on proto.co.za (see _public-site-url.js) —
+// the old default pointed at the raw Vercel host, which is not the domain Proto
+// is migrating to.
+const MAIN_PORTAL_URL = (process.env.MAIN_PORTAL_URL || process.env.VITE_APP_URL || PUBLIC_SITE_URL).replace(/\/$/, '');
 
 async function markHandedOver(orderId) {
   const supabase = getPortalAdminClient();

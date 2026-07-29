@@ -8,6 +8,7 @@ import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
+import { PUBLIC_ASSET_URL } from './_public-site-url.js';
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -752,7 +753,7 @@ export function buildOrderEmailHtml({
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td align="center" style="padding:28px 34px 24px;background:#ffffff;border-bottom:1px solid #e5e7eb;">
   <div style="display:inline-block;background:#000000;padding:4px 8px;border-radius:9px;margin-bottom:18px;line-height:0;overflow:hidden;">
-    <img src="https://site.proto.co.za/proto-trading-online-email.png" alt="Proto Trading Online" width="280" height="77" style="display:block;width:280px;max-width:100%;height:auto;border:0;" />
+    <img src="${PUBLIC_ASSET_URL}/proto-trading-online-email.png" alt="Proto Trading Online" width="280" height="77" style="display:block;width:280px;max-width:100%;height:auto;border:0;" />
   </div>
   <h1 style="margin:0;color:#0f172a;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
   <p style="margin:10px 0 0;color:#475569;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#c40000;font-weight:800;">${ref}</span>` : ''}</p>
