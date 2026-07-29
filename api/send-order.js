@@ -8,7 +8,6 @@ import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
-import { priceIncludingVat } from '../lib/pricing.mjs';
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -62,13 +61,6 @@ function computeSubtotal(items) {
   return items.reduce((sum, item) => {
     const product = item.product || {};
     return sum + Number(product.price || 0) * Number(item.qty || 0);
-  }, 0);
-}
-
-function computeSubtotalExVat(items) {
-  return items.reduce((sum, item) => {
-    const product = item.product || {};
-    return sum + Number(product.priceExVat || 0) * Number(item.qty || 0);
   }, 0);
 }
 
@@ -136,8 +128,8 @@ async function resolveAuthoritativePrices(items) {
       throw error;
     }
     const row = productBySku.get(sku) || (barcode ? productByBarcode.get(barcode) : null);
-    const priceExVat = Number(row?.price);
-    if (!row || !Number.isFinite(priceExVat) || priceExVat < 0) {
+    const price = Number(row?.price);
+    if (!row || !Number.isFinite(price) || price < 0) {
       const error = new Error(`Product on order line ${index + 1} is unavailable.`);
       error.status = 400;
       throw error;
@@ -152,8 +144,7 @@ async function resolveAuthoritativePrices(items) {
         code: authoritativeBarcode,
         barcode: authoritativeBarcode,
         name: cleanText(row.title, authoritativeSku),
-        price: priceIncludingVat(priceExVat),
-        priceExVat,
+        price,
         image: cleanText(row.image_url_one),
         remoteImage: cleanText(row.image_url_one),
       },
@@ -784,7 +775,7 @@ function isMissingClientRefColumn(error) {
 }
 
 /** Persist a verified order. Idempotency is scoped to the authenticated user. */
-async function captureOrderRow({ supabase, userId, items, subtotalExVat, deliveryMethod, customerNotes, promo, clientRef }) {
+async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
   try {
     if (clientRef) {
       const { data: existing } = await supabase
@@ -799,7 +790,7 @@ async function captureOrderRow({ supabase, userId, items, subtotalExVat, deliver
     const rows = items.map((item) => {
       const product = item.product || {};
       const qty = Number(item.qty || 0);
-      const unitPrice = Number(product.priceExVat || 0);
+      const unitPrice = Number(product.price || 0);
       return {
         productId: product.id,
         code: product.code,
@@ -817,7 +808,7 @@ async function captureOrderRow({ supabase, userId, items, subtotalExVat, deliver
       original_items: rows,
       final_items: rows,
       order_match: 'order-match',
-      total_ex_vat: subtotalExVat,
+      total_ex_vat: subtotal,
       delivery_method: deliveryMethod,
       ...(customerNotes ? { customer_notes: customerNotes } : {}),
       ...(promo?.code ? {
@@ -905,7 +896,6 @@ export default async function handler(req, res) {
     return res.status(err?.status || 500).json({ error: err?.message || 'Order items could not be verified.' });
   }
   const subtotal = computeSubtotal(orderItems);
-  const subtotalExVat = computeSubtotalExVat(orderItems);
   let promo = null;
   const promoCode = cleanText(rawPromoCode).toUpperCase();
   if (promoCode) {
@@ -983,7 +973,7 @@ export default async function handler(req, res) {
     supabase: portal,
     userId: user.id,
     items: orderItems,
-    subtotalExVat,
+    subtotal,
     deliveryMethod,
     customerNotes,
     promo,
