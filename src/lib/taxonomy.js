@@ -172,6 +172,14 @@ export function filterNavChildrenByCount(nodes, parentNavPath, counts, categorie
   });
 }
 
+/** Keep navigation usable while count data is still loading; only hide explicit zeroes. */
+export function filterNavChildrenWhenCountsReady(nodes, parentNavPath, counts, categories) {
+  return (nodes || []).filter((node) => {
+    const count = lookupProductCount(counts, [...parentNavPath, node.id], categories);
+    return count == null || count > 0;
+  });
+}
+
 /** Build a slug categoryPath from human labels (category + ordered subcategory levels). */
 export function buildCategoryPath(category, subLabels = []) {
   const catSlug = labelToSlug(category);
