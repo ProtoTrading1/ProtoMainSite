@@ -1,0 +1,60 @@
+.cart-fly-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+}
+
+.cart-fly-ring {
+  position: fixed;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #8b1a1a;
+  border-radius: 50%;
+  animation: cart-fly-ring 0.42s ease-out both;
+}
+
+.cart-fly-icon {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  color: #8b1a1a;
+  filter: drop-shadow(0 6px 12px rgba(139, 26, 26, 0.45));
+  animation: cart-fly-icon 0.58s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes cart-fly-ring {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate3d(0, 0, 0) scale(2.25);
+    opacity: 0;
+  }
+}
+
+@keyframes cart-fly-icon {
+  from {
+    transform: translate3d(var(--cart-fly-from-x), var(--cart-fly-from-y), 0) scale(1.08) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(var(--cart-fly-to-x), var(--cart-fly-to-y), 0) scale(0.35) rotate(8deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-fly-ring {
+    animation-duration: 0.12s;
+  }
+
+  .cart-fly-icon {
+    animation-duration: 0.18s;
+  }
+}
