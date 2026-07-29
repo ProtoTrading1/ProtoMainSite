@@ -8,7 +8,7 @@ import {
   buildOrderEmailHtml,
   isRetryableBrevoStatus,
   paginateOrderItems,
-} from '../api/send-order.js';
+} from '../../api/send-order.js';
 
 function buildItems(count) {
   return Array.from({ length: count }, (_, index) => ({
