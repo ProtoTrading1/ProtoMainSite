@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
  *
  * Tokens are 12 hex chars (48 bits) — enough for short-lived per-order URLs that
  * an attacker would also have to guess a random UUID for. Verify still accepts
- * the legacy 32-char tokens so old WhatsApp messages keep working.
+ * the legacy 32-char tokens so links in old notifications keep working.
  */
 const TOKEN_LEN = 12;
 const LEGACY_TOKEN_LEN = 32;

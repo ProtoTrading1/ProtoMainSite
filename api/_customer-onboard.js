@@ -1,7 +1,3 @@
-import { normalizeWhatsapp, watiConfig, watiEnsureContact } from './_wati-notify.js';
-
-const WELCOME_TEMPLATE = 'proto_welcome_';
-
 export const PROTO_ACTIVE_SELECT =
   'id, account_code, name, contact_name, first_name, email, sales_last_12_months, invoice_count, last_purchase_date';
 
@@ -53,40 +49,4 @@ export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
 /** True only when the customer's identity was verified by their registered email. */
 export function isVerifiedProtoActiveMatch(match) {
   return Boolean(match?.matchType === 'email' && match?.row?.account_code);
-}
-
-/** Send the WATI proto_welcome_ template after signup opt-in. */
-export async function sendWelcomeWhatsapp(customer) {
-  const phone = normalizeWhatsapp(customer?.phone);
-  if (!phone) return { sent: false, reason: 'no_phone' };
-
-  const { baseUrl, token } = watiConfig();
-  if (!token) return { sent: false, reason: 'no_token' };
-
-  const displayName = customer?.contactName || customer?.businessName || 'Customer';
-
-  try {
-    await watiEnsureContact(baseUrl, token, phone, displayName).catch(() => {});
-    const res = await fetch(
-      `${baseUrl}/api/v1/sendTemplateMessage?whatsappNumber=${encodeURIComponent(phone)}`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_name: WELCOME_TEMPLATE,
-          broadcast_name: WELCOME_TEMPLATE,
-          parameters: [],
-        }),
-      },
-    );
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      console.error('WATI welcome send error:', res.status, JSON.stringify(body));
-      return { sent: false, reason: 'wati_error', status: res.status };
-    }
-    return { sent: true };
-  } catch (err) {
-    console.error('WATI welcome error:', err.message);
-    return { sent: false, reason: 'exception' };
-  }
 }

@@ -13,15 +13,10 @@ test('records the customer acknowledgement result alongside the team delivery lo
   assert.match(source, /saveOrderNotifyLog\(orderId/);
 });
 
-test('treats WhatsApp as accepted until a delivery webhook confirms it', () => {
+test('order notify is email-only: no WATI sends remain, and email+PDF advances status', () => {
   const notifySource = fs.readFileSync(new URL('../../api/_order-notify-core.js', import.meta.url), 'utf8');
-  assert.match(notifySource, /accepted:\s*sent\.length/);
-  assert.match(notifySource, /deliveryConfirmed:\s*false/);
-  assert.match(notifySource, /if \(emailSent && pdfStored\)/);
-  assert.doesNotMatch(notifySource, /if \(emailSent && whatsappOk\)/);
-});
-
-test('only an explicit false opts a fulfilment user out of order alerts', () => {
-  const notifySource = fs.readFileSync(new URL('../../api/_order-notify-core.js', import.meta.url), 'utf8');
-  assert.match(notifySource, /\.filter\(\(u\) => u\?\.orderAlerts !== false\)/);
+  assert.doesNotMatch(notifySource, /watiSend|watiEnsure|watiConfig|_wati-notify/, 'no WATI client usage remains');
+  assert.match(notifySource, /if \(emailSent && pdfStored\)/, 'the stored order + email advances the workflow');
+  assert.match(notifySource, /whatsappNotConfigured: true/, 'admin audit is told email alone completes the round');
+  assert.ok(!fs.existsSync(new URL('../../api/_wati-notify.js', import.meta.url).pathname), 'the WATI client is deleted');
 });

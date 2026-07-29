@@ -16,7 +16,7 @@ export function isOrderNotificationAuthorized(req) {
   return Boolean(header && safeEqual(header, secret));
 }
 
-/** POST handler for team WhatsApp + status advance after an order email. */
+/** POST handler: store the fulfilment PDF + advance status after an order email. */
 export async function handleOrderNotification(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {

@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Valid order id is required' });
   }
 
-  // Access requires either a signed per-order token (WhatsApp/fulfillment links)
+  // Access requires either a signed per-order token (fulfillment/email links)
   // or an authenticated portal session.
   const token = String(req.query.k || '').trim();
   if (!verifyOrderToken(orderId, token)) {
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     let buffer = await downloadStoredOrderPdf(orderId);
 
     // Not yet stored (e.g. created before this feature, or storage failed at
-    // order time) — generate on demand so the WhatsApp button always works.
+    // order time) — generate on demand so the emailed download link always works.
     if (!buffer) {
       const result = await generateAndStoreOrderPdf(orderId);
       buffer = result.buffer;
