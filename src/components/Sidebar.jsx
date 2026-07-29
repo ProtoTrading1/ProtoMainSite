@@ -17,7 +17,9 @@ preloadMegaMenu();
 const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
-const MENU_HOVER_INTENT_MS = 250;
+// A short intent window prevents accidental flyouts while moving the pointer
+// through the rail, without making a deliberate category hover feel sluggish.
+const MENU_HOVER_INTENT_MS = 100;
 
 function ProductRequestModal({ onClose }) {
   const [description, setDescription] = useState('');
