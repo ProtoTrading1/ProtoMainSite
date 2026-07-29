@@ -17,6 +17,8 @@ preloadMegaMenu();
 const LazyMegaMenu = lazy(() => preloadMegaMenu());
 import { filterNavChildrenByCount } from '../lib/taxonomy';
 
+const MENU_HOVER_INTENT_MS = 250;
+
 function ProductRequestModal({ onClose }) {
   const [description, setDescription] = useState('');
   const [qty, setQty] = useState('');
@@ -25,8 +27,10 @@ function ProductRequestModal({ onClose }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+  const closeButtonRef = useRef(null);
 
   useEffect(() => {
+    closeButtonRef.current?.focus();
     const onGlobalEscape = (event) => {
       if (event.key !== 'Escape') return;
       onClose?.();
@@ -64,12 +68,19 @@ function ProductRequestModal({ onClose }) {
 
   return (
     <div className="topnav-modal-backdrop" onClick={onClose}>
-      <div className="topnav-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-        <button className="topnav-modal-close" onClick={onClose} type="button"><X size={18} /></button>
+      <div
+        className="topnav-modal"
+        style={{ maxWidth: 520 }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-request-title"
+      >
+        <button ref={closeButtonRef} className="topnav-modal-close" onClick={onClose} type="button" aria-label="Close product request"><X size={18} /></button>
         {done ? (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <PackageSearch size={40} style={{ color: '#8B1A1A', margin: '0 auto 16px', display: 'block' }} />
-            <h2 style={{ marginBottom: 8 }}>Request sent!</h2>
+            <h2 id="product-request-title" style={{ marginBottom: 8 }}>Request sent!</h2>
             <p style={{ color: '#6b7280', fontSize: 14 }}>Our team will get back to you shortly.</p>
             <button onClick={onClose} style={{ marginTop: 20, padding: '10px 24px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Close</button>
           </div>
@@ -78,7 +89,7 @@ function ProductRequestModal({ onClose }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
               <PackageSearch size={20} style={{ color: '#8B1A1A', flexShrink: 0, marginTop: 2 }} />
               <div>
-                <h2 style={{ margin: 0, fontSize: 18 }}>Can't find what you're looking for?</h2>
+                <h2 id="product-request-title" style={{ margin: 0, fontSize: 18 }}>Can't find what you're looking for?</h2>
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 13 }}>Describe the product and attach a reference image — we'll source it for you.</p>
               </div>
             </div>
@@ -93,7 +104,18 @@ function ProductRequestModal({ onClose }) {
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Reference image <span style={{ color: '#e11d48' }}>*</span></label>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
-              <div onClick={() => fileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+              <div
+                role="button"
+                tabIndex="0"
+                aria-label={image ? 'Change reference image' : 'Attach a reference image'}
+                onClick={() => fileRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  fileRef.current?.click();
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
                 style={{ border: `2px dashed ${image ? '#d1d5db' : '#cbd5e1'}`, borderRadius: 10, minHeight: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 6, padding: image ? 0 : 14 }}>
                 {image ? <><img src={image.preview} alt="ref" style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', padding: 8 }} /><div style={{ fontSize: 12, color: '#6b7280', paddingBottom: 8 }}>Click or drop to change</div></> : <><Upload size={22} style={{ color: '#9ca3af' }} /><div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>Drop image or click to browse</div></>}
               </div>
@@ -120,10 +142,16 @@ function MegaMenuSkeleton() {
 }
 
 export default function Sidebar({ categories, path, navigate, onAllProducts, counts }) {
-  const [openCategoryId, setOpenCategoryId] = useState(path?.[0] || null);
+  // Keep the active department highlighted without forcing its flyout open on
+  // first render. The menu appears only after deliberate pointer or keyboard
+  // intent, so a deep-linked category never starts with its products obscured.
+  const [openCategoryId, setOpenCategoryId] = useState(null);
   const [menuTopOffset, setMenuTopOffset] = useState(0);
   const [showRequest, setShowRequest] = useState(false);
   const containerRef = useRef(null);
+  const hoverTimerRef = useRef(null);
+  const menuTriggerRef = useRef(null);
+  const requestTriggerRef = useRef(null);
 
   const activeRoot = path?.[0] || null;
 
@@ -144,10 +172,13 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
       if (event.key !== 'Escape') return;
       event.preventDefault();
       setOpenCategoryId(null);
+      window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
     };
     document.addEventListener('keydown', onGlobalEscape);
     return () => document.removeEventListener('keydown', onGlobalEscape);
   }, [menuOpen]);
+
+  useEffect(() => () => window.clearTimeout(hoverTimerRef.current), []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -167,13 +198,35 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
   }, []);
 
   const handleToggleL1 = (id, btnEl) => {
+    window.clearTimeout(hoverTimerRef.current);
     preloadMegaMenu();
+    if (btnEl) menuTriggerRef.current = btnEl;
     setOpenCategoryId(id);
     if (id && btnEl && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const btnRect = btnEl.getBoundingClientRect();
       setMenuTopOffset(Math.max(0, btnRect.top - containerRect.top));
     }
+  };
+
+  const handleHoverL1 = (id, btnEl) => {
+    window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => {
+      handleToggleL1(id, btnEl);
+    }, MENU_HOVER_INTENT_MS);
+  };
+
+  const closeMenu = ({ restoreFocus = false } = {}) => {
+    window.clearTimeout(hoverTimerRef.current);
+    setOpenCategoryId(null);
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
+    }
+  };
+
+  const closeProductRequest = () => {
+    setShowRequest(false);
+    window.requestAnimationFrame(() => requestTriggerRef.current?.focus());
   };
 
   const focusFirstFlyoutItem = () => {
@@ -187,7 +240,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
     <div
       ref={containerRef}
       className="sidebar-container"
-      onMouseLeave={() => setOpenCategoryId(null)}
+      onMouseLeave={() => closeMenu()}
       style={{ position: 'relative', height: '100%', backgroundColor: '#fff', zIndex: 100 }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 210 }}>
@@ -200,6 +253,8 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
             counts={counts}
             openCategoryId={openCategoryId}
             onToggleL1={handleToggleL1}
+            onHoverL1={handleHoverL1}
+            onCloseFlyout={() => closeMenu()}
             onOpenFlyoutWithKeyboard={focusFirstFlyoutItem}
           />
         </div>
@@ -207,6 +262,7 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
         {/* CTA buttons — below category list */}
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
           <button
+            ref={requestTriggerRef}
             type="button"
             onClick={() => setShowRequest(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', border: '1.5px solid #e8eaed', borderRadius: 10, background: '#fafafa', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
@@ -242,13 +298,13 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
             navigate={navigate}
             counts={counts}
             categories={categories}
-            onClose={() => setOpenCategoryId(null)}
+            onClose={(restoreFocus = false) => closeMenu({ restoreFocus })}
             topOffset={menuTopOffset}
           />
         </Suspense>
       )}
 
-      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} />}
+      {showRequest && <ProductRequestModal onClose={closeProductRequest} />}
     </div>
   );
 }
