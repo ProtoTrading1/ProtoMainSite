@@ -6,15 +6,11 @@ export async function signIn(email, password) {
   return data;
 }
 
-export async function signUp(email, password, name) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name } },
-  });
-  if (error) throw error;
-  return data;
-}
+// There is deliberately NO signUp() here. Creating an account from the client
+// would fire Supabase's own "confirm your email" mail — the step we removed —
+// and would create an account without a trade application, skipping the
+// approval queue. Accounts are created server-side by api/register-trade.js
+// (email_confirm: true, is_approved decided by the allowlist) and nowhere else.
 
 // Trade applications go through src/lib/tradeApplication.js (includes WhatsApp opt-in).
 export { submitTradeApplication } from './tradeApplication';

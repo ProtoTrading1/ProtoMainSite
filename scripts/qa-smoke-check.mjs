@@ -233,8 +233,16 @@ for (const addr of ['online@proto.co.za', 'george@proto.co.za', 'danieljoffeinfo
 assert.match(orderRecipientsSrc, /DEFAULT_NOTIFY_EMAILS,\s*\.\.\.extra/, 'ORDER_NOTIFY_EMAILS adds to the defaults instead of replacing them');
 
 // Unapproved logins must read as "still reviewing", never as an email-confirmation error.
-const loginSrc = readFileSync(join(root, 'src/pages/LoginPage.jsx'), 'utf8');
+// LoginModal is the LIVE login surface (Root renders it; the old
+// pages/LoginPage.jsx was unreferenced and is deleted) — assert against it, or
+// the wording fix lands in a file nobody sees.
+const loginSrc = readFileSync(join(root, 'src/components/LoginModal.jsx'), 'utf8');
 assert.match(loginSrc, /Proto is still reviewing your application/, 'login maps pending accounts to the review message');
+assert.doesNotMatch(loginSrc, /Check your email to confirm/, 'login surface never tells the customer to confirm their email');
+// No client-side account creation: it would bypass the trade application and
+// trigger Supabase's own confirmation mail.
+const authLibSrc = readFileSync(join(root, 'src/lib/auth.js'), 'utf8');
+assert.doesNotMatch(authLibSrc, /supabase\.auth\.signUp/, 'no raw client-side supabase signUp');
 const rootSrc = readFileSync(join(root, 'src/Root.jsx'), 'utf8');
 assert.match(rootSrc, /Proto is still reviewing your application/, 'pending-approval gate uses the review message');
 console.log('✓ Signup: no email confirmation, pending-review wording, full order recipient list');

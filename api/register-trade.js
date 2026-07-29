@@ -504,7 +504,9 @@ export default async function handler(req, res) {
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
           subject: shouldApprove
-            ? 'Your trade account is approved — verify your email to continue'
+            // No "verify your email" — email confirmation was removed; the
+            // account is usable the moment it is approved.
+            ? 'Your trade account is approved — Proto Trading'
             : 'We have received your request — you will hear from us within 24 hours',
           htmlContent: shouldApprove
             ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
