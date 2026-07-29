@@ -1108,7 +1108,9 @@ export default async function handler(req, res) {
       },
       to: notifyEmails.map((email) => ({ email })),
       replyTo: customer.email ? { email: customer.email } : undefined,
-      subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
+      // Reads as what it is — a new order from a customer — and carries the
+      // order number so the team can find it without opening the mail.
+      subject: `New order received from ${cleanText(customer.name, 'a trade customer')}${orderNumber ? ` — ${orderNumber}` : ''}`,
       htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
       attachment,
       // Brevo applies this key when a timed-out request is retried, preventing

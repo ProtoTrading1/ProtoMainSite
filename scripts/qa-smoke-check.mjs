@@ -231,6 +231,7 @@ for (const addr of ['online@proto.co.za', 'george@proto.co.za', 'danieljoffeinfo
   assert.match(orderRecipientsSrc, new RegExp(addr.replace('.', '\\.')), `order notifications include ${addr}`);
 }
 assert.match(orderRecipientsSrc, /DEFAULT_NOTIFY_EMAILS,\s*\.\.\.extra/, 'ORDER_NOTIFY_EMAILS adds to the defaults instead of replacing them');
+assert.match(sendOrderSrc, /subject: `New order received from/, 'team order email is titled as a new order from a customer');
 
 // Unapproved logins must read as "still reviewing", never as an email-confirmation error.
 // LoginModal is the LIVE login surface (Root renders it; the old
