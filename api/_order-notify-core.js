@@ -1,4 +1,5 @@
-import { readSiteConfigJson, saveOrderNotifyLog } from './_site-config.js';
+import { createHash } from 'node:crypto';
+import { readSiteConfigJson, saveOrderNotifyLog, writeSiteConfigJson } from './_site-config.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { advanceOrderStatus } from './_order-status.js';
 import {
@@ -92,7 +93,13 @@ async function notifyRecipient(baseUrl, token, recipient, ctx) {
   if (templateOk || sessionOk) {
     const method = templateOk && sessionOk ? 'both' : templateOk ? 'template' : 'session';
     const marketingMaybeBlocked = templateOk && !sessionOk && sessionExpired;
-    return { ok: true, method, marketingMaybeBlocked, detail };
+    return {
+      ok: true,
+      method,
+      marketingMaybeBlocked,
+      messageId: templateResult.messageId || null,
+      detail,
+    };
   }
 
   const combinedError = [
@@ -103,7 +110,12 @@ async function notifyRecipient(baseUrl, token, recipient, ctx) {
   return { ok: false, method: null, error: combinedError, detail };
 }
 
-/** Notify fulfilment team via WATI. Handed Over only when every team member receives WhatsApp. */
+function messageIndexFile(messageId) {
+  const digest = createHash('sha256').update(String(messageId)).digest('hex');
+  return `orders/notify-index/${digest}.json`;
+}
+
+/** Notify fulfilment team via WATI. API acceptance is not delivery proof. */
 export async function runOrderTeamNotify(orderId, {
   emailSent = false,
   emailRecipients = [],
@@ -161,6 +173,8 @@ export async function runOrderTeamNotify(orderId, {
   }
 
   const recipients = users
+    // Existing records do not have orderAlerts, so only an explicit false opts out.
+    .filter((u) => u?.orderAlerts !== false)
     .map((u) => {
       const phone = normalizeWhatsapp(u.whatsapp || u.phone || '');
       return { name: String(u.name || '').trim(), phone };
@@ -188,6 +202,8 @@ export async function runOrderTeamNotify(orderId, {
             phone: recipient.phone,
             name: recipient.name,
             method: result.method,
+            messageId: result.messageId || null,
+            deliveryStatus: result.messageId ? 'accepted' : 'accepted-untracked',
             marketingMaybeBlocked: Boolean(result.marketingMaybeBlocked),
           });
         } else {
@@ -204,13 +220,15 @@ export async function runOrderTeamNotify(orderId, {
     }
   }
 
-  const allTeamNotified = uniqueRecipients.length > 0 && sent.length === uniqueRecipients.length;
-  const whatsappOk = !token ? false : allTeamNotified;
+  const allTeamAccepted = uniqueRecipients.length > 0 && sent.length === uniqueRecipients.length;
+  const whatsappAccepted = !token ? false : allTeamAccepted;
 
   let statusAdvanced = false;
   let statusBlockedReason = null;
 
-  if (emailSent && whatsappOk) {
+  // WhatsApp is a secondary alert. A safely stored order with its operational
+  // email must not remain stuck in New while waiting for WATI delivery proof.
+  if (emailSent && pdfStored) {
     try {
       const result = await markHandedOver(orderId);
       statusAdvanced = result.ok;
@@ -222,12 +240,10 @@ export async function runOrderTeamNotify(orderId, {
       statusBlockedReason = err.message;
       console.error('order-notify: failed to set handed over status:', err.message);
     }
-  } else if (emailSent && !whatsappOk) {
-    statusBlockedReason = !token
-      ? 'WATI not configured'
-      : !uniqueRecipients.length
-        ? 'No team WhatsApp numbers in Team settings'
-        : `WhatsApp failed for ${failed.length} of ${uniqueRecipients.length} team member(s)`;
+  } else {
+    statusBlockedReason = !emailSent
+      ? 'Internal order email was not accepted'
+      : 'Order PDF was not stored';
     console.warn('order-notify: keeping order pending —', statusBlockedReason);
   }
 
@@ -241,6 +257,7 @@ export async function runOrderTeamNotify(orderId, {
         : null,
     pdfStored,
     teamSize: uniqueRecipients.length,
+    accepted: sent.length,
     sent: sent.length,
     failed: failed.length,
     sentList: sent.map((s) => s.phone),
@@ -257,24 +274,39 @@ export async function runOrderTeamNotify(orderId, {
     emailProviderStatus: emailProviderStatus != null ? Number(emailProviderStatus) : null,
     emailPdfAttached: Boolean(pdfAttached),
     emailPdfSource: pdfSource || null,
+    delivered: 0,
+    read: 0,
+    deliveryFailed: 0,
+    whatsappAccepted,
+    deliveryConfirmed: false,
     at: new Date().toISOString(),
-    ok: whatsappOk,
+    ok: emailSent && pdfStored,
     skippedNoToken: !token,
     skippedNoTeam: uniqueRecipients.length === 0,
   };
 
   try {
     await saveOrderNotifyLog(orderId, notifyLog);
+    await Promise.all(
+      sent
+        .filter((entry) => entry.messageId)
+        .map((entry) => writeSiteConfigJson(messageIndexFile(entry.messageId), {
+          orderId,
+          messageId: entry.messageId,
+          phone: entry.phone,
+        })),
+    );
   } catch (err) {
     console.error('order-notify: failed to save notify log:', err.message);
   }
 
   return {
-    ok: whatsappOk,
+    ok: emailSent && pdfStored,
     orderId,
     pdfStored,
     template: ORDER_TEMPLATE,
     teamSize: uniqueRecipients.length,
+    accepted: sent.length,
     sent: sent.length,
     failed: failed.length,
     sentDetails: sent.slice(0, 25),

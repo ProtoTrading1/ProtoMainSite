@@ -6,7 +6,7 @@ import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
-import { getPortalAdminClient } from './_site-config.js';
+import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
@@ -804,7 +804,9 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
   // customer.email — otherwise a logged-in user could make Proto's Brevo send
   // "order received" mail to any address they type. Name is cosmetic only.
   const to = cleanText(toEmail);
-  if (!to || !to.includes('@')) return;
+  if (!to || !to.includes('@')) {
+    return { sent: false, recipient: to || null, error: 'Customer email address is unavailable' };
+  }
   try {
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -839,9 +841,24 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
       console.error('send-order: customer ack email error:', resp.status, JSON.stringify(body));
+      return {
+        sent: false,
+        recipient: to,
+        providerStatus: resp.status,
+        error: body.message || `Brevo ${resp.status}`,
+      };
     }
+    const body = await resp.json().catch(() => ({}));
+    return {
+      sent: true,
+      recipient: to,
+      providerStatus: resp.status,
+      messageId: body.messageId || body.message_id || null,
+      at: new Date().toISOString(),
+    };
   } catch (err) {
     console.error('send-order: customer ack email failed:', err?.message || err);
+    return { sent: false, recipient: to, error: err?.message || 'Customer acknowledgement failed' };
   }
 }
 
@@ -1266,6 +1283,28 @@ export default async function handler(req, res) {
       if (settled.status === 'rejected') {
         console.error(`send-order: ${label} failed:`, settled.reason?.message || settled.reason);
       }
+    }
+
+    // Complete the delivery audit only after the parallel send operations have
+    // settled. Merging with the notification log preserves the WhatsApp/PDF
+    // evidence written by runOrderTeamNotify while adding the independently
+    // delivered customer acknowledgement result.
+    try {
+      const customerAck = ackSettled.status === 'fulfilled'
+        ? ackSettled.value
+        : { sent: false, recipient: cleanText(user?.email) || null, error: ackSettled.reason?.message || 'Customer acknowledgement failed' };
+      const currentLog = await readOrderNotifyLog(orderId) || { orderId };
+      await saveOrderNotifyLog(orderId, {
+        ...currentLog,
+        customerEmailSent: Boolean(customerAck?.sent),
+        customerEmailRecipient: customerAck?.recipient || cleanText(user?.email) || null,
+        customerEmailMessageId: customerAck?.messageId || null,
+        customerEmailProviderStatus: customerAck?.providerStatus ?? null,
+        customerEmailFailReason: customerAck?.error || null,
+        customerEmailAt: customerAck?.at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('send-order: failed to persist customer acknowledgement audit:', err?.message || err);
     }
   }
 
