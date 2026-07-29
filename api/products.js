@@ -7,6 +7,7 @@ import { loadPlacementMapIfEnabled } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
+import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -354,6 +355,9 @@ export default async function handler(req, res) {
       loadGroupInfoMapIfEnabled(supabase),
     ]);
     const products = rows
+      // Defence in depth: invalid catalogue rows must never reach a customer,
+      // even if an importer, manual edit, or future sync leaves one live.
+      .filter(isSafeStorefrontProduct)
       .map((row) => adapt(
         row,
         tree,
