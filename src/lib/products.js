@@ -37,6 +37,8 @@ let _sortOrdersPromise = null;
 let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
+const _identifierRequests = new Map();
+let _categoryCountsMemo = new WeakMap();
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
@@ -157,6 +159,8 @@ export function invalidateProductCache() {
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
   _sortOrdersPromise = null;
+  _identifierRequests.clear();
+  _categoryCountsMemo = new WeakMap();
   invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch {}
 }
@@ -495,19 +499,31 @@ export async function fetchProducts() {
   return getAllCached();
 }
 
-async function fetchIdentifierProducts(query) {
+export async function fetchIdentifierProducts(query) {
   const identifier = String(query || '').trim();
   if (!isIdentifierQuery(identifier)) return [];
-  try {
-    const products = await fetchJsonWithTimeout(
-      `/api/products?identifier=${encodeURIComponent(identifier)}`,
-      4500,
-      { cache: 'no-store' },
-    );
-    return Array.isArray(products) ? products : [];
-  } catch {
-    return [];
-  }
+
+  // Header suggestions and the main result grid request the same identifier at
+  // almost the same moment. Share that authenticated no-store request rather
+  // than making the API perform the lookup twice. The entry is deliberately
+  // short-lived: this is request coalescing, not a stock/catalogue cache.
+  const key = identifier.toUpperCase();
+  if (_identifierRequests.has(key)) return _identifierRequests.get(key);
+
+  const request = fetchJsonWithTimeout(
+    `/api/products?identifier=${encodeURIComponent(identifier)}`,
+    4500,
+    { cache: 'no-store', authenticated: true },
+  )
+    .then((products) => (Array.isArray(products) ? products : []))
+    .catch(() => [])
+    .finally(() => {
+      globalThis.setTimeout(() => {
+        if (_identifierRequests.get(key) === request) _identifierRequests.delete(key);
+      }, 1000);
+    });
+  _identifierRequests.set(key, request);
+  return request;
 }
 
 export async function fetchProductPage({
@@ -599,20 +615,79 @@ function collectTaxonomyNavPaths(nodes, prefix = [], out = []) {
 
 export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false } = {}) {
   let products = await getAllCached();
+  const tree = getActiveTaxonomy();
+  let byTree = _categoryCountsMemo.get(products);
+  if (!byTree) {
+    byTree = new WeakMap();
+    _categoryCountsMemo.set(products, byTree);
+  }
+  let byScope = byTree.get(tree);
+  if (!byScope) {
+    byScope = new Map();
+    byTree.set(tree, byScope);
+  }
+  const scopeKey = `${collection}|${inStockOnly ? '1' : '0'}`;
+  const memoized = byScope.get(scopeKey);
+  if (memoized) return memoized;
+
   products = applyCollection(products, collection);
   products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
-  const tree = getActiveTaxonomy();
   const counts = { '': products.length };
 
-  for (const navPath of collectTaxonomyNavPaths(tree)) {
-    const count = products.filter((p) => productMatchesNavPath(p, tree, navPath)).length;
-    if (count <= 0) continue;
-    const key = productCountKey(navPath, tree);
-    counts[key] = count;
-    const legacyKey = navPath.join('/');
-    if (legacyKey && legacyKey !== key) counts[legacyKey] = count;
+  // Count in one pass over products and their path prefixes. The old shape
+  // filtered every product once for every taxonomy node (products × nodes),
+  // which became the main-thread pause customers felt when opening menus.
+  const navEntries = collectTaxonomyNavPaths(tree).map((navPath) => ({
+    navPath,
+    legacyKey: navPath.join('/'),
+    resolvedKey: productCountKey(navPath, tree),
+  }));
+  const standardByResolvedPath = new Map(
+    navEntries
+      .filter(({ navPath }) => !isMotarroBrowsePath(navPath))
+      .map((entry) => [entry.resolvedKey, entry]),
+  );
+  const mottaroByNavPath = new Map(
+    navEntries
+      .filter(({ navPath }) => isMotarroBrowsePath(navPath))
+      .map((entry) => [entry.legacyKey, entry]),
+  );
+  const entryCounts = new Map();
+
+  for (const product of products) {
+    const matchedEntries = new Set();
+    for (const productPath of productPaths(product)) {
+      for (let depth = 1; depth <= productPath.length; depth += 1) {
+        const entry = standardByResolvedPath.get(productPath.slice(0, depth).join('/'));
+        if (entry) matchedEntries.add(entry);
+      }
+    }
+
+    if (isMotarroProduct(product)) {
+      const mottaroPath = product.alternateCategoryPath?.length
+        ? product.alternateCategoryPath
+        : inferMotarroPathFromRow(productRowForMotarro(product), tree);
+      for (let depth = 1; depth <= mottaroPath.length; depth += 1) {
+        const entry = mottaroByNavPath.get(mottaroPath.slice(0, depth).join('/'));
+        if (entry) matchedEntries.add(entry);
+      }
+    }
+
+    for (const entry of matchedEntries) {
+      entryCounts.set(entry, (entryCounts.get(entry) || 0) + 1);
+    }
   }
 
+  for (const entry of navEntries) {
+    const count = entryCounts.get(entry) || 0;
+    if (count <= 0) continue;
+    counts[entry.resolvedKey] = count;
+    if (entry.legacyKey && entry.legacyKey !== entry.resolvedKey) {
+      counts[entry.legacyKey] = count;
+    }
+  }
+
+  byScope.set(scopeKey, counts);
   return counts;
 }
