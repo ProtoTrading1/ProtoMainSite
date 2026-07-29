@@ -24,6 +24,8 @@ export default function CategoryNav({
   navigate,
   onAllProducts,
   onToggleL1,
+  onHoverL1 = () => {},
+  onCloseFlyout = () => {},
   onOpenFlyoutWithKeyboard = () => {},
   openCategoryId,
   counts,
@@ -47,7 +49,7 @@ export default function CategoryNav({
         <button
           type="button"
           className="cat-nav-all-products-btn"
-          onClick={() => { onAllProducts(); onToggleL1(null, null); }}
+          onClick={() => { onAllProducts(); onCloseFlyout(); }}
         >
           All Products
         </button>
@@ -86,9 +88,8 @@ export default function CategoryNav({
               <button
                 type="button"
                 className="cat-nav-btn"
-                onClick={() => navigate([cat.id])}
-                onMouseEnter={(e) => onToggleL1(cat.id, e.currentTarget)}
-                onFocus={(e) => onToggleL1(cat.id, e.currentTarget)}
+                onClick={() => { navigate([cat.id]); onCloseFlyout(); }}
+                onMouseEnter={(e) => onHoverL1(cat.id, e.currentTarget)}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown') {
                     e.preventDefault();
