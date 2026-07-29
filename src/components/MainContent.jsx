@@ -241,7 +241,16 @@ export default function MainContent({
     refinementsKey,
   ]);
 
-  const shouldShowSkeleton = loading && showDelayedSkeleton;
+  // The skeleton may only appear when there is NOTHING painted yet. Replacing
+  // an already-rendered grid during a background refresh (the 30s revalidate,
+  // a sort change resolving from cache, the post-login re-fetch) is what made
+  // the main page flicker. With products on screen, a reload happens silently
+  // and the new rows simply swap in.
+  const shouldShowSkeleton = loading && products.length === 0 && showDelayedSkeleton;
+  // While an empty view is still loading (first 200ms before the skeleton), a
+  // premature "No products match" flashed on every slow load. Hold blank
+  // space instead — the skeleton or the grid takes over within a beat.
+  const holdWhileEmptyLoading = loading && products.length === 0 && !showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
   const inStockOnlyId = useId();
   const sortSelectId = useId();
@@ -372,7 +381,9 @@ export default function MainContent({
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
 
       {shouldShowSkeleton ? (
-        <ProductGridSkeleton count={products.length || 12} />
+        <ProductGridSkeleton count={12} />
+      ) : holdWhileEmptyLoading ? (
+        <div aria-hidden="true" style={{ minHeight: '40vh' }} />
       ) : products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />

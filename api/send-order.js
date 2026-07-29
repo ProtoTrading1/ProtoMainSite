@@ -7,7 +7,7 @@ import { runOrderTeamNotify } from './_order-notify-core.js';
 import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
-import { validatePromoCode } from './_promo-codes.js';
+import { hasCustomerUsedPromo, validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 
@@ -996,6 +996,13 @@ export default async function handler(req, res) {
     const promoResult = await validatePromoCode(promoCode, subtotal);
     if (!promoResult.valid) {
       return res.status(400).json({ error: promoResult.error || 'Invalid promo code.' });
+    }
+    try {
+      if (await hasCustomerUsedPromo(getPortalAdminClient(), user.id, promoResult.code)) {
+        return res.status(400).json({ error: 'This promo code has already been used on a previous order.' });
+      }
+    } catch (err) {
+      return res.status(503).json({ error: err.message });
     }
     promo = {
       code: promoResult.code,

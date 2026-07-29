@@ -58,3 +58,25 @@ export async function validatePromoCode(code, subtotal) {
     label: match.label || null,
   };
 }
+
+/**
+ * One redemption per customer: true if this customer already has an order that
+ * used the code. Checked at validation (so the cart says so immediately) AND
+ * at order capture (authoritative — the cart check alone could be raced).
+ */
+export async function hasCustomerUsedPromo(supabase, customerId, code) {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!customerId || !normalized) return false;
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('customer_id', customerId)
+    .eq('promo_code', normalized)
+    .limit(1);
+  if (error) {
+    // Fail CLOSED: if usage cannot be verified, do not grant the discount —
+    // an outage must not turn a one-per-customer code into an unlimited one.
+    throw new Error('Could not verify promo code usage. Please try again.');
+  }
+  return Boolean(data?.length);
+}

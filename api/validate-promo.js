@@ -1,4 +1,5 @@
-import { validatePromoCode } from './_promo-codes.js';
+import { hasCustomerUsedPromo, validatePromoCode } from './_promo-codes.js';
+import { getPortalAdminClient } from './_site-config.js';
 import { requireAuth } from './_auth.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
 
@@ -25,6 +26,10 @@ export default async function handler(req, res) {
     const result = await validatePromoCode(code, subtotal);
     if (!result.valid) {
       return res.status(200).json({ valid: false, error: result.error });
+    }
+    // One redemption per customer — tell them in the cart, not at submit.
+    if (await hasCustomerUsedPromo(getPortalAdminClient(), user.id, result.code)) {
+      return res.status(200).json({ valid: false, error: 'This promo code has already been used on a previous order.' });
     }
     return res.status(200).json({
       valid: true,

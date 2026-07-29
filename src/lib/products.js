@@ -74,6 +74,9 @@ export function prefetchCatalog() {
   const stale = loadFromLocalCache();
   if (stale?.length) preloadCatalogImages(stale);
   void getAllCached().then((products) => preloadCatalogImages(products));
+  // The home grid is Featured — resolve it now so the first screen after
+  // login paints without a loading pass.
+  void fetchFeaturedCatalogProducts().catch(() => {});
 }
 
 function saveToLocalCache(data) {
@@ -149,6 +152,7 @@ function getAllCached() {
 
 export function invalidateProductCache() {
   _cache = null;
+  _featuredResolved = null;
   _loadPromise = null;
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
@@ -246,10 +250,34 @@ export async function fetchProductsBySkus(skus) {
   return bySku;
 }
 
+// Featured (the home grid) resolved over the network on EVERY visit to the
+// home page — including the reload triggered by the background catalogue
+// revalidate — so returning to the main page always went through a loading
+// pass. Cache the resolved list in memory and serve it instantly, refreshing
+// in the background once it is older than a minute.
+let _featuredResolved = null; // { key, products, at }
+let _featuredRefreshing = false;
+const FEATURED_RESOLVED_REFRESH_MS = 60_000;
+
 async function fetchFeaturedCatalogProducts() {
   const featuredSkus = await getFeaturedProducts();
   if (!featuredSkus.length) return [];
 
+  const key = featuredSkus.join(',');
+  if (_featuredResolved && _featuredResolved.key === key) {
+    if (Date.now() - _featuredResolved.at > FEATURED_RESOLVED_REFRESH_MS && !_featuredRefreshing) {
+      _featuredRefreshing = true;
+      void resolveFeaturedCatalogProducts(featuredSkus, key)
+        .then(() => emitCatalogRefresh())
+        .catch(() => {})
+        .finally(() => { _featuredRefreshing = false; });
+    }
+    return _featuredResolved.products;
+  }
+  return resolveFeaturedCatalogProducts(featuredSkus, key);
+}
+
+async function resolveFeaturedCatalogProducts(featuredSkus, key) {
   try {
     const batches = chunkArray(featuredSkus, FEATURED_PRODUCTS_BATCH_SIZE);
     const responses = await Promise.all(
@@ -266,16 +294,20 @@ async function fetchFeaturedCatalogProducts() {
       if (key && !bySku.has(key)) bySku.set(key, product);
     }
 
-    return featuredSkus
+    const resolved = featuredSkus
       .map((sku) => bySku.get(String(sku || '').toUpperCase()))
       .filter(Boolean);
+    _featuredResolved = { key, products: resolved, at: Date.now() };
+    return resolved;
   } catch {
     // Fall back to cached full catalogue when the fast SKU request path fails.
     const allProducts = await getAllCached();
     const bySku = new Map(allProducts.map((product) => [productSkuKey(product), product]));
-    return featuredSkus
+    const resolved = featuredSkus
       .map((sku) => bySku.get(String(sku || '').toUpperCase()))
       .filter(Boolean);
+    _featuredResolved = { key, products: resolved, at: Date.now() };
+    return resolved;
   }
 }
 
