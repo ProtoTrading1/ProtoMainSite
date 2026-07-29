@@ -39,7 +39,7 @@ let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
-const LS_KEY = 'proto_catalog_v10';
+const LS_KEY = 'proto_catalog_v11';
 // Bounds how stale the FIRST paint can be on a repeat visit. The background
 // revalidate (now a cheap 304 when unchanged) corrects it within a moment, but
 // this caps the window in which a shopper could see yesterday's price. Kept

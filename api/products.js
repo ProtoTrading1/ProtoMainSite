@@ -7,6 +7,7 @@ import { loadPlacementMapIfEnabled } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
+import { priceIncludingVat } from '../lib/pricing.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -200,6 +201,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
   ].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
+  const priceExVat = Number(row.price) || 0;
   const base = {
     id: row.sku,
     code: row.barcode,
@@ -219,7 +221,8 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     title: row.title,
     description: row.original_description || '',
     originalDescription: row.original_description || '',
-    price: Number(row.price) || 0,
+    price: priceIncludingVat(priceExVat),
+    priceExVat,
     images,
     image: images[0] || '',
     secondaryImage: images[1] || '',

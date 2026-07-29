@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireIntercomSecret } from '../_auth.js';
+import { priceIncludingVat } from '../../../lib/pricing.mjs';
 
 const MAX_RESULTS = 25;
 const SELECT_COLS = 'sku, barcode, title, category, subcategory_one, subcategory_two, price, image_url_one, available_stock, stock_qty, keep_live_when_oos';
@@ -16,7 +17,7 @@ function escapeIlike(raw) {
 }
 
 function formatPrice(value) {
-  const n = Number(value);
+  const n = priceIncludingVat(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return `R${n.toFixed(2)}`;
 }
