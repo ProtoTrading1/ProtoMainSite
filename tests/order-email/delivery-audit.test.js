@@ -12,3 +12,11 @@ test('records the customer acknowledgement result alongside the team delivery lo
   assert.match(source, /readOrderNotifyLog\(orderId\)/);
   assert.match(source, /saveOrderNotifyLog\(orderId/);
 });
+
+test('treats WhatsApp as accepted until a delivery webhook confirms it', () => {
+  const notifySource = fs.readFileSync(new URL('../../api/_order-notify-core.js', import.meta.url), 'utf8');
+  assert.match(notifySource, /accepted:\s*sent\.length/);
+  assert.match(notifySource, /deliveryConfirmed:\s*false/);
+  assert.match(notifySource, /if \(emailSent && pdfStored\)/);
+  assert.doesNotMatch(notifySource, /if \(emailSent && whatsappOk\)/);
+});
