@@ -159,7 +159,11 @@ export default function Drawer({
     const getFocusable = () => Array.from(dialog?.querySelectorAll(focusableSelector) || [])
       .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
 
-    getFocusable()[0]?.focus();
+    // CheckoutModal restores focus during its own cleanup. Defer this focus
+    // until that cleanup has finished so the newly opened delivery dialog wins.
+    const focusFrame = window.requestAnimationFrame(() => {
+      getFocusable()[0]?.focus();
+    });
 
     const onGlobalKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -198,6 +202,7 @@ export default function Drawer({
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onGlobalKeyDown, true);
+      window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = prevOverflow;
       courierPreviousFocusRef.current?.focus?.();
     };
