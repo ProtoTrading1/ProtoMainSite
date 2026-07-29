@@ -40,7 +40,7 @@ test('supports and renders a complete 250-line internal order email', () => {
   assert.equal(MAX_ORDER_LINES, 250);
   assert.match(html, /BAR-001/);
   assert.match(html, /Product 250/);
-  assert.match(html, /250 product lines/);
+  assert.equal((html.match(/BAR-\\d{3}/g) || []).length, 250);
   assert.ok(Buffer.byteLength(html, 'utf8') < 1_000_000);
 });
 
