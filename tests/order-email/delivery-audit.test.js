@@ -20,3 +20,8 @@ test('treats WhatsApp as accepted until a delivery webhook confirms it', () => {
   assert.match(notifySource, /if \(emailSent && pdfStored\)/);
   assert.doesNotMatch(notifySource, /if \(emailSent && whatsappOk\)/);
 });
+
+test('only an explicit false opts a fulfilment user out of order alerts', () => {
+  const notifySource = fs.readFileSync(new URL('../../api/_order-notify-core.js', import.meta.url), 'utf8');
+  assert.match(notifySource, /\.filter\(\(u\) => u\?\.orderAlerts !== false\)/);
+});
