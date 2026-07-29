@@ -72,8 +72,75 @@ function getStockClient() {
   );
 }
 
-const MAX_ORDER_LINES = 250;
-const MAX_QTY_PER_LINE = 100000;
+export const MAX_ORDER_LINES = 250;
+export const MAX_QTY_PER_LINE = 100000;
+export const TEAM_EMAIL_TIMEOUT_MS = 15000;
+export const TEAM_EMAIL_MAX_ATTEMPTS = 2;
+
+export function isRetryableBrevoStatus(status) {
+  const code = Number(status);
+  return code === 408 || code === 429 || code >= 500;
+}
+
+async function sendTeamEmailWithRetry(payload, orderNumber) {
+  let lastError = 'Unknown Brevo delivery error';
+  let lastStatus = null;
+
+  for (let attempt = 1; attempt <= TEAM_EMAIL_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'api-key': process.env.BREVO_API_KEY,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(TEAM_EMAIL_TIMEOUT_MS),
+      });
+      const body = await resp.json().catch(() => ({}));
+      lastStatus = resp.status;
+
+      if (resp.ok) {
+        return {
+          ok: true,
+          attemptCount: attempt,
+          messageId: cleanText(body.messageId),
+          status: resp.status,
+          error: null,
+        };
+      }
+
+      lastError = body.message || `Brevo ${resp.status}`;
+      console.error('send-order: team email rejected by Brevo', {
+        orderNumber,
+        attempt,
+        status: resp.status,
+        error: lastError,
+      });
+      if (!isRetryableBrevoStatus(resp.status)) break;
+    } catch (err) {
+      lastError = err?.message || 'Network error';
+      console.error('send-order: team email request failed', {
+        orderNumber,
+        attempt,
+        error: lastError,
+      });
+    }
+
+    if (attempt < TEAM_EMAIL_MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    }
+  }
+
+  return {
+    ok: false,
+    attemptCount: TEAM_EMAIL_MAX_ATTEMPTS,
+    messageId: null,
+    status: lastStatus,
+    error: lastError,
+  };
+}
 
 async function resolveAuthoritativePrices(items) {
   if (items.length > MAX_ORDER_LINES) {
@@ -1026,54 +1093,47 @@ export default async function handler(req, res) {
   let emailDeliveryFailed = false;
   let emailFailReason = null;
   let emailMessageId = null;
+  let emailAttemptCount = 0;
+  let emailProviderStatus = null;
   if (!attachment) {
     emailDeliveryFailed = true;
     emailFailReason = 'Order PDF could not be generated';
     console.error('send-order: team email not sent because no PDF attachment was available:', orderNumber);
-  } else try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'api-key': process.env.BREVO_API_KEY,
+  } else {
+    const teamEmailResult = await sendTeamEmailWithRetry({
+      sender: {
+        name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
+        email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
       },
-      body: JSON.stringify({
-        sender: {
-          name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
-          email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
-        },
-        to: notifyEmails.map((email) => ({ email })),
-        replyTo: customer.email ? { email: customer.email } : undefined,
-        subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-        htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
-        attachment,
-      }),
-      // Bounded: a hung Brevo connection must not hold the checkout function
-      // open (it previously had no timeout at all).
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      const msg = body.message || `Brevo ${resp.status}`;
-      console.error('Brevo API error:', resp.status, JSON.stringify(body));
-      emailDeliveryFailed = true;
-      emailFailReason = msg;
-    } else {
-      const body = await resp.json().catch(() => ({}));
-      emailMessageId = cleanText(body.messageId);
+      to: notifyEmails.map((email) => ({ email })),
+      replyTo: customer.email ? { email: customer.email } : undefined,
+      subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
+      htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
+      attachment,
+      // Brevo applies this key when a timed-out request is retried, preventing
+      // the same order email from being delivered twice.
+      headers: { 'Idempotency-Key': `proto-team-order-${orderNumber}` },
+    }, orderNumber);
+
+    emailDeliveryFailed = !teamEmailResult.ok;
+    emailFailReason = teamEmailResult.error;
+    emailMessageId = teamEmailResult.messageId;
+    emailAttemptCount = teamEmailResult.attemptCount;
+    emailProviderStatus = teamEmailResult.status;
+
+    if (teamEmailResult.ok) {
       console.info('send-order: team email accepted by Brevo', {
         orderNumber,
         recipients: notifyEmails,
+        lineCount: orderItems.length,
         pdfAttached: true,
+        pdfBytes: pdfBuffer.length,
         pdfSource,
+        attemptCount: emailAttemptCount,
+        providerStatus: emailProviderStatus,
         messageId: emailMessageId || null,
       });
     }
-  } catch (err) {
-    console.error('Brevo fetch error:', err?.stack || err?.message || err);
-    emailDeliveryFailed = true;
-    emailFailReason = err?.message || 'Network error';
   }
 
   let notifyResult = null;
@@ -1107,6 +1167,9 @@ export default async function handler(req, res) {
         emailSent: !emailDeliveryFailed,
         emailRecipients: notifyEmails,
         emailMessageId,
+        emailFailReason,
+        emailAttemptCount,
+        emailProviderStatus,
         pdfAttached: Boolean(attachment),
         pdfSource,
       }),
