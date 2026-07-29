@@ -84,6 +84,8 @@ export default function CheckoutModal({
 
   useEffect(() => {
     if (!isOpen) return undefined;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -104,13 +106,18 @@ export default function CheckoutModal({
       } else if (!e.shiftKey && document.activeElement === last) {
         e.preventDefault();
         first.focus();
+      } else if (!dialogRef.current.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onKey, true);
     document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
     };
   }, [isOpen]);
 
