@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
@@ -296,7 +296,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const defaultVariant = variants[0] || null;
@@ -686,3 +686,5 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     </>
   );
 }
+
+export default memo(ProductCard);
