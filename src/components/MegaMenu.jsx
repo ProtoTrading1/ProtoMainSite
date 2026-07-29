@@ -78,7 +78,7 @@ function PanelHeader({ label, onViewAll, color }) {
   );
 }
 
-const NAV_ROW_HEIGHT = 42;
+const NAV_ROW_HEIGHT = 44;
 
 function ListItem({
   itemId,
@@ -224,7 +224,11 @@ export default function MegaMenu({ l1Node, navigate, counts, categories, onClose
       role="menu"
       aria-label={`${l1Node.label} categories`}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose(true);
+        }
       }}
       style={{
         position: 'absolute',
