@@ -7,6 +7,7 @@ import { loadPlacementMapIfEnabled } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
+import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -47,15 +48,16 @@ let catalogMemo = { key: null, payload: null, builtAt: 0 };
 // Safety net: even if a writer ever forgets to bump updated_at, never serve a
 // memoized payload for longer than this.
 const CATALOG_MEMO_MAX_MS = 60_000;
-// The stamp's time bucket exists because the payload is ALSO built from inputs
-// (taxonomy JSON, feature flags, product_placements, product_groups,
-// yearly_sales) that website_stock's updated_at does not cover — without it,
-// changing one of those would pin clients on a 304 forever. But at 60s the
-// bucket rotated the ETag every minute, which made 304s impossible in practice
-// and re-shipped the full ~6MB catalogue on nearly every visit. 10 minutes
-// bounds those secondary changes while letting unchanged catalogues answer
-// 304 + empty body — stock edits still bust the ETag instantly via updated_at.
-const CATALOG_MAX_STALE_MS = 10 * 60_000;
+// The version stamp below is derived from website_stock, but the payload is ALSO
+// built from taxonomy JSON, feature flags, product_placements, product_groups
+// and products.yearly_sales — none of which touch website_stock. Changing one of
+// those (e.g. flipping the multiPlacement kill switch to withdraw products)
+// would otherwise leave the stamp identical and pin clients on a 304 forever.
+// Folding a coarse time bucket into the stamp bounds staleness from ANY input to
+// this window, while still letting every request inside the window share a 304 /
+// the memo. 60s also matches the freshness the previous s-maxage=10 +
+// stale-while-revalidate=60 actually delivered.
+const CATALOG_MAX_STALE_MS = 60_000;
 
 async function loadCatalogVersion(supabase) {
   const { data, count, error } = await supabase
@@ -354,6 +356,9 @@ export default async function handler(req, res) {
       loadGroupInfoMapIfEnabled(supabase),
     ]);
     const products = rows
+      // Defence in depth: invalid catalogue rows must never reach a customer,
+      // even if an importer, manual edit, or future sync leaves one live.
+      .filter(isSafeStorefrontProduct)
       .map((row) => adapt(
         row,
         tree,
