@@ -87,6 +87,8 @@ export default function Drawer({
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const courierDialogRef = useRef(null);
+  const courierPreviousFocusRef = useRef(null);
   const courierDialogTitleId = useId();
 
   const inclVatEstimate = cartTotal;
@@ -144,22 +146,60 @@ export default function Drawer({
 
   useEffect(() => {
     if (!showCourierPicker) return undefined;
-    const onGlobalEscape = (event) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      setShowCourierPicker(false);
-      setCourierChoice(null);
-      setCustomerNotes('');
+    courierPreviousFocusRef.current = document.activeElement;
+    const dialog = courierDialogRef.current;
+    const focusableSelector = [
+      'button:not([disabled])',
+      'textarea:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      '[href]',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const getFocusable = () => Array.from(dialog?.querySelectorAll(focusableSelector) || [])
+      .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
+
+    getFocusable()[0]?.focus();
+
+    const onGlobalKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setShowCourierPicker(false);
+        setCourierChoice(null);
+        setCustomerNotes('');
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialog?.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     // Capture phase so this runs before other document Escape handlers (e.g. the
     // mobile cart) — Escape should close only the delivery modal, not the cart.
-    document.addEventListener('keydown', onGlobalEscape, true);
+    document.addEventListener('keydown', onGlobalKeyDown, true);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', onGlobalEscape, true);
+      document.removeEventListener('keydown', onGlobalKeyDown, true);
       document.body.style.overflow = prevOverflow;
+      courierPreviousFocusRef.current?.focus?.();
     };
   }, [showCourierPicker]);
 
@@ -334,7 +374,12 @@ export default function Drawer({
           onClick={closeCourierPicker}
           className="courier-modal-backdrop"
         >
-          <div onClick={(e) => e.stopPropagation()} className="courier-modal-sheet">
+          <div
+            ref={courierDialogRef}
+            onClick={(e) => e.stopPropagation()}
+            className="courier-modal-sheet"
+            tabIndex={-1}
+          >
             <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>Choose delivery for your order request</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select how you would like to receive the order. Proto will confirm the final delivery details and cost.</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
