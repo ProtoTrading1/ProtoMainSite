@@ -235,6 +235,10 @@ for (const addr of ['online@proto.co.za', 'george@proto.co.za', 'danieljoffeinfo
 }
 assert.match(orderRecipientsSrc, /DEFAULT_NOTIFY_EMAILS,\s*\.\.\.extra/, 'ORDER_NOTIFY_EMAILS adds to the defaults instead of replacing them');
 assert.match(sendOrderSrc, /subject: `New order received from/, 'team order email is titled as a new order from a customer');
+// A missing/oversized PDF must never cost the team the whole notification.
+assert.doesNotMatch(sendOrderSrc, /team email not sent because no PDF attachment/, 'the team email is no longer skipped when the PDF is unavailable');
+assert.match(sendOrderSrc, /MAX_ATTACHMENT_BYTES/, 'oversized order PDFs are capped instead of being sent and rejected');
+assert.match(sendOrderSrc, /\/api\/orders\/\$\{orderId\}\/pdf\?k=/, 'a signed PDF download link replaces a dropped attachment');
 
 // Unapproved logins must read as "still reviewing", never as an email-confirmation error.
 // LoginModal is the LIVE login surface (Root renders it; the old
