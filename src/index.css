@@ -705,7 +705,8 @@ textarea:focus-visible,
 .mobile-cart-sheet {
   background: #fff;
   border-radius: 20px 20px 0 0;
-  max-height: 90vh;
+  height: min(90dvh, 760px);
+  max-height: calc(100dvh - env(safe-area-inset-top));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -741,17 +742,20 @@ textarea:focus-visible,
 }
 .mobile-cart-sheet-body {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 0;
 }
 /* Make the order-drawer visible and full-width inside the mobile sheet */
 .mobile-cart-sheet-body .order-drawer {
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;
 }
 .mobile-cart-sheet-body .drawer-items {
-  max-height: calc(60vh - 120px);
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .mobile-cart-sheet-close {
   background: #F3F4F6;
@@ -870,9 +874,54 @@ textarea:focus-visible,
   padding: 24px 20px 32px;
   width: 100%;
   max-width: 420px;
-  max-height: 85vh;
+  max-height: min(85dvh, 760px);
   overflow-y: auto;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+.courier-options {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.courier-modal-actions {
+  position: sticky;
+  bottom: -32px;
+  margin: 0 -20px -32px;
+  padding: 10px 20px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+.courier-submit-button,
+.courier-cancel-button {
+  width: 100%;
+  min-height: 44px;
+  font-family: inherit;
+}
+.courier-submit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 4px;
+  padding: 13px;
+  border: none;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+.courier-submit-button:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+.courier-cancel-button {
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .checkout-payment-notice,
@@ -928,7 +977,7 @@ textarea:focus-visible,
   }
   .courier-modal-sheet {
     max-width: 100%;
-    max-height: 90vh;
+    max-height: calc(100dvh - env(safe-area-inset-top));
     border-radius: 16px 16px 0 0;
     animation: courier-sheet-up 0.22s ease-out;
   }
@@ -3600,7 +3649,7 @@ textarea:focus-visible,
 .checkout-modal {
   position: relative;
   width: min(680px, 100%);
-  max-height: min(86vh, 820px);
+  max-height: min(86dvh, 820px);
   overflow-y: auto;
   padding: 28px 24px 24px;
   border-radius: 14px;
@@ -3919,6 +3968,7 @@ textarea:focus-visible,
 .checkout-modal-back-link {
   display: block;
   width: 100%;
+  min-height: 44px;
   margin-top: 10px;
   padding: 8px;
   border: none;
@@ -3935,15 +3985,37 @@ textarea:focus-visible,
   }
   .checkout-modal {
     width: 100%;
-    max-height: 92vh;
+    max-height: calc(100dvh - env(safe-area-inset-top));
     border-radius: 16px 16px 0 0;
-    padding: 24px 18px 20px;
+    padding: 24px 18px calc(20px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+  .checkout-review-lines {
+    max-height: none;
+    overflow: visible;
   }
   .checkout-review-account {
     grid-template-columns: 1fr;
   }
   .checkout-modal-actions {
     grid-template-columns: 1fr;
+    position: sticky;
+    bottom: calc(-20px - env(safe-area-inset-bottom));
+    margin: 0 -18px calc(-20px - env(safe-area-inset-bottom));
+    padding: 10px 18px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-cart-sheet,
+  .checkout-modal {
+    animation: none;
+    scroll-behavior: auto;
+  }
+  .drawer-auto-close div {
+    transition: none;
   }
 }
 .order-modal {
@@ -4574,7 +4646,7 @@ textarea:focus-visible,
   .price-row strong { font-size: 20px; }
   .buy-row { flex-direction: column; gap: 8px; }
   .qty-stepper { width: 100%; }
-  .add-button { width: 100%; justify-content: center; min-height: 42px; }
+  .add-button { width: 100%; justify-content: center; min-height: 44px; }
   /* Hide verbose fields on small cards */
   .product-detail-row, .product-trade-note, .view-product-link, .product-colour-row, .product-badges { display: none; }
 
@@ -6934,5 +7006,19 @@ textarea:focus-visible,
 
   .sort-control select {
     width: 100%;
+  }
+}
+
+/* Very narrow phones need an ordering card, not two compressed desktop cards.
+   Keep the denser two-column catalogue on normal phones (381px and wider). */
+@media (max-width: 380px) {
+  .product-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .product-grid-section-header {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
