@@ -14,7 +14,7 @@ const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimati
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { groupProductsByBarcode } from './lib/productGroups';
 import { fuzzyFilter } from './lib/fuzzySearch';
@@ -32,6 +32,9 @@ import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
+// Mirrors MAX_ORDER_LINES in api/send-order.js — the server rejects an order
+// with more lines than this, so the cart must not be allowed to exceed it.
+const MAX_CART_LINES = 250;
 const DRAWER_PEEK_MS = 5000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
@@ -798,26 +801,52 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     }
   };
 
-  const handleReorder = (items) => {
-    const selectedItems = items
-      .map((item) => {
-        const product = catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
-        return product ? { product, qty: item.qty } : null;
-      })
-      .filter(Boolean);
+  const handleReorder = async (items) => {
+    // Look products up by SKU through the API, NOT in catalogProducts — that is
+    // only the current 60-product page, narrowed further by the active
+    // category/search/in-stock filter. Matching against it meant a large
+    // reorder silently added whatever happened to be on screen and dropped the
+    // rest: a 160-line order added a handful of items with no error shown.
+    const bySku = await fetchProductsBySkus(items.map((item) => item.productId || item.code));
 
-    setCartItems((prev) => {
-      const next = [...prev];
-      for (const item of selectedItems) {
-        const existing = next.find((entry) => entry.product.id === item.product.id);
-        if (existing) existing.qty += item.qty;
-        else next.push(item);
-      }
-      return next;
-    });
-    markCartActivity();
+    const resolved = [];
+    const missing = [];
+    for (const item of items) {
+      const product = bySku.get(String(item.productId || '').toUpperCase())
+        || bySku.get(String(item.code || '').toUpperCase())
+        || catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
+      if (product) resolved.push({ product, qty: item.qty });
+      else missing.push(item);
+    }
 
-    setReorderModal(false);
+    // Build the next cart OUTSIDE the state updater. Deriving the counts inside
+    // it would be unreliable — React may run the updater later, or twice in
+    // StrictMode, so `added`/`overflow` could be wrong or double-counted in the
+    // message shown to the customer.
+    const nextCart = cartItems.map((entry) => ({ ...entry }));
+    let added = 0;
+    let overflow = 0;
+    for (const item of resolved) {
+      const existing = nextCart.find((entry) => entry.product.id === item.product.id);
+      if (existing) { existing.qty += item.qty; added += 1; continue; }
+      // The server rejects an order over MAX_CART_LINES lines. Stopping here
+      // beats letting the cart grow past the limit and failing at checkout,
+      // after the customer has already spent the effort.
+      if (nextCart.length >= MAX_CART_LINES) { overflow += 1; continue; }
+      nextCart.push(item);
+      added += 1;
+    }
+
+    if (added) {
+      setCartItems(nextCart);
+      markCartActivity();
+    }
+
+    // The modal stays open when something could not be added, so the customer
+    // sees which lines are no longer available rather than assuming the whole
+    // order went back in the cart.
+    if (!missing.length && !overflow) setReorderModal(false);
+    return { added, missing, overflow };
   };
 
   const [previewProduct, setPreviewProduct] = useState(null);

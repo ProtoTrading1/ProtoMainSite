@@ -157,6 +157,11 @@ async function loadSalesByBarcode(supabase, skuFilter = null) {
   }
 }
 
+// One `skus=` request is bounded so a caller cannot turn this into an
+// unbounded IN(...) against the stock database. Legitimate callers (reorder,
+// featured) already batch at 80.
+const MAX_SKUS_PER_REQUEST = 200;
+
 function parseSkuQuery(raw) {
   const value = Array.isArray(raw) ? raw.join(',') : String(raw || '');
   const list = value
@@ -164,7 +169,7 @@ function parseSkuQuery(raw) {
     .map((sku) => sku.trim())
     .filter(Boolean);
   if (!list.length) return null;
-  return [...new Set(list)];
+  return [...new Set(list)].slice(0, MAX_SKUS_PER_REQUEST);
 }
 
 function parseIdentifierQuery(raw) {

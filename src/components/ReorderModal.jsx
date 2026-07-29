@@ -5,6 +5,10 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   const [selected, setSelected] = useState(() =>
     new Set((lastOrder?.items || []).map((_, i) => i))
   );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [unavailable, setUnavailable] = useState([]);
+  const unavailableCodes = new Set(unavailable.map((item) => item.productId || item.code));
 
   if (!lastOrder) return null;
 
@@ -16,9 +20,34 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
     return next;
   });
 
-  const handleReorder = () => {
-    const selectedItems = items.filter((_, i) => selected.has(i));
-    onReorder(selectedItems);
+  const handleReorder = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const selectedItems = items.filter((_, i) => selected.has(i));
+      // Resolving 160 lines is a real round-trip, so the button reports
+      // progress; the previous version returned instantly whether or not the
+      // items had actually gone into the cart.
+      const result = await onReorder(selectedItems);
+      const missing = result?.missing || [];
+      const overflow = result?.overflow || 0;
+      if (missing.length || overflow) {
+        setUnavailable(missing);
+        const parts = [`${result.added} item${result.added === 1 ? '' : 's'} added.`];
+        if (missing.length) {
+          parts.push(`${missing.length} ${missing.length === 1 ? 'is' : 'are'} no longer available and could not be added.`);
+        }
+        if (overflow) {
+          parts.push(`${overflow} could not fit — an order can hold at most 250 different products.`);
+        }
+        setError(parts.join(' '));
+      }
+    } catch {
+      setError('Those items could not be added right now. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -39,9 +68,14 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
 
         {/* Items */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+          {error && (
+            <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', fontSize: '13px', color: '#9a3412', lineHeight: 1.5 }}>
+              {error}
+            </div>
+          )}
           <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>Select items to add back to your current order:</p>
           {items.map((item, i) => (
-            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}>
+            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f8fafc', cursor: 'pointer', opacity: unavailableCodes.has(item.productId || item.code) ? 0.45 : 1 }}>
               <input
                 type="checkbox"
                 checked={selected.has(i)}
@@ -53,7 +87,12 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>{item.code} · qty {item.qty} · R{Number(item.unitPrice).toFixed(2)} each</div>
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  {item.code} · qty {item.qty} · R{Number(item.unitPrice).toFixed(2)} each
+                  {unavailableCodes.has(item.productId || item.code) && (
+                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · no longer available</span>
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#e11d48', flexShrink: 0 }}>
                 R{(item.unitPrice * item.qty).toFixed(2)}
@@ -69,10 +108,12 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
           </button>
           <button
             onClick={handleReorder}
-            disabled={selected.size === 0}
-            style={{ flex: 2, padding: '12px', background: '#e11d48', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: '14px', color: '#fff', opacity: selected.size === 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            disabled={selected.size === 0 || busy}
+            style={{ flex: 2, padding: '12px', background: '#e11d48', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: (selected.size === 0 || busy) ? 'not-allowed' : 'pointer', fontSize: '14px', color: '#fff', opacity: (selected.size === 0 || busy) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <ShoppingCart size={16} />
-            Add {selected.size} item{selected.size !== 1 ? 's' : ''} to order
+            {busy
+              ? `Adding ${selected.size} item${selected.size !== 1 ? 's' : ''}…`
+              : `Add ${selected.size} item${selected.size !== 1 ? 's' : ''} to order`}
           </button>
         </div>
       </div>

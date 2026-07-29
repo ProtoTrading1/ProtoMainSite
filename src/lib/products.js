@@ -188,6 +188,63 @@ function chunkArray(items, size) {
   return chunks;
 }
 
+/**
+ * Resolve products by SKU (the client's `product.id`), in batches.
+ *
+ * Reorder used to look items up in the CURRENT catalogue page — 60 products,
+ * narrowed further by whatever category/search/in-stock filter was active — so
+ * a 160-line reorder silently dropped everything that happened not to be on
+ * screen. Anything the catalogue no longer carries is reported back to the
+ * caller as `missing` instead of vanishing.
+ *
+ * Returns a Map keyed by upper-cased SKU.
+ */
+export async function fetchProductsBySkus(skus) {
+  const wanted = [...new Set(
+    (Array.isArray(skus) ? skus : [])
+      .map((sku) => String(sku || '').trim().toUpperCase())
+      .filter(Boolean),
+  )];
+  if (!wanted.length) return new Map();
+
+  const bySku = new Map();
+  const addAll = (products) => {
+    for (const product of products) {
+      const key = productSkuKey(product);
+      if (key && !bySku.has(key)) bySku.set(key, product);
+    }
+  };
+
+  try {
+    const batches = chunkArray(wanted, FEATURED_PRODUCTS_BATCH_SIZE);
+    // Batches are independent; one failing must not lose the others, so a
+    // partial result is better than an all-or-nothing throw.
+    const responses = await Promise.allSettled(
+      batches.map((batch) => fetchJsonWithTimeout(
+        `/api/products?skus=${encodeURIComponent(batch.join(','))}`,
+        15000,
+        { cache: 'no-store' },
+      )),
+    );
+    for (const settled of responses) {
+      if (settled.status === 'fulfilled' && Array.isArray(settled.value)) addAll(settled.value);
+    }
+  } catch {
+    // fall through to the cached-catalogue path below
+  }
+
+  // Anything still unresolved may simply have been missed by a failed batch —
+  // try the cached full catalogue before declaring it unavailable.
+  if (bySku.size < wanted.length) {
+    try {
+      const all = await getAllCached();
+      addAll(all.filter((product) => wanted.includes(productSkuKey(product))));
+    } catch { /* leave the remainder reported as missing */ }
+  }
+
+  return bySku;
+}
+
 async function fetchFeaturedCatalogProducts() {
   const featuredSkus = await getFeaturedProducts();
   if (!featuredSkus.length) return [];
