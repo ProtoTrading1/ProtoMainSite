@@ -669,14 +669,21 @@ export async function fetchProductPage({
     }
   }
 
-  let products = categoryPath.length && !hasSearch && collection === 'all'
-    ? await fetchBrowseProducts(categoryPath)
+  const isCategoryBrowse = categoryPath.length && !hasSearch && collection === 'all';
+  // The direct endpoint wins only while the complete catalogue is still
+  // arriving. Once the in-memory/IndexedDB snapshot is ready, changing to
+  // another department is a local filter and must not return to the network.
+  const canFilterCategoryLocally = isCategoryBrowse && Array.isArray(_cache) && _cache.length > 0;
+  let products = isCategoryBrowse
+    ? canFilterCategoryLocally
+      ? applyPathFilter(_cache, categoryPath)
+      : await fetchBrowseProducts(categoryPath)
     : await getAllCached();
   const pool = products;
   products = applyCollection(products, collection, specialIds);
   // The fast browse endpoint already returns this branch only. The local
   // fallback and non-category paths still use the shared client filter.
-  if (!hasSearch && !(categoryPath.length && collection === 'all')) {
+  if (!hasSearch && !isCategoryBrowse) {
     products = applyPathFilter(products, categoryPath);
   }
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
