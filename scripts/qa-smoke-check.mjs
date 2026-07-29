@@ -199,7 +199,10 @@ console.log('✓ Unlimited category depth (subcategory_extra) reaches the storef
 // _public-site-url.js so the whole estate repoints with one env var; Email 2
 // wording; Email 5 (customer order acknowledgement) sent on order placement.
 const publicUrlSrc = readFileSync(join(root, 'api/_public-site-url.js'), 'utf8');
-assert.match(publicUrlSrc, /SITE_URL \|\| 'https:\/\/proto\.co\.za'/, 'email links default to proto.co.za');
+assert.match(publicUrlSrc, /EMAIL_LINK_URL \|\| 'https:\/\/proto\.co\.za'/, 'email links default to proto.co.za');
+// The legacy SITE_URL is set to site.proto.co.za in production. If email LINKS
+// ever inherit it again, every emailed link silently returns to the old host.
+assert.doesNotMatch(publicUrlSrc, /PUBLIC_SITE_URL = \(process\.env\.SITE_URL/, 'email links do not inherit the legacy SITE_URL');
 const resetSrc = readFileSync(join(root, 'api/send-reset-email.js'), 'utf8');
 assert.match(resetSrc, /PUBLIC_SITE_URL/, 'reset link is built from PUBLIC_SITE_URL');
 assert.doesNotMatch(resetSrc, /protoportal-main\.vercel\.app/, 'reset email no longer references the old vercel host');
