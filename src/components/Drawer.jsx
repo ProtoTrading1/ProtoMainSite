@@ -199,11 +199,14 @@ export default function Drawer({
     // mobile cart) — Escape should close only the delivery modal, not the cart.
     document.addEventListener('keydown', onGlobalKeyDown, true);
     const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
     document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
     return () => {
       document.removeEventListener('keydown', onGlobalKeyDown, true);
       window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = prevOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
       courierPreviousFocusRef.current?.focus?.();
     };
   }, [showCourierPicker]);
@@ -387,7 +390,7 @@ export default function Drawer({
           >
             <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>Choose delivery for your order request</div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select how you would like to receive the order. Proto will confirm the final delivery details and cost.</div>
-            <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+            <div className="courier-options">
               {[
                 { key: 'own', Icon: Truck, title: "I'll use my own courier", desc: 'You arrange collection or delivery.' },
                 { key: 'proto', Icon: Package, title: 'Proto Trading delivers', desc: 'We will arrange delivery and include the cost in your quote.' },
@@ -430,18 +433,20 @@ export default function Drawer({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleConfirmCourier}
-              disabled={!courierChoice || submitting}
-              style={{ width: '100%', padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: !courierChoice ? '#e2e8f0' : '#0f172a', color: !courierChoice ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: !courierChoice ? 'not-allowed' : submitting ? 'wait' : 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s' }}
-            >
-              {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
-              {submitting ? 'Sending your order request…' : 'Send order request — no payment now'}
-            </button>
-            <button type="button" onClick={closeCourierPicker} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
-              Cancel
-            </button>
+            <div className="courier-modal-actions">
+              <button
+                type="button"
+                onClick={handleConfirmCourier}
+                disabled={!courierChoice || submitting}
+                className="courier-submit-button"
+              >
+                {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
+                {submitting ? 'Sending your order request…' : 'Send order request — no payment now'}
+              </button>
+              <button type="button" onClick={closeCourierPicker} className="courier-cancel-button">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>,
         document.body,
