@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Search, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
-import { filterNavChildrenByCount, lookupProductCount } from '../lib/taxonomy';
+import { filterNavChildrenWhenCountsReady, lookupProductCount } from '../lib/taxonomy';
 import { openIntercom } from '../lib/intercom';
 import { authHeaders } from '../lib/authHeaders';
 
@@ -64,17 +64,50 @@ function MobileProductRequest({ onClose: closeAll }) {
 
 export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout }) {
   const [showProductRequest, setShowProductRequest] = useState(false);
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return undefined;
-    const onGlobalEscape = (event) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      onClose?.();
+    previousFocusRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const onDialogKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose?.();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', onGlobalEscape);
-    return () => document.removeEventListener('keydown', onGlobalEscape);
+    document.addEventListener('keydown', onDialogKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus?.();
+    };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) setCategoryQuery('');
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -94,13 +127,21 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
 
   // Hide empty categories at every level — including empty top-level
   // departments at the root — so mobile matches the desktop rail.
-  currentCategories = filterNavChildrenByCount(currentCategories, path || [], counts, categories);
+  currentCategories = filterNavChildrenWhenCountsReady(currentCategories, path || [], counts, categories);
 
   const currentLabel = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].label : 'All Categories';
-
-  const handleSelect = (id) => {
-    navigate([...path, id]);
+  const normalizedQuery = categoryQuery.trim().toLocaleLowerCase();
+  const collectMatches = (nodes, parentPath = [], matches = []) => {
+    for (const node of nodes || []) {
+      const nodePath = [...parentPath, node.id];
+      if (lookupProductCount(counts, nodePath, categories) === 0) continue;
+      if (node.label.toLocaleLowerCase().includes(normalizedQuery)) matches.push({ ...node, navPath: nodePath });
+      collectMatches(node.children, nodePath, matches);
+    }
+    return matches;
   };
+  const searchMatches = normalizedQuery ? collectMatches(categories).slice(0, 40) : null;
+  const visibleCategories = searchMatches || currentCategories.map((cat) => ({ ...cat, navPath: [...path, cat.id] }));
 
   return (
     <div
@@ -114,13 +155,14 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Browse categories"
         style={{
           width: '85%',
           maxWidth: '320px',
-          height: '100%',
+          height: '100dvh',
           backgroundColor: '#fff',
           display: 'flex',
           flexDirection: 'column',
@@ -141,7 +183,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {path.length > 0 ? (
-              <button onClick={() => navigate(path.slice(0, -1))} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px' }}>
+              <button onClick={() => navigate(path.slice(0, -1))} aria-label="Back one category level" style={{ width: 44, height: 44, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0 }}>
                 <ChevronLeft size={24} />
               </button>
             ) : (
@@ -149,12 +191,27 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             )}
             <span style={{ fontSize: '18px', fontWeight: '800' }}>{currentLabel}</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}>
+          <button ref={closeButtonRef} onClick={onClose} aria-label="Close categories" style={{ width: 44, height: 44, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}>
             <X size={24} />
           </button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          <div style={{ padding: '4px 12px 10px' }}>
+            <label htmlFor="mobile-category-search" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Search categories</label>
+            <div style={{ position: 'relative' }}>
+              <Search size={17} aria-hidden="true" style={{ position: 'absolute', left: 13, top: 14, color: '#6B7280' }} />
+              <input
+                id="mobile-category-search"
+                type="search"
+                value={categoryQuery}
+                onChange={(event) => setCategoryQuery(event.target.value)}
+                placeholder="Search categories"
+                style={{ width: '100%', minHeight: 44, padding: '10px 36px 10px 40px', border: '1px solid #D1D5DB', borderRadius: 9, fontFamily: 'inherit', fontSize: 15, boxSizing: 'border-box' }}
+              />
+              {categoryQuery && <button onClick={() => setCategoryQuery('')} aria-label="Clear category search" style={{ position: 'absolute', right: 2, top: 1, width: 42, height: 42, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: '#6B7280' }}><X size={16} /></button>}
+            </div>
+          </div>
           {path.length > 0 && (
             <button
               onClick={() => {
@@ -204,29 +261,26 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               {counts?.[''] != null && <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600' }}>({counts['']})</span>}
             </button>
 
-            {currentCategories.map((cat) => {
+            {visibleCategories.map((cat) => {
               const deptColor = DEPT_COLORS[cat.id] || '#374151';
               const Icon = cat.icon ? LUCIDE_ICON_MAP[cat.icon] : null;
-              const isTopLevel = path.length === 0;
+              const isTopLevel = cat.navPath.length === 1;
+              const count = lookupProductCount(counts, cat.navPath, categories);
               return (
-                <button
-                  key={cat.id}
-                  onClick={() => handleSelect(cat.id)}
+                <div
+                  key={cat.navPath.join('/')}
                   style={{
                     width: '100%',
-                    padding: '14px 16px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    border: 'none',
                     background: 'none',
                     borderBottom: '1px solid #F3F4F6',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    gap: '12px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                  <button
+                    onClick={() => { navigate(cat.navPath); onClose(); }}
+                    style={{ minHeight: 52, padding: '8px 8px 8px 16px', display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer' }}
+                  >
                     {isTopLevel && Icon && (
                       <span style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -237,21 +291,29 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
                       </span>
                     )}
                     <span style={{ fontSize: '15px', fontWeight: '600', color: '#111827', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
-                    {lookupProductCount(counts, [...path, cat.id], categories) != null && (
+                    {count != null && (
                       <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600', flexShrink: 0 }}>
-                        {lookupProductCount(counts, [...path, cat.id], categories)}
+                        {count}
                       </span>
                     )}
-                  </div>
-                  {cat.children && cat.children.length > 0 && <ChevronRight size={18} color="#D1D5DB" style={{ flexShrink: 0 }} />}
-                </button>
+                  </button>
+                  {cat.children && cat.children.length > 0 && (
+                    <button
+                      onClick={() => { setCategoryQuery(''); navigate(cat.navPath); }}
+                      aria-label={`Browse subcategories in ${cat.label}`}
+                      style={{ width: 52, minWidth: 52, height: 52, display: 'grid', placeItems: 'center', border: 0, borderLeft: '1px solid #F3F4F6', background: 'transparent', cursor: 'pointer' }}
+                    >
+                      <ChevronRight size={19} color="#6B7280" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
 
-          {currentCategories.length === 0 && (
+          {visibleCategories.length === 0 && (
             <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>You&apos;re inside {currentLabel}</div>
+              <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>{normalizedQuery ? 'No matching categories.' : `You're inside ${currentLabel}`}</div>
               <button
                 onClick={onClose}
                 style={{
