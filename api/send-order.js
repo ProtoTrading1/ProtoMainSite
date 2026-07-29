@@ -10,6 +10,7 @@ import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './
 import { validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
+import { enqueueOrderNotificationJobs } from './_order-notification-enqueue.js';
 
 // Brevo rejects a message over ~10 MB, and base64 inflates the PDF by ~33%.
 // Stay well under so the HTML body and headers always fit.
@@ -82,6 +83,10 @@ export const MAX_ORDER_LINES = 250;
 export const MAX_QTY_PER_LINE = 100000;
 export const TEAM_EMAIL_TIMEOUT_MS = 15000;
 export const TEAM_EMAIL_MAX_ATTEMPTS = 2;
+
+export function isDurableNotificationQueueEnabled(env = process.env) {
+  return String(env?.ORDER_NOTIFICATION_QUEUE_ENABLED || '').trim().toLowerCase() === 'true';
+}
 
 export function isRetryableBrevoStatus(status) {
   const code = Number(status);
@@ -1081,6 +1086,61 @@ export default async function handler(req, res) {
   const orderId = String(captured.id);
   const orderNumber = cleanText(captured.order_number);
 
+  // Durable queue mode returns as soon as the verified order and its complete
+  // atomic notification batch are stored. PDF generation and Brevo are
+  // then handled by short background workers with leases and retries. If the
+  // additive queue migration or enqueue step is unavailable, retain the
+  // proven synchronous path below as a safe rollout fallback.
+  if (isDurableNotificationQueueEnabled()) {
+    try {
+      const queuedJobs = await enqueueOrderNotificationJobs(orderId);
+      if (Array.isArray(queuedJobs) && queuedJobs.length > 0) {
+        // Premium tier remains an order-side business rule rather than a
+        // notification job. It is best-effort and can never fail checkout.
+        try {
+          const storedItems = Array.isArray(captured?.items) ? captured.items : [];
+          const serverTotal = storedItems.reduce(
+            (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.qty || 0),
+            0,
+          );
+          const qualifies = serverTotal > 4000
+            && storedItems.some((item) => Number(item.qty || 0) > 10);
+          if (qualifies && captured?.customer_id) {
+            await portal
+              .from('customers')
+              .update({ tier: 'premium' })
+              .eq('id', captured.customer_id)
+              .eq('tier', 'regular');
+          }
+        } catch (tierError) {
+          console.error('send-order: queued premium tier check failed:', tierError?.message || tierError);
+        }
+
+        return res.status(200).json({
+          success: true,
+          orderId,
+          orderNumber,
+          dbCaptureFailed: false,
+          notificationQueued: true,
+          queuedJobs: queuedJobs.length,
+          emailDeliveryPending: true,
+          emailDeliveryFailed: false,
+          emailFailReason: null,
+          pdfAttached: false,
+          emailMessageId: null,
+          notify: {
+            queued: true,
+            jobCount: queuedJobs.length,
+          },
+          notifyWarning: null,
+        });
+      }
+      console.error('send-order: durable queue returned no jobs; using synchronous fallback');
+    } catch (queueError) {
+      console.error('send-order: durable queue enqueue failed; using synchronous fallback:', queueError?.message || queueError);
+    }
+  }
+
   // Generate the polished order sheet first. If that renderer fails, fall back
   // to the independently maintained fulfilment PDF so the operational email is
   // never silently sent without an attachment.
@@ -1222,7 +1282,7 @@ export default async function handler(req, res) {
     // concurrency during a burst of checkouts. Each is individually best-effort:
     // a failure is logged and never fails the order.
     const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
-      // 1) Team WhatsApp notification (+ stored fulfilment PDF).
+      // 1) Store the fulfilment PDF and complete the internal email audit.
       runOrderTeamNotify(orderId, {
         emailSent: !emailDeliveryFailed,
         emailRecipients: notifyEmails,
@@ -1286,7 +1346,7 @@ export default async function handler(req, res) {
     }
 
     // Complete the delivery audit only after the parallel send operations have
-    // settled. Merging with the notification log preserves the WhatsApp/PDF
+    // settled. Merging with the notification log preserves the PDF/internal-email
     // evidence written by runOrderTeamNotify while adding the independently
     // delivered customer acknowledgement result.
     try {
@@ -1319,7 +1379,7 @@ export default async function handler(req, res) {
     emailMessageId,
     notify: notifyResult,
     notifyWarning: notifyResult && !notifyResult.ok
-      ? notifyResult.statusBlockedReason || 'WhatsApp team notification did not reach everyone'
+      ? notifyResult.statusBlockedReason || 'Order delivery recording is incomplete'
       : null,
   });
 }
