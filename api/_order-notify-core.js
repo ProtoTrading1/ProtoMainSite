@@ -168,6 +168,8 @@ export async function runOrderTeamNotify(orderId, {
   }
 
   const recipients = users
+    // Existing records do not have orderAlerts, so only an explicit false opts out.
+    .filter((u) => u?.orderAlerts !== false)
     .map((u) => {
       const phone = normalizeWhatsapp(u.whatsapp || u.phone || '');
       return { name: String(u.name || '').trim(), phone };
