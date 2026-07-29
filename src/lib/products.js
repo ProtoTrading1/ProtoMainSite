@@ -38,6 +38,7 @@ let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
 const _identifierRequests = new Map();
+const _browseRequests = new Map();
 let _categoryCountsMemo = new WeakMap();
 let _persistentCachePromise = null;
 
@@ -194,7 +195,10 @@ function startCatalogFetch() {
       _cache = products;
       saveToLocalCache(products);
       void saveToIndexedCache(products);
-      if (hadPrior) emitCatalogRefresh();
+      if (hadPrior) {
+        _browseRequests.clear();
+        emitCatalogRefresh();
+      }
       return _cache;
     })
     .catch((err) => {
@@ -227,6 +231,7 @@ export function invalidateProductCache() {
   _sortOrdersCachedAt = 0;
   _sortOrdersPromise = null;
   _identifierRequests.clear();
+  _browseRequests.clear();
   _categoryCountsMemo = new WeakMap();
   _persistentCachePromise = null;
   invalidateFeaturedCache();
@@ -595,6 +600,25 @@ export async function fetchIdentifierProducts(query) {
   return request;
 }
 
+async function fetchBrowseProducts(categoryPath) {
+  const key = categoryPath.join('/');
+  const cached = _browseRequests.get(key);
+  if (cached) return cached;
+
+  const request = fetchJsonWithTimeout(
+    `/api/products?browsePath=${encodeURIComponent(key)}`,
+    8000,
+    { cache: 'default', authenticated: true },
+  )
+    .then((products) => (Array.isArray(products) ? products : []))
+    .catch(async () => {
+      const all = await getAllCached();
+      return applyPathFilter(all, categoryPath);
+    });
+  _browseRequests.set(key, request);
+  return request;
+}
+
 export async function fetchProductPage({
   page = 1,
   pageSize = 60,
@@ -645,10 +669,16 @@ export async function fetchProductPage({
     }
   }
 
-  let products = await getAllCached();
+  let products = categoryPath.length && !hasSearch && collection === 'all'
+    ? await fetchBrowseProducts(categoryPath)
+    : await getAllCached();
   const pool = products;
   products = applyCollection(products, collection, specialIds);
-  if (!hasSearch) products = applyPathFilter(products, categoryPath);
+  // The fast browse endpoint already returns this branch only. The local
+  // fallback and non-category paths still use the shared client filter.
+  if (!hasSearch && !(categoryPath.length && collection === 'all')) {
+    products = applyPathFilter(products, categoryPath);
+  }
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
 
   if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
