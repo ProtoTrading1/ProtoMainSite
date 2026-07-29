@@ -6,11 +6,11 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
+import CartFlyAnimation from './components/CartFlyAnimation';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
 // Lazy-loaded: only fetched when the user actually triggers these interactions.
-const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimation'), 'app-cart-fly-animation');
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
@@ -592,7 +592,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setDrawerPeek(false);
   }, [cartItems.length, cartLastActivityAt, cartClock, clearCart]);
 
-  const addToCart = (product, qty, buttonPos = null) => {
+  const addToCart = useCallback((product, qty, buttonPos = null) => {
     const maxQty = cartQtyCapForProduct(product);
     if (maxQty <= 0) return;
     const requestedQty = normalizeCartQtyInput(qty);
@@ -618,9 +618,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setDrawerPeek(true);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
     drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
-  };
+  }, [dismissWelcome, markCartActivity, searchQuery]);
 
-  const updateQty = (id, qty) => {
+  const updateQty = useCallback((id, qty) => {
     const requestedQty = normalizeCartQtyInput(qty);
     setCartItems((prev) => prev.flatMap((item) => {
       if (item.product.id !== id) return [item];
@@ -630,11 +630,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       return [{ ...item, qty: nextQty }];
     }));
     markCartActivity();
-  };
-  const removeFromCart = (id) => {
+  }, [markCartActivity]);
+
+  const removeFromCart = useCallback((id) => {
     setCartItems((prev) => prev.filter((i) => i.product.id !== id));
     markCartActivity();
-  };
+  }, [markCartActivity]);
 
   const cartQtyMap = useMemo(() => {
     const map = {};
@@ -642,10 +643,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return map;
   }, [cartItems]);
 
-  const handleCartQtyChange = (product, newQty) => {
+  const handleCartQtyChange = useCallback((product, newQty) => {
     if (newQty <= 0) removeFromCart(product.id);
     else updateQty(product.id, newQty);
-  };
+  }, [removeFromCart, updateQty]);
 
   const handleShortcut = (id) => {
     if (id === 'start') {
@@ -982,7 +983,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
       {reorderModal && <Suspense fallback={null}><ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
 
-      {flyAnim && <Suspense fallback={null}><CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} /></Suspense>}
+      {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
 
       {/* Global product preview — triggered from strip cards in category landings */}
       {previewProduct && (
