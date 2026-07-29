@@ -316,7 +316,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   useEffect(() => {
     if (!mobileCartOpen) return undefined;
     const dialog = mobileCartDialogRef.current;
-    window.requestAnimationFrame(() => dialog?.querySelector('[data-cart-close]')?.focus());
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    const focusFrame = window.requestAnimationFrame(() => dialog?.querySelector('[data-cart-close]')?.focus());
     const onGlobalEscape = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
@@ -336,6 +340,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
         first.focus();
+      } else if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onGlobalEscape);
@@ -343,6 +350,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return () => {
       document.removeEventListener('keydown', onGlobalEscape);
       document.removeEventListener('keydown', onTrapFocus);
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
     };
   }, [mobileCartOpen, closeMobileCart]);
 
@@ -939,7 +949,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
 
   return (
-    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
@@ -1092,6 +1102,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-cart-sheet-title"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mobile-cart-sheet-handle" />
