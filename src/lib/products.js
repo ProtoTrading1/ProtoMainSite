@@ -39,9 +39,13 @@ let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
 const _identifierRequests = new Map();
 let _categoryCountsMemo = new WeakMap();
+let _persistentCachePromise = null;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
+const IDB_NAME = 'proto-catalogue';
+const IDB_STORE = 'catalogue';
+const IDB_KEY = 'approved-customer-v1';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
@@ -73,9 +77,11 @@ function preloadCatalogImages(products, limit = 60) {
 
 /** Start catalogue fetch early (e.g. on login) so data is ready before App mounts. */
 export function prefetchCatalog() {
-  const stale = loadFromLocalCache();
-  if (stale?.length) preloadCatalogImages(stale);
   void getAllCached().then((products) => preloadCatalogImages(products));
+  // Category pages need the merchandising order as well as the product rows.
+  // Start that independent request during portal boot instead of making the
+  // customer's first department click wait for it.
+  void getSortOrders();
   // The home grid is Featured — resolve it now so the first screen after
   // login paints without a loading pass.
   void fetchFeaturedCatalogProducts().catch(() => {});
@@ -91,6 +97,64 @@ function loadFromLocalCache() {
     const { data, ts } = JSON.parse(raw);
     return (Date.now() - ts < LS_TTL) ? data : null;
   } catch { return null; }
+}
+
+function openCatalogueDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function saveToIndexedCache(data) {
+  const db = await openCatalogueDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).put({ data, ts: Date.now() }, IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
+}
+
+async function loadFromIndexedCache() {
+  const db = await openCatalogueDb();
+  if (!db) return null;
+  const entry = await new Promise((resolve) => {
+    const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => resolve(null);
+  });
+  db.close();
+  if (!entry || Date.now() - Number(entry.ts || 0) >= LS_TTL) return null;
+  return Array.isArray(entry.data) ? entry.data : null;
+}
+
+async function loadFromPersistentCache() {
+  const local = loadFromLocalCache();
+  if (local?.length) return local;
+  return loadFromIndexedCache();
+}
+
+async function clearIndexedCache() {
+  const db = await openCatalogueDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).delete(IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
@@ -129,6 +193,7 @@ function startCatalogFetch() {
       const hadPrior = !!_cache;
       _cache = products;
       saveToLocalCache(products);
+      void saveToIndexedCache(products);
       if (hadPrior) emitCatalogRefresh();
       return _cache;
     })
@@ -139,17 +204,19 @@ function startCatalogFetch() {
 }
 
 function getAllCached() {
-  if (!_cache) {
-    const stale = loadFromLocalCache();
-    if (stale) _cache = stale;
+  if (_cache) {
+    if (!_loadPromise) _loadPromise = startCatalogFetch();
+    return Promise.resolve(_cache);
   }
 
-  if (!_loadPromise) {
-    _loadPromise = startCatalogFetch();
+  if (!_persistentCachePromise) {
+    _persistentCachePromise = loadFromPersistentCache().then((stale) => {
+      if (stale?.length && !_cache) _cache = stale;
+      if (!_loadPromise) _loadPromise = startCatalogFetch();
+      return _cache ? Promise.resolve(_cache) : _loadPromise;
+    });
   }
-
-  if (_cache) return Promise.resolve(_cache);
-  return _loadPromise;
+  return _persistentCachePromise;
 }
 
 export function invalidateProductCache() {
@@ -161,8 +228,10 @@ export function invalidateProductCache() {
   _sortOrdersPromise = null;
   _identifierRequests.clear();
   _categoryCountsMemo = new WeakMap();
+  _persistentCachePromise = null;
   invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch {}
+  void clearIndexedCache();
 }
 
 async function getSortOrders() {
