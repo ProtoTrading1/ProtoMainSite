@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
-import { resetPassword, signIn, signUp } from '../lib/auth';
+import { resetPassword, signIn } from '../lib/auth';
 import ProtoLogo from './ProtoLogo';
 
 export default function LoginModal({ onLogin, onClose, onApply }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -36,23 +35,22 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
         setMode('login');
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
-        if (mode === 'login') {
-          const { session } = await signIn(email, password);
-          if (session) await onLogin(session);
-        } else {
-          await signUp(email, password, name);
-          setInfo('Account created. Check your email to confirm, then log in.');
-          setMode('login');
-        }
+        const { session } = await signIn(email, password);
+        if (session) await onLogin(session);
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed.');
+      const raw = err?.message || 'Authentication failed.';
+      // Email confirmation was removed — accounts are gated by ADMIN APPROVAL.
+      // Supabase can still answer "Email not confirmed" for an account created
+      // before that change, and a pending account is not an error the customer
+      // can act on, so both read as "we are still reviewing you".
+      setError(/email not confirmed|not confirmed|pending approval|not approved/i.test(raw)
+        ? 'Proto is still reviewing your application. We will notify you when you have been approved.'
+        : raw);
     } finally {
       setLoading(false);
     }
   };
-
-  const switchMode = () => { setMode(m => m === 'login' ? 'signup' : 'login'); setError(''); setInfo(''); };
 
   return (
     <div
@@ -74,8 +72,8 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Heading */}
           <div className="lm-heading">
-            <h2>{mode === 'login' ? 'Welcome back.' : mode === 'forgot' ? 'Reset password.' : 'Create account.'}</h2>
-            <p>{mode === 'login' ? 'Log in to your trade account.' : mode === 'forgot' ? 'Enter your email and we\'ll send a reset link.' : 'Register for trade portal access.'}</p>
+            <h2>{mode === 'forgot' ? 'Reset password.' : 'Welcome back.'}</h2>
+            <p>{mode === 'forgot' ? 'Enter your email and we\'ll send a reset link.' : 'Log in to your trade account.'}</p>
           </div>
 
           {/* Alerts */}
@@ -84,19 +82,6 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Form */}
           <form className="lm-form" onSubmit={handleSubmit}>
-            {mode === 'signup' && (
-              <div className="lm-field">
-                <label>Business / Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name or business name"
-                  autoFocus
-                />
-              </div>
-            )}
-
             <div className="lm-field">
               <label>Email address</label>
               <div className="lm-input-wrap">
@@ -106,7 +91,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@business.co.za"
-                  autoFocus={mode === 'login' || mode === 'forgot'}
+                  autoFocus
                   required
                 />
               </div>
@@ -141,9 +126,8 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
             <button type="submit" className="lm-submit" disabled={loading}>
               {loading
                 ? (mode === 'forgot' ? 'Sending…' : 'Signing in…')
-                : mode === 'login' ? 'Log in'
                 : mode === 'forgot' ? 'Send reset link'
-                : 'Create account'}
+                : 'Log in'}
             </button>
           </form>
 

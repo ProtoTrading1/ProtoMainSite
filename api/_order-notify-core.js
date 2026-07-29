@@ -17,11 +17,16 @@ import {
   buildSessionOrderMessage,
 } from './_wati-notify.js';
 import { orderToken } from './_order-token.js';
+import { APP_ORIGIN } from './_public-site-url.js';
 
 const USERS_FILE = 'fulfillment/users.json';
 const ORDER_TEMPLATE = process.env.WATI_ORDER_TEMPLATE || 'proto_order_notis';
 const ORDER_TEMPLATE_CATEGORY = (process.env.WATI_ORDER_TEMPLATE_CATEGORY || 'UTILITY').toUpperCase();
-const MAIN_PORTAL_URL = (process.env.MAIN_PORTAL_URL || process.env.VITE_APP_URL || 'https://protoportal-main.vercel.app').replace(/\/$/, '');
+// This builds the TEAM's order-PDF download link, not a customer link, so it
+// follows APP_ORIGIN — the host that actually serves /api/orders/:id/pdf. The
+// old default was the raw Vercel host; pointing it at the migration target
+// instead would 404 until DNS moves and leave the team unable to open an order.
+const MAIN_PORTAL_URL = (process.env.MAIN_PORTAL_URL || process.env.VITE_APP_URL || APP_ORIGIN).replace(/\/$/, '');
 
 async function markHandedOver(orderId) {
   const supabase = getPortalAdminClient();

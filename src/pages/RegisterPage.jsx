@@ -295,11 +295,11 @@ export default function RegisterPage({ onLogin, standalone = false }) {
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
-                <h3>{instantAccess ? 'You\'re approved — verify your email' : 'Application received'}</h3>
+                <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
                 <p>
                   {instantAccess
-                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''}. We sent a secure verification link to {email.trim()}; click it before logging in.</>
-                    : <>Thank you, {contactName.trim()}. We sent a verification link to {email.trim()}. Please verify your address while we review your application.</>}
+                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — log in with {email.trim()} to access the catalogue.</>
+                    : <>Thank you, {contactName.trim()}. Proto is reviewing your application and we will notify {email.trim()} when you have been approved.</>}
                 </p>
                 {!standalone && (
                   <button type="button" onClick={onLogin}>

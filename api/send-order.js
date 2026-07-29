@@ -8,6 +8,12 @@ import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { validatePromoCode } from './_promo-codes.js';
+import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
+import { orderToken } from './_order-token.js';
+
+// Brevo rejects a message over ~10 MB, and base64 inflates the PDF by ~33%.
+// Stay well under so the HTML body and headers always fit.
+export const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -664,6 +670,9 @@ export function buildOrderEmailHtml({
   items = [],
   totals,
   promo,
+  // Optional banner rendered above the line items — used to explain a missing
+  // PDF attachment and offer the download link instead.
+  notice = '',
 }) {
   const isTeam = audience === 'team';
   const name = escapeHtml(cleanText(customer?.name, 'there'));
@@ -752,12 +761,13 @@ export function buildOrderEmailHtml({
 <tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td align="center" style="padding:28px 34px 24px;background:#ffffff;border-bottom:1px solid #e5e7eb;">
   <div style="display:inline-block;background:#000000;padding:4px 8px;border-radius:9px;margin-bottom:18px;line-height:0;overflow:hidden;">
-    <img src="https://site.proto.co.za/proto-trading-online-email.png" alt="Proto Trading Online" width="280" height="77" style="display:block;width:280px;max-width:100%;height:auto;border:0;" />
+    <img src="${PUBLIC_ASSET_URL}/proto-trading-online-email.png" alt="Proto Trading Online" width="280" height="77" style="display:block;width:280px;max-width:100%;height:auto;border:0;" />
   </div>
   <h1 style="margin:0;color:#0f172a;font-size:28px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">${heading}</h1>
   <p style="margin:10px 0 0;color:#475569;font-size:14px;line-height:1.6;">${subheading}${ref ? ` &nbsp;·&nbsp; <span style="color:#c40000;font-weight:800;">${ref}</span>` : ''}</p>
 </td></tr>
 <tr><td style="padding:34px 32px 30px;background:#ffffff;">
+  ${notice}
   ${intro}
   ${metaRow}
   ${contactBlock}
@@ -1083,23 +1093,52 @@ export default async function handler(req, res) {
     }
   }
 
-  const attachment = pdfBuffer
+  // Brevo caps a message at ~10 MB and `content` is base64, which inflates the
+  // PDF by ~33%. A large order (hundreds of lines, each with a product image)
+  // can blow past that; Brevo then rejects the whole send and the team receives
+  // NOTHING — the worst possible outcome, and it lands hardest on the biggest
+  // orders. Cap the attachment well under the limit and fall back to a signed
+  // download link rather than losing the notification.
+  const pdfTooLarge = Boolean(pdfBuffer) && pdfBuffer.length > MAX_ATTACHMENT_BYTES;
+  if (pdfTooLarge) {
+    console.warn('send-order: order PDF too large to attach, sending download link instead', {
+      orderNumber,
+      pdfBytes: pdfBuffer.length,
+      limitBytes: MAX_ATTACHMENT_BYTES,
+      lineCount: orderItems.length,
+    });
+  }
+
+  const attachment = pdfBuffer && !pdfTooLarge
     ? [{
         name: `proto-order-${cleanText(orderNumber, String(Date.now()))}.pdf`,
         content: pdfBuffer.toString('base64'),
       }]
     : undefined;
 
+  // Signed, per-order link to the stored PDF. The route regenerates the file if
+  // it is missing, so this works even when PDF generation failed a moment ago.
+  const pdfLink = orderId && orderToken(orderId)
+    ? `${APP_ORIGIN}/api/orders/${orderId}/pdf?k=${orderToken(orderId)}`
+    : null;
+
+  // The email ALWAYS goes out. Previously a missing attachment skipped the send
+  // entirely, so a PDF failure silently cost the team the whole order.
+  const pdfNotice = attachment
+    ? ''
+    : `<p style="margin:0 0 18px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412;font-size:14px;line-height:1.6;">
+        <strong>${pdfTooLarge ? 'This order is too large to attach as a PDF.' : 'The order PDF could not be generated automatically.'}</strong><br/>
+        ${pdfLink
+          ? `Every line is listed below, and the full PDF is here: <a href="${pdfLink}" style="color:#c40000;font-weight:700;">Download order ${escapeHtml(cleanText(orderNumber, ''))}</a>`
+          : 'Every line is listed below — open the order in the admin portal for the PDF.'}
+      </p>`;
+
   let emailDeliveryFailed = false;
   let emailFailReason = null;
   let emailMessageId = null;
   let emailAttemptCount = 0;
   let emailProviderStatus = null;
-  if (!attachment) {
-    emailDeliveryFailed = true;
-    emailFailReason = 'Order PDF could not be generated';
-    console.error('send-order: team email not sent because no PDF attachment was available:', orderNumber);
-  } else {
+  {
     const teamEmailResult = await sendTeamEmailWithRetry({
       sender: {
         name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
@@ -1107,8 +1146,10 @@ export default async function handler(req, res) {
       },
       to: notifyEmails.map((email) => ({ email })),
       replyTo: customer.email ? { email: customer.email } : undefined,
-      subject: `Proto Trading Quote Request - ${cleanText(customer.name, 'Trade customer')}`,
-      htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo }),
+      // Reads as what it is — a new order from a customer — and carries the
+      // order number so the team can find it without opening the mail.
+      subject: `New order received from ${cleanText(customer.name, 'a trade customer')}${orderNumber ? ` — ${orderNumber}` : ''}`,
+      htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo, notice: pdfNotice }),
       attachment,
       // Brevo applies this key when a timed-out request is retried, preventing
       // the same order email from being delivered twice.
@@ -1126,8 +1167,10 @@ export default async function handler(req, res) {
         orderNumber,
         recipients: notifyEmails,
         lineCount: orderItems.length,
-        pdfAttached: true,
-        pdfBytes: pdfBuffer.length,
+        pdfAttached: Boolean(attachment),
+        pdfBytes: pdfBuffer?.length ?? 0,
+        pdfTooLarge,
+        pdfLinkSent: !attachment && Boolean(pdfLink),
         pdfSource,
         attemptCount: emailAttemptCount,
         providerStatus: emailProviderStatus,

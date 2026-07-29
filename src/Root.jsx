@@ -285,7 +285,7 @@ export default function Root() {
           <div style={{ fontSize: '48px' }}>⏳</div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
           <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
-            Your trade account is pending admin approval. You will be notified once approved.
+            Proto is still reviewing your application. We will notify you when you have been approved.
           </p>
           <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
             Log Out
@@ -381,7 +381,7 @@ export default function Root() {
         <div style={{ fontSize: '48px' }}>⏳</div>
         <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
         <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
-          Your trade account is pending admin approval. You will be notified once approved.
+          Proto is still reviewing your application. We will notify you when you have been approved.
         </p>
         <button onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
           Log Out

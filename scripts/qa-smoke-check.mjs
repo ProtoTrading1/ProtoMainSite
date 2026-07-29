@@ -130,10 +130,14 @@ assert.match(apiProductsSrc, /orderableWhenOutOfStock: !!row\.to_order/, 'produc
 assert.match(cardSrc, /Available to order/, 'card shows an "Available to order" state/disclaimer for to_order products');
 console.log('✓ To-order: zero-stock orderability is opt-in (to_order)');
 
-// Stale fallback removed — last-ditch catalogue uses the regenerated file
+// Static catalogue snapshots are GONE (487d5b6): a file under public/ is served
+// unauthenticated, so shipping the trade catalogue that way exposed wholesale
+// pricing to anyone with the URL. The catalogue must come from the authenticated
+// API only — no client-side fallback to a static file.
 const appSrc = readFileSync(join(root, 'src/App.jsx'), 'utf8');
-assert.match(appSrc, /fetch\('\/products\.json'\)/, 'fallback fetches regenerated products.json');
+assert.doesNotMatch(appSrc, /fetch\('\/products\.json'\)/, 'no fetch of the public products.json snapshot');
 assert.doesNotMatch(appSrc, /stockProducts\.json'\)/, 'no fetch of frozen stockProducts.json');
+assert.ok(!existsSync(join(root, 'public/products.json')), 'public products.json snapshot deleted');
 assert.ok(!existsSync(join(root, 'public/stockProducts.json')), 'frozen stockProducts.json deleted');
 console.log('✓ Stale catalogue fallback removed');
 
@@ -191,20 +195,65 @@ for (const f of ['api/products.js', 'scripts/generate-catalog.js']) {
 }
 console.log('✓ Unlimited category depth (subcategory_extra) reaches the storefront');
 
-// Email revamp — Email 1 (reset) points at site.proto.co.za; Email 2 wording;
-// Email 5 (customer order acknowledgement) sent on order placement.
+// Email revamp — every clickable link in outgoing mail resolves through
+// _public-site-url.js so the whole estate repoints with one env var; Email 2
+// wording; Email 5 (customer order acknowledgement) sent on order placement.
+const publicUrlSrc = readFileSync(join(root, 'api/_public-site-url.js'), 'utf8');
+assert.match(publicUrlSrc, /EMAIL_LINK_URL \|\| 'https:\/\/proto\.co\.za'/, 'email links default to proto.co.za');
+// The legacy SITE_URL is set to site.proto.co.za in production. If email LINKS
+// ever inherit it again, every emailed link silently returns to the old host.
+assert.doesNotMatch(publicUrlSrc, /PUBLIC_SITE_URL = \(process\.env\.SITE_URL/, 'email links do not inherit the legacy SITE_URL');
 const resetSrc = readFileSync(join(root, 'api/send-reset-email.js'), 'utf8');
-assert.match(resetSrc, /SITE_URL \|\| 'https:\/\/site\.proto\.co\.za'/, 'reset link defaults to site.proto.co.za');
+assert.match(resetSrc, /PUBLIC_SITE_URL/, 'reset link is built from PUBLIC_SITE_URL');
 assert.doesNotMatch(resetSrc, /protoportal-main\.vercel\.app/, 'reset email no longer references the old vercel host');
+const notifySrc = readFileSync(join(root, 'api/_order-notify-core.js'), 'utf8');
+assert.doesNotMatch(notifySrc, /'https:\/\/protoportal-main\.vercel\.app'/, 'order-notify PDF links no longer default to the old vercel host');
 const registerSrc = readFileSync(join(root, 'api/register-trade.js'), 'utf8');
 assert.match(registerSrc, /approve your request within 24 hours/, 'application-received email states the 24-hour window');
 const sendOrderSrc = readFileSync(join(root, 'api/send-order.js'), 'utf8');
 assert.match(sendOrderSrc, /async function sendCustomerOrderAck/, 'order flow acknowledges the customer');
 assert.match(sendOrderSrc, /We have received your order/, 'customer order ack says we received your order');
-assert.match(sendOrderSrc, /await sendCustomerOrderAck\(\{ customer, itemCount: items\.length, toEmail: user\?\.email \}\)/, 'order handler sends the ack to the AUTHENTICATED account email');
+// Match the property, not the exact argument list — the call has grown extra
+// fields (order number, totals, promo) and a literal-string assertion breaks on
+// every legitimate edit while proving nothing about the security rule.
+assert.match(sendOrderSrc, /sendCustomerOrderAck\(\{[^}]*toEmail: user\?\.email/, 'order handler sends the ack to the AUTHENTICATED account email');
 assert.match(sendOrderSrc, /const to = cleanText\(toEmail\)/, 'ack recipient is the verified email, never the client-supplied customer.email');
 assert.match(sendOrderSrc, /signal: AbortSignal\.timeout\(5000\)/, 'ack email is time-bounded so it cannot stall the order response');
 console.log('✓ Email revamp (portal): reset URL, received wording, order acknowledgement (verified recipient + bounded)');
+
+// Email confirmation is REMOVED — accounts are created already-confirmed and
+// gated by admin approval instead. A regression here silently locks every new
+// signup out behind a verification mail nobody sends.
+assert.match(registerSrc, /email_confirm: true/, 'signup creates the account already confirmed');
+assert.doesNotMatch(registerSrc, /generateLink|sendVerificationEmail|buildVerificationHtml/, 'no email-confirmation round-trip remains in signup');
+
+// Every order notification must reach the whole team; config may add but never
+// drop a required address.
+const orderRecipientsSrc = readFileSync(join(root, 'api/_order-email-recipients.js'), 'utf8');
+for (const addr of ['online@proto.co.za', 'george@proto.co.za', 'danieljoffeinfo@gmail.com']) {
+  assert.match(orderRecipientsSrc, new RegExp(addr.replace('.', '\\.')), `order notifications include ${addr}`);
+}
+assert.match(orderRecipientsSrc, /DEFAULT_NOTIFY_EMAILS,\s*\.\.\.extra/, 'ORDER_NOTIFY_EMAILS adds to the defaults instead of replacing them');
+assert.match(sendOrderSrc, /subject: `New order received from/, 'team order email is titled as a new order from a customer');
+// A missing/oversized PDF must never cost the team the whole notification.
+assert.doesNotMatch(sendOrderSrc, /team email not sent because no PDF attachment/, 'the team email is no longer skipped when the PDF is unavailable');
+assert.match(sendOrderSrc, /MAX_ATTACHMENT_BYTES/, 'oversized order PDFs are capped instead of being sent and rejected');
+assert.match(sendOrderSrc, /\/api\/orders\/\$\{orderId\}\/pdf\?k=/, 'a signed PDF download link replaces a dropped attachment');
+
+// Unapproved logins must read as "still reviewing", never as an email-confirmation error.
+// LoginModal is the LIVE login surface (Root renders it; the old
+// pages/LoginPage.jsx was unreferenced and is deleted) — assert against it, or
+// the wording fix lands in a file nobody sees.
+const loginSrc = readFileSync(join(root, 'src/components/LoginModal.jsx'), 'utf8');
+assert.match(loginSrc, /Proto is still reviewing your application/, 'login maps pending accounts to the review message');
+assert.doesNotMatch(loginSrc, /Check your email to confirm/, 'login surface never tells the customer to confirm their email');
+// No client-side account creation: it would bypass the trade application and
+// trigger Supabase's own confirmation mail.
+const authLibSrc = readFileSync(join(root, 'src/lib/auth.js'), 'utf8');
+assert.doesNotMatch(authLibSrc, /supabase\.auth\.signUp/, 'no raw client-side supabase signUp');
+const rootSrc = readFileSync(join(root, 'src/Root.jsx'), 'utf8');
+assert.match(rootSrc, /Proto is still reviewing your application/, 'pending-approval gate uses the review message');
+console.log('✓ Signup: no email confirmation, pending-review wording, full order recipient list');
 
 // Phase two — checkout clarity, search debounce, delivery modal, category skeleton
 const checkoutModalSrc = readFileSync(join(root, 'src/components/CheckoutModal.jsx'), 'utf8');
@@ -215,7 +264,9 @@ assert.match(indexCssSrc, /\.checkout-modal-btn--confirm\s*\{[^}]*#16a34a/, 'con
 assert.match(indexCssSrc, /\.checkout-modal-btn--danger\s*\{[^}]*#dc2626/, 'keep-shopping button is red');
 const headerSrc = readFileSync(join(root, 'src/components/Header.jsx'), 'utf8');
 assert.match(headerSrc, /const \[inputValue, setInputValue\] = useState\(searchQuery\)/, 'desktop search input is local state (no per-keystroke App re-render)');
-assert.match(headerSrc, /setTimeout\(\(\) => setSearchQuery\(val\), 200\)/, 'typed value is pushed to the parent on a debounce');
+// The debounce interval is a tuning knob, not a contract — assert that the
+// typed value reaches the parent on a timer at all, not the exact milliseconds.
+assert.match(headerSrc, /setTimeout\(\(\) => setSearchQuery\(val\), \d+\)/, 'typed value is pushed to the parent on a debounce');
 assert.match(headerSrc, /value=\{inputValue\}/, 'the desktop input renders the local value');
 assert.doesNotMatch(headerSrc, /value=\{searchQuery\}\n\s*onFocus=\{focusSearch\}/, 'desktop input no longer bound directly to the committed searchQuery');
 const drawerSrc = readFileSync(join(root, 'src/components/Drawer.jsx'), 'utf8');

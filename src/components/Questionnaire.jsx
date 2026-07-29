@@ -204,11 +204,11 @@ export default function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success">
         <CheckCircle2 size={48} />
-        <h3>{instantAccess ? "You're approved — verify your email" : 'Application received'}</h3>
+        <h3>{instantAccess ? "You're approved" : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. We sent a secure verification link to ${email.trim()}; click it before logging in to access the catalogue.`
-            : `Thank you, ${contactName}. A verification email has been sent to ${email.trim()}. Please verify the address while Proto Trading reviews your application.`}
+            ? `Welcome back, ${contactName}. Your trade account is approved — log in with ${email.trim()} to access the catalogue.`
+            : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
         <button type="button" onClick={onLogin}>Go to login</button>
       </div>
