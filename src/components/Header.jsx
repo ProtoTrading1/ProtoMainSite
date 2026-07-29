@@ -503,7 +503,7 @@ function CartProgressIcon({ cartTotal, size = 22 }) {
   const clipY = ((1 - pct / 100) * size).toFixed(1);
   return (
     <div style={{ position: 'relative', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-      <ShoppingCart size={size} style={{ color: pct === 0 ? 'currentColor' : '#94a3b8' }} />
+      <ShoppingCart size={size} style={{ color: pct === 0 ? 'currentColor' : 'rgba(255,255,255,0.55)' }} />
       {pct > 0 && (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', clipPath: `inset(${clipY}px 0 0 0)` }}>
           <ShoppingCart size={size} style={{ color: '#8B1A1A' }} />
@@ -801,9 +801,13 @@ export default function Header({
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
   const [mobileInput, setMobileInput] = useState('');
+  const mobileSearchInputRef = useRef(null);
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
     setMobileInput('');
+    // The input is permanently mounted, so autoFocus never re-fires; focus it
+    // explicitly once the overlay is visible so the keyboard opens right away.
+    setTimeout(() => mobileSearchInputRef.current?.focus(), 60);
     setScanError('');
     setMobileActiveIdx(-1);
     void loadProductsOnce();
@@ -1118,7 +1122,7 @@ export default function Header({
       <div className={`mobile-action-search-drop${mobileSearchOpen ? ' open' : ''}`}>
         <Search size={16} color="rgba(255,255,255,0.5)" />
         <input
-          autoFocus={mobileSearchOpen}
+          ref={mobileSearchInputRef}
           type="search"
           placeholder="Search products, SKU or barcode…"
           value={mobileInput}

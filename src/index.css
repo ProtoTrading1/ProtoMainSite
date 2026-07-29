@@ -324,6 +324,36 @@ textarea:focus-visible,
 @media (max-width: 900px) {
   .mobile-tab-bar { display: grid; }
   .mobile-action-bar { display: none !important; }
+
+  /* Search opens as a FIXED overlay. It used to sit in the document flow at
+     the very top of the page, so tapping Search while scrolled down did
+     nothing visible — you had to scroll all the way up to find the input. */
+  .mobile-action-search-drop.open {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 620;
+    min-height: 64px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  }
+  .mobile-search-scan-error {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    z-index: 620;
+  }
+  .mobile-search-results {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 610;
+    max-height: none;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
 }
 
 /* ── Mobile category drawer ── */

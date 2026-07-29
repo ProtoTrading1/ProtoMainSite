@@ -632,9 +632,29 @@
     --logo-height: 38px;
   }
 
-  /* Mobile: keep order total visible in the top bar. */
+  /* Mobile: keep order total visible in the top bar. The cart button was
+     overflowing past the right edge — the row must shrink, never the cart. */
   .app-header--premium .header-actions {
     gap: 8px;
+    flex-shrink: 0;
+  }
+  /* The actions live inside .header-utilities. It was allowed to shrink, so
+     the icons and the cart spilled OUT of it past the right edge of the
+     screen — the cart rendered fully off-viewport. It keeps its content
+     width; the brand (flex: 1, overflow hidden) is what gives way. */
+  .app-header--premium .header-utilities {
+    flex-shrink: 0;
+    min-width: fit-content;
+  }
+  /* When space runs out the BRAND clips — the action icons and the cart
+     never compress or slide off-screen. */
+  .app-header--premium .brand-block {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .app-header--premium .cart-summary-amount {
+    white-space: nowrap;
   }
 
   .app-header--premium .header-icon-mobile--logout {
