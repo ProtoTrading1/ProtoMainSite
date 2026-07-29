@@ -958,7 +958,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
-            onClose={() => setCartDrawerOpen(false)}
+            onClose={() => {
+              // The drawer is visible when EITHER flag is set. Closing only
+              // cartDrawerOpen made the X a no-op during the auto-"peek" after
+              // adding an item — the "sometimes the X doesn't work" bug.
+              setCartDrawerOpen(false);
+              setDrawerPeek(false);
+              if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+            }}
           />
         </aside>
       </div>

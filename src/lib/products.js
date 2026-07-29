@@ -40,11 +40,12 @@ const SORT_ORDERS_TTL = 15_000;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
-// Bounds how stale the FIRST paint can be on a repeat visit. The background
-// revalidate (now a cheap 304 when unchanged) corrects it within a moment, but
-// this caps the window in which a shopper could see yesterday's price. Kept
-// long enough to still give instant repeat loads within a session.
-const LS_TTL = 60 * 60 * 1000;
+// Bounds how stale the FIRST paint can be on a repeat visit; the background
+// revalidate corrects it within moments. 24h so the common case — a customer
+// logging back in the next morning — still paints the catalogue instantly
+// instead of staring at a spinner while 6MB re-downloads. Logout clears the
+// cache (Root.handleLogout -> invalidateProductCache).
+const LS_TTL = 24 * 60 * 60 * 1000;
 
 const _refreshListeners = new Set();
 
