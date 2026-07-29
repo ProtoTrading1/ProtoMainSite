@@ -190,6 +190,30 @@ function applyIdentifierFilter(query, identifier) {
   ).order('sku', { ascending: true });
 }
 
+async function fetchIdentifierRows(supabase, identifier) {
+  // Exact SKU/barcode is the overwhelmingly common operational lookup. Give it
+  // an index-friendly query first; only pay for prefix matching when no exact
+  // row exists. The previous OR mixed eq + ilike in one query, which forced
+  // exact scans through the slower prefix plan too.
+  const exact = await fetchAllRows(
+    supabase,
+    'website_stock',
+    STOCK_SELECT,
+    (q) => q
+      .or(`sku.eq.${identifier},barcode.eq.${identifier}`)
+      .order('sku', { ascending: true }),
+    10,
+  );
+  if (exact.length) return exact;
+  return fetchAllRows(
+    supabase,
+    'website_stock',
+    STOCK_SELECT,
+    (q) => applyIdentifierFilter(q, identifier),
+    10,
+  );
+}
+
 /**
  * Adapt a stock row for the storefront.
  *
@@ -337,15 +361,14 @@ export default async function handler(req, res) {
     }
 
     const [rows, tree, salesByBarcode, placements, groupInfo] = await Promise.all([
-      fetchAllRows(
-        supabase,
-        'website_stock',
-        STOCK_SELECT,
-        requestedSkus?.length
-          ? (q) => q.in('sku', requestedSkus)
-          : identifier ? (q) => applyIdentifierFilter(q, identifier) : null,
-        identifier ? 10 : Infinity,
-      ),
+      identifier
+        ? fetchIdentifierRows(supabase, identifier)
+        : fetchAllRows(
+          supabase,
+          'website_stock',
+          STOCK_SELECT,
+          requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
+        ),
       loadTaxonomyTree(),
       // A direct code lookup should stay direct: only fetch sales for the
       // returned codes instead of scanning the entire sales catalogue.
