@@ -93,6 +93,8 @@ async function sendAdminSignupEmail(payload) {
         'content-type': 'application/json',
         'api-key': process.env.BREVO_API_KEY,
       },
+      // Bounded: a slow Brevo must never hold a registration open.
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         sender: BREVO_SENDER,
         to: ADMIN_SIGNUP_RECIPIENTS.map((email) => ({ email })),
@@ -249,12 +251,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
-  // Throttle per IP: registration creates an auth account and sends welcome +
-  // admin emails, so it must not be scriptable into mass account / email abuse.
-  const rl = await checkRateLimit({ bucket: `register-trade:${clientIp(req)}`, max: 5, windowSeconds: 3600 });
+  // Throttling: registration creates an auth account and sends emails, so it
+  // must not be scriptable into mass abuse — but South African mobile carriers
+  // put THOUSANDS of customers behind one CGNAT IP, so a tight per-IP cap
+  // rejects real signups on a busy day. Per-IP stays generous; the per-EMAIL
+  // bucket below is what stops someone hammering a single address.
+  const rl = await checkRateLimit({ bucket: `register-trade:${clientIp(req)}`, max: 30, windowSeconds: 3600 });
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter || 60));
     return res.status(429).json({ error: 'Too many registration attempts. Please try again later.' });
+  }
+  const emailForLimit = String(email || '').trim().toLowerCase();
+  if (emailForLimit) {
+    const rlEmail = await checkRateLimit({ bucket: `register-trade-email:${emailForLimit}`, max: 3, windowSeconds: 3600 });
+    if (!rlEmail.allowed) {
+      res.setHeader('Retry-After', String(rlEmail.retryAfter || 60));
+      return res.status(429).json({ error: 'Too many registration attempts for this email. Please try again later.' });
+    }
   }
 
   if (confirmPassword && String(password) !== String(confirmPassword)) {
@@ -504,6 +517,8 @@ export default async function handler(req, res) {
           'content-type': 'application/json',
           'api-key': process.env.BREVO_API_KEY,
         },
+        // Bounded: a slow Brevo must never hold a registration open.
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
