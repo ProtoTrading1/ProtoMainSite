@@ -15,10 +15,18 @@ describe('catalogue interaction accessibility', () => {
   it('uses deliberate hover intent and explicit keyboard flyout opening', async () => {
     const sidebar = await readSource('src/components/Sidebar.jsx');
     const categoryNav = await readSource('src/components/CategoryNav.jsx');
-    assert.match(sidebar, /MENU_HOVER_INTENT_MS = 250/);
+    assert.match(sidebar, /MENU_HOVER_INTENT_MS = 100/);
     assert.match(categoryNav, /onMouseEnter=\{\(e\) => onHoverL1/);
     assert.match(categoryNav, /e\.key === 'ArrowRight'/);
     assert.doesNotMatch(categoryNav, /onFocus=\{\(e\) => onToggleL1/);
+  });
+
+  it('keeps department navigation usable while catalogue counts load', async () => {
+    const categoryNav = await readSource('src/components/CategoryNav.jsx');
+    assert.match(categoryNav, /const visibleCategories = countsReady/);
+    assert.match(categoryNav, /: cats;/);
+    assert.match(categoryNav, /aria-busy=\{!countsReady\}/);
+    assert.doesNotMatch(categoryNav, /cat-nav-list--loading/);
   });
 
   it('gives cart icon controls contextual accessible names', async () => {
