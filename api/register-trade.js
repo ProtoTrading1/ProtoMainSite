@@ -5,6 +5,7 @@ import {
   isVerifiedProtoActiveMatch,
   lookupProtoActiveCustomer,
 } from './_customer-onboard.js';
+import { PUBLIC_SITE_URL } from './_public-site-url.js';
 
 const BREVO_SENDER = {
   name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -151,7 +152,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
   <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review and approve your request within 24 hours.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm, and we'll notify you the moment Proto Trading Online launches so you can access our full wholesale catalogue, live stock availability, and trade pricing.</p>
+  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm — from that moment you can log in and access our full wholesale catalogue, live stock availability, and trade pricing.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
     <tr><td style="padding:22px 24px;">
       <p style="margin:0 0 14px;color:#111111;font-size:15px;font-weight:800;">What you get as a trade account holder:</p>
@@ -199,7 +200,10 @@ const APPROVED_HTML = (name) => `<!DOCTYPE html>
 </td></tr>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news — your Proto Trading Online trade account has been approved. Our brand-new online store is almost ready, and we'll notify you the moment it goes live so you can browse the full wholesale catalogue, live stock and trade pricing.</p>
+  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news — your Proto Trading Online trade account has been approved. You can log in now to browse the full wholesale catalogue, live stock and trade pricing, and place orders online.</p>
+  <p style="margin:0 0 24px;">
+    <a href="${PUBLIC_SITE_URL}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px;">Log in to the trade portal</a>
+  </p>
   <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> · <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
 </td></tr>
 </table>
