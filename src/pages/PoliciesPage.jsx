@@ -305,7 +305,7 @@ export default function PoliciesPage({ onLogin }) {
           {onLogin && (
             <button className="access-login" type="button" onClick={onLogin}>
               <Lock size={16} />
-              Log in
+              Sign in
             </button>
           )}
         </div>
