@@ -59,7 +59,7 @@ body {
   background: var(--bg-main);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -169,9 +169,25 @@ textarea:focus-visible,
 ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.9); background-clip: content-box; }
 
 /* ── Portal Layout Shell ── */
+/* Overflow lives here rather than in App.jsx's inline style so old-browser
+   fallbacks can be expressed (see the @supports block below). Rationale on
+   .main-layout. */
+.app-root {
+  overflow: clip;
+}
+
 .main-layout {
   display: flex;
-  overflow: hidden;
+  /* clip CLIPS like hidden but the box cannot be scrolled AT ALL — not by
+     the user, not programmatically, not by the browser's scroll-into-view
+     when focus enters the cart drawer. The closed drawer sits one
+     drawer-width off-canvas (translateX(100%)), which made this box
+     horizontally scrollable under `hidden`; a focus jump then dragged the
+     whole layout left with no scrollbar to undo it (worst at zoomed-out
+     viewports). A plain hidden→clip declaration pair would be the classic
+     fallback, but the CSS minifier collapses duplicate properties and drops
+     the hidden — hence the @supports block below instead. */
+  overflow: clip;
   overflow-anchor: none;
   /* 100% rather than 100vw: 100vw includes the vertical scrollbar, so it can
      overflow by the scrollbar width on a scrolling page. (Here it resolves the
@@ -180,6 +196,14 @@ textarea:focus-visible,
   max-width: 100%;
   position: relative;
 }
+
+/* Browsers without `overflow: clip` (Safari ≤ 15) treat it as invalid and
+   would fall all the way back to `visible`. Give them the old behaviour. */
+@supports not (overflow: clip) {
+  .app-root, .main-layout { overflow: hidden; }
+  body { overflow-x: hidden; }
+}
+
 
 .sidebar-rail {
   width: var(--sidebar-width);
