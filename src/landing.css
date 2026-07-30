@@ -417,25 +417,30 @@
 }
 
 .vhero-support-wrap {
+  display: grid;
+  gap: 12px;
   max-width: 660px;
-  height: 84px;
   opacity: 0;
   animation: vhero-fade-in 220ms ease-out 470ms forwards;
 }
 
+/* Set like the campaign banner: uppercase, bold, white, with the action the
+   customer has to take picked out in the same red as the headline accent. */
 .vhero-support-message {
   margin: 0;
-  color: #d7dce4;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: 0.008em;
-  opacity: 1;
-  transition: opacity 200ms linear;
+  color: #f4f4f5;
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(15px, 1.5vw, 21px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
 }
 
-.vhero-support-message.is-fading {
-  opacity: 0;
+.vhero-support-message strong {
+  color: #E02020;
+  font-weight: 700;
 }
 
 .vhero-support-line {
@@ -3272,13 +3277,16 @@
     color: rgba(255,255,255,0.7);
   }
 
+  /* The fixed height here reserved space for the rotating tagline so it could
+     not shift the layout as lines changed. The message is static now, so the
+     wrap sizes to its content instead of clipping the second line. */
   .vhero-support-wrap {
-    height: 88px;
+    gap: 9px;
   }
 
   .vhero-support-message {
     font-size: 15px;
-    line-height: 1.42;
+    line-height: 1.3;
   }
 
   /* Scroll hint */
