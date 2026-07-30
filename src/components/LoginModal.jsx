@@ -73,7 +73,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
           {/* Heading */}
           <div className="lm-heading">
             <h2>{mode === 'forgot' ? 'Reset password.' : 'Welcome back.'}</h2>
-            <p>{mode === 'forgot' ? 'Enter your email and we\'ll send a reset link.' : 'Log in to your trade account.'}</p>
+            <p>{mode === 'forgot' ? 'Enter your email and we\'ll send a reset link.' : 'Sign in to your trade account.'}</p>
           </div>
 
           {/* Alerts */}
@@ -127,21 +127,21 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
               {loading
                 ? (mode === 'forgot' ? 'Sending…' : 'Signing in…')
                 : mode === 'forgot' ? 'Send reset link'
-                : 'Log in'}
+                : 'Sign in'}
             </button>
           </form>
 
           {/* Back to login link when in forgot mode */}
           {mode === 'forgot' && (
             <button type="button" className="lm-toggle" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
-              ← Back to login
+              ← Back to sign in
             </button>
           )}
 
           {/* Apply link */}
           {mode === 'login' && onApply && (
             <button type="button" className="lm-apply-link" onClick={onApply}>
-              New to Proto Trading? Apply for access ↓
+              New to Proto Trading? Apply for a trade account ↓
             </button>
           )}
 

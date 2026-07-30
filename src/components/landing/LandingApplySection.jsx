@@ -10,7 +10,7 @@ export default function LandingApplySection({ children }) {
         viewport={{ once: true }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
       >
-        <span className="lp-eyebrow lp-eyebrow-light">Apply for access</span>
+        <span className="lp-eyebrow lp-eyebrow-light">Apply for a trade account</span>
         <h2>Get access to Proto Trading&apos;s catalogue.</h2>
         <p className="lp-apply-reassurance">
           Four quick steps. Applications are reviewed within one business day.

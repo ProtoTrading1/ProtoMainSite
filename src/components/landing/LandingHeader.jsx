@@ -32,7 +32,7 @@ export default function LandingHeader({ onLogin, onApply }) {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button onClick={onLogin} className="btn-outline" style={{ padding: '8px 20px', fontSize: '14px' }}>Log In</button>
+          <button onClick={onLogin} className="btn-outline" style={{ padding: '8px 20px', fontSize: '14px' }}>Sign In</button>
           <button onClick={onApply} className="btn-premium" style={{ padding: '8px 20px', fontSize: '14px' }}>Apply Access</button>
         </div>
       </div>

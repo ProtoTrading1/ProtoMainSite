@@ -298,12 +298,12 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
                 <p>
                   {instantAccess
-                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — log in with {email.trim()} to access the catalogue.</>
+                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — sign in with {email.trim()} to access the catalogue.</>
                     : <>Thank you, {contactName.trim()}. Proto is reviewing your application and we will notify {email.trim()} when you have been approved.</>}
                 </p>
                 {!standalone && (
                   <button type="button" onClick={onLogin}>
-                    Go to login
+                    Go to sign in
                   </button>
                 )}
               </div>
@@ -623,22 +623,22 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       disabled={submitting || !canAdvanceStandalone()}
                     >
                       {submitting
-                        ? 'Creating your account…'
+                        ? 'Submitting your application…'
                         : standaloneStep < STANDALONE_STEPS.length - 1
                           ? 'Continue'
-                          : 'Create trade account'}
+                          : 'Submit trade application'}
                       {!submitting && standaloneStep < STANDALONE_STEPS.length - 1 && <ArrowRight size={16} />}
                     </button>
                   </div>
                 ) : (
                 <div className="lp-register-actions">
                   <button type="submit" className="lp-register-submit" disabled={submitting}>
-                    {submitting ? 'Creating your account…' : 'Create trade account'}
+                    {submitting ? 'Submitting your application…' : 'Submit trade application'}
                   </button>
                   {!standalone && (
                     <p className="lp-register-footnote">
                       Already have an account?{' '}
-                      <button type="button" className="lp-register-link" onClick={onLogin}>Log in</button>
+                      <button type="button" className="lp-register-link" onClick={onLogin}>Sign in</button>
                     </p>
                   )}
                 </div>
@@ -660,7 +660,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           </a>
           <button type="button" className="lp-register-login" onClick={onLogin}>
             <Lock size={15} />
-            Log in
+            Sign in
           </button>
         </header>
       )}
@@ -688,8 +688,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
               <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
               <h1>Open your wholesale trade account</h1>
               <p>
-                Register once to access live stock, trade pricing, and our full catalogue.
-                Approved accounts can log in immediately after signup.
+                Apply once to access live stock, trade pricing, and our full catalogue.
+                Approved accounts can sign in immediately after approval.
               </p>
               <ul className="lp-apply-list">
                 <li>Instant approval for new trade customers</li>

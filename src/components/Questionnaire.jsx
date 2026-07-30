@@ -207,10 +207,10 @@ export default function Questionnaire({ onLogin }) {
         <h3>{instantAccess ? "You're approved" : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. Your trade account is approved — log in with ${email.trim()} to access the catalogue.`
+            ? `Welcome back, ${contactName}. Your trade account is approved — sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
-        <button type="button" onClick={onLogin}>Go to login</button>
+        <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );
   }
