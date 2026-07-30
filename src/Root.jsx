@@ -6,7 +6,12 @@ import { isAdminHost } from './lib/isAdminHost';
 import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
-import { setIntercomLauncherVisibility } from './lib/intercom';
+import {
+  identifyIntercom,
+  refreshIntercomIdentity,
+  resetIntercom,
+  setIntercomLauncherVisibility,
+} from './lib/intercom';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -165,6 +170,9 @@ export default function Root() {
       if (sess?.user) {
         void import('./lib/products').then((m) => m.prefetchCatalog());
         void loadCustomer(sess.user.id, sess);
+        // Hand Intercom a signed identity so Fin's catalogue connector can
+        // trust the email it receives. No-ops if the account isn't approved.
+        void identifyIntercom(sess);
       } else {
         setCustomerLoading(false);
         setCustomer(null);
@@ -199,6 +207,13 @@ export default function Root() {
           clearTimeout(bootstrapTimer);
           setSession(sess ?? null);
           if (sess?.user) {
+            if (event === 'TOKEN_REFRESHED') {
+              // Keep the signed Intercom identity alive on long-lived tabs
+              // without tearing down an open conversation.
+              void refreshIntercomIdentity(sess);
+            } else {
+              void identifyIntercom(sess);
+            }
             await loadCustomer(sess.user.id, sess);
           } else {
             setCustomerLoading(false);
@@ -223,6 +238,7 @@ export default function Root() {
     setSession(sess);
     try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
+    void identifyIntercom(sess);
     await loadCustomer(sess.user.id, sess);
   };
 
@@ -231,6 +247,9 @@ export default function Root() {
     await signOut();
     const { invalidateProductCache } = await import('./lib/products');
     invalidateProductCache();
+    // Drop the Intercom contact too, or the next person on this browser
+    // inherits the signed-out customer's identity — and their trade prices.
+    resetIntercom();
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);

@@ -7,6 +7,7 @@ import { Intercom } from '@intercom/messenger-js-sdk'
 import './index.css'
 import Root from './Root.jsx'
 import { captureError, initMonitoring } from './lib/monitoring'
+import { intercomInitSettings } from './lib/intercom'
 
 initMonitoring();
 
@@ -39,15 +40,11 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Boot Intercom after render and isolate any failure so the chat widget can
-// never block the app from mounting.
+// never block the app from mounting. This boot is deliberately ANONYMOUS —
+// Root.jsx re-boots with a signed JWT once a logged-in, approved customer is
+// known (see src/lib/intercom.js identifyIntercom).
 try {
-  Intercom({
-    app_id: 'qk0xorsx',
-    alignment: 'right',
-    horizontal_padding: 20,
-    vertical_padding: 20,
-    hide_default_launcher: true,
-  });
+  Intercom(intercomInitSettings());
 } catch (err) {
   console.error('Intercom init failed:', err);
 }
