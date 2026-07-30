@@ -434,10 +434,10 @@ function Questionnaire({ onLogin }) {
         <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. Your email is on our active trade list — log in with ${email.trim()} to access the catalogue.`
+            ? `Welcome back, ${contactName}. Your email is on our active trade list — sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
-        <button type="button" onClick={onLogin}>Go to login</button>
+        <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );
   }
@@ -764,9 +764,9 @@ export default function LandingPage({ onLogin, onApply }) {
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
-<button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
+          <button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply for a trade account</button>
           <button type="button" onClick={() => setShowAbout(true)}>About us</button>
-          <button type="button" className="access-nav-login" onClick={onLogin}>Log in</button>
+          <button type="button" className="access-nav-login" onClick={onLogin}>Sign in</button>
         </nav>
       </header>
 
@@ -810,7 +810,7 @@ export default function LandingPage({ onLogin, onApply }) {
           </div>
           <button className="access-login" type="button" onClick={onLogin}>
             <Lock size={15} />
-            Customer login
+            Sign in
           </button>
         </footer>
         </div>{/* end belowHero */}
