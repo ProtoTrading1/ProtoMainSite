@@ -194,7 +194,6 @@ function TruckScrollbar() {
   const PAD      = isMobile ? 18 : 24;
   const dotSize  = isMobile ? 6  : 8;
   const trackW   = isMobile ? 2  : 3;
-  const scale    = isMobile ? 0.65 : 1;
 
   // Which stage are we in?
   let curIdx = 0;
@@ -705,7 +704,7 @@ function Questionnaire({ onLogin }) {
                 style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
               />
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
-                If your email has changed since you last ordered, enter your account code so we can match and approve you instantly.
+                If your email has changed since you last ordered, enter your account code so we can match your existing customer record.
               </p>
             </div>
           </div>
@@ -736,7 +735,30 @@ function Questionnaire({ onLogin }) {
   );
 }
 
-export default function LandingPage({ onLogin, onApply }) {
+function RegistrationCampaignHero({ onApply }) {
+  return (
+    <section className="registration-campaign-hero" aria-label="Proto Trading Online registration">
+      <button
+        type="button"
+        className="registration-campaign-hero__action"
+        onClick={onApply}
+        aria-label="Existing customers must re-register and new customers can apply online. Go to the registration form."
+      >
+        <img
+          src="/register-reregister-banner-v3.webp"
+          alt="Welcome to the new Proto Trading Online. Existing customers must re-register. New customers can apply for online access."
+          fetchPriority="high"
+          decoding="async"
+        />
+      </button>
+      <p className="registration-campaign-hero__hint">
+        Select the banner to re-register or apply for Proto Trading Online access.
+      </p>
+    </section>
+  );
+}
+
+export default function LandingPage({ onLogin, onApply, registrationMode = false }) {
   useEffect(() => {
     const prev = document.body.style.background;
     document.body.style.background = '#000';
@@ -769,13 +791,14 @@ export default function LandingPage({ onLogin, onApply }) {
       </header>
 
       <main>
-        {/* ── Video hero ── */}
-        <LandingHero onApply={scrollToForm} />
+        {registrationMode
+          ? <RegistrationCampaignHero onApply={scrollToForm} />
+          : <LandingHero onApply={scrollToForm} />}
 
         <div>
         <LandingMapSection />
         <LandingDepartmentsSection />
-        <LandingApplySection>
+        <LandingApplySection registrationMode={registrationMode}>
           <Questionnaire onLogin={onLogin} />
         </LandingApplySection>
 

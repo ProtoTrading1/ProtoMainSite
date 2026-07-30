@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 
-export default function LandingApplySection({ children }) {
+export default function LandingApplySection({ children, registrationMode = false }) {
   return (
     <section className="lp-apply-wrapper" id="lp-apply">
       <motion.div
@@ -10,10 +10,18 @@ export default function LandingApplySection({ children }) {
         viewport={{ once: true }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
       >
-        <span className="lp-eyebrow lp-eyebrow-light">Apply for a trade account</span>
-        <h2>Get access to Proto Trading&apos;s catalogue.</h2>
+        <span className="lp-eyebrow lp-eyebrow-light">
+          {registrationMode ? 'Proto Trading Online registration' : 'Apply for a trade account'}
+        </span>
+        <h2>
+          {registrationMode
+            ? 'Existing customers re-register. New customers apply online.'
+            : <>Get access to Proto Trading&apos;s catalogue.</>}
+        </h2>
         <p className="lp-apply-reassurance">
-          Four quick steps. Applications are reviewed within one business day.
+          {registrationMode
+            ? 'Complete four quick steps. Applications are reviewed before online purchasing access is approved.'
+            : 'Four quick steps. Applications are reviewed within one business day.'}
         </p>
       </motion.div>
 

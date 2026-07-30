@@ -308,7 +308,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 )}
               </div>
             ) : (
-              <form className="lp-register-form" onSubmit={handleSubmit} noValidate>
+              <form id="trade-registration-form" className="lp-register-form" onSubmit={handleSubmit} noValidate>
                 <input
                   type="text"
                   name="company_fax"
@@ -651,6 +651,24 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     </div>
   );
 
+  const registrationBanner = (
+    <div className={standalone ? 'lp-register-standalone-banner' : 'lp-register-route-banner'}>
+      <button
+        type="button"
+        className="lp-register-banner-action"
+        aria-label="Existing customers must re-register. New customers can apply for Proto Trading Online access. Online approval does not create an account at our physical store. Go to the registration form."
+        onClick={() => document.getElementById('trade-registration-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      >
+        <img
+          src="/register-reregister-banner.webp?v=2"
+          alt="Welcome to the new Proto Trading Online. Existing customers must re-register. New customers can apply for online access. Online approval does not create an account at our physical store."
+          fetchPriority="high"
+          decoding="async"
+        />
+      </button>
+    </div>
+  );
+
   return (
     <div className={`lp-register-page${standalone ? ' lp-register-page--standalone' : ''}`}>
       {!standalone && (
@@ -668,37 +686,33 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       <main className={`lp-register-main${standalone ? ' lp-register-main-standalone' : ''}`}>
         {standalone ? (
           <div className="lp-register-standalone-panel">
-            {standaloneStep === 0 && (
-              <div className="lp-register-standalone-banner">
-                <img
-                  src="/pre-register-banner.jpg?v=2"
-                  alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
-                  fetchPriority="high"
-                  decoding="async"
-                />
-              </div>
-            )}
+            {standaloneStep === 0 && registrationBanner}
             <div className="lp-register-standalone-body">
               {registerCard}
             </div>
           </div>
         ) : (
-          <div className="lp-register-shell">
-            <div className="lp-register-intro">
-              <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
-              <h1>Open your wholesale trade account</h1>
-              <p>
-                Apply once to access live stock, trade pricing, and our full catalogue.
-                Approved accounts can sign in immediately after approval.
-              </p>
-              <ul className="lp-apply-list">
-                <li>Instant approval for new trade customers</li>
-                <li>Live stock checks on every product</li>
-                <li>Order builder with PDF quote requests</li>
-              </ul>
+          <>
+            {registrationBanner}
+            <div className="lp-register-shell">
+              <div className="lp-register-intro">
+                <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
+                <h1>Re-register or apply for Proto Trading Online access</h1>
+                <p>
+                  Existing customers must re-register for the new online website.
+                  New customers can apply for online purchasing access. Approval gives
+                  access to Proto Trading Online only and does not create an account
+                  for purchases at our physical store.
+                </p>
+                <ul className="lp-apply-list">
+                  <li>Existing customers must re-register for the new website</li>
+                  <li>New applications are reviewed before online access is approved</li>
+                  <li>Live stock, trade pricing, and online ordering</li>
+                </ul>
+              </div>
+              {registerCard}
             </div>
-            {registerCard}
-          </div>
+          </>
         )}
       </main>
 
