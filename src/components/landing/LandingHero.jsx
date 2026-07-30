@@ -1,86 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, CheckCircle2 } from 'lucide-react';
 
-const ROTATING_SUPPORT_MESSAGES = [
-  'Trusted by South African retailers since 1987.',
-  '5,000+ wholesale products with live stock.',
-  'Exclusive trade pricing for approved retailers.',
-  'Built for retailers, resellers and growing businesses.',
-  'Spend less time ordering.\nMore time growing your business.',
-  'One supplier.\nThousands of possibilities.',
-];
+// One fixed launch message, not the old rotating set: during the re-register
+// campaign the subtext has a job to do, and a line that changes every 9
+// seconds cannot do it.
+const SUPPORT_MESSAGE = 'Existing customers must re-register.\nNew customers can apply for online access.';
 
 export default function LandingHero({ onApply }) {
-  const [messageIdx, setMessageIdx] = useState(0);
-  const [isFading, setIsFading] = useState(false);
-  const reduceMotion = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    reduceMotion.current = media.matches;
-    const onChange = (e) => {
-      reduceMotion.current = e.matches;
-    };
-    if (media.addEventListener) media.addEventListener('change', onChange);
-    else media.addListener(onChange);
-    return () => {
-      if (media.removeEventListener) media.removeEventListener('change', onChange);
-      else media.removeListener(onChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion.current || ROTATING_SUPPORT_MESSAGES.length <= 1) return undefined;
-
-    let holdTimer = null;
-    let fadeTimer = null;
-    let cancelled = false;
-
-    const scheduleNext = () => {
-      if (cancelled) return;
-      holdTimer = window.setTimeout(() => {
-        if (cancelled || document.visibilityState !== 'visible') return;
-        setIsFading(true);
-        fadeTimer = window.setTimeout(() => {
-          if (cancelled) return;
-          setMessageIdx((prev) => (prev + 1) % ROTATING_SUPPORT_MESSAGES.length);
-          setIsFading(false);
-          scheduleNext();
-        }, 200);
-      }, 9000);
-    };
-
-    const handleVisibilityChange = () => {
-      if (holdTimer) {
-        window.clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-      if (fadeTimer) {
-        window.clearTimeout(fadeTimer);
-        fadeTimer = null;
-      }
-      setIsFading(false);
-      if (document.visibilityState === 'visible') {
-        scheduleNext();
-      }
-    };
-
-    if (document.visibilityState === 'visible') {
-      scheduleNext();
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      if (holdTimer) window.clearTimeout(holdTimer);
-      if (fadeTimer) window.clearTimeout(fadeTimer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  const activeMessage = ROTATING_SUPPORT_MESSAGES[messageIdx].split('\n');
-
   return (
     <section className="vhero-section vhero-section--static vhero-section--banner">
       <img
@@ -92,15 +17,15 @@ export default function LandingHero({ onApply }) {
       />
       <div className="vhero-banner-scrim" />
       <div className="vhero-copy">
-        <h1 className="vhero-headline" aria-label="Wholesale made smarter">
-          <span className="vhero-headline-line">WHOLESALE</span>
-          <span className="vhero-headline-line">MADE</span>
-          <span className="vhero-headline-line vhero-headline-line--accent">SMARTER.</span>
+        <h1 className="vhero-headline" aria-label="Welcome to our new online store">
+          <span className="vhero-headline-line">WELCOME TO</span>
+          <span className="vhero-headline-line">OUR NEW</span>
+          <span className="vhero-headline-line vhero-headline-line--accent">ONLINE STORE</span>
         </h1>
-        <div className="vhero-support-wrap" aria-live="off" aria-atomic="true">
-          <p className={`vhero-support-message${isFading ? ' is-fading' : ''}`}>
-            {activeMessage.map((line, idx) => (
-              <span key={`${messageIdx}-${idx}`} className="vhero-support-line">
+        <div className="vhero-support-wrap">
+          <p className="vhero-support-message">
+            {SUPPORT_MESSAGE.split('\n').map((line) => (
+              <span key={line} className="vhero-support-line">
                 {line}
               </span>
             ))}
