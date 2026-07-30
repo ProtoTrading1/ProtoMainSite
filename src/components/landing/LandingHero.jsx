@@ -2,8 +2,12 @@ import { ArrowDown, CheckCircle2 } from 'lucide-react';
 
 // One fixed launch message, not the old rotating set: during the re-register
 // campaign the subtext has a job to do, and a line that changes every 9
-// seconds cannot do it.
-const SUPPORT_MESSAGE = 'Existing customers must re-register.\nNew customers can apply for online access.';
+// seconds cannot do it. Set like the campaign banner — uppercase and bold,
+// with the action itself in red.
+const SUPPORT_LINES = [
+  ['Existing customers must ', 're-register', '.'],
+  ['New customers can apply for ', 'online access', '.'],
+];
 
 export default function LandingHero({ onApply }) {
   return (
@@ -23,13 +27,13 @@ export default function LandingHero({ onApply }) {
           <span className="vhero-headline-line vhero-headline-line--accent">ONLINE STORE</span>
         </h1>
         <div className="vhero-support-wrap">
-          <p className="vhero-support-message">
-            {SUPPORT_MESSAGE.split('\n').map((line) => (
-              <span key={line} className="vhero-support-line">
-                {line}
-              </span>
-            ))}
-          </p>
+          {SUPPORT_LINES.map(([lead, accent, tail]) => (
+            <p key={accent} className="vhero-support-message">
+              {lead}
+              <strong>{accent}</strong>
+              {tail}
+            </p>
+          ))}
         </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
