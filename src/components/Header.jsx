@@ -319,7 +319,7 @@ function SearchPanel({
           <span className="sp-search-intro-icon"><Search size={18} /></span>
           <div>
             <strong>Find anything in seconds</strong>
-            <span>Search by product name, SKU or barcode.</span>
+            <span>Search by product name or barcode.</span>
           </div>
         </div>
 
@@ -738,14 +738,8 @@ export default function Header({
   const liftSearch = useCallback((val) => {
     pendingSearchRef.current = val;
     clearTimeout(liftRef.current);
-    liftRef.current = setTimeout(() => {
-      // Suggestions and the results grid are catalogue-wide. Commit the root
-      // route with the debounced term so global matches never appear beneath a
-      // stale department heading or highlighted menu item.
-      if (val.trim()) navigateForSearch?.([]);
-      setSearchQuery(val);
-    }, 350);
-  }, [navigateForSearch, setSearchQuery]);
+    liftRef.current = setTimeout(() => setSearchQuery(val), 350);
+  }, [setSearchQuery]);
 
   // Immediate commit (Enter, suggestion/category pick, clear): cancel any
   // pending debounce and sync the local box + parent together.
@@ -1020,12 +1014,12 @@ export default function Header({
               ref={inputRef}
               type="text"
               className="header-search-premium__input"
-              placeholder="Search products, SKU or barcode…"
+              placeholder="Search products…"
               value={inputValue}
               onFocus={focusSearch}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              aria-label="Search products, SKU or barcode"
+              aria-label="Search products"
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={searchOpen}
@@ -1210,7 +1204,7 @@ export default function Header({
         <input
           ref={mobileSearchInputRef}
           type="search"
-          placeholder="Search products, SKU or barcode…"
+          placeholder="Search products…"
           value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
@@ -1238,7 +1232,7 @@ export default function Header({
               commitMobileSearch(mobileInput.trim());
             }
           }}
-          aria-label="Search products, SKU or barcode"
+          aria-label="Search products"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={mobileSearchOpen && Boolean(mobileInput.trim())}
