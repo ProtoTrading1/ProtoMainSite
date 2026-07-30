@@ -126,7 +126,7 @@
   width: var(--search-width);
   max-width: 520px;
   height: var(--search-height);
-  padding: 0 5px 0 8px;
+  padding: 0 5px 0 14px;
   border-radius: var(--search-radius);
   background: var(--search-bg);
   border: 1px solid var(--search-border);
@@ -140,29 +140,6 @@
 .header-search-premium:focus-within {
   border-color: var(--search-border-focus);
   box-shadow: var(--search-glow);
-}
-
-.header-search-premium__icon {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: #FFFFFF;
-  opacity: 0.92;
-}
-.header-search-premium__icon:hover {
-  background: rgba(255,255,255,0.08);
-  opacity: 1;
-}
-.header-search-premium__icon:focus-visible {
-  outline: 2px solid #D4AD56;
-  outline-offset: 1px;
 }
 
 .header-search-premium__input {
