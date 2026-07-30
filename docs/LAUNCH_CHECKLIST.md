@@ -57,6 +57,13 @@ bridge. Full detail: protoportal-admin/scripts/install-sql-bridge-service.md.
       **Site URL** → `https://proto.co.za`; **Redirect URLs** → add
       `https://proto.co.za/**` and `https://www.proto.co.za/**`
       (keep the site.proto.co.za entries during transition).
+- [ ] Supabase (MAIN project) → Authentication → Sessions:
+      **Time-box user sessions** → `720` hours (30 days).
+      The portal keeps customers signed in across refreshes and enforces the
+      same 30-day window in the browser (`src/lib/sessionPolicy.js`); this
+      setting is the server-side half, so a stolen refresh token also dies at
+      30 days. Leave **inactivity timeout** empty — customers who browse
+      occasionally should not be logged out for being quiet.
 
 ## Part 3 — Verify (after DNS propagates; use your phone's mobile data for a cold view)
 
