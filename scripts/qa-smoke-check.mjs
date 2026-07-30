@@ -256,12 +256,24 @@ assert.match(rootSrc, /Proto is still reviewing your application/, 'pending-appr
 console.log('✓ Signup: no email confirmation, pending-review wording, full order recipient list');
 
 // Phase two — checkout clarity, search debounce, delivery modal, category skeleton
+// The confirm step used to be a Yes/No dialog inside CheckoutModal. The
+// ordering rework moved it: CheckoutModal now ends at "Continue to delivery"
+// and the real commit point is the courier picker in Drawer.jsx. The contract
+// being guarded is unchanged — an order is never sent without an explicit
+// final action, a way to back out, and unambiguous "this is not a payment"
+// wording — so the assertions follow the flow rather than the old file.
 const checkoutModalSrc = readFileSync(join(root, 'src/components/CheckoutModal.jsx'), 'utf8');
-assert.match(checkoutModalSrc, /checkout-modal-btn--confirm[^]*Yes, submit/, 'submit dialog has a green Yes, submit button');
-assert.match(checkoutModalSrc, /checkout-modal-btn--danger[^]*No, keep shopping/, 'submit dialog has a red No, keep shopping button');
+assert.match(checkoutModalSrc, /Continue to delivery/, 'checkout hands off to the delivery step rather than submitting inline');
+assert.doesNotMatch(checkoutModalSrc, /\/api\/send-order/, 'checkout modal never submits the order itself');
+const drawerConfirmSrc = readFileSync(join(root, 'src/components/Drawer.jsx'), 'utf8');
+assert.match(drawerConfirmSrc, /className="courier-submit-button"/, 'the delivery step carries the final submit button');
+assert.match(drawerConfirmSrc, /disabled=\{!courierChoice \|\| submitting\}/, 'submit stays disabled until a delivery option is chosen');
+assert.match(drawerConfirmSrc, /Send order request — no payment now/, 'the submit button says no payment is due');
+assert.match(drawerConfirmSrc, /className="courier-cancel-button"/, 'the customer can back out of the delivery step');
+assert.match(drawerConfirmSrc, /This is an order request — not an invoice/, 'the delivery step states it is not an invoice');
 const indexCssSrc = readFileSync(join(root, 'src/index.css'), 'utf8');
-assert.match(indexCssSrc, /\.checkout-modal-btn--confirm\s*\{[^}]*#16a34a/, 'confirm button is green');
-assert.match(indexCssSrc, /\.checkout-modal-btn--danger\s*\{[^}]*#dc2626/, 'keep-shopping button is red');
+assert.match(indexCssSrc, /\.courier-submit-button\s*\{/, 'the final submit button is styled');
+assert.match(indexCssSrc, /\.courier-cancel-button\s*\{/, 'the cancel button is styled');
 const headerSrc = readFileSync(join(root, 'src/components/Header.jsx'), 'utf8');
 assert.match(headerSrc, /const \[inputValue, setInputValue\] = useState\(searchQuery\)/, 'desktop search input is local state (no per-keystroke App re-render)');
 // The debounce interval is a tuning knob, not a contract — assert that the
@@ -277,13 +289,18 @@ assert.match(indexCssSrc, /\.courier-modal-backdrop\s*\{[^}]*position: fixed/, '
 assert.match(indexCssSrc, /@media \(max-width: 640px\)[^]*courier-modal-sheet[^]*border-radius: 16px 16px 0 0/, 'delivery modal is a bottom-sheet on mobile');
 const catNavSrc = readFileSync(join(root, 'src/components/CategoryNav.jsx'), 'utf8');
 assert.match(catNavSrc, /const countsReady = Boolean\(counts\) && !\(/, 'category nav treats the placeholder counts as not-ready');
-assert.match(catNavSrc, /cat-nav-skeleton/, 'category nav renders a skeleton while counts load');
-assert.match(indexCssSrc, /@keyframes cat-nav-shimmer/, 'category skeleton has a shimmer animation');
+// The departments list used to show a shimmer skeleton until counts arrived.
+// It now renders the real tree immediately and hydrates counts behind it, so
+// the guarantee to assert is that an unready count set never empties the menu
+// — a stronger version of what the skeleton was protecting against.
+assert.match(catNavSrc, /countsReady\s*\?\s*cats\.filter\(/, 'departments are only filtered by count once counts are ready');
+assert.match(catNavSrc, /:\s*cats;/, 'the full department tree renders while counts are still loading');
+assert.match(catNavSrc, /aria-busy=\{!countsReady\}/, 'the loading state is announced rather than drawn as a placeholder');
 // Review hardening
 assert.match(headerSrc, /clearTimeout\(liftRef\.current\);\s*\n\s*pendingSearchRef\.current = searchQuery;\s*\n\s*setInputValue\(searchQuery\)/, 'external search clears cancel a pending debounced lift (no ghost search)');
-assert.match(catNavSrc, /Object\.keys\(counts\)\.length === 1 && Number\(counts\[''\]\) === 0/, 'skeleton only shows for the initial placeholder — never sticks in API-fallback mode');
+assert.match(catNavSrc, /Object\.keys\(counts\)\.length === 1 && Number\(counts\[''\]\) === 0/, 'count-driven filtering never sticks off in API-fallback mode');
 assert.match(drawerSrc, /document\.body\.style\.overflow = 'hidden'/, 'delivery modal locks body scroll while open');
-console.log('✓ Phase two: submit dialog colours, search debounce, delivery modal, category skeleton');
+console.log('✓ Phase two: order confirm step, search debounce, delivery modal, department menu');
 
 // Cart over-order advisory: ordering beyond stock is allowed (backorder request)
 // but a clear warning is shown; the cart no longer silently clamps to stock.

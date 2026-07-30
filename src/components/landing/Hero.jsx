@@ -74,10 +74,10 @@ export default function Hero({ onLogin, onApply }) {
 
           <div className="hero-btns" style={{ display: 'flex', gap: '20px', marginBottom: '32px', flexWrap: 'wrap' }}>
             <button onClick={onApply} className="btn-premium" style={{ padding: '20px 48px', fontSize: '18px', borderRadius: '12px' }}>
-              Apply for Trade Access <ArrowRight size={22} />
+              Apply for a Trade Account <ArrowRight size={22} />
             </button>
             <button onClick={onLogin} className="btn-outline" style={{ padding: '20px 48px', fontSize: '18px', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.1)' }}>
-              Log In to Portal
+              Sign In
             </button>
           </div>
 
@@ -122,7 +122,6 @@ export default function Hero({ onLogin, onApply }) {
     </section>
   );
 }
-
 
 
 

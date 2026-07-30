@@ -1,6 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, Lock, PackageCheck, ShieldAlert, ShoppingCart, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Loader2,
+  Package,
+  PackageCheck,
+  ShieldAlert,
+  ShoppingCart,
+  Store,
+  Trash2,
+  Truck,
+  X,
+} from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
@@ -59,6 +71,7 @@ export default function Drawer({
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
   onClose,
+  onContinueShopping,
 }) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
@@ -74,6 +87,8 @@ export default function Drawer({
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const courierDialogRef = useRef(null);
+  const courierPreviousFocusRef = useRef(null);
   const courierDialogTitleId = useId();
 
   const inclVatEstimate = cartTotal;
@@ -101,6 +116,11 @@ export default function Drawer({
     setCustomerNotes('');
   };
 
+  const handleContinueShopping = () => {
+    setShowCheckoutModal(false);
+    onContinueShopping?.();
+  };
+
   const handleConfirmCourier = async () => {
     setSubmitting(true);
     try {
@@ -126,22 +146,68 @@ export default function Drawer({
 
   useEffect(() => {
     if (!showCourierPicker) return undefined;
-    const onGlobalEscape = (event) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      setShowCourierPicker(false);
-      setCourierChoice(null);
-      setCustomerNotes('');
+    courierPreviousFocusRef.current = document.activeElement;
+    const dialog = courierDialogRef.current;
+    const focusableSelector = [
+      'button:not([disabled])',
+      'textarea:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      '[href]',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const getFocusable = () => Array.from(dialog?.querySelectorAll(focusableSelector) || [])
+      .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
+
+    // CheckoutModal restores focus during its own cleanup. Defer this focus
+    // until that cleanup has finished so the newly opened delivery dialog wins.
+    const focusFrame = window.requestAnimationFrame(() => {
+      getFocusable()[0]?.focus();
+    });
+
+    const onGlobalKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setShowCourierPicker(false);
+        setCourierChoice(null);
+        setCustomerNotes('');
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialog?.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     // Capture phase so this runs before other document Escape handlers (e.g. the
     // mobile cart) — Escape should close only the delivery modal, not the cart.
-    document.addEventListener('keydown', onGlobalEscape, true);
+    document.addEventListener('keydown', onGlobalKeyDown, true);
     const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
     document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
     return () => {
-      document.removeEventListener('keydown', onGlobalEscape, true);
+      document.removeEventListener('keydown', onGlobalKeyDown, true);
+      window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = prevOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+      courierPreviousFocusRef.current?.focus?.();
     };
   }, [showCourierPicker]);
 
@@ -164,7 +230,13 @@ export default function Drawer({
             </span>
           )}
           {onClose && (
-            <button onClick={onClose} type="button" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center' }} aria-label="Close cart">
+            <button
+              onClick={onClose}
+              type="button"
+              className="drawer-close-button"
+              aria-label="Close cart"
+              data-cart-close
+            >
               <X size={16} />
             </button>
           )}
@@ -182,7 +254,7 @@ export default function Drawer({
           <div className="drawer-empty">
             <div className="drawer-empty-icon"><ShoppingCart size={22} /></div>
             <strong>Your basket is empty</strong>
-            <span>Browse the catalogue and add wholesale lines to build your quote.</span>
+            <span>Browse the catalogue and add wholesale lines to build your order request.</span>
           </div>
         )}
         {cartItems.map((item) => (
@@ -212,7 +284,7 @@ export default function Drawer({
                     +
                   </button>
                 </div>
-                <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label="Remove item">
+                <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label={`Remove ${item.product.name} from cart`}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -266,12 +338,12 @@ export default function Drawer({
         {isReady ? (
           <button className="primary-order-button" onClick={handleSubmitClick} type="button">
             <ShoppingCart size={17} />
-            Submit order request
+            Review order request
           </button>
         ) : (
-          <button className="locked-order-button" type="button" disabled aria-disabled="true">
-            <Lock size={15} />
-            Add more products to submit
+          <button className="continue-shopping-button" type="button" onClick={handleContinueShopping}>
+            <ArrowLeft size={15} />
+            Continue shopping — R{remaining.toFixed(2)} remaining
           </button>
         )}
         <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button">
@@ -280,24 +352,25 @@ export default function Drawer({
         </button>
         <div className="drawer-trust">
           <PackageCheck size={14} />
-          No payment is taken at checkout. We send a pro-forma after confirmation.
+          No payment now. We send a pro-forma after confirming your request.
         </div>
         <ol className="quote-steps">
           <li>Add trade products</li>
           <li>Reach the minimum</li>
-          <li>Send for confirmation</li>
+          <li>Review and send your request</li>
         </ol>
       </div>
 
       <CheckoutModal
         isOpen={showCheckoutModal}
         onClose={() => setShowCheckoutModal(false)}
+        cartItems={cartItems}
         cartSubtotal={cartTotal}
         customer={customer}
         appliedPromo={appliedPromo}
         onPromoApplied={setAppliedPromo}
         onPromoClear={() => setAppliedPromo(null)}
-        onKeepShopping={() => setShowCheckoutModal(false)}
+        onKeepShopping={handleContinueShopping}
         onContinue={handleCheckoutContinue}
       />
 
@@ -309,39 +382,44 @@ export default function Drawer({
           onClick={closeCourierPicker}
           className="courier-modal-backdrop"
         >
-          <div onClick={(e) => e.stopPropagation()} className="courier-modal-sheet">
-            <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>How will your order be shipped?</div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select a delivery option before we send your quote request.</div>
-            <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+          <div
+            ref={courierDialogRef}
+            onClick={(e) => e.stopPropagation()}
+            className="courier-modal-sheet"
+            tabIndex={-1}
+          >
+            <div id={courierDialogTitleId} style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>Choose delivery for your order request</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Select how you would like to receive the order. Proto will confirm the final delivery details and cost.</div>
+            <div className="courier-options">
               {[
-                { key: 'own', icon: '🚚', title: "I'll use my own courier", desc: 'You arrange collection or delivery.' },
-                { key: 'proto', icon: '📦', title: 'Proto Trading delivers', desc: 'We will arrange delivery and include the cost in your quote.' },
-                { key: 'pickup', icon: '🏬', title: 'Pick up in store', desc: 'Collect your order from Proto — no delivery.' },
-              ].map(({ key, icon, title, desc }) => (
+                { key: 'own', Icon: Truck, title: "I'll use my own courier", desc: 'You arrange collection or delivery.' },
+                { key: 'proto', Icon: Package, title: 'Proto Trading delivers', desc: 'We will arrange delivery and include the cost in your quote.' },
+                { key: 'pickup', Icon: Store, title: 'Pick up in store', desc: 'Collect your order from Proto — no delivery.' },
+              ].map(({ key, Icon, title, desc }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setCourierChoice(key)}
                   style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', border: `2px solid ${courierChoice === key ? '#0f172a' : '#e2e8f0'}`, borderRadius: 12, background: courierChoice === key ? '#f8fafc' : '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.15s' }}
                 >
-                  <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+                  <Icon size={22} aria-hidden="true" style={{ flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 2 }}>{title}</div>
                     <div style={{ fontSize: 12, color: '#64748b' }}>{desc}</div>
                   </div>
-                  {courierChoice === key && <span style={{ marginLeft: 'auto', color: '#0f172a', fontSize: 18, flexShrink: 0 }}>✓</span>}
+                  {courierChoice === key && <Check size={18} aria-hidden="true" style={{ marginLeft: 'auto', color: '#0f172a', flexShrink: 0 }} />}
                 </button>
               ))}
             </div>
 
             <label style={{ display: 'block', marginBottom: 20 }}>
               <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 8 }}>
-                Order notes (optional)
+                PO/reference or delivery notes (optional)
               </span>
               <textarea
                 value={customerNotes}
                 onChange={(e) => setCustomerNotes(e.target.value)}
-                placeholder="Anything we should know about delivery, timing, or your order…"
+                placeholder="For example: PO 1234, delivery timing or collection instructions…"
                 rows={3}
                 style={{ width: '100%', padding: '12px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
               />
@@ -350,23 +428,25 @@ export default function Drawer({
             <div className="checkout-payment-notice" role="note" aria-label="Payment instruction">
               <ShieldAlert size={19} aria-hidden />
               <div>
-                <strong>This is an order request - not an invoice.</strong>
+                <strong>This is an order request — not an invoice.</strong>
                 <span>Please do not make payment yet. We will confirm stock, final pricing and delivery, then email your pro-forma invoice with payment instructions.</span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleConfirmCourier}
-              disabled={!courierChoice || submitting}
-              style={{ width: '100%', padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: !courierChoice ? '#e2e8f0' : '#0f172a', color: !courierChoice ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: !courierChoice ? 'not-allowed' : submitting ? 'wait' : 'pointer', fontFamily: 'inherit', marginBottom: 8, transition: 'all 0.15s' }}
-            >
-              {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
-              {submitting ? 'Sending your order request…' : 'Submit order request'}
-            </button>
-            <button type="button" onClick={closeCourierPicker} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
-              Cancel
-            </button>
+            <div className="courier-modal-actions">
+              <button
+                type="button"
+                onClick={handleConfirmCourier}
+                disabled={!courierChoice || submitting}
+                className="courier-submit-button"
+              >
+                {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
+                {submitting ? 'Sending your order request…' : 'Send order request — no payment now'}
+              </button>
+              <button type="button" onClick={closeCourierPicker} className="courier-cancel-button">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>,
         document.body,

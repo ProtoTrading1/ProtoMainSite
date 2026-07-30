@@ -37,9 +37,16 @@ let _sortOrdersPromise = null;
 let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
 const SORT_ORDERS_TTL = 15_000;
+const _identifierRequests = new Map();
+const _browseRequests = new Map();
+let _categoryCountsMemo = new WeakMap();
+let _persistentCachePromise = null;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
 const LS_KEY = 'proto_catalog_v10';
+const IDB_NAME = 'proto-catalogue';
+const IDB_STORE = 'catalogue';
+const IDB_KEY = 'approved-customer-v1';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
@@ -71,9 +78,11 @@ function preloadCatalogImages(products, limit = 60) {
 
 /** Start catalogue fetch early (e.g. on login) so data is ready before App mounts. */
 export function prefetchCatalog() {
-  const stale = loadFromLocalCache();
-  if (stale?.length) preloadCatalogImages(stale);
   void getAllCached().then((products) => preloadCatalogImages(products));
+  // Category pages need the merchandising order as well as the product rows.
+  // Start that independent request during portal boot instead of making the
+  // customer's first department click wait for it.
+  void getSortOrders();
   // The home grid is Featured — resolve it now so the first screen after
   // login paints without a loading pass.
   void fetchFeaturedCatalogProducts().catch(() => {});
@@ -89,6 +98,64 @@ function loadFromLocalCache() {
     const { data, ts } = JSON.parse(raw);
     return (Date.now() - ts < LS_TTL) ? data : null;
   } catch { return null; }
+}
+
+function openCatalogueDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function saveToIndexedCache(data) {
+  const db = await openCatalogueDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).put({ data, ts: Date.now() }, IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
+}
+
+async function loadFromIndexedCache() {
+  const db = await openCatalogueDb();
+  if (!db) return null;
+  const entry = await new Promise((resolve) => {
+    const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => resolve(null);
+  });
+  db.close();
+  if (!entry || Date.now() - Number(entry.ts || 0) >= LS_TTL) return null;
+  return Array.isArray(entry.data) ? entry.data : null;
+}
+
+async function loadFromPersistentCache() {
+  const local = loadFromLocalCache();
+  if (local?.length) return local;
+  return loadFromIndexedCache();
+}
+
+async function clearIndexedCache() {
+  const db = await openCatalogueDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).delete(IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
@@ -127,7 +194,11 @@ function startCatalogFetch() {
       const hadPrior = !!_cache;
       _cache = products;
       saveToLocalCache(products);
-      if (hadPrior) emitCatalogRefresh();
+      void saveToIndexedCache(products);
+      if (hadPrior) {
+        _browseRequests.clear();
+        emitCatalogRefresh();
+      }
       return _cache;
     })
     .catch((err) => {
@@ -137,17 +208,19 @@ function startCatalogFetch() {
 }
 
 function getAllCached() {
-  if (!_cache) {
-    const stale = loadFromLocalCache();
-    if (stale) _cache = stale;
+  if (_cache) {
+    if (!_loadPromise) _loadPromise = startCatalogFetch();
+    return Promise.resolve(_cache);
   }
 
-  if (!_loadPromise) {
-    _loadPromise = startCatalogFetch();
+  if (!_persistentCachePromise) {
+    _persistentCachePromise = loadFromPersistentCache().then((stale) => {
+      if (stale?.length && !_cache) _cache = stale;
+      if (!_loadPromise) _loadPromise = startCatalogFetch();
+      return _cache ? Promise.resolve(_cache) : _loadPromise;
+    });
   }
-
-  if (_cache) return Promise.resolve(_cache);
-  return _loadPromise;
+  return _persistentCachePromise;
 }
 
 export function invalidateProductCache() {
@@ -157,8 +230,13 @@ export function invalidateProductCache() {
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
   _sortOrdersPromise = null;
+  _identifierRequests.clear();
+  _browseRequests.clear();
+  _categoryCountsMemo = new WeakMap();
+  _persistentCachePromise = null;
   invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch {}
+  void clearIndexedCache();
 }
 
 async function getSortOrders() {
@@ -495,19 +573,50 @@ export async function fetchProducts() {
   return getAllCached();
 }
 
-async function fetchIdentifierProducts(query) {
+export async function fetchIdentifierProducts(query) {
   const identifier = String(query || '').trim();
   if (!isIdentifierQuery(identifier)) return [];
-  try {
-    const products = await fetchJsonWithTimeout(
-      `/api/products?identifier=${encodeURIComponent(identifier)}`,
-      4500,
-      { cache: 'no-store' },
-    );
-    return Array.isArray(products) ? products : [];
-  } catch {
-    return [];
-  }
+
+  // Header suggestions and the main result grid request the same identifier at
+  // almost the same moment. Share that authenticated no-store request rather
+  // than making the API perform the lookup twice. The entry is deliberately
+  // short-lived: this is request coalescing, not a stock/catalogue cache.
+  const key = identifier.toUpperCase();
+  if (_identifierRequests.has(key)) return _identifierRequests.get(key);
+
+  const request = fetchJsonWithTimeout(
+    `/api/products?identifier=${encodeURIComponent(identifier)}`,
+    4500,
+    { cache: 'no-store', authenticated: true },
+  )
+    .then((products) => (Array.isArray(products) ? products : []))
+    .catch(() => [])
+    .finally(() => {
+      globalThis.setTimeout(() => {
+        if (_identifierRequests.get(key) === request) _identifierRequests.delete(key);
+      }, 1000);
+    });
+  _identifierRequests.set(key, request);
+  return request;
+}
+
+async function fetchBrowseProducts(categoryPath) {
+  const key = categoryPath.join('/');
+  const cached = _browseRequests.get(key);
+  if (cached) return cached;
+
+  const request = fetchJsonWithTimeout(
+    `/api/products?browsePath=${encodeURIComponent(key)}`,
+    8000,
+    { cache: 'default', authenticated: true },
+  )
+    .then((products) => (Array.isArray(products) ? products : []))
+    .catch(async () => {
+      const all = await getAllCached();
+      return applyPathFilter(all, categoryPath);
+    });
+  _browseRequests.set(key, request);
+  return request;
 }
 
 export async function fetchProductPage({
@@ -560,10 +669,23 @@ export async function fetchProductPage({
     }
   }
 
-  let products = await getAllCached();
+  const isCategoryBrowse = categoryPath.length && !hasSearch && collection === 'all';
+  // The direct endpoint wins only while the complete catalogue is still
+  // arriving. Once the in-memory/IndexedDB snapshot is ready, changing to
+  // another department is a local filter and must not return to the network.
+  const canFilterCategoryLocally = isCategoryBrowse && Array.isArray(_cache) && _cache.length > 0;
+  let products = isCategoryBrowse
+    ? canFilterCategoryLocally
+      ? applyPathFilter(_cache, categoryPath)
+      : await fetchBrowseProducts(categoryPath)
+    : await getAllCached();
   const pool = products;
   products = applyCollection(products, collection, specialIds);
-  if (!hasSearch) products = applyPathFilter(products, categoryPath);
+  // The fast browse endpoint already returns this branch only. The local
+  // fallback and non-category paths still use the shared client filter.
+  if (!hasSearch && !isCategoryBrowse) {
+    products = applyPathFilter(products, categoryPath);
+  }
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
 
   if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
@@ -599,20 +721,79 @@ function collectTaxonomyNavPaths(nodes, prefix = [], out = []) {
 
 export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false } = {}) {
   let products = await getAllCached();
+  const tree = getActiveTaxonomy();
+  let byTree = _categoryCountsMemo.get(products);
+  if (!byTree) {
+    byTree = new WeakMap();
+    _categoryCountsMemo.set(products, byTree);
+  }
+  let byScope = byTree.get(tree);
+  if (!byScope) {
+    byScope = new Map();
+    byTree.set(tree, byScope);
+  }
+  const scopeKey = `${collection}|${inStockOnly ? '1' : '0'}`;
+  const memoized = byScope.get(scopeKey);
+  if (memoized) return memoized;
+
   products = applyCollection(products, collection);
   products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
-  const tree = getActiveTaxonomy();
   const counts = { '': products.length };
 
-  for (const navPath of collectTaxonomyNavPaths(tree)) {
-    const count = products.filter((p) => productMatchesNavPath(p, tree, navPath)).length;
-    if (count <= 0) continue;
-    const key = productCountKey(navPath, tree);
-    counts[key] = count;
-    const legacyKey = navPath.join('/');
-    if (legacyKey && legacyKey !== key) counts[legacyKey] = count;
+  // Count in one pass over products and their path prefixes. The old shape
+  // filtered every product once for every taxonomy node (products × nodes),
+  // which became the main-thread pause customers felt when opening menus.
+  const navEntries = collectTaxonomyNavPaths(tree).map((navPath) => ({
+    navPath,
+    legacyKey: navPath.join('/'),
+    resolvedKey: productCountKey(navPath, tree),
+  }));
+  const standardByResolvedPath = new Map(
+    navEntries
+      .filter(({ navPath }) => !isMotarroBrowsePath(navPath))
+      .map((entry) => [entry.resolvedKey, entry]),
+  );
+  const mottaroByNavPath = new Map(
+    navEntries
+      .filter(({ navPath }) => isMotarroBrowsePath(navPath))
+      .map((entry) => [entry.legacyKey, entry]),
+  );
+  const entryCounts = new Map();
+
+  for (const product of products) {
+    const matchedEntries = new Set();
+    for (const productPath of productPaths(product)) {
+      for (let depth = 1; depth <= productPath.length; depth += 1) {
+        const entry = standardByResolvedPath.get(productPath.slice(0, depth).join('/'));
+        if (entry) matchedEntries.add(entry);
+      }
+    }
+
+    if (isMotarroProduct(product)) {
+      const mottaroPath = product.alternateCategoryPath?.length
+        ? product.alternateCategoryPath
+        : inferMotarroPathFromRow(productRowForMotarro(product), tree);
+      for (let depth = 1; depth <= mottaroPath.length; depth += 1) {
+        const entry = mottaroByNavPath.get(mottaroPath.slice(0, depth).join('/'));
+        if (entry) matchedEntries.add(entry);
+      }
+    }
+
+    for (const entry of matchedEntries) {
+      entryCounts.set(entry, (entryCounts.get(entry) || 0) + 1);
+    }
   }
 
+  for (const entry of navEntries) {
+    const count = entryCounts.get(entry) || 0;
+    if (count <= 0) continue;
+    counts[entry.resolvedKey] = count;
+    if (entry.legacyKey && entry.legacyKey !== entry.resolvedKey) {
+      counts[entry.legacyKey] = count;
+    }
+  }
+
+  byScope.set(scopeKey, counts);
   return counts;
 }

@@ -459,9 +459,89 @@
     width: 100%;
     min-width: 0;
     min-height: 44px;
+    background: #111111;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .product-card .qty-stepper button:hover:not(:disabled),
+  .product-card .qty-stepper button:active:not(:disabled) {
+    background: #2f2f2f;
+    color: #ffffff;
+  }
+
+  .product-card .qty-stepper button:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
   }
 
   .product-card .qty-stepper input {
     height: 44px;
+    background: #ffffff;
+  }
+}
+
+@media (max-width: 380px) {
+  .product-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .product-card .product-image,
+  .product-card .product-image.product-image-button {
+    height: 188px;
+    min-height: 188px;
+    max-height: 188px;
+  }
+
+  .product-card .product-body {
+    min-width: 0;
+    padding: 12px 14px 14px;
+  }
+
+  .product-card .product-title-button,
+  .product-card h3 {
+    min-width: 0;
+  }
+
+  .product-card h3 {
+    min-height: 40px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .product-card .pc-sku-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+
+  .product-card .pc-sku-code {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .product-card .pc-price-amount {
+    font-size: 22px;
+  }
+
+  .product-card .qty-stepper {
+    grid-template-columns: minmax(44px, 1fr) minmax(52px, 72px) minmax(44px, 1fr);
+    height: 46px;
+  }
+
+  .product-card .qty-stepper button,
+  .product-card .qty-stepper input {
+    min-height: 44px;
+  }
+
+  .product-card .add-button {
+    min-height: 48px;
+  }
+
+  .pc-skeleton-image {
+    height: 188px;
   }
 }

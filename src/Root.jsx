@@ -6,7 +6,12 @@ import { isAdminHost } from './lib/isAdminHost';
 import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
-import { setIntercomLauncherVisibility } from './lib/intercom';
+import {
+  identifyIntercom,
+  refreshIntercomIdentity,
+  resetIntercom,
+  setIntercomLauncherVisibility,
+} from './lib/intercom';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
@@ -15,7 +20,6 @@ const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-p
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
-const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
 const PORTAL_URL = getPortalUrl();
 
@@ -167,6 +171,9 @@ export default function Root() {
       if (sess?.user) {
         void import('./lib/products').then((m) => m.prefetchCatalog());
         void loadCustomer(sess.user.id, sess);
+        // Hand Intercom a signed identity so Fin's catalogue connector can
+        // trust the email it receives. No-ops if the account isn't approved.
+        void identifyIntercom(sess);
       } else {
         setCustomerLoading(false);
         setCustomer(null);
@@ -214,6 +221,13 @@ export default function Root() {
           clearTimeout(bootstrapTimer);
           setSession(sess);
           if (sess?.user) {
+            if (event === 'TOKEN_REFRESHED') {
+              // Keep the signed Intercom identity alive on long-lived tabs
+              // without tearing down an open conversation.
+              void refreshIntercomIdentity(sess);
+            } else {
+              void identifyIntercom(sess);
+            }
             await loadCustomer(sess.user.id, sess);
           } else {
             setCustomerLoading(false);
@@ -238,6 +252,7 @@ export default function Root() {
     setSession(sess);
     try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
+    void identifyIntercom(sess);
     await loadCustomer(sess.user.id, sess);
   };
 
@@ -246,6 +261,9 @@ export default function Root() {
     await signOut();
     const { invalidateProductCache } = await import('./lib/products');
     invalidateProductCache();
+    // Drop the Intercom contact too, or the next person on this browser
+    // inherits the signed-out customer's identity — and their trade prices.
+    resetIntercom();
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);
@@ -262,6 +280,32 @@ export default function Root() {
         <div style={{ color: '#94a3b8', fontSize: '13px' }}>Preparing your account view.</div>
       </div>
     </div>
+  );
+
+  const registrationLanding = (
+    <>
+      <LandingPage
+        registrationMode
+        onLogin={() => setSurface('login')}
+        onApply={() => {
+          document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+      {view === 'login' && (
+        <Suspense fallback={null}>
+          <LoginModal
+            onLogin={handleLogin}
+            onClose={() => setSurface('landing')}
+            onApply={() => {
+              setSurface('landing');
+              window.requestAnimationFrame(() => {
+                document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
+              });
+            }}
+          />
+        </Suspense>
+      )}
+    </>
   );
 
   if (preRegisterHost) {
@@ -308,32 +352,13 @@ export default function Root() {
       );
     }
 
-    return (
-      <Suspense fallback={authSurfaceFallback}>
-        <RegisterPage standalone />
-      </Suspense>
-    );
+    return registrationLanding;
   }
 
   if (isRegisterRoute) {
     if (session === undefined) return authSurfaceFallback;
     if (!session) {
-      return (
-        <>
-          <Suspense fallback={authSurfaceFallback}>
-            <RegisterPage onLogin={() => setSurface('login')} />
-          </Suspense>
-          {view === 'login' && (
-            <Suspense fallback={null}>
-              <LoginModal
-                onLogin={handleLogin}
-                onClose={() => setSurface('landing')}
-                onApply={() => {}}
-              />
-            </Suspense>
-          )}
-        </>
-      );
+      return registrationLanding;
     }
   }
 

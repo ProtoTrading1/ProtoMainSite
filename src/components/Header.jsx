@@ -4,7 +4,7 @@ import {
   MessageCircle, Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
-import { fetchProducts } from '../lib/products';
+import { fetchIdentifierProducts, fetchProducts } from '../lib/products';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
@@ -232,14 +232,14 @@ function SearchProductResult({
 
   return (
     <div
-      id={optionId}
       className={`sp-product-row${exact ? ' sp-product-row--exact' : ''}${dark ? ' sp-product-row--dark' : ''}${active ? ' active' : ''}`}
-      role="option"
-      aria-selected={active}
     >
       <button
+        id={optionId}
         type="button"
         className="sp-product-main"
+        role="option"
+        aria-selected={active}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => onPick(product)}
       >
@@ -309,6 +309,8 @@ function SearchPanel({
   onAddProduct,
   onRequestProduct,
   previousOrderCodes,
+  searchState = 'idle',
+  onRetry,
 }) {
   if (!query.trim()) {
     return (
@@ -387,6 +389,23 @@ function SearchPanel({
 
   return (
     <div className="search-panel" id={listboxId} role="listbox" aria-label="Search suggestions">
+      {searchState === 'loading' && (
+        <div className="sp-search-status sp-search-status--loading" role="status" aria-live="polite">
+          <Loader2 size={16} className="spin-icon" aria-hidden="true" />
+          <span>Searching products…</span>
+        </div>
+      )}
+      {searchState === 'error' && (
+        <div className="sp-search-status sp-search-status--error" role="alert">
+          <div>
+            <strong>Search couldn’t connect</strong>
+            <span>Your wording is fine. Please try again.</span>
+          </div>
+          <button type="button" onClick={onRetry}>
+            <RotateCcw size={14} aria-hidden="true" /> Try again
+          </button>
+        </div>
+      )}
       {relatedSearchTerm && suggestions.length > 0 && (
         <div className="sp-related-search">
           We also searched for <strong>{relatedSearchTerm}</strong>
@@ -472,7 +491,7 @@ function SearchPanel({
         </div>
       )}
 
-      {suggestions.length === 0 && catMatches.length === 0 && (
+      {searchState !== 'loading' && searchState !== 'error' && suggestions.length === 0 && catMatches.length === 0 && (
         <div className="sp-empty">
           <Search size={24} />
           <p>No results for "<strong>{query}</strong>"</p>
@@ -531,6 +550,8 @@ export default function Header({
   const [showRequest, setShowRequest] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
+  const [desktopSearchState, setDesktopSearchState] = useState('idle');
+  const [mobileSearchState, setMobileSearchState] = useState('idle');
   const [activeIdx, setActiveIdx] = useState(-1);
   const [mobileActiveIdx, setMobileActiveIdx] = useState(-1);
   const [recentSearches, setRecentSearches] = useState(loadRecent);
@@ -564,18 +585,17 @@ export default function Header({
     productsLoading.current = (async () => {
       try {
         productsCache.current = await fetchProducts();
-      } catch {
-        productsCache.current = [];
+        const products = productsCache.current;
+        const warmIndex = () => prepareSearchIndex(products);
+        if (typeof window.requestIdleCallback === 'function') {
+          window.requestIdleCallback(warmIndex, { timeout: 1500 });
+        } else {
+          window.setTimeout(warmIndex, 0);
+        }
+        return productsCache.current;
+      } finally {
+        productsLoading.current = null;
       }
-      const products = productsCache.current;
-      const warmIndex = () => prepareSearchIndex(products);
-      if (typeof window.requestIdleCallback === 'function') {
-        window.requestIdleCallback(warmIndex, { timeout: 1500 });
-      } else {
-        window.setTimeout(warmIndex, 0);
-      }
-      productsLoading.current = null;
-      return productsCache.current;
     })();
     return productsLoading.current;
   }, []);
@@ -590,17 +610,11 @@ export default function Header({
     setCatMatches(matchCategories(query));
   }, [previousOrderCodes]);
 
-  const fetchIdentifierSuggestions = useCallback(async (query) => {
-    const response = await fetch(`/api/products?identifier=${encodeURIComponent(query)}`, { cache: 'no-store' });
-    if (!response.ok) return [];
-    const products = await response.json();
-    return Array.isArray(products) ? products : [];
-  }, []);
-
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setSuggestions([]);
     setCatMatches([]);
+    setDesktopSearchState('idle');
     setActiveIdx(-1);
   }, []);
 
@@ -635,41 +649,59 @@ export default function Header({
     if (!query.trim()) {
       setSuggestions([]);
       setCatMatches([]);
+      setDesktopSearchState('idle');
       return;
     }
+    setDesktopSearchState('loading');
     const identifier = isIdentifierQuery(query);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
-        void fetchIdentifierSuggestions(query).then((matches) => {
+        void fetchIdentifierProducts(query).then((matches) => {
           if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setSuggestions(matches.slice(0, 10));
             setCatMatches([]);
+            setDesktopSearchState('ready');
             return;
           }
           // If the code is not found, retain the existing local matcher as a
           // fallback for historical/variant identifiers.
           void loadProductsOnce().then((products) => {
-            if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+            if (requestId === suggestionRequestRef.current) {
+              updateSuggestions(query, products);
+              setDesktopSearchState('ready');
+            }
+          }).catch(() => {
+            if (requestId === suggestionRequestRef.current) setDesktopSearchState('error');
           });
         }).catch(() => {
           if (requestId !== suggestionRequestRef.current) return;
           void loadProductsOnce().then((products) => {
-            if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+            if (requestId === suggestionRequestRef.current) {
+              updateSuggestions(query, products);
+              setDesktopSearchState('ready');
+            }
+          }).catch(() => {
+            if (requestId === suggestionRequestRef.current) setDesktopSearchState('error');
           });
         });
         return;
       }
       void loadProductsOnce().then((products) => {
-        if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
+        if (requestId === suggestionRequestRef.current) {
+          updateSuggestions(query, products);
+          setDesktopSearchState('ready');
+        }
+      }).catch(() => {
+        if (requestId === suggestionRequestRef.current) setDesktopSearchState('error');
       });
     }, identifier ? 45 : 85);
-  }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
+  }, [loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
     setRecentSearches(loadRecent());
     setSearchOpen(true);
-    void loadProductsOnce();
+    void loadProductsOnce().catch(() => {});
   }, [loadProductsOnce]);
 
   const focusSearch = useCallback(() => {
@@ -677,7 +709,7 @@ export default function Header({
   }, [openSearch]);
 
   useEffect(() => {
-    const prefetch = () => { void loadProductsOnce(); };
+    const prefetch = () => { void loadProductsOnce().catch(() => {}); };
     if (typeof window.requestIdleCallback === 'function') {
       const idleId = window.requestIdleCallback(prefetch, { timeout: 2200 });
       return () => window.cancelIdleCallback?.(idleId);
@@ -796,6 +828,16 @@ export default function Header({
     setSearchOpen(false);
   };
 
+  const submitDesktopSearch = () => {
+    const term = inputValue.trim();
+    if (term) {
+      commitSearch(term);
+      return;
+    }
+    inputRef.current?.focus();
+    openSearch();
+  };
+
   // Mobile search — mobileInput is the transient typed text, separate from the
   // committed searchQuery so the input clears after a search without losing results.
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
@@ -810,7 +852,8 @@ export default function Header({
     setTimeout(() => mobileSearchInputRef.current?.focus(), 60);
     setScanError('');
     setMobileActiveIdx(-1);
-    void loadProductsOnce();
+    setMobileSearchState('idle');
+    void loadProductsOnce().catch(() => {});
   };
   const closeMobileSearch = useCallback(() => {
     setMobileSearchOpen(false);
@@ -818,6 +861,7 @@ export default function Header({
     setMobileCatMatches([]);
     setMobileInput('');
     setScanError('');
+    setMobileSearchState('idle');
     setMobileActiveIdx(-1);
   }, [setMobileSearchOpen]);
   const handleMobileInput = (val) => {
@@ -826,22 +870,32 @@ export default function Header({
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     const requestId = ++suggestionRequestRef.current;
-    if (!val.trim()) { setMobileSuggestions([]); setMobileCatMatches([]); return; }
+    if (!val.trim()) {
+      setMobileSuggestions([]);
+      setMobileCatMatches([]);
+      setMobileSearchState('idle');
+      return;
+    }
+    setMobileSearchState('loading');
     const identifier = isIdentifierQuery(val);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
-        void fetchIdentifierSuggestions(val).then((matches) => {
+        void fetchIdentifierProducts(val).then((matches) => {
           if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setMobileSuggestions(matches.slice(0, 10));
             setMobileCatMatches([]);
+            setMobileSearchState('ready');
             return;
           }
           void loadProductsOnce().then((products) => {
             if (requestId === suggestionRequestRef.current) {
               setMobileSuggestions(getSuggestions(products, val, 12));
               setMobileCatMatches(matchCategories(val));
+              setMobileSearchState('ready');
             }
+          }).catch(() => {
+            if (requestId === suggestionRequestRef.current) setMobileSearchState('error');
           });
         }).catch(() => {
           if (requestId !== suggestionRequestRef.current) return;
@@ -849,7 +903,10 @@ export default function Header({
             if (requestId === suggestionRequestRef.current) {
               setMobileSuggestions(getSuggestions(products, val, 12));
               setMobileCatMatches(matchCategories(val));
+              setMobileSearchState('ready');
             }
+          }).catch(() => {
+            if (requestId === suggestionRequestRef.current) setMobileSearchState('error');
           });
         });
         return;
@@ -858,7 +915,10 @@ export default function Header({
         if (requestId === suggestionRequestRef.current) {
           setMobileSuggestions(getSuggestions(products, val, 12));
           setMobileCatMatches(matchCategories(val));
+          setMobileSearchState('ready');
         }
+      }).catch(() => {
+        if (requestId === suggestionRequestRef.current) setMobileSearchState('error');
       });
     }, identifier ? 45 : 85);
   };
@@ -950,7 +1010,6 @@ export default function Header({
         {/* Signature search */}
         <div className="header-search-premium-wrap desktop-only" ref={searchWrapRef}>
           <div className="header-search-premium">
-            <Search size={18} className="header-search-premium__icon" aria-hidden="true" />
             <input
               ref={inputRef}
               type="text"
@@ -978,15 +1037,24 @@ export default function Header({
                   setSearchImmediate('');
                   setSuggestions([]);
                   setCatMatches([]);
+                  setDesktopSearchState('idle');
                   setActiveIdx(-1);
                   inputRef.current?.focus();
                 }}
               >
                 <X size={15} />
               </button>
-            ) : (
-              <kbd className="header-search-premium__shortcut">/</kbd>
-            )}
+            ) : null}
+            <button
+              type="button"
+              className="header-search-premium__submit"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={submitDesktopSearch}
+              title="Search products (keyboard shortcut: /)"
+            >
+              <Search size={15} aria-hidden="true" />
+              <span>Search</span>
+            </button>
           </div>
           {searchOpen && (
             <div className="header-search-dropdown">
@@ -1010,6 +1078,8 @@ export default function Header({
                   setShowRequest(true);
                 }}
                 previousOrderCodes={previousOrderCodes}
+                searchState={desktopSearchState}
+                onRetry={() => scheduleSuggestions(inputValue)}
               />
             </div>
           )}
@@ -1120,7 +1190,17 @@ export default function Header({
 
       {/* Mobile search */}
       <div className={`mobile-action-search-drop${mobileSearchOpen ? ' open' : ''}`}>
-        <Search size={16} color="rgba(255,255,255,0.5)" />
+        <button
+          type="button"
+          className="mobile-search-submit"
+          aria-label="Search"
+          onClick={() => {
+            if (mobileInput.trim()) commitMobileSearch(mobileInput.trim());
+            else mobileSearchInputRef.current?.focus();
+          }}
+        >
+          <Search size={17} />
+        </button>
         <input
           ref={mobileSearchInputRef}
           type="search"
@@ -1161,7 +1241,7 @@ export default function Header({
           aria-activedescendant={activeMobileItemId}
         />
         {mobileInput && (
-          <button type="button" onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); }} aria-label="Clear">
+          <button type="button" onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); setMobileSearchState('idle'); }} aria-label="Clear">
             <X size={15} />
           </button>
         )}
@@ -1196,6 +1276,23 @@ export default function Header({
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
         <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
+          {mobileSearchState === 'loading' && (
+            <div className="sp-search-status sp-search-status--loading" role="status" aria-live="polite">
+              <Loader2 size={16} className="spin-icon" aria-hidden="true" />
+              <span>Searching products…</span>
+            </div>
+          )}
+          {mobileSearchState === 'error' && (
+            <div className="sp-search-status sp-search-status--error" role="alert">
+              <div>
+                <strong>Search couldn’t connect</strong>
+                <span>Your wording is fine. Please try again.</span>
+              </div>
+              <button type="button" onClick={() => handleMobileInput(mobileInput)}>
+                <RotateCcw size={14} aria-hidden="true" /> Try again
+              </button>
+            </div>
+          )}
           {mobileCatMatches.map((cat) => {
             const optionId = `${mobileListboxId}-cat-${cat.id}`;
             const isActive = activeMobileItemId === optionId;
@@ -1232,7 +1329,7 @@ export default function Header({
               />
             );
           })}
-          {mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
+          {mobileSearchState !== 'loading' && mobileSearchState !== 'error' && mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
             <div className="sp-empty sp-empty--mobile">
               <Search size={24} />
               <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>

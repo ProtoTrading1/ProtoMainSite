@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Lock,
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
@@ -195,7 +194,6 @@ function TruckScrollbar() {
   const PAD      = isMobile ? 18 : 24;
   const dotSize  = isMobile ? 6  : 8;
   const trackW   = isMobile ? 2  : 3;
-  const scale    = isMobile ? 0.65 : 1;
 
   // Which stage are we in?
   let curIdx = 0;
@@ -434,10 +432,10 @@ function Questionnaire({ onLogin }) {
         <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. Your email is on our active trade list — log in with ${email.trim()} to access the catalogue.`
+            ? `Welcome back, ${contactName}. Your email is on our active trade list — sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
-        <button type="button" onClick={onLogin}>Go to login</button>
+        <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );
   }
@@ -706,7 +704,7 @@ function Questionnaire({ onLogin }) {
                 style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
               />
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
-                If your email has changed since you last ordered, enter your account code so we can match and approve you instantly.
+                If your email has changed since you last ordered, enter your account code so we can match your existing customer record.
               </p>
             </div>
           </div>
@@ -737,7 +735,30 @@ function Questionnaire({ onLogin }) {
   );
 }
 
-export default function LandingPage({ onLogin, onApply }) {
+function RegistrationCampaignHero({ onApply }) {
+  return (
+    <section className="registration-campaign-hero" aria-label="Proto Trading Online registration">
+      <button
+        type="button"
+        className="registration-campaign-hero__action"
+        onClick={onApply}
+        aria-label="Existing customers must re-register and new customers can apply online. Go to the registration form."
+      >
+        <img
+          src="/register-reregister-banner-v3.webp"
+          alt="Welcome to the new Proto Trading Online. Existing customers must re-register. New customers can apply for online access."
+          fetchPriority="high"
+          decoding="async"
+        />
+      </button>
+      <p className="registration-campaign-hero__hint">
+        Select the banner to re-register or apply for Proto Trading Online access.
+      </p>
+    </section>
+  );
+}
+
+export default function LandingPage({ onLogin, onApply, registrationMode = false }) {
   useEffect(() => {
     const prev = document.body.style.background;
     document.body.style.background = '#000';
@@ -764,20 +785,20 @@ export default function LandingPage({ onLogin, onApply }) {
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
-<button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply</button>
           <button type="button" onClick={() => setShowAbout(true)}>About us</button>
-          <button type="button" className="access-nav-login" onClick={onLogin}>Log in</button>
+          <button type="button" className="access-nav-login" onClick={onLogin}>Sign in</button>
         </nav>
       </header>
 
       <main>
-        {/* ── Video hero ── */}
-        <LandingHero onLogin={onLogin} onApply={scrollToForm} />
+        {registrationMode
+          ? <RegistrationCampaignHero onApply={scrollToForm} />
+          : <LandingHero onApply={scrollToForm} />}
 
         <div>
         <LandingMapSection />
         <LandingDepartmentsSection />
-        <LandingApplySection>
+        <LandingApplySection registrationMode={registrationMode}>
           <Questionnaire onLogin={onLogin} />
         </LandingApplySection>
 
@@ -808,10 +829,6 @@ export default function LandingPage({ onLogin, onApply }) {
               ))}
             </div>
           </div>
-          <button className="access-login" type="button" onClick={onLogin}>
-            <Lock size={15} />
-            Customer login
-          </button>
         </footer>
         </div>{/* end belowHero */}
       </main>

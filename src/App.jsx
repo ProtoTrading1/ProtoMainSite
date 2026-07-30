@@ -6,11 +6,11 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
+import CartFlyAnimation from './components/CartFlyAnimation';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
 // Lazy-loaded: only fetched when the user actually triggers these interactions.
-const CartFlyAnimation = lazyWithRetry(() => import('./components/CartFlyAnimation'), 'app-cart-fly-animation');
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
@@ -35,7 +35,10 @@ const CATALOG_PAGE_SIZE = 60;
 // Mirrors MAX_ORDER_LINES in api/send-order.js — the server rejects an order
 // with more lines than this, so the cart must not be allowed to exceed it.
 const MAX_CART_LINES = 250;
-const DRAWER_PEEK_MS = 5000;
+// Keep the add-to-cart confirmation brief so it does not cover the catalogue,
+// but never retreat while the customer is inspecting or editing the basket.
+const DRAWER_PEEK_MS = 700;
+const WELCOME_DISPLAY_MS = 3500;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
@@ -151,6 +154,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, []);
 
+  useEffect(() => {
+    if (!showWelcome) return undefined;
+    const dismissTimer = window.setTimeout(dismissWelcome, WELCOME_DISPLAY_MS);
+    const dismissOnScroll = () => dismissWelcome();
+    window.addEventListener('scroll', dismissOnScroll, { passive: true, once: true });
+    return () => {
+      window.clearTimeout(dismissTimer);
+      window.removeEventListener('scroll', dismissOnScroll);
+    };
+  }, [dismissWelcome, showWelcome]);
+
   const handleInStockOnlyChange = useCallback((next) => {
     setInStockOnly(next);
     try {
@@ -194,6 +208,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
+  const cartTriggerRef = useRef(null);
+  const desktopCartRef = useRef(null);
+  const mobileCartDialogRef = useRef(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const lastSearchLogKeyRef = useRef('');
   const hasInitializedCartAnnouncementRef = useRef(false);
@@ -214,11 +231,50 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
 
+  const restoreCartTriggerFocus = useCallback(() => {
+    const trigger = cartTriggerRef.current;
+    cartTriggerRef.current = null;
+    window.requestAnimationFrame(() => trigger?.focus());
+  }, []);
+
+  const closeDesktopCart = useCallback(({ restoreFocus = true } = {}) => {
+    setCartDrawerOpen(false);
+    setDrawerPeek(false);
+    if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
+    if (restoreFocus) restoreCartTriggerFocus();
+  }, [restoreCartTriggerFocus]);
+
+  const pauseDrawerPeek = useCallback(() => {
+    if (!drawerPeek || cartDrawerOpen) return;
+    if (drawerTimerRef.current) {
+      window.clearTimeout(drawerTimerRef.current);
+      drawerTimerRef.current = null;
+    }
+  }, [cartDrawerOpen, drawerPeek]);
+
+  const resumeDrawerPeek = useCallback(() => {
+    if (!drawerPeek || cartDrawerOpen) return;
+    if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
+    drawerTimerRef.current = window.setTimeout(() => {
+      setDrawerPeek(false);
+      drawerTimerRef.current = null;
+    }, DRAWER_PEEK_MS);
+  }, [cartDrawerOpen, drawerPeek]);
+
+  const closeMobileCart = useCallback(({ restoreFocus = true } = {}) => {
+    setMobileCartOpen(false);
+    if (restoreFocus) restoreCartTriggerFocus();
+  }, [restoreCartTriggerFocus]);
+
+  const handleCartOpen = useCallback((event) => {
+    cartTriggerRef.current = event?.currentTarget || document.activeElement;
+    if (window.innerWidth > 1200) setCartDrawerOpen(true);
+    else setMobileCartOpen(true);
+  }, []);
+
   const goHome = useCallback(() => {
-    try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
-    setShowWelcome(true);
     setSearchQuery('');
     setActiveCollection('all');
     setSort(DEFAULT_SORT);
@@ -288,14 +344,58 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     if (!mobileCartOpen) return undefined;
+    const dialog = mobileCartDialogRef.current;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    const focusFrame = window.requestAnimationFrame(() => dialog?.querySelector('[data-cart-close]')?.focus());
     const onGlobalEscape = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      setMobileCartOpen(false);
+      closeMobileCart();
+    };
+    const onTrapFocus = (event) => {
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onGlobalEscape);
+    document.addEventListener('keydown', onTrapFocus);
+    return () => {
+      document.removeEventListener('keydown', onGlobalEscape);
+      document.removeEventListener('keydown', onTrapFocus);
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, [mobileCartOpen, closeMobileCart]);
+
+  useEffect(() => {
+    if (!cartDrawerOpen) return undefined;
+    window.requestAnimationFrame(() => desktopCartRef.current?.querySelector('[data-cart-close]')?.focus());
+    const onGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeDesktopCart();
     };
     document.addEventListener('keydown', onGlobalEscape);
     return () => document.removeEventListener('keydown', onGlobalEscape);
-  }, [mobileCartOpen]);
+  }, [cartDrawerOpen, closeDesktopCart]);
 
   useEffect(() => {
     setPage(1);
@@ -391,6 +491,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return subscribeCatalogRefresh(() => setCatalogRefreshKey((k) => k + 1));
   }, []);
 
+  // Category counts describe the catalogue scope, not the current browse
+  // position. Keeping them in the page-loading effect made every department,
+  // category, page, search and sort change repeat the full taxonomy count pass.
+  // Refresh only when an input that can actually change a count changes.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCategoryCounts({ collection: activeCollection, inStockOnly })
+      .then((nextCounts) => {
+        if (!cancelled) setCounts(nextCounts);
+      })
+      .catch(() => {
+        // Counts are supporting navigation data. A transient count failure must
+        // not clear otherwise valid counts or block the product page.
+      });
+    return () => { cancelled = true; };
+  }, [activeCollection, categories, inStockOnly, catalogRefreshKey]);
+
   useEffect(() => {
     let cancelled = false;
     let cancelDeferredImageWarm = null;
@@ -427,16 +544,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     const load = async () => {
       setLoading(true);
-      let allowCountsUpdate = true;
       try {
         const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
-        const countsPromise = fetchCategoryCounts({ collection: activeCollection, inStockOnly })
-          .then((nextCounts) => {
-            if (cancelled || !allowCountsUpdate) return;
-            setCounts(nextCounts);
-          })
-          .catch(() => {});
-
         const pageData = await fetchProductPage({
           page,
           pageSize: CATALOG_PAGE_SIZE,
@@ -482,16 +591,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setCatalogProducts(pageData.products);
         setCatalogTotal(pageData.total);
         warmPageImages(pageData.products);
-        void countsPromise;
       } catch {
         // Never fall back to a public catalogue file: trade pricing and stock
         // are available only through the approved-customer API.
-        allowCountsUpdate = false;
         if (cancelled) return;
         setUsingFallback(false);
         setCatalogTotal(0);
         setCatalogProducts([]);
-        setCounts({ '': 0 });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -592,7 +698,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     setDrawerPeek(false);
   }, [cartItems.length, cartLastActivityAt, cartClock, clearCart]);
 
-  const addToCart = (product, qty, buttonPos = null) => {
+  const addToCart = useCallback((product, qty, buttonPos = null) => {
     const maxQty = cartQtyCapForProduct(product);
     if (maxQty <= 0) return;
     const requestedQty = normalizeCartQtyInput(qty);
@@ -617,10 +723,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     setDrawerPeek(true);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
-    drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
-  };
+    drawerTimerRef.current = setTimeout(() => {
+      setDrawerPeek(false);
+      drawerTimerRef.current = null;
+    }, DRAWER_PEEK_MS);
+  }, [dismissWelcome, markCartActivity, searchQuery]);
 
-  const updateQty = (id, qty) => {
+  const updateQty = useCallback((id, qty) => {
     const requestedQty = normalizeCartQtyInput(qty);
     setCartItems((prev) => prev.flatMap((item) => {
       if (item.product.id !== id) return [item];
@@ -630,11 +739,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       return [{ ...item, qty: nextQty }];
     }));
     markCartActivity();
-  };
-  const removeFromCart = (id) => {
+  }, [markCartActivity]);
+
+  const removeFromCart = useCallback((id) => {
     setCartItems((prev) => prev.filter((i) => i.product.id !== id));
     markCartActivity();
-  };
+  }, [markCartActivity]);
 
   const cartQtyMap = useMemo(() => {
     const map = {};
@@ -642,10 +752,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return map;
   }, [cartItems]);
 
-  const handleCartQtyChange = (product, newQty) => {
+  const handleCartQtyChange = useCallback((product, newQty) => {
     if (newQty <= 0) removeFromCart(product.id);
     else updateQty(product.id, newQty);
-  };
+  }, [removeFromCart, updateQty]);
 
   const handleShortcut = (id) => {
     if (id === 'start') {
@@ -868,9 +978,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [searchQuery, page]);
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
+  const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
 
   return (
-    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
@@ -878,7 +989,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         navigateForSearch={navigateForSearch}
-        onMenuClick={() => setMobileMenuOpen(true)}
+        onMenuClick={() => { dismissWelcome(); setMobileMenuOpen(true); }}
         onHome={goHome}
         customer={customer}
         onViewProfile={onViewProfile}
@@ -889,11 +1000,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
-        onCartClick={() => { if (window.innerWidth > 1200) setCartDrawerOpen(true); else setMobileCartOpen(true); }}
+        onCartClick={handleCartOpen}
       />
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
-        <aside className="sidebar-rail">
+        <aside className="sidebar-rail" onMouseEnter={dismissWelcome}>
           <Sidebar
             categories={categories}
             path={path}
@@ -905,7 +1016,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </aside>
 
-        <main className="content-area">
+        <main className="content-area" onScroll={dismissWelcome}>
           <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
@@ -945,8 +1056,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </main>
 
-        <aside className={`cart-drawer${cartDrawerOpen ? ' open' : drawerPeek ? ' peek' : ''}`}>
-          <Drawer
+        <aside
+          ref={desktopCartRef}
+          className={`cart-drawer${cartDrawerOpen ? ' open' : drawerPeek ? ' peek' : ''}`}
+          aria-hidden={!desktopDrawerVisible}
+          onMouseEnter={pauseDrawerPeek}
+          onMouseLeave={resumeDrawerPeek}
+        >
+          {desktopDrawerVisible && <Drawer
             cartItems={cartItems}
             cartTotal={cartTotal}
             updateQty={updateQty}
@@ -958,15 +1075,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
-            onClose={() => {
-              // The drawer is visible when EITHER flag is set. Closing only
-              // cartDrawerOpen made the X a no-op during the auto-"peek" after
-              // adding an item — the "sometimes the X doesn't work" bug.
-              setCartDrawerOpen(false);
-              setDrawerPeek(false);
-              if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
-            }}
-          />
+            onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
+            onContinueShopping={() => closeDesktopCart({ restoreFocus: true })}
+          />}
         </aside>
       </div>
 
@@ -982,7 +1093,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
       {reorderModal && <Suspense fallback={null}><ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
 
-      {flyAnim && <Suspense fallback={null}><CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} /></Suspense>}
+      {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
 
       {/* Global product preview — triggered from strip cards in category landings */}
       {previewProduct && (
@@ -1018,12 +1129,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
       {/* Mobile cart — opened from bottom tab bar */}
       {mobileCartOpen && (
-        <div className="mobile-cart-backdrop" onClick={() => setMobileCartOpen(false)}>
+        <div className="mobile-cart-backdrop" onClick={() => closeMobileCart()}>
           <div
+            ref={mobileCartDialogRef}
             className="mobile-cart-sheet"
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-cart-sheet-title"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mobile-cart-sheet-handle" />
@@ -1032,8 +1145,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
               <button
                 type="button"
                 className="mobile-cart-sheet-close"
-                onClick={() => setMobileCartOpen(false)}
+                onClick={() => closeMobileCart()}
                 aria-label="Close cart"
+                data-cart-close
               >
                 <X size={16} />
               </button>
@@ -1045,12 +1159,13 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 updateQty={updateQty}
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
-                sendOrderEmail={(opts) => { setMobileCartOpen(false); sendOrderEmail(opts); }}
+                sendOrderEmail={(opts) => { closeMobileCart({ restoreFocus: false }); sendOrderEmail(opts); }}
                 customer={customer}
                 autoCloseProgress={cartExpiryProgress}
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
+                onContinueShopping={() => setMobileCartOpen(false)}
               />
             </div>
           </div>

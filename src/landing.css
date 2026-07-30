@@ -1643,6 +1643,12 @@
 
 @media (max-width: 1100px) {
   .access-nav {
+    display: flex;
+    margin-left: auto;
+    gap: 0;
+  }
+
+  .access-nav > button:not(.access-nav-login) {
     display: none;
   }
 
@@ -1696,7 +1702,7 @@
     height: auto;
     min-height: 76px;
     padding: 14px 18px;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .access-brand small,
@@ -2140,6 +2146,50 @@
   padding: 88px clamp(28px, 6vw, 96px);
   background: #000;
   color: #fff;
+}
+
+/* Registration campaign hero — replaces only the public video hero. */
+.registration-campaign-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: clamp(12px, 2vw, 28px);
+  background: #000;
+}
+
+.registration-campaign-hero__action {
+  display: block;
+  width: min(100%, 1716px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 16px;
+  background: #000;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.48);
+  cursor: pointer;
+}
+
+.registration-campaign-hero__action img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.registration-campaign-hero__action:hover {
+  border-color: rgba(245, 158, 11, 0.9);
+}
+
+.registration-campaign-hero__action:focus-visible {
+  outline: 3px solid #f5b700;
+  outline-offset: 4px;
+}
+
+.registration-campaign-hero__hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 650;
+  text-align: center;
 }
 
 .lp-apply-copy h2 {
@@ -2618,6 +2668,18 @@
 }
 
 @media (max-width: 600px) {
+  .registration-campaign-hero {
+    padding: 8px;
+  }
+
+  .registration-campaign-hero__action {
+    border-radius: 10px;
+  }
+
+  .registration-campaign-hero__hint {
+    padding: 0 10px 4px;
+  }
+
   .lp-stats {
     grid-template-columns: 1fr;
   }
@@ -3571,6 +3633,22 @@
   box-shadow: none;
 }
 
+.lp-register-banner-action {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lp-register-banner-action:focus-visible {
+  outline: 3px solid #f2b724;
+  outline-offset: -3px;
+}
+
 .lp-register-standalone-body {
   padding: clamp(32px, 4vw, 48px);
 }
@@ -4333,6 +4411,27 @@
 .lp-register-main {
   flex: 1;
   padding: 36px 20px 48px;
+}
+
+.lp-register-route-banner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto 36px;
+}
+
+.lp-register-route-banner .lp-register-banner-action {
+  overflow: hidden;
+  border: 1.5px solid rgba(139, 26, 26, 0.6);
+  border-radius: 16px;
+  box-shadow:
+    0 22px 55px rgba(0, 0, 0, 0.48),
+    0 0 32px rgba(139, 26, 26, 0.08);
+}
+
+.lp-register-route-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .lp-register-shell {

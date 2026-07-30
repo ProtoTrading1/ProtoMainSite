@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowDown, CheckCircle2 } from 'lucide-react';
 
 const ROTATING_SUPPORT_MESSAGES = [
   'Trusted by South African retailers since 1987.',
@@ -10,7 +10,7 @@ const ROTATING_SUPPORT_MESSAGES = [
   'One supplier.\nThousands of possibilities.',
 ];
 
-export default function LandingHero({ onLogin, onApply }) {
+export default function LandingHero({ onApply }) {
   const [messageIdx, setMessageIdx] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const reduceMotion = useRef(false);
@@ -108,10 +108,7 @@ export default function LandingHero({ onLogin, onApply }) {
         </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
-            Apply for Trade Account <ArrowRight size={18} />
-          </button>
-          <button className="access-login large" type="button" onClick={onLogin}>
-            Sign In
+            Apply for a Trade Account <ArrowDown size={18} />
           </button>
         </div>
         <div className="vhero-trust-strip" role="list" aria-label="Wholesale platform highlights">

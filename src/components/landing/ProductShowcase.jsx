@@ -50,7 +50,7 @@ export default function ProductShowcase() {
                   fontFamily: 'Outfit'
                 }}>{p.name}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  <Lock size={12} /> <span style={{ textTransform: 'uppercase' }}>Login for Pricing</span>
+                  <Lock size={12} /> <span style={{ textTransform: 'uppercase' }}>Sign in for Pricing</span>
                 </div>
               </div>
             </div>
