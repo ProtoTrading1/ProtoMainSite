@@ -688,6 +688,25 @@ textarea:focus-visible,
   padding: 6px;
   touch-action: manipulation;
 }
+.mobile-action-search-drop .mobile-search-submit {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #e1bd6a;
+  border-radius: 10px;
+  background: #c89a3c;
+  color: #111;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mobile-action-search-drop .mobile-search-submit:active {
+  background: #d8ae55;
+}
+.mobile-search-results .sp-search-status {
+  border-bottom-color: rgba(255,255,255,0.1);
+}
 @media (max-width: 900px) {
   .mobile-action-bar { display: flex; }
 }
