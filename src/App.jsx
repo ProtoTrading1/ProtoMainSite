@@ -37,7 +37,7 @@ const CATALOG_PAGE_SIZE = 60;
 const MAX_CART_LINES = 250;
 // Keep the add-to-cart confirmation brief so it does not cover the catalogue,
 // but never retreat while the customer is inspecting or editing the basket.
-const DRAWER_PEEK_MS = 1200;
+const DRAWER_PEEK_MS = 700;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
