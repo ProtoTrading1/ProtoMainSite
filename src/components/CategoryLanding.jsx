@@ -169,7 +169,9 @@ export default function CategoryLanding({
                 <div className="cat-subcat-card-body">
                   <span className="cat-subcat-name">{sub.label}</span>
                   {sub.children?.length > 0 && (
-                    <span className="cat-subcat-types">{sub.children.length} types</span>
+                    <span className="cat-subcat-types">
+                      {sub.children.length} {sub.children.length === 1 ? 'type' : 'types'}
+                    </span>
                   )}
                 </div>
                 <ChevronRight size={14} className="cat-subcat-arrow" />
