@@ -1,8 +1,8 @@
 import { UserPlus, ShieldCheck, LayoutGrid } from 'lucide-react';
 
 const steps = [
-  { Icon: UserPlus,    num: '1', title: 'Apply for Access',    detail: 'Submit our trade registration form. We verify all applicants to maintain a secure B2B environment.' },
-  { Icon: ShieldCheck, num: '2', title: 'Business Verification', detail: 'Our trade team reviews your credentials. Verified retailers receive portal login details via email.' },
+  { Icon: UserPlus,    num: '1', title: 'Apply for a Trade Account', detail: 'Submit our trade application form. We verify all applicants to maintain a secure B2B environment.' },
+  { Icon: ShieldCheck, num: '2', title: 'Business Verification', detail: 'Our trade team reviews your credentials. Verified retailers receive sign-in details via email.' },
   { Icon: LayoutGrid,  num: '3', title: 'Browse & Order',  detail: 'Gain full access to our 5,000+ products, view live trade pricing, and manage orders with ease.' },
 ];
 
