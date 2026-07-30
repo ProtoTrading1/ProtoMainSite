@@ -37,7 +37,7 @@ describe('catalogue interaction accessibility', () => {
 
   it('keeps the basket preview open while the customer is using it', async () => {
     const source = await readSource('src/App.jsx');
-    assert.match(source, /const DRAWER_PEEK_MS = 1200/);
+    assert.match(source, /const DRAWER_PEEK_MS = 700/);
     assert.match(source, /const pauseDrawerPeek = useCallback/);
     assert.match(source, /const resumeDrawerPeek = useCallback/);
     assert.match(source, /onMouseEnter=\{pauseDrawerPeek\}/);
