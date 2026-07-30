@@ -1010,19 +1010,6 @@ export default function Header({
         {/* Signature search */}
         <div className="header-search-premium-wrap desktop-only" ref={searchWrapRef}>
           <div className="header-search-premium">
-            <button
-              type="button"
-              className="header-search-premium__icon"
-              aria-label="Open product search"
-              title="Open search"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                inputRef.current?.focus();
-                openSearch();
-              }}
-            >
-              <Search size={18} aria-hidden="true" />
-            </button>
             <input
               ref={inputRef}
               type="text"
