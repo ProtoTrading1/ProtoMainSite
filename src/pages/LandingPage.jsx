@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Lock,
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
@@ -764,7 +763,6 @@ export default function LandingPage({ onLogin, onApply }) {
         </div>
         <nav className="access-nav" aria-label="Public site navigation">
           <button type="button" onClick={() => document.getElementById('lp-departments')?.scrollIntoView({ behavior: 'smooth' })}>Departments</button>
-          <button type="button" onClick={() => document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' })}>Apply for a trade account</button>
           <button type="button" onClick={() => setShowAbout(true)}>About us</button>
           <button type="button" className="access-nav-login" onClick={onLogin}>Sign in</button>
         </nav>
@@ -772,7 +770,7 @@ export default function LandingPage({ onLogin, onApply }) {
 
       <main>
         {/* ── Video hero ── */}
-        <LandingHero onLogin={onLogin} onApply={scrollToForm} />
+        <LandingHero onApply={scrollToForm} />
 
         <div>
         <LandingMapSection />
@@ -808,10 +806,6 @@ export default function LandingPage({ onLogin, onApply }) {
               ))}
             </div>
           </div>
-          <button className="access-login" type="button" onClick={onLogin}>
-            <Lock size={15} />
-            Sign in
-          </button>
         </footer>
         </div>{/* end belowHero */}
       </main>
