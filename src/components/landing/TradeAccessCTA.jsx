@@ -26,11 +26,11 @@ export default function TradeAccessCTA({ onApply }) {
             marginBottom: '48px',
             fontWeight: '500'
           }}>
-            Apply for trade access today and join South Africa's most trusted professional wholesale network. Immediate access to live pricing and bulk ordering upon approval.
+            Apply for a trade account and join South Africa's most trusted professional wholesale network. Access live pricing and bulk ordering once approved.
           </p>
           <div className="hero-btns" style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '32px' }}>
             <button onClick={onApply} className="btn-premium" style={{ padding: '18px 48px', fontSize: '17px' }}>
-              Apply for Trade Access <ArrowRight size={20} />
+              Apply for a Trade Account <ArrowRight size={20} />
             </button>
             <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="btn-outline" style={{ padding: '18px 48px', fontSize: '17px' }}>
               View Product Range
