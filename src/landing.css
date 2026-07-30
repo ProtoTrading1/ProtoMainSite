@@ -4357,6 +4357,27 @@
   padding: 36px 20px 48px;
 }
 
+.lp-register-route-banner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto 36px;
+}
+
+.lp-register-route-banner .lp-register-banner-action {
+  overflow: hidden;
+  border: 1.5px solid rgba(139, 26, 26, 0.6);
+  border-radius: 16px;
+  box-shadow:
+    0 22px 55px rgba(0, 0, 0, 0.48),
+    0 0 32px rgba(139, 26, 26, 0.08);
+}
+
+.lp-register-route-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .lp-register-shell {
   max-width: 1180px;
   margin: 0 auto;

@@ -651,6 +651,24 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     </div>
   );
 
+  const registrationBanner = (
+    <div className={standalone ? 'lp-register-standalone-banner' : 'lp-register-route-banner'}>
+      <button
+        type="button"
+        className="lp-register-banner-action"
+        aria-label="All customers must re-register for the new website. Go to the re-registration form."
+        onClick={() => document.getElementById('trade-registration-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      >
+        <img
+          src="/register-reregister-banner.webp?v=1"
+          alt="Welcome to the new Proto Trading Online. All customers must re-register for the new website. Re-register now."
+          fetchPriority="high"
+          decoding="async"
+        />
+      </button>
+    </div>
+  );
+
   return (
     <div className={`lp-register-page${standalone ? ' lp-register-page--standalone' : ''}`}>
       {!standalone && (
@@ -668,44 +686,31 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       <main className={`lp-register-main${standalone ? ' lp-register-main-standalone' : ''}`}>
         {standalone ? (
           <div className="lp-register-standalone-panel">
-            {standaloneStep === 0 && (
-              <div className="lp-register-standalone-banner">
-                <button
-                  type="button"
-                  className="lp-register-banner-action"
-                  aria-label="All customers must re-register for the new website. Go to the re-registration form."
-                  onClick={() => document.getElementById('trade-registration-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                >
-                  <img
-                    src="/register-reregister-banner.webp?v=1"
-                    alt="Welcome to the new Proto Trading Online. All customers must re-register for the new website. Re-register now."
-                    fetchPriority="high"
-                    decoding="async"
-                  />
-                </button>
-              </div>
-            )}
+            {standaloneStep === 0 && registrationBanner}
             <div className="lp-register-standalone-body">
               {registerCard}
             </div>
           </div>
         ) : (
-          <div className="lp-register-shell">
-            <div className="lp-register-intro">
-              <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
-              <h1>Open your wholesale trade account</h1>
-              <p>
-                Apply once to access live stock, trade pricing, and our full catalogue.
-                Approved accounts can sign in immediately after approval.
-              </p>
-              <ul className="lp-apply-list">
-                <li>Instant approval for new trade customers</li>
-                <li>Live stock checks on every product</li>
-                <li>Order builder with PDF quote requests</li>
-              </ul>
+          <>
+            {registrationBanner}
+            <div className="lp-register-shell">
+              <div className="lp-register-intro">
+                <span className="lp-eyebrow lp-eyebrow-light">Trade registration</span>
+                <h1>Open your wholesale trade account</h1>
+                <p>
+                  Apply once to access live stock, trade pricing, and our full catalogue.
+                  Approved accounts can sign in immediately after approval.
+                </p>
+                <ul className="lp-apply-list">
+                  <li>Instant approval for new trade customers</li>
+                  <li>Live stock checks on every product</li>
+                  <li>Order builder with PDF quote requests</li>
+                </ul>
+              </div>
+              {registerCard}
             </div>
-            {registerCard}
-          </div>
+          </>
         )}
       </main>
 
