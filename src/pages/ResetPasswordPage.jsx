@@ -45,7 +45,7 @@ export default function ResetPasswordPage({ token, onDone }) {
               <h2 style={{ color: '#fff', fontFamily: 'Outfit, sans-serif', fontWeight: '900', margin: '0 0 12px' }}>Password updated</h2>
               <p style={{ color: '#94a3b8', margin: '0 0 28px', lineHeight: 1.6 }}>Your password has been changed successfully.</p>
               <button onClick={onDone} style={{ width: '100%', padding: '14px', background: '#c40000', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '15px', cursor: 'pointer' }}>
-                Back to login
+                Back to sign in
               </button>
             </div>
           ) : (
