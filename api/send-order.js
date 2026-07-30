@@ -7,7 +7,7 @@ import { runOrderTeamNotify } from './_order-notify-core.js';
 import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
-import { hasCustomerUsedPromo, validatePromoCode } from './_promo-codes.js';
+import { hasCustomerUsedPromo, recordPromoRedemption, validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 
@@ -1087,6 +1087,17 @@ export default async function handler(req, res) {
   }
   const orderId = String(captured.id);
   const orderNumber = cleanText(captured.order_number);
+
+  // Burn the promo the moment the order exists — the ledger survives order
+  // deletion, so cleaning up test orders can no longer resurrect a code.
+  if (promo?.code) {
+    await recordPromoRedemption(portal, {
+      customerId: user.id,
+      code: promo.code,
+      orderId,
+      orderNumber,
+    });
+  }
 
   // Generate the polished order sheet first. If that renderer fails, fall back
   // to the independently maintained fulfilment PDF so the operational email is
