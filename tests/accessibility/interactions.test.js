@@ -34,4 +34,13 @@ describe('catalogue interaction accessibility', () => {
     assert.match(source, /aria-label="Close cart"/);
     assert.match(source, /aria-label=\{`Remove \$\{item\.product\.name\} from cart`\}/);
   });
+
+  it('keeps the basket preview open while the customer is using it', async () => {
+    const source = await readSource('src/App.jsx');
+    assert.match(source, /const DRAWER_PEEK_MS = 1200/);
+    assert.match(source, /const pauseDrawerPeek = useCallback/);
+    assert.match(source, /const resumeDrawerPeek = useCallback/);
+    assert.match(source, /onMouseEnter=\{pauseDrawerPeek\}/);
+    assert.match(source, /onMouseLeave=\{resumeDrawerPeek\}/);
+  });
 });
