@@ -108,7 +108,7 @@ export default function LandingHero({ onLogin, onApply }) {
         </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
-            Apply for Trade Account <ArrowRight size={18} />
+            Apply for a Trade Account <ArrowRight size={18} />
           </button>
           <button className="access-login large" type="button" onClick={onLogin}>
             Sign In
