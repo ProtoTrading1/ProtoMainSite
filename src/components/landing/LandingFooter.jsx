@@ -39,7 +39,7 @@ export default function LandingFooter() {
           {/* Contact */}
           <div>
             <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '24px', fontFamily: 'Outfit' }}>Trade Support</h4>
-            <a href="mailto:orders@prototrading.co.za" style={{ fontSize: '15px', color: 'var(--proto-red)', fontWeight: '700' }}>orders@prototrading.co.za</a>
+            <a href="mailto:online@proto.co.za" style={{ fontSize: '15px', color: 'var(--proto-red)', fontWeight: '700' }}>online@proto.co.za</a>
             <p style={{ fontSize: '14px', color: 'var(--text-white-muted)', marginTop: '16px', lineHeight: 1.6 }}>
               Mon - Fri: 08:30 - 17:00<br />
               Cape Town, South Africa

@@ -53,7 +53,7 @@ Refunds are not offered.`,
       },
       {
         heading: 'Contact Details',
-        body: `Email: online@prototrading.co.za
+        body: `Email: online@proto.co.za
 Telephone: +27 21 461 5883
 Address: De Roos Street, Off Sir Lowry Road, District Six, Cape Town, South Africa
 
@@ -171,7 +171,7 @@ Address: De Roos Street, Off Sir Lowry Road, District Six, Cape Town, South Afri
       },
       {
         heading: 'Contact Details',
-        body: `Email: online@prototrading.co.za
+        body: `Email: online@proto.co.za
 Telephone: +27 21 461 5883
 Address: De Roos Street, Off Sir Lowry Road, District Six, Cape Town, South Africa
 
@@ -261,10 +261,10 @@ All third parties are required to handle your data in compliance with applicable
         heading: 'Contact Us',
         body: `For any privacy-related queries, requests, or complaints, please contact us:
 
-Email: online@prototrading.co.za
+Email: online@proto.co.za
 Telephone: +27 21 461 5883
 Address: De Roos Street, Off Sir Lowry Road, District Six, Cape Town, South Africa
-Website: www.prototrading.co.za
+Website: proto.co.za
 
 Proudly serving trade customers since 1987.`,
       },
@@ -336,7 +336,7 @@ export default function PoliciesPage({ onLogin }) {
             Proto Trading Policies
           </h1>
           <p style={{ color: '#64748b', fontSize: 14, marginTop: 10 }}>
-            All policies are effective as of June 2026. For questions, contact us at online@prototrading.co.za.
+            All policies are effective as of June 2026. For questions, contact us at online@proto.co.za.
           </p>
         </div>
 

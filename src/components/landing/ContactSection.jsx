@@ -28,7 +28,7 @@ export default function ContactSection() {
               </div>
               <div>
                 <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Trade Enquiries</div>
-                <a href="mailto:orders@prototrading.co.za" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--proto-red)', fontFamily: 'Outfit' }}>orders@prototrading.co.za</a>
+                <a href="mailto:online@proto.co.za" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--proto-red)', fontFamily: 'Outfit' }}>online@proto.co.za</a>
               </div>
             </div>
 
