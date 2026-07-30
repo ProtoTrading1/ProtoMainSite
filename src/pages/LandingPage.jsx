@@ -745,7 +745,7 @@ function RegistrationCampaignHero({ onApply }) {
         aria-label="Existing customers must re-register and new customers can apply online. Go to the registration form."
       >
         <img
-          src="/register-reregister-banner.webp?v=2"
+          src="/register-reregister-banner-v3.webp"
           alt="Welcome to the new Proto Trading Online. Existing customers must re-register. New customers can apply for online access."
           fetchPriority="high"
           decoding="async"

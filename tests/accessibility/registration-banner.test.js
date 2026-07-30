@@ -17,7 +17,7 @@ test('the registration route keeps the full landing experience and replaces only
   assert.match(landing, /<LandingMapSection \/>/);
   assert.match(landing, /<LandingDepartmentsSection \/>/);
   assert.match(landing, /<LandingApplySection registrationMode=\{registrationMode\}>/);
-  assert.match(landing, /src="\/register-reregister-banner\.webp\?v=2"/);
+  assert.match(landing, /src="\/register-reregister-banner-v3\.webp"/);
   assert.match(landing, /Existing customers must re-register/);
   assert.match(landing, /New customers can apply for online access/);
   assert.match(landing, /getElementById\('lp-apply'\)\?\.scrollIntoView/);
