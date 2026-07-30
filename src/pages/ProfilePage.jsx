@@ -5,6 +5,12 @@ import {
 } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
 import { fetchOrderHistory } from '../lib/orders';
+import { MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
+import { SADC_COUNTRIES, SA_PROVINCES } from '../lib/sadcCountries';
+import {
+  BUILDING_TYPES, SELECTABLE_BUSINESS_TYPES,
+  buildProfileForm, buildProfilePatch, validateProfileForm,
+} from '../lib/profileForm';
 
 function ProfileField({ icon: Icon, label, value }) {
   if (!value) return null;
@@ -37,20 +43,36 @@ function structuredDeliverySummary(customer) {
   return customer?.delivery_address || '';
 }
 
+const LABEL_STYLE = { display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 };
+const CONTROL_STYLE = { width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff' };
+
+const focusProps = {
+  onFocus: (e) => { e.target.style.borderColor = '#8B1A1A'; },
+  onBlur: (e) => { e.target.style.borderColor = '#e2e8f0'; },
+};
+
+function Field({ label, hint, children, full = false }) {
+  return (
+    <div style={full ? { gridColumn: '1 / -1' } : undefined}>
+      <label style={LABEL_STYLE}>{label}</label>
+      {children}
+      {hint && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 5 }}>{hint}</div>}
+    </div>
+  );
+}
+
 export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
-  const [form, setForm] = useState({
-    name: customer?.name || '',
-    phone: customer?.phone || '',
-    delivery_address: customer?.delivery_address || '',
-    business_type: customer?.business_type || '',
-    monthly_spend: customer?.monthly_spend || '',
-    website: customer?.website || '',
-  });
-  const SPEND_BANDS = ['R0 – R5,000', 'R5,000 – R10,000', 'R10,000 – R25,000', 'R25,000 – R50,000', 'R50,000+'];
+  const [form, setForm] = useState(() => buildProfileForm(customer));
   const [orders, setOrders] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  // The customer row can arrive (or be refreshed) after the first render.
+  // Keyed on the id only — depending on the object itself would discard
+  // whatever the customer is typing on every parent re-render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setForm(buildProfileForm(customer)); }, [customer?.id]);
 
   useEffect(() => {
     if (!customer?.id) return;
@@ -58,9 +80,11 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
   }, [customer?.id]);
 
   const handleSave = async () => {
+    const problem = validateProfileForm(form);
+    if (problem) { setError(problem); setSaved(false); return; }
     setSaving(true); setSaved(false); setError('');
     try {
-      const updated = await updateProfile(customer.id, form);
+      const updated = await updateProfile(customer.id, buildProfilePatch(form));
       onProfileUpdate?.(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -74,6 +98,9 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const deliverySummary = structuredDeliverySummary(customer);
+  const isSouthAfrica = form.country === 'South Africa';
+  const hasStructuredAddress = ['street_name', 'suburb', 'city', 'postal_code']
+    .some((key) => String(form[key] || '').trim());
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
@@ -135,64 +162,115 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            {[['Full name', 'name', 'text', 'Jane Smith'], ['Contact number', 'phone', 'tel', '+27 82 000 0000']].map(([label, key, type, placeholder]) => (
-              <div key={key}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{label}</label>
-                <input
-                  type={type} value={form[key]} onChange={set(key)} placeholder={placeholder}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
-              </div>
-            ))}
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 16 }}>
+            <Field label="Full name">
+              <input type="text" value={form.name} onChange={set('name')} placeholder="Jane Smith" style={CONTROL_STYLE} {...focusProps} />
+            </Field>
+            <Field label="Contact number">
+              <input type="tel" value={form.phone} onChange={set('phone')} placeholder="+27 82 000 0000" style={CONTROL_STYLE} {...focusProps} />
+            </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Business type</label>
-              <input
-                type="text" value={form.business_type} onChange={set('business_type')} placeholder="e.g. Retail store"
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Monthly spend</label>
-              <select
-                value={form.monthly_spend} onChange={set('monthly_spend')}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff' }}
-                onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-              >
-                <option value="">Select…</option>
-                {SPEND_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+            <Field label="Type of store">
+              <select value={form.business_type} onChange={set('business_type')} style={CONTROL_STYLE} {...focusProps}>
+                <option value="">Select your type of store…</option>
+                {SELECTABLE_BUSINESS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                <option value="Other">Other</option>
               </select>
+            </Field>
+            {form.business_type === 'Other' && (
+              <Field label="Describe your business">
+                <input type="text" value={form.business_type_other} onChange={set('business_type_other')} placeholder="e.g. Toy importer" style={CONTROL_STYLE} {...focusProps} />
+              </Field>
+            )}
+
+            <Field label="Monthly spend">
+              <select value={form.monthly_spend} onChange={set('monthly_spend')} style={CONTROL_STYLE} {...focusProps}>
+                <option value="">Select…</option>
+                {MONTHLY_SPEND_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </Field>
+
+            <Field label="Website or social media" full>
+              <input type="text" value={form.website} onChange={set('website')} placeholder="www.yourshop.co.za or @yourshop" style={CONTROL_STYLE} {...focusProps} />
+            </Field>
+          </div>
+
+          <div style={{ borderTop: '1px solid #e8eaed', paddingTop: 20, marginBottom: 20 }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, fontFamily: 'Outfit, sans-serif', color: '#0f172a' }}>Delivery address</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>Where we deliver your orders. This is what prints on your invoices and packing slips.</p>
+
+            {!hasStructuredAddress && customer?.delivery_address && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+                Currently on your account: <strong>{customer.delivery_address}</strong><br />
+                Fill in the fields below to update it.
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              <Field label="Street name and number">
+                <input type="text" value={form.street_name} onChange={set('street_name')} placeholder="12 Main Road" style={CONTROL_STYLE} {...focusProps} />
+              </Field>
+              <Field label="Suburb">
+                <input type="text" value={form.suburb} onChange={set('suburb')} placeholder="Suburb" style={CONTROL_STYLE} {...focusProps} />
+              </Field>
+              <Field label="City">
+                <input type="text" value={form.city} onChange={set('city')} placeholder="City" style={CONTROL_STYLE} {...focusProps} />
+              </Field>
+              <Field label="Postal code">
+                <input type="text" value={form.postal_code} onChange={set('postal_code')} placeholder="0000" style={CONTROL_STYLE} {...focusProps} />
+              </Field>
+
+              <Field label="Country">
+                <select
+                  value={form.country}
+                  onChange={(e) => setForm((f) => ({
+                    ...f,
+                    country: e.target.value,
+                    province: e.target.value === 'South Africa' ? f.province : '',
+                  }))}
+                  style={CONTROL_STYLE}
+                  {...focusProps}
+                >
+                  {SADC_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              {isSouthAfrica && (
+                <Field label="Province">
+                  <select value={form.province} onChange={set('province')} style={CONTROL_STYLE} {...focusProps}>
+                    <option value="">Select province…</option>
+                    {SA_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              <Field label="Building type">
+                <select
+                  value={form.building_type}
+                  onChange={(e) => setForm((f) => ({
+                    ...f,
+                    building_type: e.target.value,
+                    unit_number: e.target.value === 'Apartments' ? f.unit_number : '',
+                    building_type_other: e.target.value === 'Other' ? f.building_type_other : '',
+                  }))}
+                  style={CONTROL_STYLE}
+                  {...focusProps}
+                >
+                  <option value="">Select…</option>
+                  {BUILDING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  <option value="Other">Other</option>
+                </select>
+              </Field>
+              {form.building_type === 'Other' && (
+                <Field label="Describe building type">
+                  <input type="text" value={form.building_type_other} onChange={set('building_type_other')} placeholder="e.g. Warehouse, Industrial unit" style={CONTROL_STYLE} {...focusProps} />
+                </Field>
+              )}
+              {form.building_type === 'Apartments' && (
+                <Field label="Unit / apartment number">
+                  <input type="text" value={form.unit_number} onChange={set('unit_number')} placeholder="Unit number" style={CONTROL_STYLE} {...focusProps} />
+                </Field>
+              )}
             </div>
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Website or social media</label>
-            <input
-              type="text" value={form.website} onChange={set('website')} placeholder="www.yourshop.co.za or @yourshop"
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-              onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
-              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-            />
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Delivery address</label>
-            <textarea
-              value={form.delivery_address} onChange={set('delivery_address')}
-              placeholder="Street address, suburb, city, postcode"
-              rows={3}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#0f172a', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              onFocus={(e) => e.target.style.borderColor = '#8B1A1A'}
-              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-            />
           </div>
 
           <button
