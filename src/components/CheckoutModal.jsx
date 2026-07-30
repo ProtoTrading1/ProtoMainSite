@@ -4,24 +4,14 @@ import {
   Building2, Loader2, Mail, MapPin, MessageCircle, PackageCheck, Tag, User, X,
 } from 'lucide-react';
 import { updateWhatsappOptIn } from '../lib/auth';
+import { getDeliveryAddressReview } from '../lib/checkoutReview';
 import { validatePromoCode } from '../lib/promoCode';
 
-function deliveryAddress(customer) {
-  const structured = [
-    customer?.unit_number ? `Unit ${customer.unit_number}` : '',
-    customer?.street_name,
-    customer?.suburb,
-    customer?.city,
-    customer?.postal_code,
-    customer?.province,
-    customer?.country,
-  ].filter(Boolean);
-  return customer?.delivery_address || structured.join(', ') || 'To confirm with Proto';
-}
-
-function ReviewField({ icon: Icon, label, value }) {
+function ReviewField({
+  icon: Icon, label, value, describedBy,
+}) {
   return (
-    <div className="checkout-review-field">
+    <div className="checkout-review-field" aria-describedby={describedBy}>
       <Icon size={15} aria-hidden />
       <div>
         <span>{label}</span>
@@ -57,6 +47,7 @@ export default function CheckoutModal({
   }, [onClose]);
 
   const showWhatsapp = customer && customer.accept_whatsapp !== true;
+  const addressReview = getDeliveryAddressReview(customer);
 
   // Reset the modal to its first step only when it OPENS. Depending on
   // appliedPromo?.code here was a bug: applying a valid code changed that value,
@@ -190,8 +181,27 @@ export default function CheckoutModal({
               )}
               <ReviewField icon={User} label="Contact" value={customer?.contact_name || customer?.name} />
               <ReviewField icon={Mail} label="Email" value={customer?.email} />
-              <ReviewField icon={MapPin} label="Delivery address" value={deliveryAddress(customer)} />
+              <ReviewField
+                icon={MapPin}
+                label="Delivery address"
+                value={addressReview.value}
+                describedBy={!addressReview.complete ? 'checkout-address-warning' : undefined}
+              />
             </div>
+            {!addressReview.complete && (
+              <div
+                id="checkout-address-warning"
+                className="checkout-address-warning"
+                role="status"
+                aria-live="polite"
+              >
+                <MapPin size={17} aria-hidden />
+                <div>
+                  <strong>Check your delivery address</strong>
+                  <span>{addressReview.warning}</span>
+                </div>
+              </div>
+            )}
 
             <div className="checkout-review-heading">
               <strong>Products</strong>
@@ -234,22 +244,25 @@ export default function CheckoutModal({
           <>
             <h2 id="checkout-modal-title" className="checkout-modal-title">Order request options</h2>
             <p className="checkout-modal-sub">
-              Add an optional promo code and choose your update preference. Final pricing is confirmed by Proto.
+              Add a promo code if you have one. On the next screen, choose delivery and add any PO/reference. No payment is taken now.
             </p>
 
             <div className="checkout-modal-section">
-              <label className="checkout-modal-label">
+              <label className="checkout-modal-label" htmlFor="checkout-promo-code">
                 <Tag size={14} />
                 Promo code (optional)
               </label>
               <div className="checkout-modal-promo-row">
                 <input
+                  id="checkout-promo-code"
                   type="text"
                   value={promoInput}
                   onChange={(e) => { setPromoInput(e.target.value); setPromoError(''); }}
                   placeholder="Enter code"
                   className="checkout-modal-input"
                   autoCapitalize="characters"
+                  aria-invalid={Boolean(promoError)}
+                  aria-describedby={promoError ? 'checkout-promo-error' : undefined}
                 />
                 <button
                   type="button"
@@ -260,9 +273,13 @@ export default function CheckoutModal({
                   {promoLoading ? <Loader2 size={16} className="spin-icon" /> : 'Apply'}
                 </button>
               </div>
-              {promoError && <p className="checkout-modal-error">{promoError}</p>}
+              {promoError && (
+                <p id="checkout-promo-error" className="checkout-modal-error" role="alert">
+                  {promoError}
+                </p>
+              )}
               {appliedPromo && !promoError && (
-                <div className="checkout-modal-promo-applied">
+                <div className="checkout-modal-promo-applied" role="status" aria-live="polite">
                   <p className="checkout-modal-success">
                     ✓ {appliedPromo.code} applied — {appliedPromo.discountPct}% off, you save R{appliedPromo.discountAmount.toFixed(2)}
                   </p>
@@ -277,15 +294,16 @@ export default function CheckoutModal({
 
             {showWhatsapp && (
               <div className="checkout-modal-section checkout-modal-whatsapp">
-                <div className="checkout-modal-label">
+                <div id="checkout-whatsapp-label" className="checkout-modal-label">
                   <MessageCircle size={14} />
                   Get stock updates and specials on WhatsApp?
                 </div>
-                <div className="checkout-modal-whatsapp-actions">
+                <div className="checkout-modal-whatsapp-actions" role="group" aria-labelledby="checkout-whatsapp-label">
                   <button
                     type="button"
                     className={`checkout-modal-btn checkout-modal-btn--wa${whatsappChoice === true ? ' selected' : ''}`}
                     onClick={() => setWhatsappChoice(true)}
+                    aria-pressed={whatsappChoice === true}
                   >
                     Yes, join
                   </button>
@@ -293,6 +311,7 @@ export default function CheckoutModal({
                     type="button"
                     className={`checkout-modal-btn checkout-modal-btn--secondary${whatsappChoice === false ? ' selected' : ''}`}
                     onClick={() => setWhatsappChoice(false)}
+                    aria-pressed={whatsappChoice === false}
                   >
                     No thanks
                   </button>
