@@ -1643,6 +1643,12 @@
 
 @media (max-width: 1100px) {
   .access-nav {
+    display: flex;
+    margin-left: auto;
+    gap: 0;
+  }
+
+  .access-nav > button:not(.access-nav-login) {
     display: none;
   }
 
@@ -1696,7 +1702,7 @@
     height: auto;
     min-height: 76px;
     padding: 14px 18px;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .access-brand small,
@@ -3569,6 +3575,22 @@
   margin: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.lp-register-banner-action {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lp-register-banner-action:focus-visible {
+  outline: 3px solid #f2b724;
+  outline-offset: -3px;
 }
 
 .lp-register-standalone-body {

@@ -308,7 +308,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 )}
               </div>
             ) : (
-              <form className="lp-register-form" onSubmit={handleSubmit} noValidate>
+              <form id="trade-registration-form" className="lp-register-form" onSubmit={handleSubmit} noValidate>
                 <input
                   type="text"
                   name="company_fax"
@@ -670,12 +670,19 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           <div className="lp-register-standalone-panel">
             {standaloneStep === 0 && (
               <div className="lp-register-standalone-banner">
-                <img
-                  src="/pre-register-banner.jpg?v=2"
-                  alt="Your exclusive invitation — complete your Proto Trading account and enjoy 7.5% off your first online order with code PROTO75"
-                  fetchPriority="high"
-                  decoding="async"
-                />
+                <button
+                  type="button"
+                  className="lp-register-banner-action"
+                  aria-label="All customers must re-register for the new website. Go to the re-registration form."
+                  onClick={() => document.getElementById('trade-registration-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  <img
+                    src="/register-reregister-banner.webp?v=1"
+                    alt="Welcome to the new Proto Trading Online. All customers must re-register for the new website. Re-register now."
+                    fetchPriority="high"
+                    decoding="async"
+                  />
+                </button>
               </div>
             )}
             <div className="lp-register-standalone-body">
