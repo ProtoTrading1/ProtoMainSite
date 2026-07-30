@@ -39,10 +39,7 @@ export async function requireAdmin(req, res) {
   return user;
 }
 
-export async function requireApprovedCustomer(req, res) {
-  const user = await requireAuth(req, res);
-  if (!user) return null;
-
+export async function getApprovedCustomer(user, res) {
   const { data: customer, error } = await getServiceClient()
     .from('customers')
     .select('id, role, is_approved, name, business_name')
@@ -61,4 +58,10 @@ export async function requireApprovedCustomer(req, res) {
   }
 
   return { user, customer };
+}
+
+export async function requireApprovedCustomer(req, res) {
+  const user = await requireAuth(req, res);
+  if (!user) return null;
+  return getApprovedCustomer(user, res);
 }
