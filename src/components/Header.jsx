@@ -738,8 +738,14 @@ export default function Header({
   const liftSearch = useCallback((val) => {
     pendingSearchRef.current = val;
     clearTimeout(liftRef.current);
-    liftRef.current = setTimeout(() => setSearchQuery(val), 350);
-  }, [setSearchQuery]);
+    liftRef.current = setTimeout(() => {
+      // Suggestions and the results grid are catalogue-wide. Commit the root
+      // route with the debounced term so global matches never appear beneath a
+      // stale department heading or highlighted menu item.
+      if (val.trim()) navigateForSearch?.([]);
+      setSearchQuery(val);
+    }, 350);
+  }, [navigateForSearch, setSearchQuery]);
 
   // Immediate commit (Enter, suggestion/category pick, clear): cancel any
   // pending debounce and sync the local box + parent together.
