@@ -65,6 +65,11 @@ bridge. Full detail: protoportal-admin/scripts/install-sql-bridge-service.md.
       30 days. Leave **inactivity timeout** empty — customers who browse
       occasionally should not be logged out for being quiet.
 
+- [ ] Vercel → portal project → env vars: set `VITE_PORTAL_URL=https://proto.co.za`
+      **and REDEPLOY** — it is compiled into the bundle at build time, so the
+      env change alone does nothing. It drives the "go to the portal" button
+      on register.proto.co.za (defaults to site.proto.co.za until rebuilt).
+
 ## Part 3 — Verify (after DNS propagates; use your phone's mobile data for a cold view)
 
 Plumbing:
