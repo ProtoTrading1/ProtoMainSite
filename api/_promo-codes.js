@@ -67,8 +67,13 @@ export async function validatePromoCode(code, subtotal) {
 export async function hasCustomerUsedPromo(supabase, customerId, code) {
   const normalized = String(code || '').trim().toUpperCase();
   if (!customerId || !normalized) return false;
+  // The ledger, not the orders table, is the source of truth: admins delete
+  // test orders, and a check that reads orders forgets the redemption the
+  // moment the order is cleaned up — which is exactly how a one-per-customer
+  // code got used twice in production. promo_redemptions rows are never
+  // deleted with the order (migration 056).
   const { data, error } = await supabase
-    .from('orders')
+    .from('promo_redemptions')
     .select('id')
     .eq('customer_id', customerId)
     .eq('promo_code', normalized)
@@ -79,4 +84,25 @@ export async function hasCustomerUsedPromo(supabase, customerId, code) {
     throw new Error('Could not verify promo code usage. Please try again.');
   }
   return Boolean(data?.length);
+}
+
+/**
+ * Record a redemption. Called after the order row is captured; the unique
+ * index on (customer_id, upper(promo_code)) makes a duplicate structurally
+ * impossible even if two submissions race past the pre-capture check.
+ * Best-effort by design: the order already exists, so a logging failure must
+ * not fail the order — the pre-capture check still guards the next attempt.
+ */
+export async function recordPromoRedemption(supabase, { customerId, code, orderId, orderNumber }) {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!customerId || !normalized) return;
+  const { error } = await supabase.from('promo_redemptions').insert({
+    customer_id: customerId,
+    promo_code: normalized,
+    order_id: orderId || null,
+    order_number: orderNumber || null,
+  });
+  if (error && !/duplicate|unique/i.test(error.message || '')) {
+    console.error('promo redemption log failed:', error.message);
+  }
 }
