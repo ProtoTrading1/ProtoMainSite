@@ -37,11 +37,13 @@ describe('catalogue interaction accessibility', () => {
 
   it('keeps the basket preview open while the customer is using it', async () => {
     const source = await readSource('src/App.jsx');
-    assert.match(source, /const DRAWER_PEEK_MS = 700/);
+    const styles = await readSource('src/index.css');
+    assert.match(source, /const DRAWER_PEEK_MS = 1200/);
     assert.match(source, /const pauseDrawerPeek = useCallback/);
     assert.match(source, /const resumeDrawerPeek = useCallback/);
     assert.match(source, /onMouseEnter=\{pauseDrawerPeek\}/);
     assert.match(source, /onMouseLeave=\{resumeDrawerPeek\}/);
+    assert.match(styles, /transition: transform 0\.16s/);
   });
 
   it('dismisses the welcome banner quickly and does not restore it during the session', async () => {
