@@ -9,6 +9,12 @@ const SUPPORT_LINES = [
   ['New customers can apply for ', 'online access', '.'],
 ];
 
+// Sets expectations before anyone applies: an online account is not an account
+// at the physical store. Quieter than the lines above — it qualifies them, it
+// does not compete with them.
+const APPROVAL_NOTE = 'Online approval is for purchasing on Proto Trading Online only. '
+  + 'It does not create an account at our physical store.';
+
 export default function LandingHero({ onApply }) {
   return (
     <section className="vhero-section vhero-section--static vhero-section--banner">
@@ -34,6 +40,7 @@ export default function LandingHero({ onApply }) {
               {tail}
             </p>
           ))}
+          <p className="vhero-support-note">{APPROVAL_NOTE}</p>
         </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
