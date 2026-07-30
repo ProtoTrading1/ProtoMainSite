@@ -176,9 +176,9 @@
   color: #fff;
 }
 .header-search-premium__submit {
-  min-width: 88px;
+  min-width: 76px;
   height: 36px;
-  padding: 0 13px;
+  padding: 0 10px;
   border: 1px solid #E1BD6A;
   border-radius: 10px;
   background: #C89A3C;
@@ -186,7 +186,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
   font: 800 13px/1 Outfit, sans-serif;
   transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
