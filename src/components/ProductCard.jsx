@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
@@ -130,10 +130,10 @@ function StockBadge({ product }) {
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku }) {
+function StockCheck({ sku, autoCheck = false }) {
   const [state, setState] = useState({ status: 'idle', qty: null, toOrder: false });
 
-  const check = async () => {
+  const check = useCallback(async () => {
     if (!sku) return;
     setState({ status: 'loading', qty: null, toOrder: false });
     try {
@@ -151,7 +151,15 @@ function StockCheck({ sku }) {
     } catch {
       setState({ status: 'error', qty: null, toOrder: false });
     }
-  };
+  }, [sku]);
+
+  // A customer opening the detail view is already evaluating the product.
+  // Start the same authenticated, no-store live lookup immediately so the
+  // number is usually ready before they reach the quantity controls. Product
+  // cards remain click-to-check to avoid a request storm across the grid.
+  useEffect(() => {
+    if (autoCheck) void check();
+  }, [autoCheck, check]);
 
   let readout = null;
   if (state.status === 'done') {
@@ -296,7 +304,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-export default function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const defaultVariant = variants[0] || null;
@@ -636,7 +644,10 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
                 )}
 
                 <div className="pz-stock-check">
-                  <StockCheck sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id} />
+                  <StockCheck
+                    sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
+                    autoCheck
+                  />
                 </div>
               </div>
 
@@ -686,3 +697,5 @@ export default function ProductCard({ product, addToCart, cartQty = 0, onCartQty
     </>
   );
 }
+
+export default memo(ProductCard);

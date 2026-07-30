@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
 import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
-import { loadPlacementMapIfEnabled } from './_placements.js';
+import { loadPlacementMapIfEnabled, skusMatchingBrowsePath } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -181,6 +181,47 @@ function parseIdentifierQuery(raw) {
   return value;
 }
 
+function parseBrowsePath(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  const path = value.split('/').map((segment) => segment.trim()).filter(Boolean);
+  if (!path.length || path.length > 8) return null;
+  if (path.some((segment) => !/^[a-z0-9_-]+$/i.test(segment))) return null;
+  return path;
+}
+
+function resolveBrowseLabels(tree, path) {
+  const labels = [];
+  let nodes = tree || [];
+  for (const segment of path || []) {
+    const node = nodes.find((candidate) => candidate.id === segment);
+    if (!node) return null;
+    labels.push(node.label);
+    nodes = node.children || [];
+  }
+  return labels;
+}
+
+function primaryBrowseFilter(labels) {
+  const columns = ['category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four'];
+  return (query) => labels.reduce(
+    (next, label, index) => (columns[index] ? next.eq(columns[index], label) : next),
+    query,
+  );
+}
+
+function productMatchesBrowsePath(product, browsePath, labels) {
+  const candidates = product.categoryPaths?.length
+    ? product.categoryPaths
+    : product.categoryPath?.length ? [product.categoryPath] : [];
+  const resolvedPath = labels.map(labelToSlug);
+  return candidates.some((candidate) => {
+    if (candidate.length < browsePath.length) return false;
+    return browsePath.every((segment, index) =>
+      candidate[index] === segment || candidate[index] === resolvedPath[index]);
+  });
+}
+
 function applyIdentifierFilter(query, identifier) {
   if (!identifier) return query;
   // Exact SKU/barcode wins. Prefix matching makes scanner fragments and a
@@ -188,6 +229,30 @@ function applyIdentifierFilter(query, identifier) {
   return query.or(
     `sku.eq.${identifier},barcode.eq.${identifier},sku.ilike.${identifier}%,barcode.ilike.${identifier}%`,
   ).order('sku', { ascending: true });
+}
+
+async function fetchIdentifierRows(supabase, identifier) {
+  // Exact SKU/barcode is the overwhelmingly common operational lookup. Give it
+  // an index-friendly query first; only pay for prefix matching when no exact
+  // row exists. The previous OR mixed eq + ilike in one query, which forced
+  // exact scans through the slower prefix plan too.
+  const exact = await fetchAllRows(
+    supabase,
+    'website_stock',
+    STOCK_SELECT,
+    (q) => q
+      .or(`sku.eq.${identifier},barcode.eq.${identifier}`)
+      .order('sku', { ascending: true }),
+    10,
+  );
+  if (exact.length) return exact;
+  return fetchAllRows(
+    supabase,
+    'website_stock',
+    STOCK_SELECT,
+    (q) => applyIdentifierFilter(q, identifier),
+    10,
+  );
 }
 
 /**
@@ -283,6 +348,7 @@ export default async function handler(req, res) {
   try {
     const requestedSkus = parseSkuQuery(req.query?.skus);
     const identifier = requestedSkus ? null : parseIdentifierQuery(req.query?.identifier);
+    const browsePath = requestedSkus || identifier ? null : parseBrowsePath(req.query?.browsePath);
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
@@ -295,6 +361,56 @@ export default async function handler(req, res) {
     // only, and the ETag below makes that revalidation cheap.
     res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
     res.setHeader('Vary', 'Authorization');
+
+    // A department click should not wait for the entire protected catalogue.
+    // Resolve only that branch from website_stock, plus products explicitly
+    // placed into it. This keeps first-order navigation fast while preserving
+    // the same live taxonomy and multi-placement rules as the full catalogue.
+    if (browsePath) {
+      const [tree, placements, groupInfo] = await Promise.all([
+        loadTaxonomyTree(),
+        loadPlacementMapIfEnabled(supabase),
+        loadGroupInfoMapIfEnabled(supabase),
+      ]);
+      const labels = resolveBrowseLabels(tree, browsePath);
+      if (!labels) return res.status(200).json([]);
+
+      const placedSkus = [...skusMatchingBrowsePath(placements, browsePath)];
+      const placedBatches = [];
+      for (let i = 0; i < placedSkus.length; i += MAX_SKUS_PER_REQUEST) {
+        placedBatches.push(placedSkus.slice(i, i + MAX_SKUS_PER_REQUEST));
+      }
+
+      const [primaryRows, ...placedRows] = await Promise.all([
+        fetchAllRows(supabase, 'website_stock', STOCK_SELECT, primaryBrowseFilter(labels)),
+        ...placedBatches.map((batch) =>
+          fetchAllRows(supabase, 'website_stock', STOCK_SELECT, (query) => query.in('sku', batch))),
+      ]);
+      const rowMap = new Map();
+      for (const row of [primaryRows, ...placedRows].flat()) {
+        const key = String(row.sku || '').trim();
+        if (key && !rowMap.has(key)) rowMap.set(key, row);
+      }
+      const rows = [...rowMap.values()];
+      const salesByBarcode = await loadSalesByBarcode(
+        supabase,
+        rows.map((row) => row.sku).filter(Boolean),
+      );
+      const products = rows
+        .filter(isSafeStorefrontProduct)
+        .map((row) => adapt(
+          row,
+          tree,
+          salesByBarcode,
+          placements ? (placements.get(row.sku) || []) : null,
+          groupInfo ? (groupInfo.get(row.sku) || null) : null,
+        ))
+        .filter((product) => productMatchesBrowsePath(product, browsePath, labels));
+
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(200).json(products);
+    }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
     const isFullCatalog = !requestedSkus?.length && !identifier;
@@ -337,15 +453,14 @@ export default async function handler(req, res) {
     }
 
     const [rows, tree, salesByBarcode, placements, groupInfo] = await Promise.all([
-      fetchAllRows(
-        supabase,
-        'website_stock',
-        STOCK_SELECT,
-        requestedSkus?.length
-          ? (q) => q.in('sku', requestedSkus)
-          : identifier ? (q) => applyIdentifierFilter(q, identifier) : null,
-        identifier ? 10 : Infinity,
-      ),
+      identifier
+        ? fetchIdentifierRows(supabase, identifier)
+        : fetchAllRows(
+          supabase,
+          'website_stock',
+          STOCK_SELECT,
+          requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
+        ),
       loadTaxonomyTree(),
       // A direct code lookup should stay direct: only fetch sales for the
       // returned codes instead of scanning the entire sales catalogue.

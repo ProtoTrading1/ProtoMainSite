@@ -4,7 +4,7 @@ import {
   MessageCircle, Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
-import { fetchProducts } from '../lib/products';
+import { fetchIdentifierProducts, fetchProducts } from '../lib/products';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
@@ -590,13 +590,6 @@ export default function Header({
     setCatMatches(matchCategories(query));
   }, [previousOrderCodes]);
 
-  const fetchIdentifierSuggestions = useCallback(async (query) => {
-    const response = await fetch(`/api/products?identifier=${encodeURIComponent(query)}`, { cache: 'no-store' });
-    if (!response.ok) return [];
-    const products = await response.json();
-    return Array.isArray(products) ? products : [];
-  }, []);
-
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setSuggestions([]);
@@ -640,7 +633,7 @@ export default function Header({
     const identifier = isIdentifierQuery(query);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
-        void fetchIdentifierSuggestions(query).then((matches) => {
+        void fetchIdentifierProducts(query).then((matches) => {
           if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setSuggestions(matches.slice(0, 10));
@@ -664,7 +657,7 @@ export default function Header({
         if (requestId === suggestionRequestRef.current) updateSuggestions(query, products);
       });
     }, identifier ? 45 : 85);
-  }, [fetchIdentifierSuggestions, loadProductsOnce, updateSuggestions]);
+  }, [loadProductsOnce, updateSuggestions]);
 
   const openSearch = useCallback(() => {
     setRecentSearches(loadRecent());
@@ -830,7 +823,7 @@ export default function Header({
     const identifier = isIdentifierQuery(val);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
-        void fetchIdentifierSuggestions(val).then((matches) => {
+        void fetchIdentifierProducts(val).then((matches) => {
           if (requestId !== suggestionRequestRef.current) return;
           if (matches.length) {
             setMobileSuggestions(matches.slice(0, 10));
