@@ -2148,6 +2148,50 @@
   color: #fff;
 }
 
+/* Registration campaign hero — replaces only the public video hero. */
+.registration-campaign-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: clamp(12px, 2vw, 28px);
+  background: #000;
+}
+
+.registration-campaign-hero__action {
+  display: block;
+  width: min(100%, 1716px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 16px;
+  background: #000;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.48);
+  cursor: pointer;
+}
+
+.registration-campaign-hero__action img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.registration-campaign-hero__action:hover {
+  border-color: rgba(245, 158, 11, 0.9);
+}
+
+.registration-campaign-hero__action:focus-visible {
+  outline: 3px solid #f5b700;
+  outline-offset: 4px;
+}
+
+.registration-campaign-hero__hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 650;
+  text-align: center;
+}
+
 .lp-apply-copy h2 {
   font-size: clamp(28px, 3vw, 44px);
   line-height: 1.05;
@@ -2624,6 +2668,18 @@
 }
 
 @media (max-width: 600px) {
+  .registration-campaign-hero {
+    padding: 8px;
+  }
+
+  .registration-campaign-hero__action {
+    border-radius: 10px;
+  }
+
+  .registration-campaign-hero__hint {
+    padding: 0 10px 4px;
+  }
+
   .lp-stats {
     grid-template-columns: 1fr;
   }

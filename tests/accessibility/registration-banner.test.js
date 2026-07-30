@@ -2,18 +2,26 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('the registration banner sends every customer to the re-registration form', async () => {
-  const source = await readFile(new URL('../../src/pages/RegisterPage.jsx', import.meta.url), 'utf8');
+test('the registration route keeps the full landing experience and replaces only its hero', async () => {
+  const [landing, root, applySection] = await Promise.all([
+    readFile(new URL('../../src/pages/LandingPage.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/Root.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/components/landing/LandingApplySection.jsx', import.meta.url), 'utf8'),
+  ]);
 
-  assert.match(source, /id="trade-registration-form"/);
-  assert.match(source, /src="\/register-reregister-banner\.webp\?v=2"/);
-  assert.match(source, /Existing customers must re-register/);
-  assert.match(source, /New customers can apply for Proto Trading Online access/);
-  assert.match(source, /does not create an account at our physical store/);
-  assert.match(source, /New applications are reviewed before online access is approved/);
-  assert.match(source, /getElementById\('trade-registration-form'\)\?\.scrollIntoView/);
-  assert.match(source, /standaloneStep === 0 && registrationBanner/);
-  assert.match(source, /\{registrationBanner\}\s*<div className="lp-register-shell">/);
-  assert.doesNotMatch(source, /Instant approval for new trade customers/);
-  assert.doesNotMatch(source, /enjoy 7\.5% off your first online order/);
+  assert.match(root, /const registrationLanding =/);
+  assert.match(root, /<LandingPage\s+registrationMode/);
+  assert.doesNotMatch(root, /<RegisterPage/);
+  assert.match(landing, /registrationMode\s*\?\s*<RegistrationCampaignHero/);
+  assert.match(landing, /:\s*<LandingHero/);
+  assert.match(landing, /<LandingMapSection \/>/);
+  assert.match(landing, /<LandingDepartmentsSection \/>/);
+  assert.match(landing, /<LandingApplySection registrationMode=\{registrationMode\}>/);
+  assert.match(landing, /src="\/register-reregister-banner\.webp\?v=2"/);
+  assert.match(landing, /Existing customers must re-register/);
+  assert.match(landing, /New customers can apply for online access/);
+  assert.match(landing, /getElementById\('lp-apply'\)\?\.scrollIntoView/);
+  assert.match(applySection, /Existing customers re-register\. New customers apply online\./);
+  assert.match(applySection, /reviewed before online purchasing access is approved/);
+  assert.doesNotMatch(landing, /approve you instantly/);
 });

@@ -14,7 +14,6 @@ const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-p
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
-const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'root-register-page');
 
 const PORTAL_URL = getPortalUrl();
 
@@ -250,6 +249,32 @@ export default function Root() {
     </div>
   );
 
+  const registrationLanding = (
+    <>
+      <LandingPage
+        registrationMode
+        onLogin={() => setSurface('login')}
+        onApply={() => {
+          document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+      {view === 'login' && (
+        <Suspense fallback={null}>
+          <LoginModal
+            onLogin={handleLogin}
+            onClose={() => setSurface('landing')}
+            onApply={() => {
+              setSurface('landing');
+              window.requestAnimationFrame(() => {
+                document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
+              });
+            }}
+          />
+        </Suspense>
+      )}
+    </>
+  );
+
   if (preRegisterHost) {
     if (session === undefined) return authSurfaceFallback;
 
@@ -294,32 +319,13 @@ export default function Root() {
       );
     }
 
-    return (
-      <Suspense fallback={authSurfaceFallback}>
-        <RegisterPage standalone />
-      </Suspense>
-    );
+    return registrationLanding;
   }
 
   if (isRegisterRoute) {
     if (session === undefined) return authSurfaceFallback;
     if (!session) {
-      return (
-        <>
-          <Suspense fallback={authSurfaceFallback}>
-            <RegisterPage onLogin={() => setSurface('login')} />
-          </Suspense>
-          {view === 'login' && (
-            <Suspense fallback={null}>
-              <LoginModal
-                onLogin={handleLogin}
-                onClose={() => setSurface('landing')}
-                onApply={() => {}}
-              />
-            </Suspense>
-          )}
-        </>
-      );
+      return registrationLanding;
     }
   }
 
