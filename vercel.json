@@ -108,6 +108,24 @@
     "api/send-order.js": {
       "includeFiles": "node_modules/pdfkit/js/data/*.afm",
       "maxDuration": 60
+    },
+    "api/order-notification-worker.js": {
+      "includeFiles": "node_modules/pdfkit/js/data/*.afm",
+      "maxDuration": 60
+    },
+    "api/order-notification-reconcile.js": {
+      "includeFiles": "node_modules/pdfkit/js/data/*.afm",
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/order-notification-worker",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/order-notification-reconcile",
+      "schedule": "*/10 * * * *"
+    }
+  ]
 }
