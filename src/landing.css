@@ -443,6 +443,19 @@
   font-weight: 700;
 }
 
+/* Qualifies the two lines above, so it is deliberately quieter than them:
+   smaller, grey, normal weight — read after, not instead of. */
+.vhero-support-note {
+  margin: 2px 0 0;
+  max-width: 46ch;
+  color: #a1a1aa;
+  font-size: clamp(11px, 0.85vw, 13px);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
 .vhero-support-line {
   display: block;
 }
