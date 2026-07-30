@@ -11,10 +11,8 @@ import { motion } from 'motion/react';
 import {
   ArrowRight,
   CheckCircle2,
-  ChevronRight,
   Eye,
   EyeOff,
-  Lock,
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
@@ -737,62 +735,25 @@ function Questionnaire({ onLogin }) {
   );
 }
 
-/**
- * Same banner file as before — the wording is just no longer read off it.
- * The artwork's left side is flat #000 behind its baked-in copy, so a black
- * panel over that side hides the old words seamlessly and the campaign text
- * is written here instead. Nothing about the image changes: same file, same
- * aspect ratio, same photography.
- *
- * To reword the campaign, edit the text below — no artwork export needed.
- */
 function RegistrationCampaignHero({ onApply }) {
   return (
     <section className="registration-campaign-hero" aria-label="Proto Trading Online registration">
-      <div className="registration-campaign-hero__frame">
+      <button
+        type="button"
+        className="registration-campaign-hero__action"
+        onClick={onApply}
+        aria-label="Existing customers must re-register and new customers can apply online. Go to the registration form."
+      >
         <img
-          className="registration-campaign-hero__img"
           src="/register-reregister-banner-v3.webp"
-          alt=""
-          aria-hidden="true"
+          alt="Welcome to the new Proto Trading Online. Existing customers must re-register. New customers can apply for online access."
           fetchPriority="high"
           decoding="async"
         />
-
-        <div className="registration-campaign-hero__copy">
-          <p className="rch-wordmark">
-            <span className="rch-wordmark__proto">PROTO</span>
-            {' '}
-            <span className="rch-wordmark__trading">TRADING</span>
-            <span className="rch-wordmark__online">ONLINE</span>
-          </p>
-
-          <h1 className="rch-headline">
-            <span className="rch-headline__lead">Welcome to our new</span>
-            <span className="rch-headline__accent">Online Store</span>
-          </h1>
-
-          <hr className="rch-rule" />
-
-          <p className="rch-lede">
-            Existing customers must <strong>re-register</strong>.
-          </p>
-          <p className="rch-lede">
-            New customers can apply for <strong>online access</strong>.
-          </p>
-
-          <p className="rch-note">
-            Online approval is for purchasing on Proto Trading Online only. It does not
-            create an account at our physical store.
-          </p>
-
-          <button type="button" className="rch-cta" onClick={onApply}>
-            <Lock size={18} aria-hidden />
-            <span>Re-register / Apply online</span>
-            <ChevronRight size={18} aria-hidden />
-          </button>
-        </div>
-      </div>
+      </button>
+      <p className="registration-campaign-hero__hint">
+        Select the banner to re-register or apply for Proto Trading Online access.
+      </p>
     </section>
   );
 }
