@@ -738,17 +738,27 @@ function Questionnaire({ onLogin }) {
 }
 
 /**
- * The campaign hero used to be a single flat image with its wording baked in.
- * The copy is now real text and only the photography comes from the file, so
- * it can be edited here, stays sharp at any zoom, reflows on a phone instead
- * of shrinking to unreadable, and is available to search and screen readers.
- * The image is cropped to its right-hand side (the laptop) and marked
- * decorative, because everything it said is now said in the markup.
+ * Same banner file as before — the wording is just no longer read off it.
+ * The artwork's left side is flat #000 behind its baked-in copy, so a black
+ * panel over that side hides the old words seamlessly and the campaign text
+ * is written here instead. Nothing about the image changes: same file, same
+ * aspect ratio, same photography.
+ *
+ * To reword the campaign, edit the text below — no artwork export needed.
  */
 function RegistrationCampaignHero({ onApply }) {
   return (
     <section className="registration-campaign-hero" aria-label="Proto Trading Online registration">
-      <div className="registration-campaign-hero__panel">
+      <div className="registration-campaign-hero__frame">
+        <img
+          className="registration-campaign-hero__img"
+          src="/register-reregister-banner-v3.webp"
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          decoding="async"
+        />
+
         <div className="registration-campaign-hero__copy">
           <p className="rch-wordmark">
             <span className="rch-wordmark__proto">PROTO</span>
@@ -781,20 +791,6 @@ function RegistrationCampaignHero({ onApply }) {
             <span>Re-register / Apply online</span>
             <ChevronRight size={18} aria-hidden />
           </button>
-        </div>
-
-        <div className="registration-campaign-hero__art">
-          {/* register-hero-art.webp is register-reregister-banner-v3.webp with
-              the copy half cropped off, so no wording can bleed back in at any
-              panel width. The original file is untouched — RegisterPage still
-              uses it. */}
-          <img
-            src="/register-hero-art.webp"
-            alt=""
-            aria-hidden="true"
-            fetchPriority="high"
-            decoding="async"
-          />
         </div>
       </div>
     </section>

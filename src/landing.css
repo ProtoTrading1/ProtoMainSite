@@ -2157,13 +2157,14 @@
   background: #000;
 }
 
-/* Two panels: real copy on the left, the campaign photography on the right.
-   The source file is the full original artwork, so the art panel crops away
-   the half that carries the baked-in wording — the markup says it now. */
-.registration-campaign-hero__panel {
-  display: grid;
-  grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
-  align-items: stretch;
+/* The banner file is unchanged: same artwork, same aspect ratio, same crop.
+   The frame is a size container, so every measurement in the copy panel below
+   is a fraction of the banner's own width (cqw). The text therefore scales in
+   exact lockstep with the image — it holds the artwork's proportions on a
+   1716px desktop and a 374px phone alike, and can never outgrow the banner. */
+.registration-campaign-hero__frame {
+  position: relative;
+  container-type: inline-size;
   width: min(100%, 1716px);
   overflow: hidden;
   border: 1px solid rgba(245, 158, 11, 0.45);
@@ -2172,35 +2173,34 @@
   box-shadow: 0 20px 54px rgba(0, 0, 0, 0.48);
 }
 
+.registration-campaign-hero__img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The artwork's baked-in copy sits on flat #000 and ends at x=745 of 1716
+   (43.4%) — sampled from the file, the background there is pure black. A solid
+   black panel over that side hides the old words with no visible seam, fading
+   out at its right edge so the red-and-gold diagonal still reads as the edge
+   of the photography. */
 .registration-campaign-hero__copy {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 52%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: clamp(6px, 0.9vw, 12px);
-  padding: clamp(20px, 2.6vw, 48px);
-  min-width: 0;
-}
-
-.registration-campaign-hero__art {
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* Anchored right so a narrow panel crops the dark left edge, never the laptop. */
-.registration-campaign-hero__art img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 100% 50%;
+  gap: 0.7cqw;
+  padding: 2.8cqw;
+  background: linear-gradient(90deg, #000 0%, #000 84%, rgba(0, 0, 0, 0) 100%);
 }
 
 .rch-wordmark {
-  margin: 0 0 clamp(4px, 0.8vw, 12px);
+  margin: 0 0 0.8cqw;
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: clamp(17px, 1.9vw, 32px);
+  font-size: 1.87cqw;
   letter-spacing: 0.02em;
   line-height: 1;
   color: #fff;
@@ -2210,7 +2210,7 @@
 
 .rch-wordmark__online {
   display: block;
-  margin-top: 4px;
+  margin-top: 0.2cqw;
   color: #c89a3c;
   font-size: 0.45em;
   font-weight: 600;
@@ -2221,7 +2221,7 @@
   margin: 0;
   font-family: 'Outfit', sans-serif;
   font-weight: 900;
-  font-size: clamp(26px, 4.4vw, 76px);
+  font-size: 4.43cqw;
   line-height: 0.95;
   letter-spacing: -0.01em;
   text-transform: uppercase;
@@ -2238,8 +2238,8 @@
 }
 
 .rch-rule {
-  width: min(100%, 460px);
-  margin: clamp(10px, 1.6vw, 26px) 0;
+  width: 86%;
+  margin: 1.5cqw 0;
   border: 0;
   border-top: 1px solid rgba(200, 154, 60, 0.55);
 }
@@ -2249,22 +2249,21 @@
   max-width: 22ch;
   font-family: 'Outfit', sans-serif;
   font-weight: 700;
-  font-size: clamp(14px, 1.55vw, 27px);
+  font-size: 1.57cqw;
   line-height: 1.22;
   letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #f4f4f5;
-  /* Two even lines like the artwork, instead of a long line and one orphan. */
   text-wrap: balance;
 }
 
 .rch-lede strong { color: #d81f26; font-weight: 700; }
 
 .rch-note {
-  margin: clamp(8px, 1.1vw, 16px) 0 0;
+  margin: 1cqw 0 0;
   max-width: 46ch;
-  font-size: clamp(11px, 0.95vw, 16px);
-  line-height: 1.45;
+  font-size: 0.93cqw;
+  line-height: 1.4;
   letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #a1a1aa;
@@ -2274,22 +2273,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 0.6cqw;
   align-self: start;
-  margin-top: clamp(14px, 1.8vw, 28px);
-  padding: clamp(11px, 1.1vw, 17px) clamp(18px, 1.8vw, 32px);
+  margin-top: 1.6cqw;
+  padding: 1.05cqw 1.7cqw;
   border: 1px solid rgba(245, 158, 11, 0.75);
-  border-radius: 10px;
+  border-radius: 0.7cqw;
   background: #a3151b;
   color: #fff;
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: clamp(13px, 1.15vw, 21px);
+  font-size: 1.22cqw;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
+
+.rch-cta svg { width: 1em; height: 1em; }
 
 .rch-cta:hover { background: #c01c23; border-color: #f5b700; }
 .rch-cta:active { transform: translateY(1px); }
@@ -2297,32 +2298,6 @@
 .rch-cta:focus-visible {
   outline: 3px solid #f5b700;
   outline-offset: 3px;
-}
-
-/* Below this the two columns squeeze the headline into slivers — stack the
-   copy above the photography and let the type grow back to a readable size. */
-@media (max-width: 860px) {
-  .registration-campaign-hero__panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .registration-campaign-hero__copy {
-    padding: clamp(20px, 6vw, 34px);
-  }
-
-  .registration-campaign-hero__art {
-    aspect-ratio: 16 / 9;
-    order: -1;
-  }
-
-  .rch-headline { font-size: clamp(32px, 9vw, 52px); }
-  .rch-lede { font-size: clamp(15px, 4.2vw, 22px); }
-  .rch-note { font-size: clamp(11px, 3vw, 14px); max-width: none; }
-  .rch-wordmark { font-size: clamp(19px, 5.4vw, 28px); }
-  .rch-cta {
-    align-self: stretch;
-    font-size: clamp(14px, 3.9vw, 18px);
-  }
 }
 
 .lp-apply-copy h2 {
@@ -2805,7 +2780,7 @@
     padding: 8px;
   }
 
-  .registration-campaign-hero__panel {
+  .registration-campaign-hero__frame {
     border-radius: 10px;
   }
 
