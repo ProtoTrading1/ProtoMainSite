@@ -12,7 +12,6 @@ import {
   resetIntercom,
   setIntercomLauncherVisibility,
 } from './lib/intercom';
-import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -180,46 +179,33 @@ export default function Root() {
       }
     };
 
-    // Give up and show the logged-out surface if auth never settles. A stored
-    // session gets a longer grace period: refreshing an expired access token is
-    // a network round-trip, and flashing the landing page at a signed-in
-    // customer mid-restore is worse than a moment more of the loading state.
     const bootstrapTimer = window.setTimeout(() => {
       if (!authBootstrapped.current) {
         setSession(null);
       }
-    }, hasStoredSession() ? 12000 : 3500);
+    }, 3500);
 
     (async () => {
       try {
         const { supabase } = await import('./lib/supabase');
         if (cancelled) return;
 
-        // Sessions now survive a refresh, so something has to end them: a
-        // sign-in older than the 30-day window is discarded on sight.
-        const withinPolicy = (sess) => {
-          if (!sess || !isSessionExpired(sess)) return sess ?? null;
-          void supabase.auth.signOut().catch(() => {});
-          return null;
-        };
-
         supabase.auth.getSession()
           .then(({ data }) => {
-            if (!cancelled) finishBootstrap(withinPolicy(data.session));
+            if (!cancelled) finishBootstrap(data.session ?? null);
           })
           .catch(() => {
             if (!cancelled) finishBootstrap(null);
           });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, rawSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sess) => {
           if (event === 'PASSWORD_RECOVERY') {
             setPasswordRecovery(true);
             return;
           }
-          const sess = withinPolicy(rawSession);
           authBootstrapped.current = true;
           clearTimeout(bootstrapTimer);
-          setSession(sess);
+          setSession(sess ?? null);
           if (sess?.user) {
             if (event === 'TOKEN_REFRESHED') {
               // Keep the signed Intercom identity alive on long-lived tabs
