@@ -10,6 +10,7 @@ test('desktop search has an explicit submit action and retains the slash shortcu
   assert.match(header, /className="header-search-premium__submit"/);
   assert.match(header, /keyboard shortcut: \//);
   assert.match(header, /event\.key !== '\/'/);
+  assert.doesNotMatch(header, /className="header-search-premium__icon"/);
 });
 
 test('search distinguishes loading, connection failure and no-result states', () => {
