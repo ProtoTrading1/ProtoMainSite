@@ -35,7 +35,9 @@ const CATALOG_PAGE_SIZE = 60;
 // Mirrors MAX_ORDER_LINES in api/send-order.js — the server rejects an order
 // with more lines than this, so the cart must not be allowed to exceed it.
 const MAX_CART_LINES = 250;
-const DRAWER_PEEK_MS = 5000;
+// Keep the add-to-cart confirmation brief so it does not cover the catalogue,
+// but never retreat while the customer is inspecting or editing the basket.
+const DRAWER_PEEK_MS = 1200;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
@@ -229,6 +231,23 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
     if (restoreFocus) restoreCartTriggerFocus();
   }, [restoreCartTriggerFocus]);
+
+  const pauseDrawerPeek = useCallback(() => {
+    if (!drawerPeek || cartDrawerOpen) return;
+    if (drawerTimerRef.current) {
+      window.clearTimeout(drawerTimerRef.current);
+      drawerTimerRef.current = null;
+    }
+  }, [cartDrawerOpen, drawerPeek]);
+
+  const resumeDrawerPeek = useCallback(() => {
+    if (!drawerPeek || cartDrawerOpen) return;
+    if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
+    drawerTimerRef.current = window.setTimeout(() => {
+      setDrawerPeek(false);
+      drawerTimerRef.current = null;
+    }, DRAWER_PEEK_MS);
+  }, [cartDrawerOpen, drawerPeek]);
 
   const closeMobileCart = useCallback(({ restoreFocus = true } = {}) => {
     setMobileCartOpen(false);
@@ -694,7 +713,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
     setDrawerPeek(true);
     if (drawerTimerRef.current) clearTimeout(drawerTimerRef.current);
-    drawerTimerRef.current = setTimeout(() => setDrawerPeek(false), DRAWER_PEEK_MS);
+    drawerTimerRef.current = setTimeout(() => {
+      setDrawerPeek(false);
+      drawerTimerRef.current = null;
+    }, DRAWER_PEEK_MS);
   }, [dismissWelcome, markCartActivity, searchQuery]);
 
   const updateQty = useCallback((id, qty) => {
@@ -1028,6 +1050,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           ref={desktopCartRef}
           className={`cart-drawer${cartDrawerOpen ? ' open' : drawerPeek ? ' peek' : ''}`}
           aria-hidden={!desktopDrawerVisible}
+          onMouseEnter={pauseDrawerPeek}
+          onMouseLeave={resumeDrawerPeek}
         >
           {desktopDrawerVisible && <Drawer
             cartItems={cartItems}
