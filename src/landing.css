@@ -2157,172 +2157,39 @@
   background: #000;
 }
 
-/* Two panels: real copy on the left, the campaign photography on the right.
-   The source file is the full original artwork, so the art panel crops away
-   the half that carries the baked-in wording — the markup says it now. */
-.registration-campaign-hero__panel {
-  display: grid;
-  grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
-  align-items: stretch;
+.registration-campaign-hero__action {
+  display: block;
   width: min(100%, 1716px);
+  padding: 0;
   overflow: hidden;
   border: 1px solid rgba(245, 158, 11, 0.45);
   border-radius: 16px;
   background: #000;
   box-shadow: 0 20px 54px rgba(0, 0, 0, 0.48);
+  cursor: pointer;
 }
 
-.registration-campaign-hero__copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(6px, 0.9vw, 12px);
-  padding: clamp(20px, 2.6vw, 48px);
-  min-width: 0;
-}
-
-.registration-campaign-hero__art {
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* Anchored right so a narrow panel crops the dark left edge, never the laptop. */
-.registration-campaign-hero__art img {
+.registration-campaign-hero__action img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 100% 50%;
+  height: auto;
 }
 
-.rch-wordmark {
-  margin: 0 0 clamp(4px, 0.8vw, 12px);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 800;
-  font-size: clamp(17px, 1.9vw, 32px);
-  letter-spacing: 0.02em;
-  line-height: 1;
-  color: #fff;
+.registration-campaign-hero__action:hover {
+  border-color: rgba(245, 158, 11, 0.9);
 }
 
-.rch-wordmark__trading { color: #d81f26; }
-
-.rch-wordmark__online {
-  display: block;
-  margin-top: 4px;
-  color: #c89a3c;
-  font-size: 0.45em;
-  font-weight: 600;
-  letter-spacing: 0.42em;
-}
-
-.rch-headline {
-  margin: 0;
-  font-family: 'Outfit', sans-serif;
-  font-weight: 900;
-  font-size: clamp(26px, 4.4vw, 76px);
-  line-height: 0.95;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
-}
-
-.rch-headline__lead { display: block; color: #f4f4f5; }
-
-.rch-headline__accent {
-  display: block;
-  background: linear-gradient(180deg, #f5d488 0%, #c89a3c 52%, #8f6a1f 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.rch-rule {
-  width: min(100%, 460px);
-  margin: clamp(10px, 1.6vw, 26px) 0;
-  border: 0;
-  border-top: 1px solid rgba(200, 154, 60, 0.55);
-}
-
-.rch-lede {
-  margin: 0;
-  max-width: 22ch;
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  font-size: clamp(14px, 1.55vw, 27px);
-  line-height: 1.22;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  color: #f4f4f5;
-  /* Two even lines like the artwork, instead of a long line and one orphan. */
-  text-wrap: balance;
-}
-
-.rch-lede strong { color: #d81f26; font-weight: 700; }
-
-.rch-note {
-  margin: clamp(8px, 1.1vw, 16px) 0 0;
-  max-width: 46ch;
-  font-size: clamp(11px, 0.95vw, 16px);
-  line-height: 1.45;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  color: #a1a1aa;
-}
-
-.rch-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  align-self: start;
-  margin-top: clamp(14px, 1.8vw, 28px);
-  padding: clamp(11px, 1.1vw, 17px) clamp(18px, 1.8vw, 32px);
-  border: 1px solid rgba(245, 158, 11, 0.75);
-  border-radius: 10px;
-  background: #a3151b;
-  color: #fff;
-  font-family: 'Outfit', sans-serif;
-  font-weight: 800;
-  font-size: clamp(13px, 1.15vw, 21px);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
-}
-
-.rch-cta:hover { background: #c01c23; border-color: #f5b700; }
-.rch-cta:active { transform: translateY(1px); }
-
-.rch-cta:focus-visible {
+.registration-campaign-hero__action:focus-visible {
   outline: 3px solid #f5b700;
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 
-/* Below this the two columns squeeze the headline into slivers — stack the
-   copy above the photography and let the type grow back to a readable size. */
-@media (max-width: 860px) {
-  .registration-campaign-hero__panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .registration-campaign-hero__copy {
-    padding: clamp(20px, 6vw, 34px);
-  }
-
-  .registration-campaign-hero__art {
-    aspect-ratio: 16 / 9;
-    order: -1;
-  }
-
-  .rch-headline { font-size: clamp(32px, 9vw, 52px); }
-  .rch-lede { font-size: clamp(15px, 4.2vw, 22px); }
-  .rch-note { font-size: clamp(11px, 3vw, 14px); max-width: none; }
-  .rch-wordmark { font-size: clamp(19px, 5.4vw, 28px); }
-  .rch-cta {
-    align-self: stretch;
-    font-size: clamp(14px, 3.9vw, 18px);
-  }
+.registration-campaign-hero__hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 650;
+  text-align: center;
 }
 
 .lp-apply-copy h2 {
@@ -2805,8 +2672,12 @@
     padding: 8px;
   }
 
-  .registration-campaign-hero__panel {
+  .registration-campaign-hero__action {
     border-radius: 10px;
+  }
+
+  .registration-campaign-hero__hint {
+    padding: 0 10px 4px;
   }
 
   .lp-stats {
