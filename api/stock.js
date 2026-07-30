@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireApprovedCustomer } from './_auth.js';
+import { getApprovedCustomer, requireAuth } from './_auth.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
 // Always hits the DB fresh (no-store) so a click never serves a cached number.
@@ -20,26 +20,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const access = await requireApprovedCustomer(req, res);
-  if (!access) return;
-
   const sku = String(req.query.sku || '').trim().toUpperCase();
   if (!sku || !SKU_RE.test(sku)) {
     return res.status(400).json({ error: 'Invalid or missing sku' });
   }
 
   try {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
 
-    const { data, error } = await supabase
-      .from('website_stock')
-      .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order')
-      .or(`barcode.eq.${sku},sku.eq.${sku}`)
-      .limit(1);
+    // Authentication must complete first, but the independent approval and
+    // stock reads can run together. This removes one full database round trip
+    // from every live stock check without caching or weakening either rule.
+    const [access, stockResult] = await Promise.all([
+      getApprovedCustomer(user, res),
+      supabase
+        .from('website_stock')
+        .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order')
+        .or(`barcode.eq.${sku},sku.eq.${sku}`)
+        .limit(1),
+    ]);
+    if (!access) return;
+
+    const { data, error } = stockResult;
 
     if (error) throw error;
     if (!data || data.length === 0) {
