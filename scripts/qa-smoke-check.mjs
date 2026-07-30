@@ -141,6 +141,18 @@ assert.ok(!existsSync(join(root, 'public/products.json')), 'public products.json
 assert.ok(!existsSync(join(root, 'public/stockProducts.json')), 'frozen stockProducts.json deleted');
 console.log('✓ Stale catalogue fallback removed');
 
+// The catalogue is read from website_stock in 1000-row pages while the Positill
+// stock sync writes to that table. LIMIT/OFFSET with no ORDER BY has no stable
+// row order, so an unordered paged scan silently drops products (and serves
+// others twice). The sort key must survive any refactor of fetchAllRows.
+const apiProductsPagingSrc = readFileSync(join(root, 'api/products.js'), 'utf8');
+assert.match(
+  apiProductsPagingSrc,
+  /\.select\(selectCols\)\s*\.order\('sku', \{ ascending: true \}\)\s*\.range\(from, to\)/,
+  'the paged catalogue scan orders by sku so pages cannot skip or duplicate products',
+);
+console.log('✓ Catalogue paging is deterministic (ordered by sku)');
+
 // Leaf category browse must not leak shallow products — the nav path must be a
 // PREFIX of the product path (product filed at least as deep). A Math.min depth
 // let a department/L1 product surface under every leaf beneath it.

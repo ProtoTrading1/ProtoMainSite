@@ -80,12 +80,23 @@ function etagMatches(req, etag) {
     .some((candidate) => norm(candidate) === norm(etag));
 }
 
+/**
+ * Read a whole table in pages.
+ *
+ * The ORDER BY is load-bearing, not cosmetic. LIMIT/OFFSET without one has no
+ * stable row order: Postgres re-runs the scan per page, and any UPDATE in
+ * between rewrites that row at the end of the heap and shifts every later row
+ * back a position — so the next page starts past a row that was never served.
+ * website_stock is written to continuously by the Positill stock sync and is
+ * well over one page, so an unordered scan silently drops products from the
+ * catalogue (and serves others twice). `sku` is UNIQUE and never changes.
+ */
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null, maxRows = Infinity) {
   const rows = [];
   let from = 0;
   while (true) {
     const to = Math.min(from + PAGE_SIZE - 1, maxRows - 1);
-    let q = supabase.from(table).select(selectCols).range(from, to);
+    let q = supabase.from(table).select(selectCols).order('sku', { ascending: true }).range(from, to);
     if (filter) q = filter(q);
     const { data, error } = await q;
     if (error) throw error;
@@ -240,9 +251,8 @@ async function fetchIdentifierRows(supabase, identifier) {
     supabase,
     'website_stock',
     STOCK_SELECT,
-    (q) => q
-      .or(`sku.eq.${identifier},barcode.eq.${identifier}`)
-      .order('sku', { ascending: true }),
+    // fetchAllRows already orders by sku.
+    (q) => q.or(`sku.eq.${identifier},barcode.eq.${identifier}`),
     10,
   );
   if (exact.length) return exact;
