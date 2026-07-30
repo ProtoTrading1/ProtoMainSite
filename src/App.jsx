@@ -984,7 +984,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
 
   return (
-    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
