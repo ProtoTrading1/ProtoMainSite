@@ -38,6 +38,7 @@ const MAX_CART_LINES = 250;
 // Keep the add-to-cart confirmation brief so it does not cover the catalogue,
 // but never retreat while the customer is inspecting or editing the basket.
 const DRAWER_PEEK_MS = 700;
+const WELCOME_DISPLAY_MS = 2000;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
@@ -153,6 +154,17 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     });
   }, []);
 
+  useEffect(() => {
+    if (!showWelcome) return undefined;
+    const dismissTimer = window.setTimeout(dismissWelcome, WELCOME_DISPLAY_MS);
+    const dismissOnScroll = () => dismissWelcome();
+    window.addEventListener('scroll', dismissOnScroll, { passive: true, once: true });
+    return () => {
+      window.clearTimeout(dismissTimer);
+      window.removeEventListener('scroll', dismissOnScroll);
+    };
+  }, [dismissWelcome, showWelcome]);
+
   const handleInStockOnlyChange = useCallback((next) => {
     setInStockOnly(next);
     try {
@@ -261,10 +273,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, []);
 
   const goHome = useCallback(() => {
-    try { sessionStorage.removeItem(WELCOME_DISMISSED_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
-    setShowWelcome(true);
     setSearchQuery('');
     setActiveCollection('all');
     setSort(DEFAULT_SORT);
@@ -979,7 +989,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         navigateForSearch={navigateForSearch}
-        onMenuClick={() => setMobileMenuOpen(true)}
+        onMenuClick={() => { dismissWelcome(); setMobileMenuOpen(true); }}
         onHome={goHome}
         customer={customer}
         onViewProfile={onViewProfile}
@@ -994,7 +1004,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       />
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
-        <aside className="sidebar-rail">
+        <aside className="sidebar-rail" onMouseEnter={dismissWelcome}>
           <Sidebar
             categories={categories}
             path={path}
@@ -1006,7 +1016,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           />
         </aside>
 
-        <main className="content-area">
+        <main className="content-area" onScroll={dismissWelcome}>
           <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}

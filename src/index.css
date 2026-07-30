@@ -2002,32 +2002,49 @@ textarea:focus-visible,
   color: var(--text-primary);
 }
 .site-hero-banner {
-  width: 100%;
-  border-radius: 16px;
+  position: fixed;
+  top: 92px;
+  left: 50%;
+  z-index: 45;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(230px, calc(100dvh - 120px));
+  border-radius: 14px;
   overflow: hidden;
   line-height: 0;
   box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: welcome-banner-brief 2s ease forwards;
 }
 .site-hero-banner img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-height: min(230px, calc(100dvh - 120px));
+  object-fit: contain;
   display: block;
+  background: #050505;
 }
-/* Desktop compact pass for the welcome banner:
-   keep artwork/copy unchanged, but reduce occupied vertical space. */
-@media (min-width: 1024px) {
+
+@keyframes welcome-banner-brief {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10%, 82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+@media (max-width: 767px) {
   .site-hero-banner {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #050505;
-    max-height: 560px;
+    top: 72px;
+    width: calc(100vw - 20px);
+    max-height: 170px;
   }
   .site-hero-banner img {
-    width: auto;
-    max-width: 100%;
-    max-height: 560px;
-    height: auto;
+    max-height: 170px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-hero-banner {
+    animation: none;
   }
 }
 .trade-hero {
