@@ -27,7 +27,7 @@ export default function LandingFooter() {
           <div>
             <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '24px', fontFamily: 'Outfit' }}>Quick Links</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {['Home', 'Apply for Access', 'Portal Login', 'Contact Us'].map(link => (
+              {['Home', 'Apply for a Trade Account', 'Sign In', 'Contact Us'].map(link => (
                 <a key={link} href="#" style={{ fontSize: '14px', color: 'var(--text-white-muted)', transition: 'color 0.2s ease' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#fff'}
                   onMouseLeave={e => e.currentTarget.style.color = 'var(--text-white-muted)'}
