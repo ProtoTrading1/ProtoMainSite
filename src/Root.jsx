@@ -524,7 +524,11 @@ export default function Root() {
 
   return (
     <>
+      {/* The public root carries the launch message too, not just /register:
+          the re-register campaign hero instead of the evergreen "Wholesale
+          made smarter" one, and the matching wording on the apply section. */}
       <LandingPage
+        registrationMode
         onLogin={() => setSurface('login')}
         onApply={() => {
           const el = document.getElementById('lp-apply');
