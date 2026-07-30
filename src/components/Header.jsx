@@ -1241,7 +1241,12 @@ export default function Header({
           aria-activedescendant={activeMobileItemId}
         />
         {mobileInput && (
-          <button type="button" onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); setMobileSearchState('idle'); }} aria-label="Clear">
+          <button
+            type="button"
+            className="mobile-search-clear"
+            onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); setMobileSearchState('idle'); }}
+            aria-label="Clear search"
+          >
             <X size={15} />
           </button>
         )}
@@ -1269,7 +1274,9 @@ export default function Header({
             </button>
           </>
         )}
-        <button type="button" onClick={closeMobileSearch} aria-label="Close"><X size={15} /></button>
+        <button type="button" className="mobile-search-close" onClick={closeMobileSearch} aria-label="Close search">
+          <X size={17} />
+        </button>
       </div>
       {mobileSearchOpen && scanError && <div className="mobile-search-scan-error">{scanError}</div>}
 
