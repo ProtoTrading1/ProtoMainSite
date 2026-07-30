@@ -4574,7 +4574,32 @@ textarea:focus-visible,
   .pc-in-order { font-size: 11px; margin-top: 4px; }
   .qty-stepper button { min-width: 40px; min-height: 44px; }
   .qty-stepper input { width: 52px; height: 44px; }
-  .cart-in-control button { min-width: 40px; min-height: 44px; }
+  .mini-stepper {
+    height: 44px;
+    border-color: #111111;
+  }
+  .mini-stepper button,
+  .cart-in-control button {
+    min-width: 44px;
+    min-height: 44px;
+    background: #111111;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .mini-stepper button:active,
+  .cart-in-control button:active {
+    background: #2f2f2f;
+  }
+  .mini-stepper button:disabled,
+  .cart-in-control button:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+  }
+  .mini-stepper input {
+    height: 44px;
+    background: #ffffff;
+  }
 
   /* Drawer scroll */
   .mobile-cart-sheet-body { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
