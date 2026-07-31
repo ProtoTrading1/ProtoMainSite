@@ -111,21 +111,51 @@ describe('account basket mutation validation', () => {
 });
 
 describe('whole-basket conflict semantics', () => {
-  it('treats a newer empty basket as a clear tombstone and does not resurrect old lines', () => {
+  it('imports a browser basket only when the account has no server basket yet', () => {
+    const incoming = [item('FIRST-1', 4), item('FIRST-2', 2)];
+
+    assert.deepEqual(resolveWholeCart(null, incoming, NOW - 1_000), {
+      items: incoming,
+      activityAt: NOW - 1_000,
+      changed: true,
+    });
+  });
+
+  it('lets a legacy populated browser seed an untouched empty server placeholder', () => {
+    const incoming = [item('LEGACY-1', 7)];
+    const untouchedEmptyRow = { items: [], activity_at: null, revision: 1 };
+
+    assert.deepEqual(resolveWholeCart(untouchedEmptyRow, incoming, NOW - 1_000), {
+      items: incoming,
+      activityAt: NOW - 1_000,
+      changed: true,
+    });
+  });
+
+  it('never resurrects a basket that was deliberately cleared on the server', () => {
+    const clearedRow = { items: [], activity_at: NOW - 2_000, revision: 9 };
+    const resolved = resolveWholeCart(clearedRow, [item('STALE-1', 3)], NOW - 1_000);
+
+    assert.deepEqual(resolved.items, []);
+    assert.equal(resolved.activityAt, NOW - 2_000);
+    assert.equal(resolved.changed, false);
+  });
+
+  it('does not let a stale empty browser clear an existing account basket at login', () => {
     const current = {
       items: [item('OLD-1', 4), item('OLD-2', 2)],
       activity_at: NOW - 10_000,
       revision: 8,
     };
 
-    assert.deepEqual(resolveWholeCart(current, [], NOW - 1_000), {
-      items: [],
-      activityAt: NOW - 1_000,
-      changed: true,
-    });
+    const resolved = resolveWholeCart(current, [], NOW - 1_000);
+    assert.deepEqual(resolved.items.map(canonicalItemKey), ['OLD-1', 'OLD-2']);
+    assert.deepEqual(resolved.items.map(({ qty }) => qty), [4, 2]);
+    assert.equal(resolved.activityAt, NOW - 10_000);
+    assert.equal(resolved.changed, false);
   });
 
-  it('keeps the complete newer snapshot instead of union-merging deleted products', () => {
+  it('does not let a stale populated browser replace an existing account basket at login', () => {
     const current = {
       items: [item('KEEP', 1), item('REMOVED', 9)],
       activity_at: NOW - 10_000,
@@ -134,19 +164,19 @@ describe('whole-basket conflict semantics', () => {
     const incoming = [item('KEEP', 2), item('NEW', 5)];
 
     const resolved = resolveWholeCart(current, incoming, NOW - 1_000);
-    assert.deepEqual(resolved.items.map(canonicalItemKey), ['KEEP', 'NEW']);
-    assert.deepEqual(resolved.items.map(({ qty }) => qty), [2, 5]);
-    assert.equal(resolved.changed, true);
+    assert.deepEqual(resolved.items.map(canonicalItemKey), ['KEEP', 'REMOVED']);
+    assert.deepEqual(resolved.items.map(({ qty }) => qty), [1, 9]);
+    assert.equal(resolved.changed, false);
   });
 
-  it('retains the server snapshot unless the incoming basket is strictly newer', () => {
+  it('retains the server snapshot regardless of browser clock skew', () => {
     const current = {
       items: [item('SERVER', 6)],
       activity_at: NOW - 1_000,
       revision: 5,
     };
 
-    for (const activityAt of [NOW - 2_000, NOW - 1_000]) {
+    for (const activityAt of [NOW - 2_000, NOW - 1_000, NOW + 60_000]) {
       const resolved = resolveWholeCart(current, [item('STALE', 1)], activityAt);
       assert.deepEqual(resolved.items.map(canonicalItemKey), ['SERVER']);
       assert.equal(resolved.activityAt, NOW - 1_000);
