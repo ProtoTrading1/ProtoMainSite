@@ -277,6 +277,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const cartSyncTimerRef = useRef(null);
   const cartSyncRetryCountRef = useRef(0);
   const cartSyncDrainRef = useRef(null);
+  const cartHydrateRetryRef = useRef(null);
   const cartClearActivityAtRef = useRef(null);
   // Idempotency key for the CURRENT cart's checkout. Persists across retries of
   // the same cart (so a resubmit after an email/network error recovers the
@@ -420,7 +421,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         cartSyncRetryCountRef.current = 0;
       } else {
         cartSyncRetryCountRef.current += 1;
-        setCartSyncStatus('local');
+        setCartSyncStatus('error');
       }
       const latest = currentCartRef.current;
       const nextOperation = makeCartSyncOperation(
@@ -516,15 +517,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
-        setCartSyncStatus('local');
+        setCartSyncStatus('error');
         hydrationRetryTimer = window.setTimeout(hydrate, 3000);
       }
+    };
+    cartHydrateRetryRef.current = () => {
+      if (hydrationRetryTimer) window.clearTimeout(hydrationRetryTimer);
+      hydrationRetryTimer = null;
+      return hydrate();
     };
     void hydrate();
 
     return () => {
       cancelled = true;
       if (hydrationRetryTimer) window.clearTimeout(hydrationRetryTimer);
+      cartHydrateRetryRef.current = null;
     };
   }, [customer?.id]);
 
@@ -550,7 +557,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try {
       const remote = await getAccountCart();
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
-      if (Number(remote.revision || 0) <= cartRevisionRef.current) return;
+      if (Number(remote.revision || 0) <= cartRevisionRef.current) {
+        setCartSyncStatus('saved');
+        return;
+      }
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
       const hydratedItems = await hydrateAccountCartItems(remote.items);
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
@@ -563,9 +573,22 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       setCartClock(Date.now());
       setCartSyncStatus('saved');
     } catch {
-      // Keep the device copy. Online/focus/poll events will safely try again.
+      // Keep the device copy, but make the failed account sync visible.
+      setCartSyncStatus('error');
     }
   }, []);
+
+  const retryCartSync = useCallback(() => {
+    if (!customer?.id) return;
+    if (!cartHydratedRef.current) {
+      setCartSyncStatus('loading');
+      void cartHydrateRetryRef.current?.();
+      return;
+    }
+    setCartSyncStatus('saving');
+    if (pendingCartSyncRef.current) scheduleCartSync(0);
+    else void refreshAccountCart();
+  }, [customer?.id, refreshAccountCart, scheduleCartSync]);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
@@ -1353,6 +1376,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
+            onRetryCartSync={retryCartSync}
             cartReady={cartHydrated}
             onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
             onContinueShopping={() => closeDesktopCart({ restoreFocus: true })}
@@ -1449,6 +1473,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
+                onRetryCartSync={retryCartSync}
                 cartReady={cartHydrated}
                 onContinueShopping={() => setMobileCartOpen(false)}
                 revealItemRequest={cartRevealRequest}
