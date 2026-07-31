@@ -72,6 +72,10 @@ export default function Drawer({
   cartExpiryTone = 'ok',
   onClose,
   onContinueShopping,
+  revealItemRequest = null,
+  initialScrollTop = 0,
+  onRevealItemHandled,
+  onScrollPositionChange,
 }) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
@@ -86,8 +90,11 @@ export default function Drawer({
   const [courierChoice, setCourierChoice] = useState(null);
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
   const itemsRef = useRef(null);
-  const previousItemIdsRef = useRef(new Set(cartItems.map((item) => item.product.id)));
+  const initialScrollTopRef = useRef(initialScrollTop);
+  const initialRevealItemRequestRef = useRef(revealItemRequest);
+  const onScrollPositionChangeRef = useRef(onScrollPositionChange);
   const courierDialogRef = useRef(null);
   const courierPreviousFocusRef = useRef(null);
   const courierDialogTitleId = useId();
@@ -102,16 +109,32 @@ export default function Drawer({
 
   useEffect(() => {
     const el = itemsRef.current;
-    const previousItemIds = previousItemIdsRef.current;
-    const hasNewLine = cartItems.some((item) => !previousItemIds.has(item.product.id));
-    previousItemIdsRef.current = new Set(cartItems.map((item) => item.product.id));
+    if (!el) return undefined;
+    const reportScrollPosition = onScrollPositionChangeRef.current;
+    if (!initialRevealItemRequestRef.current) el.scrollTop = initialScrollTopRef.current;
+    return () => reportScrollPosition?.(el.scrollTop);
+  }, []);
 
-    // Quantity edits and removals must preserve the customer's position in a
-    // long basket. Only reveal the bottom when a genuinely new product line is
-    // appended to a basket that was already open/populated.
-    if (!el || !hasNewLine || previousItemIds.size === 0) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [cartItems]);
+  useEffect(() => {
+    if (!revealItemRequest) return undefined;
+    const { productId, token } = revealItemRequest;
+    let highlightTimer;
+    const revealFrame = window.requestAnimationFrame(() => {
+      const line = itemsRef.current?.querySelector(`[data-cart-product-id="${productId}"]`);
+      if (!line) return;
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      line.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+      setHighlightedItemId(productId);
+      highlightTimer = window.setTimeout(() => {
+        setHighlightedItemId(null);
+        onRevealItemHandled?.(token);
+      }, 1200);
+    });
+    return () => {
+      window.cancelAnimationFrame(revealFrame);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [revealItemRequest, onRevealItemHandled]);
 
   const handleSubmitClick = () => {
     setShowCheckoutModal(true);
@@ -266,7 +289,11 @@ export default function Drawer({
           </div>
         )}
         {cartItems.map((item) => (
-          <div className="drawer-line" key={item.product.id}>
+          <div
+            className={`drawer-line${highlightedItemId === item.product.id ? ' drawer-line--just-added' : ''}`}
+            data-cart-product-id={item.product.id}
+            key={item.product.id}
+          >
             <div className="drawer-thumb">
               <img src={optimizedImageUrl(item.product.image)} alt={item.product.name} loading="lazy" decoding="async" />
             </div>
