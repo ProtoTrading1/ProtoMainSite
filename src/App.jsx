@@ -29,6 +29,7 @@ import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './l
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { resolveNavPathForProducts } from './lib/taxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
+import { cartFingerprint, clearAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -203,13 +204,19 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
   const [cartItems, setCartItems] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); } catch { return []; }
+    try {
+      const owner = localStorage.getItem(CART_OWNER_KEY);
+      if (owner && owner !== customer?.id) return [];
+      const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
   const [cartRevealRequest, setCartRevealRequest] = useState(null);
   const [cartScrollTop, setCartScrollTop] = useState(0);
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
   const [cartClock, setCartClock] = useState(Date.now());
+  const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
@@ -221,6 +228,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const lastSearchLogKeyRef = useRef('');
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
+  const cartHydratedRef = useRef(false);
+  const cartRevisionRef = useRef(0);
+  const lastSavedCartRef = useRef('');
+  const skipNextCartSaveRef = useRef(false);
   // Idempotency key for the CURRENT cart's checkout. Persists across retries of
   // the same cart (so a resubmit after an email/network error recovers the
   // existing order instead of double-inserting) and resets when the cart
@@ -324,24 +335,100 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(now)); } catch { /* ignore */ }
   }, [cartItems.length, cartLastActivityAt]);
 
-  // Scope the cart to the logged-in account. If a different user signs in
-  // (e.g. a brand-new account), drop the previous user's cart so it never
-  // carries over between accounts.
+  // Merge this browser's legacy basket into the signed-in account once. The
+  // server keeps the union and lets the most recently active basket win when
+  // both browsers contain the same product, so an empty browser cannot erase a
+  // populated one on first sign-in.
   useEffect(() => {
     const uid = customer?.id || null;
     if (!uid) return;
-    let owner = null;
-    try { owner = localStorage.getItem(CART_OWNER_KEY); } catch { /* ignore */ }
-    if (owner && owner !== uid) {
-      setCartItems([]);
-      setCartLastActivityAt(null);
+    let cancelled = false;
+    cartHydratedRef.current = false;
+    setCartSyncStatus('loading');
+
+    let localItems = [];
+    let localActivityAt = null;
+    try {
+      const owner = localStorage.getItem(CART_OWNER_KEY);
+      if (!owner || owner === uid) {
+        const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+        localItems = Array.isArray(stored) ? stored : [];
+        localActivityAt = readCartActivityAt();
+      }
+      localStorage.setItem(CART_OWNER_KEY, uid);
+    } catch { /* use the in-memory fallback */ }
+
+    void mergeAccountCart(localItems, localActivityAt).then(async (accountCart) => {
+      let hydratedItems = accountCart.items || [];
       try {
-        localStorage.removeItem(CART_STORAGE_KEY);
-        localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
-      } catch { /* ignore */ }
-    }
-    try { localStorage.setItem(CART_OWNER_KEY, uid); } catch { /* ignore */ }
+        const bySku = await fetchProductsBySkus(hydratedItems.map((item) => (
+          item.product?.id || item.product?.sku || item.product?.code
+        )));
+        hydratedItems = hydratedItems.map((item) => {
+          const keys = [item.product?.id, item.product?.sku, item.product?.code]
+            .map((value) => String(value || '').toUpperCase());
+          const live = keys.map((key) => bySku.get(key)).find(Boolean);
+          return live ? { ...item, product: live } : item;
+        });
+      } catch { /* retain the saved product snapshot while offline */ }
+      if (cancelled) return;
+      cartRevisionRef.current = accountCart.revision || 0;
+      lastSavedCartRef.current = cartFingerprint(hydratedItems);
+      setCartItems(hydratedItems);
+      setCartLastActivityAt(accountCart.activityAt || null);
+      setCartClock(Date.now());
+      cartHydratedRef.current = true;
+      setCartSyncStatus('saved');
+    }).catch(() => {
+      if (cancelled) return;
+      lastSavedCartRef.current = cartFingerprint(localItems);
+      setCartItems(localItems);
+      setCartLastActivityAt(localActivityAt);
+      cartHydratedRef.current = true;
+      setCartSyncStatus('local');
+    });
+
+    return () => { cancelled = true; };
   }, [customer?.id]);
+
+  useEffect(() => {
+    if (!customer?.id || !cartHydratedRef.current) return undefined;
+    if (skipNextCartSaveRef.current) {
+      skipNextCartSaveRef.current = false;
+      lastSavedCartRef.current = cartFingerprint(cartItems);
+      return undefined;
+    }
+    const fingerprint = cartFingerprint(cartItems);
+    if (fingerprint === lastSavedCartRef.current) return undefined;
+
+    let cancelled = false;
+    setCartSyncStatus('saving');
+    const timer = window.setTimeout(() => {
+      void saveAccountCart(cartItems, cartLastActivityAt, cartRevisionRef.current)
+        .then((saved) => {
+          if (cancelled) return;
+          cartRevisionRef.current = saved.revision || 0;
+          lastSavedCartRef.current = cartFingerprint(saved.items);
+          setCartSyncStatus('saved');
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          if (error.status === 409 && Array.isArray(error.data?.items)) {
+            cartRevisionRef.current = error.data.revision || 0;
+            lastSavedCartRef.current = cartFingerprint(error.data.items);
+            setCartItems(error.data.items);
+            setCartLastActivityAt(error.data.activityAt || null);
+            setCartSyncStatus('saved');
+            return;
+          }
+          setCartSyncStatus('local');
+        });
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cartItems, cartLastActivityAt, customer?.id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setCartClock(Date.now()), 60_000);
@@ -689,13 +776,21 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, []);
 
   const clearCart = useCallback(() => {
+    skipNextCartSaveRef.current = true;
     setCartItems([]);
     setCartLastActivityAt(null);
     try {
       localStorage.removeItem(CART_STORAGE_KEY);
       localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
     } catch { /* ignore */ }
-  }, []);
+    if (customer?.id) {
+      void clearAccountCart().then(() => {
+        cartRevisionRef.current = 0;
+        lastSavedCartRef.current = cartFingerprint([]);
+        setCartSyncStatus('saved');
+      }).catch(() => setCartSyncStatus('local'));
+    }
+  }, [customer?.id]);
 
   useEffect(() => {
     if (!cartItems.length || !cartLastActivityAt) return;
@@ -1091,6 +1186,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
+            cartSyncStatus={cartSyncStatus}
             onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
             onContinueShopping={() => closeDesktopCart({ restoreFocus: true })}
             revealItemRequest={cartRevealRequest}
@@ -1185,6 +1281,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
+                cartSyncStatus={cartSyncStatus}
                 onContinueShopping={() => setMobileCartOpen(false)}
                 revealItemRequest={cartRevealRequest}
                 initialScrollTop={cartScrollTop}

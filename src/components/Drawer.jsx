@@ -70,6 +70,7 @@ export default function Drawer({
   showAutoCloseBar = false,
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
+  cartSyncStatus = 'local',
   onClose,
   onContinueShopping,
   revealItemRequest = null,
@@ -82,6 +83,13 @@ export default function Drawer({
   const isReady = cartTotal >= MIN_ORDER;
   const hasExpiry = cartItems.length > 0 && cartExpiryRemainingMs !== null;
   const expiryLabel = formatCartExpiry(cartExpiryRemainingMs);
+  const syncLabel = cartSyncStatus === 'saving'
+    ? 'Saving…'
+    : cartSyncStatus === 'loading'
+      ? 'Loading account basket…'
+      : cartSyncStatus === 'saved'
+        ? 'Saved to account'
+        : 'Saved on this device';
   const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -257,7 +265,7 @@ export default function Drawer({
           {isReady && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
-              Saved · {expiryLabel}
+              {syncLabel} · {expiryLabel}
             </span>
           )}
           {onClose && (
