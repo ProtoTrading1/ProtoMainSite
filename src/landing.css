@@ -2056,6 +2056,10 @@
   border-radius: 14px;
 }
 
+.lp-brand picture {
+  display: contents;
+}
+
 @keyframes lp-brands-scroll {
   from { transform: translateX(-50%); }
   to { transform: translateX(0); }
@@ -2659,6 +2663,44 @@
   font-weight: 700;
 }
 
+.lp-footer-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.lp-footer-policy-links {
+  display: flex;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.lp-footer-policy-link {
+  display: inline-flex;
+  min-height: 44px;
+  padding: 0 4px;
+  align-items: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.lp-footer-policy-link:hover {
+  color: #94a3b8;
+}
+
+.lp-footer-policy-link:focus-visible {
+  color: #cbd5e1;
+  outline: 2px solid #f2b705;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Responsive lp-* */
 @media (max-width: 1100px) {
   .lp-map-wrapper {
@@ -2778,8 +2820,8 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2943,11 +2985,14 @@
 
 .lm-eye {
   position: absolute;
-  right: 12px;
+  right: 2px;
+  width: 44px;
+  height: 44px;
   color: rgba(255, 255, 255, 0.3);
-  padding: 8px;
+  padding: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   transition: color 0.18s;
 }
 
@@ -3021,12 +3066,16 @@
 
 .lm-apply-link {
   width: 100%;
+  min-height: 44px;
   margin-top: 10px;
-  padding: 8px;
+  padding: 8px 12px;
   font-size: 13px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.35);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.18s;
 }
 
@@ -3069,10 +3118,13 @@
   background: none;
   border: none;
   cursor: pointer;
+  min-height: 44px;
   font-size: 12px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.45);
-  padding: 0;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
   transition: color 0.15s;
 }
 
