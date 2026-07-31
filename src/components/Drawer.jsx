@@ -248,8 +248,8 @@ export default function Drawer({
         <div className="drawer-title-group">
           <h2>My Order</h2>
           {cartItems.length > 0 && (
-            <span className="drawer-item-count" aria-label={`${cartItems.length} items in order`}>
-              {cartItems.length}
+            <span className="drawer-item-count">
+              {cartItems.length} {cartItems.length === 1 ? 'product' : 'products'}
             </span>
           )}
         </div>
@@ -257,7 +257,7 @@ export default function Drawer({
           {isReady && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
-              Cart expires: {expiryLabel}
+              Saved · {expiryLabel}
             </span>
           )}
           {onClose && (
