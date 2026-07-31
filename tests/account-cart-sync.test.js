@@ -237,4 +237,18 @@ describe('account basket client orchestration contract', () => {
     assert.match(app, /makeCartSyncOperation\([\s\S]*?cartClearActivityAtRef\.current[\s\S]*?nextOperation\.type === 'clear'/);
     assert.match(app, /cart(?:Save|Sync)(?:Queue|Chain|InFlight|Pending)/i);
   });
+
+  it('shows account sync failures and gives customers an explicit retry action', async () => {
+    const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+    const drawer = await readFile(new URL('../src/components/Drawer.jsx', import.meta.url), 'utf8');
+
+    assert.match(app, /setCartSyncStatus\('error'\)/);
+    assert.match(app, /const retryCartSync = useCallback/);
+    assert.match(app, /cartHydrateRetryRef\.current/);
+    assert.match(app, /onRetryCartSync=\{retryCartSync\}/);
+    assert.match(drawer, /role="alert"/);
+    assert.match(drawer, /Basket sync needs attention/);
+    assert.match(drawer, /We cannot confirm this basket on your account/);
+    assert.match(drawer, /onClick=\{onRetryCartSync\}>Retry sync/);
+  });
 });
