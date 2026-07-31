@@ -219,8 +219,9 @@ test('desktop and mobile converge on the latest account basket without checkout'
     // The visible badge is part of the mobile button's accessible name
     // (for example "Cart 3"), so match its stable leading action label.
     await mobile.getByRole('button', { name: /^Cart\b/ }).click();
-    await expect(mobile.getByRole('heading', { name: 'Legacy Basket Item' })).toBeVisible();
-    await expect(mobile.getByRole('heading', { name: 'Cloud Sync Marker' })).toBeVisible();
+    const mobileOrder = mobile.getByLabel('Your Order');
+    await expect(mobileOrder.getByRole('heading', { name: 'Legacy Basket Item' })).toBeVisible();
+    await expect(mobileOrder.getByRole('heading', { name: 'Cloud Sync Marker' })).toBeVisible();
 
     // A clear is also authoritative; an older desktop copy cannot resurrect it.
     await mobile.getByRole('button', { name: 'Clear order' }).click();
