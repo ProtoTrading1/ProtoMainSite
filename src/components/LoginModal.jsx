@@ -57,12 +57,18 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
       className="lm-backdrop"
       ref={backdropRef}
       onMouseDown={(e) => { mouseDownOrigin.current = e.target; }}
-      onClick={(e) => { if (mouseDownOrigin.current === backdropRef.current) onClose(); }}
+      onClick={() => { if (mouseDownOrigin.current === backdropRef.current) onClose(); }}
     >
-      <div className="lm-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="lm-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-modal-heading"
+        onClick={(event) => event.stopPropagation()}
+      >
           {/* Close */}
-          <button className="lm-close" type="button" onClick={onClose}>
-            <X size={18} />
+          <button className="lm-close" type="button" onClick={onClose} aria-label="Close sign-in">
+            <X size={18} aria-hidden="true" />
           </button>
 
           {/* Brand */}
@@ -72,7 +78,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Heading */}
           <div className="lm-heading">
-            <h2>{mode === 'forgot' ? 'Reset password.' : 'Welcome back.'}</h2>
+            <h2 id="login-modal-heading">{mode === 'forgot' ? 'Reset password.' : 'Welcome back.'}</h2>
             <p>{mode === 'forgot' ? 'Enter your email and we\'ll send a reset link.' : 'Sign in to your trade account.'}</p>
           </div>
 
@@ -116,8 +122,15 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
                     placeholder="••••••••"
                     required
                   />
-                  <button type="button" className="lm-eye" onClick={() => setShowPw(s => !s)}>
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button
+                    type="button"
+                    className="lm-eye"
+                    onClick={() => setShowPw(s => !s)}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                  >
+                    {showPw
+                      ? <EyeOff size={16} aria-hidden="true" />
+                      : <Eye size={16} aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -141,7 +154,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
           {/* Apply link */}
           {mode === 'login' && onApply && (
             <button type="button" className="lm-apply-link" onClick={onApply}>
-              New to Proto Trading? Apply for a trade account ↓
+              Not registered on the new website? Re-register or apply ↓
             </button>
           )}
 
