@@ -79,6 +79,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [validationIssues, setValidationIssues] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
@@ -257,6 +258,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     setEmailError('');
     setSubmitting(true);
     setSubmitError('');
+    setShowAccountRecovery(false);
     try {
       const deliveryLine = resolvedDeliveryAddress();
       const result = await submitTradeApplication({
@@ -291,6 +293,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       setDone(true);
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
+      setShowAccountRecovery(submitErr.recovery === 'SIGN_IN_OR_RESET_PASSWORD');
     } finally {
       setSubmitting(false);
     }
@@ -613,7 +616,16 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   </div>
                 )}
 
-                {submitError && <div className="lp-quiz-error">{submitError}</div>}
+                {submitError && (
+                  <div className="lp-quiz-error" role="alert">
+                    <span>{submitError}</span>
+                    {showAccountRecovery && onLogin && (
+                      <button type="button" className="lp-register-recovery-action" onClick={onLogin}>
+                        Sign in or reset password
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {standalone ? (
                   <div className="lp-register-step-actions">
