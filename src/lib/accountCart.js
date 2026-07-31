@@ -36,6 +36,6 @@ export function saveAccountCart(items, activityAt, revision) {
   return requestAccountCart('PUT', { items, activityAt, revision, mode: 'save' });
 }
 
-export function clearAccountCart() {
-  return requestAccountCart('DELETE');
+export function clearAccountCart(revision, activityAt) {
+  return requestAccountCart('DELETE', { revision, activityAt });
 }

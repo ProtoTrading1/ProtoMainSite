@@ -19,7 +19,6 @@ for replay history; superseded ones are **not deleted** so the history stays int
 | `005_whatsapp_sessions.sql` | WhatsApp session tracking |
 | `006_accept_whatsapp.sql` | WhatsApp opt-in acceptance |
 | `007_whatsapp_opt_in_at.sql` | WhatsApp opt-in timestamp |
-| `057_customer_account_cart.sql` | Server-only, account-synchronised customer baskets |
 
 ## Stock project (catalogue)
 
