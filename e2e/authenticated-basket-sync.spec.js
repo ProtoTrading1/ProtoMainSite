@@ -216,7 +216,9 @@ test('desktop and mobile converge on the latest account basket without checkout'
     // Mobile refreshes from the account and renders the same two products.
     await refreshFromAccount(mobile);
     await expectStoredSkus(mobile, ['E2E-LEGACY', 'E2E-MARKER']);
-    await mobile.getByRole('button', { name: 'Cart', exact: true }).click();
+    // The visible badge is part of the mobile button's accessible name
+    // (for example "Cart 3"), so match its stable leading action label.
+    await mobile.getByRole('button', { name: /^Cart\b/ }).click();
     await expect(mobile.getByRole('heading', { name: 'Legacy Basket Item' })).toBeVisible();
     await expect(mobile.getByRole('heading', { name: 'Cloud Sync Marker' })).toBeVisible();
 
