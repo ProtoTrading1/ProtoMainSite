@@ -165,7 +165,7 @@ async function signIn(page) {
   await page.getByRole('button', { name: /sign in/i }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Welcome back.' });
   await dialog.getByPlaceholder('name@business.co.za').fill(TEST_EMAIL);
-  await dialog.getByPlaceholder('Your password').fill(TEST_PASSWORD);
+  await dialog.locator('input[type="password"]').fill(TEST_PASSWORD);
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Cloud Sync Marker', { exact: true }).first()).toBeVisible();
 }
@@ -229,7 +229,6 @@ test('desktop and mobile converge on the latest account basket without checkout'
     expect(safety.authRequests).toBe(2);
     expect(safety.destructiveRequests).toEqual([]);
   } finally {
-    await desktopContext.close();
-    await mobileContext.close();
+    await Promise.allSettled([desktopContext.close(), mobileContext.close()]);
   }
 });
