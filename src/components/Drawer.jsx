@@ -72,6 +72,7 @@ export default function Drawer({
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
+  onRetryCartSync,
   cartReady = true,
   onClose,
   onContinueShopping,
@@ -94,6 +95,7 @@ export default function Drawer({
         : 'Saved on this device';
   const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
   const basketLoading = !cartReady;
+  const syncFailed = Boolean(customer?.id) && cartSyncStatus === 'error';
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -288,6 +290,17 @@ export default function Drawer({
       {showAutoCloseBar && (
         <div className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`} aria-hidden="true">
           <div style={{ width: `${Math.max(0, Math.min(100, autoCloseProgress))}%` }} />
+        </div>
+      )}
+
+      {syncFailed && (
+        <div className="cart-sync-alert" role="alert">
+          <ShieldAlert size={18} aria-hidden="true" />
+          <div>
+            <strong>Basket sync needs attention</strong>
+            <span>We cannot confirm this basket on your account. Retry before switching devices.</span>
+          </div>
+          <button type="button" onClick={onRetryCartSync}>Retry sync</button>
         </div>
       )}
 
