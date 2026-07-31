@@ -1,8 +1,12 @@
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.386319
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 
 describe('basket scroll stability', () => {
+  // Keep add-to-cart reveal behaviour separate from in-cart quantity updates.
   it('reveals the exact added line without moving the basket for quantity edits', async () => {
     const drawer = await readFile(new URL('../../src/components/Drawer.jsx', import.meta.url), 'utf8');
     const app = await readFile(new URL('../../src/App.jsx', import.meta.url), 'utf8');
