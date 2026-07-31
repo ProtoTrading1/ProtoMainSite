@@ -3003,22 +3003,29 @@ textarea:focus-visible,
   gap: 10px;
   padding: 0 18px;
   border-radius: 16px;
-  background: #dc2626;
+  background: #9f1d24;
   color: #fff;
   font-weight: 900;
   font-size: 15px;
   letter-spacing: 0.01em;
-  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition: transform 0.12s ease, background-color 0.2s ease, box-shadow 0.2s ease;
   border: none;
-  box-shadow: 0 16px 34px rgba(220,38,38,0.30);
+  box-shadow: 0 10px 24px rgba(159,29,36,0.18);
   cursor: pointer;
 }
 .primary-order-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 20px 40px rgba(220,38,38,0.35);
-  filter: brightness(1.06);
+  background: #86171d;
+  box-shadow: 0 12px 28px rgba(159,29,36,0.22);
 }
-.primary-order-button:active { transform: translateY(0); }
+.primary-order-button:focus-visible {
+  outline: 3px solid var(--proto-gold);
+  outline-offset: 2px;
+}
+.primary-order-button:active {
+  transform: translateY(0);
+  background: #711319;
+}
 .cart-in-control {
   flex: 1;
   height: 40px;
@@ -3311,13 +3318,37 @@ textarea:focus-visible,
   background: #fff;
 }
 .drawer-header {
-  padding: 14px 18px;
+  min-height: 52px;
+  padding: 4px 8px 4px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   background: #000;
-  border-bottom: none;
+  border-bottom: 1px solid rgba(200, 154, 60, 0.7);
+}
+.drawer-title-group,
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.drawer-title-group { gap: 7px; }
+.drawer-header-actions {
+  gap: 6px;
+  justify-content: flex-end;
+}
+.drawer-item-count {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
 }
 .drawer-footer {
   padding: 14px 18px;
@@ -3483,12 +3514,21 @@ textarea:focus-visible,
   place-items: center;
   padding: 0;
   border: none;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.07);
   color: #fff;
   cursor: pointer;
 }
-.drawer-close-button:hover { background: rgba(255,255,255,0.2); }
+.drawer-close-button:hover { background: rgba(255,255,255,0.13); }
+.drawer-close-button:focus-visible {
+  outline: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .drawer-close-button:focus-visible {
+    outline: 2px solid rgba(200, 154, 60, 0.72);
+    outline-offset: -4px;
+  }
+}
 .drawer-footer {
   border-top: 1px solid #e2e8f0;
   border-bottom: 0;
@@ -3669,13 +3709,8 @@ textarea:focus-visible,
 /* The desktop side basket needs the same product-first density as mobile. */
 @media (min-width: 1201px) {
   .cart-drawer .drawer-header {
-    min-height: 60px;
-    padding: 8px 12px;
-    gap: 8px;
-  }
-  .cart-drawer .drawer-header > div:last-child {
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
+    min-height: 52px;
+    padding: 4px 8px 4px 12px;
   }
   .cart-drawer .drawer-header h2 { font-size: 15px; }
   .cart-drawer .ready-pill { display: none; }
@@ -4793,13 +4828,8 @@ textarea:focus-visible,
 @media (max-width: 600px) {
   /* Keep the mobile basket focused on the products being ordered. */
   .mobile-cart-sheet-body .drawer-header {
-    min-height: 60px;
-    padding: 8px 12px;
-    gap: 8px;
-  }
-  .mobile-cart-sheet-body .drawer-header > div:last-child {
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
+    min-height: 52px;
+    padding: 4px 8px 4px 12px;
   }
   .mobile-cart-sheet-body .drawer-header h2 { font-size: 15px; }
   .mobile-cart-sheet-body .ready-pill { display: none; }

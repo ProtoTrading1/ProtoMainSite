@@ -245,19 +245,19 @@ export default function Drawer({
   return (
     <div className="order-drawer" style={{ position: 'relative' }}>
       <div className="drawer-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="drawer-title-group">
           <h2>My Order</h2>
           {cartItems.length > 0 && (
-            <span style={{ fontSize: '11px', fontWeight: '700', background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '2px 7px', borderRadius: '999px' }}>
-              {cartItems.length}
+            <span className="drawer-item-count">
+              {cartItems.length} {cartItems.length === 1 ? 'product' : 'products'}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="drawer-header-actions">
           {isReady && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
-              Cart expires: {expiryLabel}
+              Saved · {expiryLabel}
             </span>
           )}
           {onClose && (
@@ -268,7 +268,7 @@ export default function Drawer({
               aria-label="Close cart"
               data-cart-close
             >
-              <X size={16} />
+              <X size={16} aria-hidden="true" />
             </button>
           )}
         </div>
