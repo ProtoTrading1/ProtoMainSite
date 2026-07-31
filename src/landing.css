@@ -4638,6 +4638,25 @@
   font-weight: 600;
 }
 
+.lp-register-recovery-action {
+  display: block;
+  margin: 12px auto 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lp-register-recovery-action:hover,
+.lp-register-recovery-action:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+
 .lp-register-validation-summary {
   margin: 0;
   padding: 14px 16px;
