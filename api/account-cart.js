@@ -182,12 +182,20 @@ export function resolveWholeCart(currentRow, incomingItems, incomingActivityAt) 
   const current = cartPayload(currentRow);
   if (!currentRow) return { items: incomingItems, activityAt: incomingActivityAt, changed: true };
 
-  const incomingIsNewer = incomingActivityAt !== null
-    && (current.activityAt === null || incomingActivityAt > current.activityAt);
-  if (!incomingIsNewer) {
-    return { items: current.items, activityAt: current.activityAt, changed: false };
+  // An empty row with no activity is only a placeholder created by a device
+  // that logged in without a basket. Allow one populated legacy browser to
+  // seed it, so the customer's pre-sync basket is not lost during rollout.
+  if (!current.items.length && current.activityAt === null
+      && incomingItems.length && incomingActivityAt !== null) {
+    return { items: incomingItems, activityAt: incomingActivityAt, changed: true };
   }
-  return { items: incomingItems, activityAt: incomingActivityAt, changed: true };
+
+  // Login/hydration is a one-time import path, not a normal basket save.
+  // Once an account has a server basket, that revision is authoritative.
+  // Browser timestamps are not comparable across devices and a stale phone or
+  // laptop must never replace the latest account basket merely because its
+  // local clock/activity timestamp is later.
+  return { items: current.items, activityAt: current.activityAt, changed: false };
 }
 
 function logDataError(operation, error) {
