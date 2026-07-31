@@ -3413,8 +3413,8 @@ textarea:focus-visible,
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 .drawer-line--just-added {
-  background: #fff8dc;
-  box-shadow: inset 3px 0 #d6a800;
+  background: color-mix(in srgb, var(--proto-gold) 12%, #fff);
+  box-shadow: inset 3px 0 var(--proto-gold);
 }
 .drawer-thumb {
   width: 44px;
