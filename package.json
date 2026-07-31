@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "node scripts/ensure-preregister-banner.mjs && vite build",
     "lint": "eslint .",
-    "test": "node --test tests/**/*.test.js",
+    "test": "node --test 'tests/**/*.test.js'",
     "preview": "vite preview"
   },
   "dependencies": {
