@@ -343,9 +343,15 @@ export default async function handler(req, res) {
   if (error) {
     console.error('createUser error:', error);
     // Do not echo Supabase's message: a duplicate-email error ("already
-    // registered") turns this into an account-existence oracle. Return a
-    // generic failure and log the detail server-side.
-    return res.status(400).json({ error: 'We could not complete your registration. Please check your details and try again.' });
+    // registered") turns this into an account-existence oracle. The same
+    // recovery response is returned for every account-creation failure, so an
+    // existing customer gets useful next steps without revealing whether an
+    // arbitrary email address has an account.
+    return res.status(400).json({
+      error: 'We could not create a new account with these details. If you have registered before, sign in or use Forgot password. Otherwise, check your details and try again.',
+      code: 'ACCOUNT_CREATION_FAILED',
+      recovery: 'SIGN_IN_OR_RESET_PASSWORD',
+    });
   }
 
   const userId = data.user?.id;
