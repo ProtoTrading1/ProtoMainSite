@@ -280,6 +280,7 @@ function Questionnaire({ onLogin }) {
   const [instantAccess, setInstantAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [vatNumber, setVatNumber] = useState('');
@@ -386,6 +387,7 @@ function Questionnaire({ onLogin }) {
     // Final step — submit
     setSubmitting(true);
     setSubmitError('');
+    setShowAccountRecovery(false);
     try {
       const { submitTradeApplication } = await import('../lib/tradeApplication');
       const deliveryLine = buildStructuredDeliveryAddress();
@@ -419,6 +421,7 @@ function Questionnaire({ onLogin }) {
       setDone(true);
     } catch (err) {
       setSubmitError(err.message || 'Something went wrong. Please try again.');
+      setShowAccountRecovery(err.recovery === 'SIGN_IN_OR_RESET_PASSWORD');
     } finally {
       setSubmitting(false);
     }
@@ -737,7 +740,14 @@ function Questionnaire({ onLogin }) {
       </motion.div>
 
       {submitError && (
-        <div className="lp-quiz-error">{submitError}</div>
+        <div className="lp-quiz-error" role="alert">
+          <span>{submitError}</span>
+          {showAccountRecovery && onLogin && (
+            <button type="button" className="lp-register-recovery-action" onClick={onLogin}>
+              Sign in or reset password
+            </button>
+          )}
+        </div>
       )}
 
       <div className="lp-quiz-nav">

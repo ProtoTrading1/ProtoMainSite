@@ -56,6 +56,11 @@ export async function submitTradeApplication({
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Registration failed');
+  if (!res.ok) {
+    const error = new Error(data.error || 'Registration failed');
+    error.code = data.code || null;
+    error.recovery = data.recovery || null;
+    throw error;
+  }
   return data;
 }
