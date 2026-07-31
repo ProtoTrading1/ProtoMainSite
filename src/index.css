@@ -3003,20 +3003,20 @@ textarea:focus-visible,
   gap: 10px;
   padding: 0 18px;
   border-radius: 16px;
-  background: #c51f26;
+  background: #9f1d24;
   color: #fff;
   font-weight: 900;
   font-size: 15px;
   letter-spacing: 0.01em;
   transition: transform 0.12s ease, background-color 0.2s ease, box-shadow 0.2s ease;
   border: none;
-  box-shadow: 0 10px 24px rgba(197,31,38,0.20);
+  box-shadow: 0 10px 24px rgba(159,29,36,0.18);
   cursor: pointer;
 }
 .primary-order-button:hover {
   transform: translateY(-1px);
-  background: #b51b22;
-  box-shadow: 0 12px 28px rgba(197,31,38,0.25);
+  background: #86171d;
+  box-shadow: 0 12px 28px rgba(159,29,36,0.22);
 }
 .primary-order-button:focus-visible {
   outline: 3px solid var(--proto-gold);
@@ -3024,7 +3024,7 @@ textarea:focus-visible,
 }
 .primary-order-button:active {
   transform: translateY(0);
-  background: #a9181e;
+  background: #711319;
 }
 .cart-in-control {
   flex: 1;
