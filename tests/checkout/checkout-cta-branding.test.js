@@ -8,10 +8,10 @@ test('checkout CTA uses the restrained Proto red treatment', () => {
   const baseRule = css.match(/\.primary-order-button\s*\{([\s\S]*?)\}/)?.[1] ?? '';
   const hoverRule = css.match(/\.primary-order-button:hover\s*\{([\s\S]*?)\}/)?.[1] ?? '';
 
-  assert.match(baseRule, /background:\s*#c51f26/i);
-  assert.match(baseRule, /box-shadow:\s*0 10px 24px rgba\(197,31,38,0\.20\)/i);
+  assert.match(baseRule, /background:\s*#9f1d24/i);
+  assert.match(baseRule, /box-shadow:\s*0 10px 24px rgba\(159,29,36,0\.18\)/i);
   assert.doesNotMatch(baseRule, /#dc2626/i);
-  assert.match(hoverRule, /background:\s*#b51b22/i);
+  assert.match(hoverRule, /background:\s*#86171d/i);
 });
 
 test('checkout CTA replaces the dark focus outline with the brand gold ring', () => {
