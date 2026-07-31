@@ -141,7 +141,10 @@ export default function Questionnaire({ onLogin }) {
         && (buildingType !== 'Other' || otherBuildingType.trim())
         && (buildingType !== 'Apartments' || unitNumber.trim());
     }
-    if (step === 3) return true;
+    if (step === 3) {
+      return businessType.length > 0
+        && (!businessType.includes('Other') || otherType.trim());
+    }
     return false;
   };
 

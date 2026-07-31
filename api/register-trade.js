@@ -251,6 +251,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
+  if (!String(businessType || '').trim()) {
+    return res.status(400).json({ error: 'Please select at least one nature of business option.' });
+  }
+
   // Throttling: registration creates an auth account and sends emails, so it
   // must not be scriptable into mass abuse — but South African mobile carriers
   // put THOUSANDS of customers behind one CGNAT IP, so a tight per-IP cap
