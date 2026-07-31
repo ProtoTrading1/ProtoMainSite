@@ -24,7 +24,9 @@ test('sign-in validates locally and reset mail is safely intercepted', async ({ 
   await page.goto('/');
   await page.getByRole('button', { name: /sign in/i }).first().click();
 
-  const dialog = page.getByRole('dialog', { name: 'Welcome back.' });
+  // Keep this locator stable when the heading (and therefore accessible name)
+  // changes from sign-in to password recovery.
+  const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   // Native required fields stop an empty form before React receives submit.
   await expect(dialog.locator('input[type="email"]')).toHaveAttribute('required', '');
@@ -57,10 +59,12 @@ test('registration requires at least one business category', async ({ page }) =>
   await page.getByPlaceholder('At least 8 characters').fill('SafeTest123!');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
-  await page.getByPlaceholder('Street name and number').fill('1 Safety Street');
-  await page.getByPlaceholder('Suburb').fill('Safe Suburb');
-  await page.getByPlaceholder('Postal code').fill('8001');
-  await page.getByPlaceholder('City').fill('Cape Town');
+  const addressesStep = page.getByRole('heading', { name: 'Billing and delivery addresses' })
+    .locator('..');
+  await addressesStep.getByPlaceholder('Street name and number').first().fill('1 Safety Street');
+  await addressesStep.getByPlaceholder('Suburb').first().fill('Safe Suburb');
+  await addressesStep.getByPlaceholder('Postal code').first().fill('8001');
+  await addressesStep.getByPlaceholder('City').first().fill('Cape Town');
   await page.getByRole('checkbox', { name: 'Same as billing address' }).check();
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -79,5 +83,5 @@ test('policy route renders and returns to the public home', async ({ page }) => 
   await page.getByRole('navigation', { name: 'Policies navigation' })
     .getByRole('link', { name: 'Back to home' })
     .click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Welcome to our new online store' })).toBeVisible();
 });
