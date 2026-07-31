@@ -23,9 +23,13 @@ describe('basket viewing space', () => {
     assert.match(drawer, /className="drawer-title-group"/);
     assert.match(drawer, /className="drawer-header-actions"/);
     assert.match(drawer, /className="drawer-item-count"/);
+    assert.match(drawer, /cartItems\.length === 1 \? 'product' : 'products'/);
+    assert.match(drawer, /Saved · \{expiryLabel\}/);
+    assert.doesNotMatch(drawer, /Cart expires:/);
     assert.match(styles, /\.drawer-header \{[\s\S]*?background: #000;[\s\S]*?border-bottom: 1px solid rgba\(200, 154, 60, 0\.7\);/);
     assert.match(styles, /\.drawer-header-actions \{[\s\S]*?white-space: nowrap;/);
     assert.match(styles, /\.drawer-close-button \{[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
-    assert.match(styles, /\.drawer-close-button:focus-visible \{[\s\S]*?outline: 2px solid var\(--proto-gold\);/);
+    assert.match(styles, /\.drawer-close-button:focus-visible \{[\s\S]*?outline: none;/);
+    assert.match(styles, /@media \(hover: hover\) and \(pointer: fine\) \{[\s\S]*?\.drawer-close-button:focus-visible \{[\s\S]*?outline: 2px solid rgba\(200, 154, 60, 0\.72\);[\s\S]*?outline-offset: -4px;/);
   });
 });
