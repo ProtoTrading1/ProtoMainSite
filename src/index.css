@@ -3665,6 +3665,43 @@ textarea:focus-visible,
   font-weight: 700;
 }
 .quote-steps { display: none; }
+
+/* The desktop side basket needs the same product-first density as mobile. */
+@media (min-width: 1201px) {
+  .cart-drawer .drawer-header {
+    min-height: 60px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .cart-drawer .drawer-header > div:last-child {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  .cart-drawer .drawer-header h2 { font-size: 15px; }
+  .cart-drawer .ready-pill { display: none; }
+  .cart-drawer .cart-expiry-pill {
+    padding: 4px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .cart-drawer .drawer-items {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .cart-drawer .drawer-footer { padding: 8px 12px; }
+  .cart-drawer .subtotal-row strong { font-size: 20px; }
+  .cart-drawer .minimum-card {
+    margin: 5px 0;
+    padding: 6px 9px;
+  }
+  .cart-drawer .progress-track { margin-top: 5px; }
+  .cart-drawer .primary-order-button { min-height: 50px; }
+  .cart-drawer .clear-button {
+    min-height: 32px;
+    padding: 5px 0 0;
+  }
+  .cart-drawer .drawer-trust { display: none; }
+}
 .sticky-order-bar {
   height: var(--sticky-bar-height);
   display: flex;
