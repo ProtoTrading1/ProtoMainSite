@@ -4754,6 +4754,43 @@ textarea:focus-visible,
 
 /* ── Small phones (≤ 600px) ── */
 @media (max-width: 600px) {
+  /* Keep the mobile basket focused on the products being ordered. */
+  .mobile-cart-sheet-body .drawer-header {
+    min-height: 60px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .mobile-cart-sheet-body .drawer-header > div:last-child {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  .mobile-cart-sheet-body .drawer-header h2 { font-size: 15px; }
+  .mobile-cart-sheet-body .ready-pill { display: none; }
+  .mobile-cart-sheet-body .cart-expiry-pill {
+    padding: 4px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .mobile-cart-sheet-body .drawer-items {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .mobile-cart-sheet-body .drawer-footer {
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  }
+  .mobile-cart-sheet-body .subtotal-row strong { font-size: 20px; }
+  .mobile-cart-sheet-body .minimum-card {
+    margin: 5px 0;
+    padding: 6px 9px;
+  }
+  .mobile-cart-sheet-body .progress-track { margin-top: 5px; }
+  .mobile-cart-sheet-body .primary-order-button { min-height: 50px; }
+  .mobile-cart-sheet-body .clear-button {
+    min-height: 32px;
+    padding: 5px 0 0;
+  }
+  .mobile-cart-sheet-body .drawer-trust { display: none; }
+
   /* Header */
   .app-header { padding: 0 12px; }
   .brand-logo { font-size: 17px; }
