@@ -18,5 +18,6 @@ describe('basket scroll stability', () => {
     assert.match(drawer, /onScrollPositionChangeRef\.current/);
     assert.doesNotMatch(drawer, /el\.scrollTo\(\{ top: el\.scrollHeight/);
     assert.match(styles, /\.drawer-line--just-added/);
+    assert.match(styles, /box-shadow: inset 3px 0 var\(--proto-gold\)/);
   });
 });
