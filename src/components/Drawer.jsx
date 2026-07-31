@@ -87,6 +87,7 @@ export default function Drawer({
   const [customerNotes, setCustomerNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const itemsRef = useRef(null);
+  const previousItemIdsRef = useRef(new Set(cartItems.map((item) => item.product.id)));
   const courierDialogRef = useRef(null);
   const courierPreviousFocusRef = useRef(null);
   const courierDialogTitleId = useId();
@@ -101,7 +102,14 @@ export default function Drawer({
 
   useEffect(() => {
     const el = itemsRef.current;
-    if (!el || !cartItems.length) return;
+    const previousItemIds = previousItemIdsRef.current;
+    const hasNewLine = cartItems.some((item) => !previousItemIds.has(item.product.id));
+    previousItemIdsRef.current = new Set(cartItems.map((item) => item.product.id));
+
+    // Quantity edits and removals must preserve the customer's position in a
+    // long basket. Only reveal the bottom when a genuinely new product line is
+    // appended to a basket that was already open/populated.
+    if (!el || !hasNewLine || previousItemIds.size === 0) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [cartItems]);
 
