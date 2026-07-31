@@ -206,11 +206,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try { return JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
+  const [cartRevealRequest, setCartRevealRequest] = useState(null);
+  const [cartScrollTop, setCartScrollTop] = useState(0);
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
   const [cartClock, setCartClock] = useState(Date.now());
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
+  const cartRevealSequenceRef = useRef(0);
   const cartTriggerRef = useRef(null);
   const desktopCartRef = useRef(null);
   const mobileCartDialogRef = useRef(null);
@@ -717,6 +720,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       return [...prev, { product, qty: Math.min(maxQty, requestedQty) }];
     });
     markCartActivity();
+    cartRevealSequenceRef.current += 1;
+    setCartRevealRequest({ productId: product.id, token: cartRevealSequenceRef.current });
 
     if (searchTrackRef.current.rowId && searchQuery.trim()) {
       void logSearchCartAdd(searchTrackRef.current.rowId);
@@ -731,6 +736,14 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
   }, [dismissWelcome, markCartActivity, searchQuery]);
+
+  const handleCartRevealHandled = useCallback((token) => {
+    setCartRevealRequest((current) => (current?.token === token ? null : current));
+  }, []);
+
+  const handleCartScrollPositionChange = useCallback((scrollTop) => {
+    setCartScrollTop(scrollTop);
+  }, []);
 
   const updateQty = useCallback((id, qty) => {
     const requestedQty = normalizeCartQtyInput(qty);
@@ -1080,6 +1093,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             cartExpiryTone={cartExpiryTone}
             onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
             onContinueShopping={() => closeDesktopCart({ restoreFocus: true })}
+            revealItemRequest={cartRevealRequest}
+            initialScrollTop={cartScrollTop}
+            onRevealItemHandled={handleCartRevealHandled}
+            onScrollPositionChange={handleCartScrollPositionChange}
           />}
         </aside>
       </div>
@@ -1169,6 +1186,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 onContinueShopping={() => setMobileCartOpen(false)}
+                revealItemRequest={cartRevealRequest}
+                initialScrollTop={cartScrollTop}
+                onRevealItemHandled={handleCartRevealHandled}
+                onScrollPositionChange={handleCartScrollPositionChange}
               />
             </div>
           </div>
