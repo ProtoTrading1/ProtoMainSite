@@ -3521,8 +3521,13 @@ textarea:focus-visible,
 }
 .drawer-close-button:hover { background: rgba(255,255,255,0.13); }
 .drawer-close-button:focus-visible {
-  outline: 2px solid var(--proto-gold);
-  outline-offset: -2px;
+  outline: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .drawer-close-button:focus-visible {
+    outline: 2px solid rgba(200, 154, 60, 0.72);
+    outline-offset: -4px;
+  }
 }
 .drawer-footer {
   border-top: 1px solid #e2e8f0;
