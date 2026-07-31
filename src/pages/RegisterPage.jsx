@@ -118,6 +118,12 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (!businessName.trim()) {
       issues.push({ key: 'businessName', message: 'Company / trading name', section: 'business' });
     }
+    if (businessType.length === 0) {
+      issues.push({ key: 'businessType', message: 'Nature of business — select at least one option', section: 'business' });
+    }
+    if (businessType.includes('Other') && !otherType.trim()) {
+      issues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
+    }
     if (!country.trim()) {
       issues.push({ key: 'country', message: 'Country', section: 'addresses' });
     }
