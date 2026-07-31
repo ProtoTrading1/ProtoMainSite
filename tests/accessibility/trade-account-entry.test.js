@@ -18,7 +18,7 @@ test('uses one clear label for each trade-account journey', async () => {
   assert.doesNotMatch(hero, /Sign In/);
   assert.doesNotMatch(hero, /onLogin/);
   assert.match(login, /Sign in to your trade account/);
-  assert.match(login, /Apply for a trade account/);
+  assert.match(login, /Not registered on the new website\? Re-register or apply/);
   assert.match(register, /Submit trade application/);
 
   const customerCopy = `${landing}\n${hero}\n${login}\n${register}`;

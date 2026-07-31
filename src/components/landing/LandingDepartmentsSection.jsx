@@ -16,16 +16,16 @@ const DEPARTMENTS = [
 ];
 
 const BRANDS = [
-  { name: 'dala', src: '/brands/dala.jpg' },
-  { name: 'Mötarro', src: '/brands/motarro.jpg' },
-  { name: 'STAEDTLER', src: '/brands/staedtler.jpg' },
-  { name: 'Vinnic', src: '/brands/vinnic.jpg' },
-  { name: 'Conan', src: '/brands/conan.jpg' },
-  { name: 'Marlin', src: '/brands/marlin.jpg' },
-  { name: 'Waterlily', src: '/brands/waterlily.jpg' },
-  { name: 'OYA', src: '/brands/oya.jpg' },
-  { name: 'amazcolor', src: '/brands/amazcolor.jpg' },
-  { name: 'Keep Smiling', src: '/brands/keepsmiling.jpg' },
+  { name: 'dala', slug: 'dala' },
+  { name: 'Mötarro', slug: 'motarro' },
+  { name: 'STAEDTLER', slug: 'staedtler' },
+  { name: 'Vinnic', slug: 'vinnic' },
+  { name: 'Conan', slug: 'conan' },
+  { name: 'Marlin', slug: 'marlin' },
+  { name: 'Waterlily', slug: 'waterlily' },
+  { name: 'OYA', slug: 'oya' },
+  { name: 'amazcolor', slug: 'amazcolor' },
+  { name: 'Keep Smiling', slug: 'keepsmiling' },
 ];
 
 export default function LandingDepartmentsSection() {
@@ -61,7 +61,21 @@ export default function LandingDepartmentsSection() {
           <div className="lp-brands-track">
             {[...BRANDS, ...BRANDS].map((b, i) => (
               <div className="lp-brand" key={`${b.name}-${i}`} aria-hidden={i >= BRANDS.length}>
-                <img src={b.src} alt={b.name} loading="lazy" decoding="async" />
+                <picture>
+                  <source
+                    type="image/webp"
+                    srcSet={`/brands/${b.slug}-180.webp 180w, /brands/${b.slug}-360.webp 360w`}
+                    sizes="180px"
+                  />
+                  <img
+                    src={`/brands/${b.slug}.jpg`}
+                    alt={b.name}
+                    width="180"
+                    height="180"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
               </div>
             ))}
           </div>

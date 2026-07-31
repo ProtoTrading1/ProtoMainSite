@@ -460,8 +460,11 @@ function Questionnaire({ onLogin }) {
             <h3>Start with the core company details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
-                <label>Company name</label>
+                <label htmlFor="trade-company-name">Company name</label>
                 <input
+                  id="trade-company-name"
+                  name="business_name"
+                  autoComplete="organization"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
@@ -469,8 +472,11 @@ function Questionnaire({ onLogin }) {
                 />
               </div>
               <div className="lp-quiz-field">
-                <label>Contact person name and surname</label>
+                <label htmlFor="trade-contact-name">Contact person name and surname</label>
                 <input
+                  id="trade-contact-name"
+                  name="contact_name"
+                  autoComplete="name"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   onKeyDown={handleKey}
@@ -478,8 +484,12 @@ function Questionnaire({ onLogin }) {
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>VAT number <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
+                <label htmlFor="trade-vat-number">VAT number <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
                 <input
+                  id="trade-vat-number"
+                  name="vat_number"
+                  autoComplete="off"
+                  inputMode="numeric"
                   value={vatNumber}
                   onChange={(e) => setVatNumber(e.target.value)}
                   onKeyDown={handleKey}
@@ -495,26 +505,35 @@ function Questionnaire({ onLogin }) {
             <h3>Add the account and contact details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
-                <label>Email address</label>
+                <label htmlFor="trade-email">Email address</label>
                 <input
+                  id="trade-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
                   onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
                   aria-invalid={!!emailError}
+                  aria-describedby={emailError ? 'trade-email-error' : undefined}
                 />
                 {emailError && (
-                  <span style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
+                  <span id="trade-email-error" style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
                     {emailError}
                   </span>
                 )}
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Phone number</label>
+                <label htmlFor="trade-phone">Phone number</label>
                 <input
+                  id="trade-phone"
+                  name="phone"
                   type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={handleKey}
@@ -577,10 +596,13 @@ function Questionnaire({ onLogin }) {
               )}
 
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
+                <label htmlFor="trade-new-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
+                    id="trade-new-password"
+                    name="password"
                     type={showPw ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKey}
@@ -807,9 +829,9 @@ export default function LandingPage({ onLogin, onApply, registrationMode = false
           <div className="lp-footer-brand">
             <ProtoLogo variant="full" size="md" tagline={false} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+          <div className="lp-footer-copy">
             <p style={{ margin: 0 }}>Trade access only. Not open to the general public.</p>
-            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div className="lp-footer-policy-links">
               {[
                 { label: 'Returns Policy', hash: '#/policies/returns' },
                 { label: 'Shipping Policy', hash: '#/policies/shipping' },
@@ -819,10 +841,8 @@ export default function LandingPage({ onLogin, onApply, registrationMode = false
                 <a
                   key={hash}
                   href={hash}
+                  className="lp-footer-policy-link"
                   onClick={(e) => { e.preventDefault(); window.location.hash = hash.slice(1); }}
-                  style={{ color: '#64748b', fontSize: '12px', fontWeight: 700, textDecoration: 'none', transition: 'color 0.15s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; }}
                 >
                   {label}
                 </a>
