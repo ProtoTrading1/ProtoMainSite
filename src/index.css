@@ -3003,22 +3003,29 @@ textarea:focus-visible,
   gap: 10px;
   padding: 0 18px;
   border-radius: 16px;
-  background: #dc2626;
+  background: #c51f26;
   color: #fff;
   font-weight: 900;
   font-size: 15px;
   letter-spacing: 0.01em;
-  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition: transform 0.12s ease, background-color 0.2s ease, box-shadow 0.2s ease;
   border: none;
-  box-shadow: 0 16px 34px rgba(220,38,38,0.30);
+  box-shadow: 0 10px 24px rgba(197,31,38,0.20);
   cursor: pointer;
 }
 .primary-order-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 20px 40px rgba(220,38,38,0.35);
-  filter: brightness(1.06);
+  background: #b51b22;
+  box-shadow: 0 12px 28px rgba(197,31,38,0.25);
 }
-.primary-order-button:active { transform: translateY(0); }
+.primary-order-button:focus-visible {
+  outline: 3px solid var(--proto-gold);
+  outline-offset: 2px;
+}
+.primary-order-button:active {
+  transform: translateY(0);
+  background: #a9181e;
+}
 .cart-in-control {
   flex: 1;
   height: 40px;
