@@ -1,6 +1,3 @@
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 98.386319
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
