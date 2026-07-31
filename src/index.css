@@ -3318,13 +3318,37 @@ textarea:focus-visible,
   background: #fff;
 }
 .drawer-header {
-  padding: 14px 18px;
+  min-height: 52px;
+  padding: 4px 8px 4px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   background: #000;
-  border-bottom: none;
+  border-bottom: 1px solid rgba(200, 154, 60, 0.7);
+}
+.drawer-title-group,
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.drawer-title-group { gap: 7px; }
+.drawer-header-actions {
+  gap: 6px;
+  justify-content: flex-end;
+}
+.drawer-item-count {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
 }
 .drawer-footer {
   padding: 14px 18px;
@@ -3490,12 +3514,16 @@ textarea:focus-visible,
   place-items: center;
   padding: 0;
   border: none;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.07);
   color: #fff;
   cursor: pointer;
 }
-.drawer-close-button:hover { background: rgba(255,255,255,0.2); }
+.drawer-close-button:hover { background: rgba(255,255,255,0.13); }
+.drawer-close-button:focus-visible {
+  outline: 2px solid var(--proto-gold);
+  outline-offset: -2px;
+}
 .drawer-footer {
   border-top: 1px solid #e2e8f0;
   border-bottom: 0;
@@ -3676,13 +3704,8 @@ textarea:focus-visible,
 /* The desktop side basket needs the same product-first density as mobile. */
 @media (min-width: 1201px) {
   .cart-drawer .drawer-header {
-    min-height: 60px;
-    padding: 8px 12px;
-    gap: 8px;
-  }
-  .cart-drawer .drawer-header > div:last-child {
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
+    min-height: 52px;
+    padding: 4px 8px 4px 12px;
   }
   .cart-drawer .drawer-header h2 { font-size: 15px; }
   .cart-drawer .ready-pill { display: none; }
@@ -4800,13 +4823,8 @@ textarea:focus-visible,
 @media (max-width: 600px) {
   /* Keep the mobile basket focused on the products being ordered. */
   .mobile-cart-sheet-body .drawer-header {
-    min-height: 60px;
-    padding: 8px 12px;
-    gap: 8px;
-  }
-  .mobile-cart-sheet-body .drawer-header > div:last-child {
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
+    min-height: 52px;
+    padding: 4px 8px 4px 12px;
   }
   .mobile-cart-sheet-body .drawer-header h2 { font-size: 15px; }
   .mobile-cart-sheet-body .ready-pill { display: none; }
