@@ -32,7 +32,7 @@ function formatCartExpiry(remainingMs) {
   return `${hours}h ${minutes}m left`;
 }
 
-function QuantityInput({ item, updateQty }) {
+function QuantityInput({ item, updateQty, disabled = false }) {
   // Over-ordering is allowed (backorder request); the shortfall is surfaced by
   // the per-line advisory below, so the input only enforces a sane ceiling.
   const maxQty = 9999;
@@ -51,6 +51,7 @@ function QuantityInput({ item, updateQty }) {
       max={maxQty}
       type="number"
       value={draftQty}
+      disabled={disabled}
       onBlur={commitQty}
       onChange={(e) => setDraftQty(e.target.value)}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
@@ -70,6 +71,8 @@ export default function Drawer({
   showAutoCloseBar = false,
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
+  cartSyncStatus = 'local',
+  cartReady = true,
   onClose,
   onContinueShopping,
   revealItemRequest = null,
@@ -82,7 +85,15 @@ export default function Drawer({
   const isReady = cartTotal >= MIN_ORDER;
   const hasExpiry = cartItems.length > 0 && cartExpiryRemainingMs !== null;
   const expiryLabel = formatCartExpiry(cartExpiryRemainingMs);
+  const syncLabel = cartSyncStatus === 'saving'
+    ? 'Saving…'
+    : cartSyncStatus === 'loading'
+      ? 'Loading account basket…'
+      : cartSyncStatus === 'saved'
+        ? 'Saved to account'
+        : 'Saved on this device';
   const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
+  const basketLoading = !cartReady;
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -257,7 +268,7 @@ export default function Drawer({
           {isReady && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
-              Saved · {expiryLabel}
+              {syncLabel} · {expiryLabel}
             </span>
           )}
           {onClose && (
@@ -306,20 +317,22 @@ export default function Drawer({
                   <button
                     onClick={() => updateQty(item.product.id, item.qty - 1)}
                     type="button"
+                    disabled={basketLoading}
                     aria-label={`Decrease quantity for ${item.product.name}`}
                   >
                     -
                   </button>
-                  <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} />
+                  <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} disabled={basketLoading} />
                   <button
                     onClick={() => updateQty(item.product.id, item.qty + 1)}
                     type="button"
+                    disabled={basketLoading}
                     aria-label={`Increase quantity for ${item.product.name}`}
                   >
                     +
                   </button>
                 </div>
-                <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" aria-label={`Remove ${item.product.name} from cart`}>
+                <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" disabled={basketLoading} aria-label={`Remove ${item.product.name} from cart`}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -370,7 +383,12 @@ export default function Drawer({
             <div style={{ width: `${progress}%` }} />
           </div>
         </div>
-        {isReady ? (
+        {basketLoading ? (
+          <button className="primary-order-button" type="button" disabled>
+            <Loader2 size={17} className="spin" />
+            Loading account basket…
+          </button>
+        ) : isReady ? (
           <button className="primary-order-button" onClick={handleSubmitClick} type="button">
             <ShoppingCart size={17} />
             Review order request
@@ -381,7 +399,7 @@ export default function Drawer({
             Continue shopping — R{remaining.toFixed(2)} remaining
           </button>
         )}
-        <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button">
+        <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button" disabled={basketLoading}>
           <Trash2 size={13} />
           Clear order
         </button>
