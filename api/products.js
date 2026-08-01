@@ -9,6 +9,7 @@ import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
+import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -295,7 +296,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     originalDescription: row.original_description || '',
     packDescription: String(row.pack_description || '').trim(),
     unitsOfIssue,
-    price: Number(row.price) || 0,
+    price: customerFacingCataloguePrice(row.price),
     images,
     image: images[0] || '',
     secondaryImage: images[1] || '',
