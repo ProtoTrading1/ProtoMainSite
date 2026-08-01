@@ -20,6 +20,18 @@ export function accountCreationFailureResponse() {
   };
 }
 
+export function isExistingEmailError(error) {
+  return error?.code === 'email_exists';
+}
+
+export function existingEmailResponse() {
+  return {
+    error: 'This email is already registered. Sign in, or reset your password if you have forgotten it.',
+    code: 'EMAIL_ALREADY_REGISTERED',
+    recovery: 'SIGN_IN_OR_RESET_PASSWORD',
+  };
+}
+
 // New-signup notifications go to the Proto team. The old default pointed at
 // orders@prototrading.co.za — a different domain from the one Proto is
 // migrating to — so trade applications could land in a mailbox nobody reads.
@@ -350,11 +362,12 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error('createUser error:', error);
-    // Do not echo Supabase's message: a duplicate-email error ("already
-    // registered") turns this into an account-existence oracle. The same
-    // recovery response is returned for every account-creation failure, so an
-    // existing customer gets useful next steps without revealing whether an
-    // arbitrary email address has an account.
+    // Supabase exposes the stable `email_exists` Auth error code. Customers
+    // expect a clear answer for this ordinary registration case; keep every
+    // other account-creation failure generic and never echo provider messages.
+    if (isExistingEmailError(error)) {
+      return res.status(409).json(existingEmailResponse());
+    }
     return res.status(400).json(accountCreationFailureResponse());
   }
 
