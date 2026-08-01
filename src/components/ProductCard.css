@@ -12,6 +12,22 @@
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(15, 23, 42, 0.06);
 }
 
+.product-card.product-card--unavailable {
+  background: #f8fafc;
+  border-color: #d7dde5;
+}
+
+.product-card--unavailable .product-image,
+.product-card--unavailable .product-title-button,
+.product-card--unavailable .pc-sku,
+.product-card--unavailable .pc-price-block {
+  opacity: 0.58;
+}
+
+.product-card--unavailable .pc-product-img {
+  filter: grayscale(0.72);
+}
+
 .product-grid {
   align-items: stretch;
 }

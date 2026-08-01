@@ -52,7 +52,6 @@ export default function MainContent({
   onSearchProductClick = null,
   showWelcome = false,
   inStockOnly = false,
-  onInStockOnlyChange = () => {},
   onResetFilters = () => {},
   refinements = {},
 }) {
@@ -233,25 +232,10 @@ export default function MainContent({
   // space instead — the skeleton or the grid takes over within a beat.
   const holdWhileEmptyLoading = loading && products.length === 0 && !showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
-  const inStockOnlyId = useId();
-  const orderableHelpId = useId();
   const sortSelectId = useId();
   const resultsControl = showResultsControl ? (
     <div className="results-control">
       <div className="results-control-actions">
-        <label className="catalog-filter-control" htmlFor={inStockOnlyId}>
-          <input
-            id={inStockOnlyId}
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={(e) => onInStockOnlyChange(e.target.checked)}
-            aria-describedby={orderableHelpId}
-          />
-          <span className="catalog-filter-copy">
-            <strong>Orderable</strong>
-            <small id={orderableHelpId}>In stock or available to order</small>
-          </span>
-        </label>
         <label className="sort-control" htmlFor={sortSelectId}>
           <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
             <option value="featured">Featured</option>

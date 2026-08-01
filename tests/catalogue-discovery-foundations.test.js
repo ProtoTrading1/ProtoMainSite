@@ -25,6 +25,20 @@ test('catalogue search explains all supported product identifiers', async () => 
   assert.equal((header.match(/Product name, SKU or barcode…/g) || []).length, 2);
 });
 
+test('unavailable products remain discoverable and are visually disabled', async () => {
+  const [app, content, card, cardCss] = await Promise.all([
+    readSource('src/App.jsx'),
+    readSource('src/components/MainContent.jsx'),
+    readSource('src/components/ProductCard.jsx'),
+    readSource('src/components/ProductCard.css'),
+  ]);
+  assert.match(app, /sessionStorage\.removeItem\(IN_STOCK_ONLY_KEY\)/);
+  assert.doesNotMatch(content, /Available only|<strong>Orderable<\/strong>/);
+  assert.match(card, /product-card--unavailable/);
+  assert.match(cardCss, /\.product-card\.product-card--unavailable/);
+  assert.match(cardCss, /filter: grayscale\(0\.72\)/);
+});
+
 test('orderability and customer-initiated live stock remain visible on mobile', async () => {
   const card = await readSource('src/components/ProductCard.jsx');
   const cardCss = await readSource('src/components/ProductCard.css');

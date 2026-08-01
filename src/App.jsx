@@ -63,7 +63,10 @@ function readCartActivityAt() {
 }
 
 function readInStockOnly() {
-  try { return sessionStorage.getItem(IN_STOCK_ONLY_KEY) === '1'; } catch { return false; }
+  // Unavailable products stay discoverable and are visually disabled instead
+  // of disappearing. Clear the retired preference for returning customers.
+  try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
+  return false;
 }
 
 function readInitialSort() {
@@ -222,14 +225,6 @@ export default function App({
       window.removeEventListener('scroll', dismissOnScroll);
     };
   }, [dismissWelcome, showWelcome]);
-
-  const handleInStockOnlyChange = useCallback((next) => {
-    setInStockOnly(next);
-    try {
-      if (next) sessionStorage.setItem(IN_STOCK_ONLY_KEY, '1');
-      else sessionStorage.removeItem(IN_STOCK_ONLY_KEY);
-    } catch { /* ignore */ }
-  }, []);
 
   const handleSortChange = useCallback((next) => {
     const normalized = normalizeCatalogSort(next);
@@ -1627,7 +1622,6 @@ export default function App({
             onProductPreview={handleProductPreview}
             showWelcome={showWelcome}
             inStockOnly={inStockOnly}
-            onInStockOnlyChange={handleInStockOnlyChange}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}

@@ -434,7 +434,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
   return (
     <>
-      <article className="product-card">
+      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
         {/* Image */}
         <button
           className="product-image product-image-button"
