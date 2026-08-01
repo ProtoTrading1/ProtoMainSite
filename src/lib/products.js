@@ -15,7 +15,7 @@ import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
-import { authHeaders } from './authHeaders';
+import { authenticatedGetJson } from './authHeaders';
 
 export const DEFAULT_SORT = 'featured';
 const FEATURED_PRODUCTS_BATCH_SIZE = 80;
@@ -179,14 +179,18 @@ async function clearIndexedCache() {
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
+  if (authenticated) {
+    const { response, data } = await authenticatedGetJson(url, { cache, timeoutMs });
+    if (!response.ok) throw new Error(`${url} ${response.status}`);
+    return data;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers = authenticated ? await authHeaders() : undefined;
     const response = await fetch(url, {
       signal: controller.signal,
       credentials: 'same-origin',
-      ...(headers ? { headers } : {}),
       ...(cache ? { cache } : {}),
     });
     if (!response.ok) throw new Error(`${url} ${response.status}`);

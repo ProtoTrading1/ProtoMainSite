@@ -5,7 +5,7 @@ import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
-import { authHeaders } from '../lib/authHeaders';
+import { authenticatedGetJson } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import { formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
@@ -105,7 +105,7 @@ function orderQuantityLabel(product) {
   return parts.join(' · ');
 }
 
-function StockBadge({ product }) {
+function StockBadge({ product, onSelectOption }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
   if (!sku) return null;
   const availability = catalogStockState(product);
@@ -117,7 +117,13 @@ function StockBadge({ product }) {
         <span>{availability.label}</span>
         <small>{availability.guidance}</small>
       </div>
-      <StockCheck sku={sku} />
+      {product?.isVariantGroup ? (
+        <div className="stock-check">
+          <button type="button" className="check-stock-btn" onClick={onSelectOption}>
+            <PackageSearch size={14} /> Select option for live stock
+          </button>
+        </div>
+      ) : <StockCheck sku={sku} />}
     </div>
   );
 }
@@ -126,26 +132,39 @@ function StockBadge({ product }) {
 // result is never baked in at page load and never cached across page loads.
 function StockCheck({ sku, autoCheck = false }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
+  const requestRef = useRef(null);
 
   const check = useCallback(async () => {
     if (!sku) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
     try {
-      const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, {
+      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}`, {
         cache: 'no-store',
-        headers: await authHeaders(),
+        signal: controller.signal,
+        timeoutMs: 10000,
       });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
+      if (!response.ok) throw new Error(String(response.status));
+      if (requestRef.current !== controller) return;
       setState({
         status: 'done',
         qty: Number(data.qty) || 0,
         availability: data.availability || null,
       });
     } catch {
+      if (requestRef.current !== controller) return;
       setState({ status: 'error', qty: null, availability: null });
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
     }
   }, [sku]);
+
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+  }, []);
 
   // A customer opening the detail view is already evaluating the product.
   // Start the same authenticated, no-store live lookup immediately so the
@@ -308,7 +327,9 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(
+    initialZoomOpen && isVariantGroup ? defaultVariant : null,
+  );
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -491,7 +512,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             ) : null}
           </div>
 
-          <StockBadge product={product} />
+          <StockBadge product={product} onSelectOption={openPreview} />
 
           <div className="buy-row">
             <div className="qty-stepper" aria-label="Quantity">

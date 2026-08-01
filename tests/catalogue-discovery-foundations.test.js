@@ -44,7 +44,8 @@ test('orderability and customer-initiated live stock remain visible on mobile', 
   const cardCss = await readSource('src/components/ProductCard.css');
   const siteCss = await readSource('src/index.css');
   assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{badgeClass\}`\}/);
-  assert.match(card, /<StockCheck sku=\{sku\} \/>/, 'live grid stock remains customer initiated');
+  assert.match(card, /product\?\.isVariantGroup[\s\S]*Select option for live stock/, 'variant groups require an exact option before checking stock');
+  assert.match(card, /:\s*<StockCheck sku=\{sku\} \/>/, 'single-SKU live grid stock remains customer initiated');
   assert.match(siteCss, /\.product-card \.stock-check\s*\{[\s\S]*?min-height: 44px;/);
   assert.match(siteCss, /\.product-card \.check-stock-btn\s*\{[\s\S]*?width: 100%;/);
   assert.doesNotMatch(siteCss, /\.product-card \.stock-check,[\s\S]{0,160}?display: none !important;/);
