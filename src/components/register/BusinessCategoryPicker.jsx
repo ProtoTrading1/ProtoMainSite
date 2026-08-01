@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { REGISTER_BUSINESS_TYPE_ICONS, REGISTER_BUSINESS_TYPES } from '../../lib/businessTypes';
 
 const MAIN_TYPES = REGISTER_BUSINESS_TYPES.filter((type) => type !== 'Other');
@@ -8,13 +9,22 @@ export default function BusinessCategoryPicker({
   otherValue = '',
   onOtherChange,
 }) {
+  const labelId = useId();
+  const hintId = useId();
+  const otherInputId = useId();
+
   return (
-    <div className="lp-biz-category">
+    <div
+      className="lp-biz-category"
+      role="group"
+      aria-labelledby={labelId}
+      aria-describedby={hintId}
+    >
       <div className="lp-biz-category-head">
-        <label className="lp-biz-category-label">
-          Business category <span className="lp-biz-category-required">*</span>
-        </label>
-        <p className="lp-biz-category-hint">Select all options that describe your business.</p>
+        <div id={labelId} className="lp-biz-category-label">
+          Nature of business <span className="lp-biz-category-required">(required)</span>
+        </div>
+        <p id={hintId} className="lp-biz-category-hint">Select at least one option. Choose all that describe your business.</p>
       </div>
 
       <div className="lp-biz-category-grid">
@@ -56,11 +66,13 @@ export default function BusinessCategoryPicker({
 
       {selected.includes('Other') && (
         <div className="lp-quiz-field lp-quiz-other-field">
-          <label>Describe your business</label>
+          <label htmlFor={otherInputId}>Describe your business</label>
           <input
+            id={otherInputId}
             value={otherValue}
             onChange={(e) => onOtherChange(e.target.value)}
             placeholder="Tell us what type of business you run"
+            required
           />
         </div>
       )}
