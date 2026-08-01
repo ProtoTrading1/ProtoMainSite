@@ -73,11 +73,20 @@ function availabilityForProduct(product) {
 function groupedAvailability(product) {
   if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length > 1) {
     const options = product.variants.map(availabilityForProduct);
-    const priority = ['in_stock', 'low_stock', 'landed', 'to_order', 'incoming_preorder', 'incoming'];
-    const selected = priority.map((state) => options.find((item) => item.state === state)).find(Boolean)
-      || options[0]
-      || availabilityForProduct(product);
-    return { ...selected, guidance: 'Select an option to check stock', canOrder: options.some((item) => item.canOrder) };
+    const canOrder = options.some((item) => item.canOrder);
+    return canOrder
+      ? {
+        state: 'options',
+        label: 'Stock varies by option',
+        guidance: 'Choose an option for live availability',
+        canOrder: true,
+      }
+      : {
+        state: 'out_of_stock',
+        label: 'Currently unavailable',
+        guidance: 'Choose an option for details',
+        canOrder: false,
+      };
   }
   return availabilityForProduct(product);
 }
@@ -94,6 +103,7 @@ const STOCK_BADGE_CLASS = {
   to_order: 'toorder',
   incoming_preorder: 'incoming',
   incoming: 'incoming',
+  options: 'options',
   out_of_stock: 'out',
 };
 
@@ -105,25 +115,19 @@ function orderQuantityLabel(product) {
   return parts.join(' · ');
 }
 
-function StockBadge({ product, onSelectOption }) {
+function StockBadge({ product }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
-  if (!sku) return null;
+  if (!product) return null;
   const availability = catalogStockState(product);
   const badgeClass = STOCK_BADGE_CLASS[availability.state] || 'out';
 
   return (
-    <div className="pc-stock-slot">
+    <div className={`pc-stock-slot${product.isVariantGroup ? ' pc-stock-slot--options' : ''}`}>
       <div className={`pc-orderability pc-orderability--${badgeClass}`}>
         <span>{availability.label}</span>
         <small>{availability.guidance}</small>
       </div>
-      {product?.isVariantGroup ? (
-        <div className="stock-check">
-          <button type="button" className="check-stock-btn" onClick={onSelectOption}>
-            <PackageSearch size={14} /> Select option for live stock
-          </button>
-        </div>
-      ) : <StockCheck sku={sku} />}
+      {!product.isVariantGroup && sku ? <StockCheck sku={sku} /> : null}
     </div>
   );
 }
@@ -316,10 +320,9 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
-  const defaultVariant = variants[0] || null;
   const variantCount = product?.variantCount || variants.length;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
@@ -327,15 +330,15 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
-  const [selectedVariant, setSelectedVariant] = useState(
-    initialZoomOpen && isVariantGroup ? defaultVariant : null,
-  );
+  const [focusOptionsOnOpen, setFocusOptionsOnOpen] = useState(initialFocusOptions);
+  const [selectedVariant, setSelectedVariant] = useState(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const addButtonRef = useRef(null);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const variantsRef = useRef(null);
   const lastFocusedElementRef = useRef(null);
 
   const activeProduct = selectedVariant || product;
@@ -362,7 +365,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     setActiveImageIdx(0);
   };
 
-  const openPreview = () => {
+  const showPreview = (focusOptions = false) => {
+    setFocusOptionsOnOpen(Boolean(focusOptions));
     onSearchEngage?.();
     trackEvent({
       eventType: 'product_view',
@@ -370,23 +374,23 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
       entityLabel: product?.name || product?.code,
     });
     if (onProductPreview) {
-      onProductPreview(product);
+      onProductPreview(product, { focusOptions });
       return;
-    }
-    if (isVariantGroup && defaultVariant) {
-      selectVariant(defaultVariant);
     }
     setZoomOpen(true);
   };
+  const openPreview = () => showPreview(false);
+  const openOptions = () => showPreview(true);
   const closePreview = useCallback(() => {
     setZoomOpen(false);
+    setFocusOptionsOnOpen(false);
     setSelectedVariant(null);
     onZoomClose?.();
   }, [onZoomClose]);
 
   const handleAdd = () => {
     if (isVariantGroup) {
-      openPreview();
+      openOptions();
       return;
     }
     if (!cardCanOrder) return;
@@ -453,6 +457,18 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     };
   }, [closePreview, zoomOpen]);
 
+  useEffect(() => {
+    if (!zoomOpen || !focusOptionsOnOpen || !isVariantGroup) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const variants = variantsRef.current;
+      variants?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      const option = variants?.querySelector('[aria-checked="true"]')
+        || variants?.querySelector('[role="radio"]');
+      option?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusOptionsOnOpen, isVariantGroup, zoomOpen]);
+
   return (
     <>
       <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
@@ -512,40 +528,54 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             ) : null}
           </div>
 
-          <StockBadge product={product} onSelectOption={openPreview} />
+          <StockBadge product={product} />
 
-          <div className="buy-row">
-            <div className="qty-stepper" aria-label="Quantity">
+          <div className={`buy-row${isVariantGroup ? ' buy-row--options' : ''}`}>
+            {isVariantGroup ? (
               <button
-                onClick={() => setQty((current) => Math.max(product.minQty || 1, current - 1))}
+                ref={addButtonRef}
+                className="add-button add-button--choose"
+                onClick={openOptions}
                 type="button"
-                aria-label={`Decrease quantity from ${qty}`}
-                disabled={qty <= (product.minQty || 1)}
               >
-                <Minus size={14} />
+                <PackageSearch size={16} />
+                Choose option
               </button>
-              <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-              <button
-                onClick={() => setQty((current) => Math.min(9999, current + 1))}
-                type="button"
-                aria-label={`Increase quantity from ${qty}`}
-                disabled={qty >= 9999}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            <button
-              ref={addButtonRef}
-              className="add-button"
-              onClick={handleAdd}
-              type="button"
-              disabled={!isVariantGroup && !cardCanOrder}
-            >
-              <ShoppingCart size={16} />
-              {isVariantGroup ? 'View options' : 'Add to Cart'}
-            </button>
+            ) : (
+              <>
+                <div className="qty-stepper" aria-label="Quantity">
+                  <button
+                    onClick={() => setQty((current) => Math.max(product.minQty || 1, current - 1))}
+                    type="button"
+                    aria-label={`Decrease quantity from ${qty}`}
+                    disabled={qty <= (product.minQty || 1)}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                  <button
+                    onClick={() => setQty((current) => Math.min(9999, current + 1))}
+                    type="button"
+                    aria-label={`Increase quantity from ${qty}`}
+                    disabled={qty >= 9999}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <button
+                  ref={addButtonRef}
+                  className="add-button"
+                  onClick={handleAdd}
+                  type="button"
+                  disabled={!cardCanOrder}
+                >
+                  <ShoppingCart size={16} />
+                  Add to Cart
+                </button>
+              </>
+            )}
           </div>
-          {cardAdvisory.isOverOrder && (
+          {!isVariantGroup && cardAdvisory.isOverOrder && (
             <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
           )}
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
@@ -636,7 +666,11 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   </div>
                 )}
 
-                <p className="pz-order-quantity">{orderQuantityLabel(activeProduct)}</p>
+                {isVariantGroup && !selectedVariant ? (
+                  <p className="pz-order-quantity">Choose an option to see its price, selling unit and live stock.</p>
+                ) : (
+                  <p className="pz-order-quantity">{orderQuantityLabel(activeProduct)}</p>
+                )}
 
                 {/* "To order" disclaimer — item is orderable even without stock on hand. */}
                 {modalAvailability.state === 'to_order' && (
@@ -658,11 +692,14 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
                 {/* Variant list for grouped products — click to swap image */}
                 {isVariantGroup && variants.length > 0 && (
-                  <div className="pz-variants">
+                  <div ref={variantsRef} className="pz-variants">
                     <span className="pz-variants-label">Select a variant</span>
+                    <span className="pz-variants-help">Choose one option to confirm live stock and order quantity.</span>
                     <div className="pz-variants-list" role="radiogroup" aria-label="Select a variant">
                       {variants.map((v) => {
                         const isSelected = selectedVariant?.id === v.id;
+                        const optionAvailability = availabilityForProduct(v);
+                        const optionClass = STOCK_BADGE_CLASS[optionAvailability.state] || 'out';
                         return (
                           <button
                             key={v.id}
@@ -680,7 +717,11 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                               <span className="pz-variant-code">{productSkuLabel(v, true)}</span>
                               <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
+                              <span className={`pz-variant-availability pz-variant-availability--${optionClass}`}>
+                                {optionAvailability.label}
+                              </span>
                             </div>
+                            {Number(v.price) > 0 && <span className="pz-variant-price">R{Number(v.price).toFixed(2)}</span>}
                           </button>
                         );
                       })}
@@ -690,56 +731,58 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
                 {product.tradeNote && <p className="pz-trade-note">{product.tradeNote}</p>}
 
-                {activeProduct.price > 0 && (
+                {(!isVariantGroup || selectedVariant) && activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
                     <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
                     <span>incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
                   </div>
                 )}
 
-                <div className="pz-stock-check">
-                  <StockCheck
-                    sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
-                    autoCheck
-                  />
-                </div>
+                {(!isVariantGroup || selectedVariant) && (
+                  <div className="pz-stock-check">
+                    <StockCheck
+                      sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
+                      autoCheck
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Fixed buy bar */}
               <div className="pz-buy-bar">
-                <div className="pz-qty-row">
-                  <div className="qty-stepper" aria-label="Quantity in preview">
-                    <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
-                      <Minus size={14} />
-                    </button>
-                    <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
-                    <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                </div>
-                {modalAdvisory.isOverOrder && (
-                  <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
-                )}
                 {isVariantGroup && !selectedVariant ? (
-                  <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', margin: 0 }}>
-                    Select a variant above to add to order
-                  </p>
+                  <p className="pz-options-prompt">Choose an option above to check live stock and continue.</p>
                 ) : (
-                  <button
-                    className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
-                    disabled={!modalCanOrder}
-                    onClick={() => {
-                      if (!modalCanOrder) return;
-                      addToCart(activeProduct, qty, null, true);
-                      setJustAdded(true);
-                      setTimeout(() => setJustAdded(false), 1800);
-                    }}
-                    type="button"
-                  >
-                    <ShoppingCart size={16} />
-                    {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
-                  </button>
+                  <>
+                    <div className="pz-qty-row">
+                      <div className="qty-stepper" aria-label="Quantity in preview">
+                        <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                          <Minus size={14} />
+                        </button>
+                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
+                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {modalAdvisory.isOverOrder && (
+                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
+                    )}
+                    <button
+                      className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
+                      disabled={!modalCanOrder}
+                      onClick={() => {
+                        if (!modalCanOrder) return;
+                        addToCart(activeProduct, qty, null, true);
+                        setJustAdded(true);
+                        setTimeout(() => setJustAdded(false), 1800);
+                      }}
+                      type="button"
+                    >
+                      <ShoppingCart size={16} />
+                      {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

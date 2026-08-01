@@ -271,6 +271,10 @@
   margin-top: 8px;
 }
 
+.product-card .pc-stock-slot--options {
+  min-height: 46px;
+}
+
 .product-card .pc-orderability {
   display: flex;
   align-items: baseline;
@@ -298,6 +302,10 @@
 .product-card .pc-orderability--landed,
 .product-card .pc-orderability--incoming {
   color: #245aa7;
+}
+
+.product-card .pc-orderability--options {
+  color: #172554;
 }
 
 .product-card .pc-orderability--out {
@@ -364,6 +372,10 @@
   gap: 8px;
   margin-top: auto;
   padding-top: 12px;
+}
+
+.product-card .buy-row--options {
+  padding-top: 4px;
 }
 
 .product-card .qty-stepper {

@@ -1494,11 +1494,13 @@ export default function App({
   }, [requestedReorder, onRequestedReorderHandled]);
 
   const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewOptionsFirst, setPreviewOptionsFirst] = useState(false);
   const productDetailKey = String(refinements.product || '').trim();
   const previewProductKey = productDetailId(previewProduct);
 
-  const handleProductPreview = useCallback((product) => {
+  const handleProductPreview = useCallback((product, { focusOptions = false } = {}) => {
     dismissWelcome();
+    setPreviewOptionsFirst(Boolean(focusOptions));
     setPreviewProduct(product);
     const id = productDetailId(product);
     if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
@@ -1506,6 +1508,7 @@ export default function App({
 
   const closeProductPreview = useCallback(() => {
     setPreviewProduct(null);
+    setPreviewOptionsFirst(false);
     if (!refinements.product) return;
     const next = { ...refinements };
     delete next.product;
@@ -1515,6 +1518,7 @@ export default function App({
   useEffect(() => {
     if (!productDetailKey) {
       if (previewProductKey) setPreviewProduct(null);
+      setPreviewOptionsFirst(false);
       return undefined;
     }
     if (previewProductKey === productDetailKey) return undefined;
@@ -1691,6 +1695,7 @@ export default function App({
             onCartQtyChange={handleCartQtyChange}
             special={specialsMap[previewProduct.id] || (previewProduct.isNew ? { deal: 'none' } : null)}
             initialZoomOpen={true}
+            initialFocusOptions={previewOptionsFirst}
             onZoomClose={closeProductPreview}
           />
         </div>

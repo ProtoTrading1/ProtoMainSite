@@ -6321,6 +6321,13 @@ textarea:focus-visible,
   letter-spacing: 0.08em;
   margin-bottom: 10px;
 }
+.pz-variants-help {
+  display: block;
+  margin: -5px 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
 .pz-variants-list {
   display: flex;
   flex-direction: column;
@@ -6391,6 +6398,17 @@ textarea:focus-visible,
   font-size: 11px;
   color: #6B7280;
 }
+.pz-variant-availability {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.pz-variant-availability--in,
+.pz-variant-availability--low { color: #15803d; }
+.pz-variant-availability--toorder { color: #b45309; }
+.pz-variant-availability--landed,
+.pz-variant-availability--incoming { color: #245aa7; }
+.pz-variant-availability--out { color: #6b7280; }
 .pz-variant-price {
   font-size: 13px;
   font-weight: 700;
@@ -6406,6 +6424,14 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 14px;
   flex-shrink: 0;
+}
+.pz-options-prompt {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
 }
 .pz-price-row {
   display: flex;
