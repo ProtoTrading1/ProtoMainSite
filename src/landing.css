@@ -4630,6 +4630,13 @@
   letter-spacing: 0;
 }
 
+.lp-register-required {
+  color: #f3c76f;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .lp-register-field-error {
   color: #f87171;
   font-size: 12.5px;
@@ -4896,38 +4903,20 @@ a.lp-register-login { text-decoration: none; }
 }
 
 /* ── Proto Journey Rail ─────────────────────────────────────────
-   The original order story — customer, basket, warehouse, delivery,
-   destination — with event-driven movement and a quiet idle state. */
-html.proto-journey-active {
-  scrollbar-width: none;
-}
-
-/* Belt-and-braces: the TruckScrollbar rail IS the scrollbar on desktop, so the
-   native one must never also appear. `scrollbar-width: none` above covers
-   Chrome 121+/Safari 18.2+; these cover older WebKit, where the scrollbar can
-   also be attributed to <body> rather than <html>. !important so the global
-   ::-webkit-scrollbar width/thumb rules in index.css can never resurrect it. */
-html.proto-journey-active::-webkit-scrollbar,
-html.proto-journey-active body::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-html.proto-journey-active body {
-  scrollbar-width: none;
-}
+   A decorative, event-driven progress story. The browser's native scrollbar
+   remains visible and usable; this rail never replaces page navigation. */
 
 .proto-journey-rail {
   --journey-pad: 44px;
   position: fixed;
   z-index: 120;
   top: 0;
-  right: 10px;
+  right: 18px;
   width: 48px;
   height: 100dvh;
   opacity: 1;
   transition: opacity 360ms ease;
+  pointer-events: none;
 }
 
 .proto-journey-rail.is-idle {
@@ -4953,6 +4942,31 @@ html.proto-journey-active body {
   border-radius: inherit;
   background: linear-gradient(180deg, #8b1a1a 0%, #e11d2e 100%);
   transition: height 110ms linear;
+}
+
+.proto-journey-waypoint,
+.proto-journey-start {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #2a2a2a;
+  border-radius: 50%;
+  background: #1e1e1e;
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+  transition: background 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+}
+
+.proto-journey-waypoint.is-passed,
+.proto-journey-start {
+  border-color: #c0392b;
+  background: #8b1a1a;
+  box-shadow: 0 0 7px rgba(139, 26, 26, 0.72);
+}
+
+.proto-journey-start {
+  top: var(--journey-pad);
 }
 
 .proto-journey-thumb {
@@ -4994,13 +5008,5 @@ html.proto-journey-active body {
 @media (max-width: 899px), (prefers-reduced-motion: reduce) {
   .proto-journey-rail {
     display: none;
-  }
-
-  html.proto-journey-active {
-    scrollbar-width: auto;
-  }
-
-  html.proto-journey-active::-webkit-scrollbar {
-    display: initial;
   }
 }

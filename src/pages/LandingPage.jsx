@@ -131,69 +131,57 @@ const FADE_ZONE = 0.07;
 function TruckScrollbar() {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
-  const [vw, setVw] = useState(() => window.innerWidth);
-  const targetRef = useRef(0);
-  const currentRef = useRef(0);
-  const rafRef = useRef(null);
+  const [scrolling, setScrolling] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const frameRef = useRef(null);
+  const idleTimerRef = useRef(null);
 
   useEffect(() => {
-    function getTarget() {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    function updateProgress() {
+      frameRef.current = null;
+      if (reducedMotion.matches) {
+        setVisible(false);
+        setScrolling(false);
+        return;
+      }
+
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const docH = document.documentElement.scrollHeight - window.innerHeight;
-      if (docH <= 0) return null;
-      return Math.min(scrollTop / docH, 1);
-    }
+      if (docH <= 0) {
+        setVisible(false);
+        return;
+      }
 
-    function tick() {
-      const target = targetRef.current;
-      const current = currentRef.current;
-      const next = current + (target - current) * 0.07;
-      const snapped = Math.abs(next - target) < 0.0005 ? target : next;
-      currentRef.current = snapped;
-      setProgress(snapped);
-      rafRef.current = requestAnimationFrame(tick);
-    }
-
-    function onScroll() {
-      const t = getTarget();
-      if (t === null) { setVisible(false); return; }
+      setProgress(Math.min(Math.max(scrollTop / docH, 0), 1));
+      setViewportHeight(window.innerHeight);
       setVisible(true);
-      targetRef.current = t;
+      setScrolling(true);
+
+      window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = window.setTimeout(() => setScrolling(false), 220);
     }
 
-    function onResize() {
-      setVw(window.innerWidth);
-      onScroll();
+    function scheduleUpdate() {
+      if (frameRef.current === null) {
+        frameRef.current = window.requestAnimationFrame(updateProgress);
+      }
     }
 
-    const t = getTarget();
-    if (t !== null) { setVisible(true); targetRef.current = t; }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize, { passive: true });
-    rafRef.current = requestAnimationFrame(tick);
+    scheduleUpdate();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    reducedMotion.addEventListener('change', scheduleUpdate);
 
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onResize);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      reducedMotion.removeEventListener('change', scheduleUpdate);
+      window.clearTimeout(idleTimerRef.current);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'hide-native-scrollbar';
-    style.textContent = `::-webkit-scrollbar{display:none}*{scrollbar-width:none;-ms-overflow-style:none}`;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
-  // Responsive sizing
-  const isMobile = vw < 640;
-  const right    = isMobile ? 5 : 10;
-  const PAD      = isMobile ? 18 : 24;
-  const dotSize  = isMobile ? 6  : 8;
-  const trackW   = isMobile ? 2  : 3;
 
   // Which stage are we in?
   let curIdx = 0;
@@ -209,67 +197,49 @@ function TruckScrollbar() {
   const { Icon: CurIcon, transform: curTransform } = SCROLL_STAGES[curIdx];
   const { Icon: NxtIcon, transform: nxtTransform } = SCROLL_STAGES[nextIdx];
 
-  const trackH = window.innerHeight - PAD * 2 - 40;
-  const thumbTop = PAD + progress * trackH;
+  const journeyPad = 44;
+  const thumbTop = journeyPad + progress * Math.max(0, viewportHeight - journeyPad * 2);
 
   if (!visible) return null;
 
   return (
-    <div style={{ position: 'fixed', right, top: 0, height: '100vh', width: isMobile ? 32 : 48, zIndex: 9999, pointerEvents: 'none' }}>
-      {/* Track */}
-      <div style={{ position: 'absolute', top: PAD, bottom: PAD, left: '50%', transform: 'translateX(-50%)', width: trackW, background: '#111', borderRadius: '2px' }}>
-        {/* Progress fill */}
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${progress * 100}%`, background: 'linear-gradient(to bottom, #8B1A1A, #c0392b)', borderRadius: '2px' }} />
+    <div
+      className={`proto-journey-rail${scrolling ? ' is-scrolling' : ' is-idle'}`}
+      aria-hidden="true"
+    >
+      <div className="proto-journey-track">
+        <div className="proto-journey-progress" style={{ height: `${progress * 100}%` }} />
         {/* Stage waypoint dots */}
         {[0.2, 0.4, 0.6, 0.8].map(p => {
           const passed = progress >= p - 0.01;
           return (
-            <div key={p} style={{
-              position: 'absolute',
-              top: `${p * 100}%`,
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: dotSize, height: dotSize,
-              borderRadius: '50%',
-              background: passed ? '#8B1A1A' : '#1e1e1e',
-              border: `1.5px solid ${passed ? '#c0392b' : '#2a2a2a'}`,
-              boxShadow: passed ? '0 0 5px rgba(139,26,26,0.55)' : 'none',
-              transition: 'background 0.4s, box-shadow 0.4s, border-color 0.4s',
-            }} />
+            <div
+              key={p}
+              className={`proto-journey-waypoint${passed ? ' is-passed' : ''}`}
+              style={{ top: `${p * 100}%` }}
+            />
           );
         })}
       </div>
 
-      {/* Thumb — crossfade between stage icons.
-          Each icon is independently positioned so the drop-shadow
-          filter is applied to the actual painted area, not a zero-size box. */}
-      <div style={{ position: 'absolute', top: `${thumbTop}px`, left: '50%', width: 0, height: 0 }}>
-        <div style={{
-          position: 'absolute',
+      <div className="proto-journey-thumb" style={{ transform: `translate3d(-50%, ${thumbTop}px, 0)` }}>
+        <div className="proto-journey-thumb-icon">
+        <div className="proto-journey-thumb-icon-layer" style={{
           transform: curTransform,
           opacity: 1 - blend,
-          transition: 'opacity 0.35s ease',
-          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
-          transformOrigin: '0 0',
-          ...(isMobile ? { scale: '0.7' } : {}),
         }}>
           <CurIcon />
         </div>
-        <div style={{
-          position: 'absolute',
+        <div className="proto-journey-thumb-icon-layer" style={{
           transform: nxtTransform,
           opacity: blend,
-          transition: 'opacity 0.35s ease',
-          filter: 'drop-shadow(0 2px 8px rgba(139,26,26,0.8))',
-          transformOrigin: '0 0',
-          ...(isMobile ? { scale: '0.7' } : {}),
         }}>
           <NxtIcon />
         </div>
+        </div>
       </div>
 
-      {/* Start glow dot */}
-      <div style={{ position: 'absolute', top: PAD, left: '50%', transform: 'translate(-50%, -50%)', width: dotSize, height: dotSize, borderRadius: '50%', background: '#8B1A1A', boxShadow: '0 0 8px rgba(139,26,26,0.9)' }} />
+      <div className="proto-journey-start" />
     </div>
   );
 }
@@ -665,9 +635,9 @@ function Questionnaire({ onLogin }) {
 
         {step === 3 && (
           <div className="lp-quiz-step">
-            <h3>Optional: add any extra business details.</h3>
+            <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              These details help the team, but they are not required to submit your trade request.
+              Select at least one nature of business. Monthly spend, website and customer code are optional.
             </p>
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
             <div className="lp-quiz-types">
@@ -683,14 +653,17 @@ function Questionnaire({ onLogin }) {
               ))}
             </div>
             <div style={{ height: '18px' }} />
-            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category <span style={{ opacity: 0.55, fontWeight: 400 }}>(select all that apply)</span></div>
-            <div className="lp-quiz-types">
+            <div id="landing-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
+              Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-business-type-label">
               {BUSINESS_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
                   onClick={() => toggleBusinessType(t)}
+                  aria-pressed={businessType.includes(t)}
                 >
                   {t}
                 </button>
@@ -703,12 +676,14 @@ function Questionnaire({ onLogin }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
               >
-                <label>Describe your business</label>
+                <label htmlFor="landing-other-business-type">Describe your business</label>
                 <input
+                  id="landing-other-business-type"
                   value={otherType}
                   onChange={(e) => setOtherType(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Tell us what type of business you run"
+                  required
                 />
               </motion.div>
             )}

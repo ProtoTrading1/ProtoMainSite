@@ -509,14 +509,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         ))}
                       </div>
 
-                      <div className="lp-register-subhead">Business category <span className="lp-register-optional">(select all that apply)</span></div>
-                      <div className="lp-quiz-types">
+                      <div id="register-business-type-label" className="lp-register-subhead">
+                        Nature of business <span className="lp-register-required">(required — select all that apply)</span>
+                      </div>
+                      <div className="lp-quiz-types" role="group" aria-labelledby="register-business-type-label">
                         {BUSINESS_TYPES.map((t) => (
                           <button
                             key={t}
                             type="button"
                             className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
                             onClick={() => toggleBusinessType(t)}
+                            aria-pressed={businessType.includes(t)}
                           >
                             {t}
                           </button>
@@ -524,11 +527,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
                       {businessType.includes('Other') && (
                         <div className="lp-quiz-field lp-quiz-other-field">
-                          <label>Describe your business</label>
+                          <label htmlFor="register-other-business-type">Describe your business</label>
                           <input
+                            id="register-other-business-type"
                             value={otherType}
                             onChange={(e) => setOtherType(e.target.value)}
                             placeholder="Tell us what type of business you run"
+                            required
                           />
                         </div>
                       )}
