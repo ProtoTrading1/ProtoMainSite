@@ -7,6 +7,7 @@ import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
 import { authHeaders } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
+import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
@@ -127,9 +128,9 @@ const STOCK_BADGE_GUIDANCE = {
 
 function orderQuantityLabel(product) {
   const minimum = Math.max(1, Number(product?.minQty) || 1);
-  const pack = String(product?.casePack || '').trim();
+  const unit = sellingUnitDetails(product?.unitsOfIssue || 'EACH');
   const parts = [`Minimum ${minimum}`];
-  if (pack) parts.push(`Pack: ${pack}`);
+  parts.push(unit.label);
   return parts.join(' · ');
 }
 
@@ -512,7 +513,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             {activeProduct.price > 0 ? (
               <>
                 <strong className="pc-price-amount">R{Number(activeProduct.price).toFixed(2)}</strong>
-                <span className="pc-price-vat">Incl. VAT</span>
+                <span className="pc-price-vat">Incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
               </>
             ) : null}
           </div>
@@ -633,10 +634,10 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 )}
 
                 {/* Specs */}
-                {(product.colour || product.casePack || product.leadTime) && (
+                {(product.colour || product.packDescription || product.leadTime) && (
                   <div className="pz-specs">
                     {product.colour && <span>Colour: {product.colour}</span>}
-                    {product.casePack && <span>{product.casePack}</span>}
+                    {product.packDescription && <span>{product.packDescription}</span>}
                     {product.leadTime && <span>{product.leadTime}</span>}
                   </div>
                 )}
@@ -687,7 +688,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 {activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
                     <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-                    <span>incl. VAT</span>
+                    <span>incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
                   </div>
                 )}
 

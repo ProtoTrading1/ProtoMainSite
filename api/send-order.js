@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -174,7 +175,7 @@ async function resolveAuthoritativePrices(items) {
     if (skus.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description')
         .in('sku', skus);
       if (error) throw error;
       for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
@@ -182,7 +183,7 @@ async function resolveAuthoritativePrices(items) {
     if (barcodes.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description')
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
@@ -215,6 +216,7 @@ async function resolveAuthoritativePrices(items) {
     }
     const authoritativeSku = cleanText(row.sku);
     const authoritativeBarcode = cleanText(row.barcode);
+    const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
     return {
       qty,
       product: {
@@ -226,6 +228,9 @@ async function resolveAuthoritativePrices(items) {
         price,
         image: cleanText(row.image_url_one),
         remoteImage: cleanText(row.image_url_one),
+        unitsOfIssue,
+        casePack: sellingUnitDetails(unitsOfIssue).label,
+        packDescription: cleanText(row.pack_description),
       },
     };
   });
@@ -313,7 +318,8 @@ function drawInternalPdfProductRow(doc, item, rowNumber, y, rowHeight = ORDER_PD
   const price = Number(product.price || 0);
   const lineTotal = qty * price;
   const sku = cleanText(product.sku || product.id);
-  const productDescription = `${cleanText(product.name, 'Unnamed product')}${sku ? ` [SKU: ${sku}]` : ''}`;
+  const unitLabel = sellingUnitDetails(product.unitsOfIssue).label;
+  const productDescription = `${cleanText(product.name, 'Unnamed product')} · ${unitLabel}${sku ? ` [SKU: ${sku}]` : ''}`;
   const verticalOffset = Math.max(0, (rowHeight - ORDER_PDF_ROW_HEIGHT) / 2);
 
   doc.font('Helvetica').fontSize(9).fillColor('#64748b')
@@ -646,6 +652,7 @@ function buildOrderEmailRows(items) {
     const lineTotal = qty * unitPrice;
     const code = escapeHtml(cleanText(product.code, '—'));
     const name = escapeHtml(cleanText(product.name, 'Product'));
+    const unitLabel = escapeHtml(sellingUnitDetails(product.unitsOfIssue).label);
     const img = cleanText(product.image || product.remoteImage || '');
     const imgCell = /^https:\/\//i.test(img)
       ? `<img src="${escapeHtml(img)}" alt="" width="46" height="46" style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#f1f5f9;border:1px solid #e5e7eb;display:block;" />`
@@ -655,7 +662,7 @@ function buildOrderEmailRows(items) {
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}<br><span style="color:#64748b;font-size:11px;font-weight:600;">Sold as: ${unitLabel}</span></td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:800;text-align:center;">${qty}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;text-align:right;white-space:nowrap;">${money(unitPrice)}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:12px;font-weight:800;text-align:right;white-space:nowrap;">${money(lineTotal)}</td>
@@ -894,6 +901,9 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
         unitPrice,
         lineTotal: unitPrice * qty,
         image: product.remoteImage || product.image || '',
+        unitsOfIssue: normalizeUnitsOfIssue(product.unitsOfIssue || 'EACH'),
+        sellingUnit: sellingUnitDetails(product.unitsOfIssue).label,
+        packDescription: cleanText(product.packDescription),
       };
     });
 
