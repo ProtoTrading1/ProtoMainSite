@@ -5,7 +5,7 @@ import { ArrowDown, CheckCircle2 } from 'lucide-react';
 // seconds cannot do it. Set like the campaign banner — uppercase and bold,
 // with the action itself in red.
 const SUPPORT_LINES = [
-  ['Existing customers must ', 're-register', '.'],
+  ['Previous online customers must ', 're-register', '.'],
   ['New customers can apply for ', 'online access', '.'],
 ];
 
