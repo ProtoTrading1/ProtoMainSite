@@ -100,7 +100,8 @@ function productCanOrderWhenOos(product) {
   return product?.toOrder === true
     || product?.to_order === true
     || product?.orderableWhenOutOfStock === true
-    || product?.orderable_when_out_of_stock === true;
+    || product?.orderable_when_out_of_stock === true
+    || product?.availability?.canOrder === true;
 }
 
 function cartQtyCapForProduct(product) {

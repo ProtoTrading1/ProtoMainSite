@@ -29,8 +29,8 @@ test('catalogue refreshes are coalesced, throttled and replace visible caches', 
 test('this catalogue-contract release cannot reload the previous persistent snapshot', async () => {
   const products = await readFile(productsUrl, 'utf8');
 
-  assert.match(products, /const LS_KEY = 'proto_catalog_v11'/);
-  assert.match(products, /const IDB_VERSION = 2/);
-  assert.match(products, /const IDB_KEY = 'approved-customer-v2'/);
+  assert.match(products, /const LS_KEY = 'proto_catalog_v12'/);
+  assert.match(products, /const IDB_VERSION = 3/);
+  assert.match(products, /const IDB_KEY = 'approved-customer-v3'/);
   assert.match(products, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
 });

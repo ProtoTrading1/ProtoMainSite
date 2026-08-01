@@ -279,6 +279,11 @@
   color: #b45309;
 }
 
+.product-card .pc-orderability--landed,
+.product-card .pc-orderability--incoming {
+  color: #245aa7;
+}
+
 .product-card .pc-orderability--out {
   color: #6b7280;
 }
@@ -499,7 +504,7 @@
   }
 
   .product-card .pc-stock-slot {
-    min-height: 30px;
+    min-height: 78px;
     margin-top: 4px;
   }
 

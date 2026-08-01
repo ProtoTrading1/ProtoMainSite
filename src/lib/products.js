@@ -48,12 +48,12 @@ let _lastLiveRefreshAt = 0;
 // Bump both persistent-cache versions whenever a release changes the catalogue
 // contract. This prevents an older price/unit payload becoming the first paint
 // after a customer reloads onto the new application bundle.
-const LS_KEY = 'proto_catalog_v11';
-const LEGACY_LS_KEYS = ['proto_catalog_v10'];
+const LS_KEY = 'proto_catalog_v12';
+const LEGACY_LS_KEYS = ['proto_catalog_v10', 'proto_catalog_v11'];
 const IDB_NAME = 'proto-catalogue';
 const IDB_STORE = 'catalogue';
-const IDB_VERSION = 2;
-const IDB_KEY = 'approved-customer-v2';
+const IDB_VERSION = 3;
+const IDB_KEY = 'approved-customer-v3';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
@@ -454,7 +454,8 @@ export function isOrderableWhenOutOfStock(product) {
   return product.toOrder === true
     || product.to_order === true
     || product.orderableWhenOutOfStock === true
-    || product.orderable_when_out_of_stock === true;
+    || product.orderable_when_out_of_stock === true
+    || product.availability?.canOrder === true;
 }
 
 function productStockQty(product) {
@@ -465,17 +466,16 @@ function productStockQty(product) {
 
 /**
  * Whether a single product row is available to buy (pre-grouping).
- * Canonical rule shared with the admin's isPublishableOnWebsite
- * (protoportal-admin lib/catalog-stock.mjs): only EXACTLY-zero stock is
- * unavailable (unless keep_live_when_oos); negative SOH stays available —
- * backorder lines are live and orderable by business rule.
+ * Positive stock is immediately orderable. Zero and negative stock require an
+ * explicit business promise (made/sourced to order, landed stock, or an open
+ * pre-order); keep_live_when_oos controls visibility only.
  */
 export function isProductAvailable(product) {
   if (!product) return false;
   const qty = productStockQty(product);
-  if (qty !== null && qty !== 0) return true;
+  if (qty !== null && qty > 0) return true;
   if (isOrderableWhenOutOfStock(product)) return true;
-  if (qty !== null) return false;
+  if (qty !== null && qty <= 0) return false;
   if (product.inStock === false) return false;
   return true;
 }

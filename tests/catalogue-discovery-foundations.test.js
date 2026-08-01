@@ -25,13 +25,15 @@ test('catalogue search explains all supported product identifiers', async () => 
   assert.equal((header.match(/Product name, SKU or barcode…/g) || []).length, 2);
 });
 
-test('orderability remains visible on mobile without automatic per-card stock requests', async () => {
+test('orderability and customer-initiated live stock remain visible on mobile', async () => {
   const card = await readSource('src/components/ProductCard.jsx');
   const cardCss = await readSource('src/components/ProductCard.css');
   const siteCss = await readSource('src/index.css');
-  assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{state\}`\}/);
+  assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{badgeClass\}`\}/);
   assert.match(card, /<StockCheck sku=\{sku\} \/>/, 'live grid stock remains customer initiated');
-  assert.match(siteCss, /\.product-card \.stock-check,[\s\S]*?display: none !important;/);
+  assert.match(siteCss, /\.product-card \.stock-check\s*\{[\s\S]*?min-height: 44px;/);
+  assert.match(siteCss, /\.product-card \.check-stock-btn\s*\{[\s\S]*?width: 100%;/);
+  assert.doesNotMatch(siteCss, /\.product-card \.stock-check,[\s\S]{0,160}?display: none !important;/);
   assert.match(cardCss, /@media \(max-width: 768px\)[\s\S]*?\.product-card \.pc-orderability/);
   assert.match(card, /Minimum \$\{minimum\}/);
 });

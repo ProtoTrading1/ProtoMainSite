@@ -10,6 +10,11 @@ import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
+import {
+  availabilityForRow,
+  loadIncomingAvailabilityMap,
+  loadIncomingAvailabilityVersion,
+} from './_product-availability.js';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -62,15 +67,24 @@ const CATALOG_MEMO_MAX_MS = 60_000;
 const CATALOG_MAX_STALE_MS = 10 * 60_000;
 
 async function loadCatalogVersion(supabase) {
-  const { data, count, error } = await supabase
-    .from('website_stock')
-    .select('updated_at', { count: 'exact' })
-    .order('updated_at', { ascending: false, nullsFirst: false })
-    .limit(1);
-  if (error) throw error;
-  const newest = data?.[0]?.updated_at || '0';
+  const [stockResult, incomingVersion] = await Promise.all([
+    supabase
+      .from('website_stock')
+      .select('updated_at', { count: 'exact' })
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .limit(1),
+    loadIncomingAvailabilityVersion(supabase),
+  ]);
+  if (stockResult.error) throw stockResult.error;
+  const newest = stockResult.data?.[0]?.updated_at || '0';
+  const incomingNewest = incomingVersion.newest;
+  const incomingCount = incomingVersion.count;
   const bucket = Math.floor(Date.now() / CATALOG_MAX_STALE_MS);
-  return { stamp: `${newest}|${count ?? 0}|${bucket}`, newest, count: count ?? 0 };
+  return {
+    stamp: `${newest}|${stockResult.count ?? 0}|${incomingNewest}|${incomingCount}|${bucket}`,
+    newest,
+    count: stockResult.count ?? 0,
+  };
 }
 
 function etagMatches(req, etag) {
@@ -265,7 +279,7 @@ async function fetchIdentifierRows(supabase, identifier) {
  * are none the returned object is byte-identical to before, so the payload is
  * unchanged while the feature is off.
  */
-function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, groupInfo = null) {
+function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, groupInfo = null, incoming = null) {
   const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
   const subLabels = [
     row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
@@ -327,6 +341,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     // disclaimer). keep_live_when_oos only keeps it VISIBLE (shown out-of-stock).
     toOrder: !!row.to_order,
     orderableWhenOutOfStock: !!row.to_order,
+    availability: availabilityForRow(row, incoming),
     yearlySales: salesByBarcode.get(String(row.barcode || '').trim().toUpperCase()) || 0,
     createdAt: row.created_at,
     supplier: '',
@@ -400,10 +415,10 @@ export default async function handler(req, res) {
         if (key && !rowMap.has(key)) rowMap.set(key, row);
       }
       const rows = [...rowMap.values()];
-      const salesByBarcode = await loadSalesByBarcode(
-        supabase,
-        rows.map((row) => row.sku).filter(Boolean),
-      );
+      const [salesByBarcode, incomingBySku] = await Promise.all([
+        loadSalesByBarcode(supabase, rows.map((row) => row.sku).filter(Boolean)),
+        loadIncomingAvailabilityMap(supabase, rows.map((row) => row.sku).filter(Boolean)),
+      ]);
       const products = rows
         .filter(isSafeStorefrontProduct)
         .map((row) => adapt(
@@ -412,6 +427,7 @@ export default async function handler(req, res) {
           salesByBarcode,
           placements ? (placements.get(row.sku) || []) : null,
           groupInfo ? (groupInfo.get(row.sku) || null) : null,
+          incomingBySku.get(row.sku) || null,
         ))
         .filter((product) => productMatchesBrowsePath(product, browsePath, labels));
 
@@ -460,7 +476,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const [rows, tree, salesByBarcode, placements, groupInfo] = await Promise.all([
+    const [rows, tree, salesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
       identifier
         ? fetchIdentifierRows(supabase, identifier)
         : fetchAllRows(
@@ -476,6 +492,7 @@ export default async function handler(req, res) {
       // null when the feature is off — no extra query, payload unchanged.
       loadPlacementMapIfEnabled(supabase),
       loadGroupInfoMapIfEnabled(supabase),
+      loadIncomingAvailabilityMap(supabase),
     ]);
     const products = rows
       // Defence in depth: invalid catalogue rows must never reach a customer,
@@ -487,6 +504,7 @@ export default async function handler(req, res) {
         salesByBarcode,
         placements ? (placements.get(row.sku) || []) : null,
         groupInfo ? (groupInfo.get(row.sku) || null) : null,
+        incomingBySku.get(row.sku) || null,
       ))
       // A product filed ONLY via a placement has no primary category label, so
       // it must survive this filter or multi-placement would silently drop it.
