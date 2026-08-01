@@ -7,6 +7,8 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingMapSection from '../components/landing/LandingMapSection';
 import LandingDepartmentsSection from '../components/landing/LandingDepartmentsSection';
 import LandingApplySection from '../components/landing/LandingApplySection';
+import { trackJourneyEvent } from '../lib/journeyAnalytics';
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
@@ -302,6 +304,11 @@ function Questionnaire({ onLogin }) {
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [stepError, setStepError] = useState('');
+
+  useEffect(() => {
+    trackJourneyEvent('registration_started', { journey: 'registration', step: 'company' });
+  }, []);
 
   const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
   const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
@@ -320,7 +327,7 @@ function Questionnaire({ onLogin }) {
     if (step === 1) {
       const phoneOk = phone.replace(/\D/g, '').length >= 8;
       const whatsappAnswered = typeof whatsappOptIn === 'boolean';
-      return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
+      return email.trim() && !validateEmailField(email) && phoneOk && !passwordPolicyError(password) && whatsappAnswered;
     }
     if (step === 2) {
       const billingOk = billingStreet.trim()
@@ -349,8 +356,28 @@ function Questionnaire({ onLogin }) {
       setEmailError(err);
       if (err) return;
     }
-    if (!canNext()) return;
+    if (!canNext()) {
+      const messages = [
+        'Enter your company name and the contact person’s full name.',
+        `Enter a valid email and phone number, choose Yes or No for WhatsApp, and use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
+        'Complete the required billing and delivery address fields, including building type.',
+        'Select at least one nature of business. If you choose Other, describe it.',
+      ];
+      setStepError(messages[step]);
+      trackJourneyEvent('registration_validation_failed', {
+        journey: 'registration',
+        step: STEP_LABELS[step].toLowerCase(),
+        outcome: 'blocked',
+      });
+      return;
+    }
+    setStepError('');
     if (step < STEP_LABELS.length - 1) {
+      trackJourneyEvent('registration_step_completed', {
+        journey: 'registration',
+        step: STEP_LABELS[step].toLowerCase(),
+        outcome: 'success',
+      });
       setStep(step + 1);
       return;
     }
@@ -389,9 +416,19 @@ function Questionnaire({ onLogin }) {
       });
       setInstantAccess(Boolean(result?.instantAccess));
       setDone(true);
+      trackJourneyEvent('registration_completed', {
+        journey: 'registration',
+        step: 'submitted',
+        outcome: result?.instantAccess ? 'instant_access' : 'pending_review',
+      });
     } catch (err) {
       setSubmitError(err.message || 'Something went wrong. Please try again.');
       setShowAccountRecovery(err.recovery === 'SIGN_IN_OR_RESET_PASSWORD');
+      trackJourneyEvent('registration_failed', {
+        journey: 'registration',
+        step: 'submitted',
+        outcome: err.code === 'EMAIL_ALREADY_REGISTERED' ? 'existing_email' : 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -418,6 +455,11 @@ function Questionnaire({ onLogin }) {
 
   return (
     <div className="lp-quiz">
+      <div className="lp-account-choice" aria-label="Choose the right account action">
+        <p><strong>Already registered on Proto Trading Online?</strong> <button type="button" onClick={() => onLogin({ initialMode: 'login' })}>Sign in</button> or <button type="button" onClick={() => onLogin({ initialMode: 'forgot' })}>reset your password</button>.</p>
+        <p><strong>Bought from our physical store before?</strong> Complete this form to register for the new website.</p>
+        <p><strong>New trade customer?</strong> Complete this form to apply for online trade access.</p>
+      </div>
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />
@@ -445,6 +487,8 @@ function Questionnaire({ onLogin }) {
                   onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Name"
+                  required
+                  aria-required="true"
                 />
               </div>
               <div className="lp-quiz-field">
@@ -457,6 +501,8 @@ function Questionnaire({ onLogin }) {
                   onChange={(e) => setContactName(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Full contact name"
+                  required
+                  aria-required="true"
                 />
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
@@ -495,6 +541,8 @@ function Questionnaire({ onLogin }) {
                   placeholder="name@business.co.za"
                   aria-invalid={!!emailError}
                   aria-describedby={emailError ? 'trade-email-error' : undefined}
+                  required
+                  aria-required="true"
                 />
                 {emailError && (
                   <span id="trade-email-error" style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
@@ -514,6 +562,8 @@ function Questionnaire({ onLogin }) {
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="+27"
+                  required
+                  aria-required="true"
                 />
               </div>
 
@@ -582,10 +632,19 @@ function Questionnaire({ onLogin }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKey}
-                    placeholder="At least 8 characters"
+                    placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                    minLength={MIN_PASSWORD_LENGTH}
+                    required
+                    aria-required="true"
                   />
-                  <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowPw((s) => !s)}>
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button
+                    type="button"
+                    className="lp-quiz-pw-eye"
+                    onClick={() => setShowPw((s) => !s)}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPw}
+                  >
+                    {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -656,7 +715,7 @@ function Questionnaire({ onLogin }) {
             <div id="landing-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
               Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-business-type-label">
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-business-type-label" aria-required="true">
               {BUSINESS_TYPES.map((t) => (
                 <button
                   key={t}
@@ -718,12 +777,25 @@ function Questionnaire({ onLogin }) {
         <div className="lp-quiz-error" role="alert">
           <span>{submitError}</span>
           {showAccountRecovery && onLogin && (
-            <button type="button" className="lp-register-recovery-action" onClick={onLogin}>
-              Sign in or reset password
-            </button>
+            <div className="lp-register-recovery-actions">
+              <button type="button" className="lp-register-recovery-action" onClick={() => {
+                trackJourneyEvent('existing_email_recovery_selected', { journey: 'registration', step: 'submitted', outcome: 'sign_in' });
+                onLogin({ initialEmail: email.trim(), initialMode: 'login' });
+              }}>
+                Sign in
+              </button>
+              <button type="button" className="lp-register-recovery-action" onClick={() => {
+                trackJourneyEvent('existing_email_recovery_selected', { journey: 'registration', step: 'submitted', outcome: 'reset_password' });
+                onLogin({ initialEmail: email.trim(), initialMode: 'forgot' });
+              }}>
+                Reset password
+              </button>
+            </div>
           )}
         </div>
       )}
+
+      {stepError && <div className="lp-quiz-error" role="alert">{stepError}</div>}
 
       <div className="lp-quiz-nav">
         {step > 0 ? (
@@ -734,7 +806,7 @@ function Questionnaire({ onLogin }) {
         <button
           type="button"
           className="lp-quiz-next"
-          disabled={!canNext() || submitting}
+          disabled={submitting}
           onClick={() => void advance()}
         >
           {submitting ? 'Submitting…' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}
@@ -807,7 +879,7 @@ export default function LandingPage({ onLogin, onApply, registrationMode = false
 
         <div>
         <LandingMapSection />
-        <LandingDepartmentsSection />
+        <LandingDepartmentsSection onApply={scrollToForm} />
         <LandingApplySection registrationMode={registrationMode}>
           <Questionnaire onLogin={onLogin} />
         </LandingApplySection>

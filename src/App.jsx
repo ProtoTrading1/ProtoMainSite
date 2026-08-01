@@ -14,10 +14,8 @@ import lazyWithRetry from './lib/lazyWithRetry';
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, isProductAvailable, sortCatalogProducts, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
-import { groupProductsByBarcode } from './lib/productGroups';
-import { fuzzyFilter } from './lib/fuzzySearch';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { fetchBanner, invalidateBannerCache } from './lib/banner';
@@ -27,9 +25,10 @@ import { authHeaders } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
-import { resolveNavPathForProducts } from './lib/taxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { trackJourneyEvent } from './lib/journeyAnalytics';
+import { productDetailId } from './lib/productDetailUrl';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -143,7 +142,7 @@ async function hydrateAccountCartItems(items) {
   }
 }
 
-function makeCartSyncOperation(accountId, items, activityAt, clearActivityAt = null) {
+function makeCartSyncOperation(accountId, items, activityAt, clearActivityAt = null, intent = 'normal') {
   const fingerprint = cartFingerprint(items);
   if (fingerprint === '[]') {
     return {
@@ -152,6 +151,7 @@ function makeCartSyncOperation(accountId, items, activityAt, clearActivityAt = n
       items: [],
       activityAt: clearActivityAt || activityAt || Date.now(),
       fingerprint,
+      intent,
     };
   }
   return {
@@ -160,6 +160,7 @@ function makeCartSyncOperation(accountId, items, activityAt, clearActivityAt = n
     items,
     activityAt: activityAt || Date.now(),
     fingerprint,
+    intent: intent === 'restore' ? 'restore' : 'normal',
   };
 }
 
@@ -172,8 +173,21 @@ function collectionLabel(collection) {
   return 'All Products';
 }
 
-export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) {
+export default function App({
+  customer,
+  onLogout,
+  onViewProfile,
+  onViewAdmin,
+  requestedReorder = null,
+  onRequestedReorderHandled,
+}) {
   const { path, refinements, navigate: hashNavigate, setRefinement } = useHashNav();
+  const catalogueRefinements = useMemo(() => {
+    const next = { ...refinements };
+    delete next.product;
+    return next;
+  }, [refinements]);
+  const pathKey = path.join('/');
   // Live category tree — fetched from /api/taxonomy on mount so admin renames
   // and new subcategories show up without a redeploy of the bundled snapshot.
   const categories = useLiveTaxonomy();
@@ -187,6 +201,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
+  const [sort, setSort] = useState(readInitialSort);
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome((prev) => {
@@ -234,7 +249,6 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
-  const [sort, setSort] = useState(readInitialSort);
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
@@ -253,7 +267,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [cartRevealRequest, setCartRevealRequest] = useState(null);
   const [cartScrollTop, setCartScrollTop] = useState(0);
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
-  const [cartClock, setCartClock] = useState(Date.now());
+  const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartHydrated, setCartHydrated] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -279,12 +293,22 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const cartSyncDrainRef = useRef(null);
   const cartHydrateRetryRef = useRef(null);
   const cartClearActivityAtRef = useRef(null);
+  const cartClearIntentRef = useRef('normal');
+  const cartRestoreFingerprintRef = useRef(null);
   // Idempotency key for the CURRENT cart's checkout. Persists across retries of
   // the same cart (so a resubmit after an email/network error recovers the
   // existing order instead of double-inserting) and resets when the cart
   // changes (a genuinely different order) or after a successful submit clears it.
   const checkoutRefRef = useRef(null);
-  useEffect(() => { checkoutRefRef.current = null; }, [cartItems]);
+  const lastCheckoutOptionsRef = useRef(null);
+  const lastCheckoutSubmissionRef = useRef(null);
+  const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
+  useEffect(() => {
+    const submittedFingerprint = lastCheckoutSubmissionRef.current?.fingerprint;
+    if (!submittedFingerprint || cartFingerprint(cartItems) !== submittedFingerprint) {
+      checkoutRefRef.current = null;
+    }
+  }, [cartItems]);
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
@@ -357,7 +381,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     if (path.length > 0) dismissWelcome();
-  }, [path.join('/'), dismissWelcome]);
+  }, [pathKey, path.length, dismissWelcome]);
 
   useEffect(() => {
     if (activeCollection !== 'all') dismissWelcome();
@@ -410,11 +434,35 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (cartAccountRef.current !== accountId) return;
       cartRevisionRef.current = Number(saved.revision || 0);
       lastSavedCartRef.current = cartFingerprint(saved.items);
-      if (operation.type === 'clear') cartClearActivityAtRef.current = null;
+      if (operation.type === 'clear') {
+        cartClearActivityAtRef.current = null;
+        cartClearIntentRef.current = 'normal';
+      }
+      if (operation.intent === 'restore') cartRestoreFingerprintRef.current = null;
       cartSyncRetryCountRef.current = 0;
     } catch (error) {
       if (cartAccountRef.current !== accountId) return;
-      if (error.status === 409 && Array.isArray(error.data?.items)) {
+      const restoreConflict = operation.intent === 'restore'
+        && error.status === 409
+        && Array.isArray(error.data?.items);
+      const submittedClearConflict = operation.intent === 'submitted_clear'
+        && error.status === 409
+        && Array.isArray(error.data?.items);
+      if (restoreConflict || submittedClearConflict) {
+        const remoteItems = await hydrateAccountCartItems(error.data.items);
+        const remoteActivityAt = error.data.activityAt || null;
+        cartRevisionRef.current = Number(error.data.revision || 0);
+        lastSavedCartRef.current = cartFingerprint(remoteItems);
+        cartRestoreFingerprintRef.current = null;
+        cartClearIntentRef.current = 'normal';
+        setCartItems(remoteItems);
+        setCartLastActivityAt(remoteActivityAt);
+        currentCartRef.current = { items: remoteItems, activityAt: remoteActivityAt };
+        setClearedCartSnapshot(null);
+        setCartAnnouncement(submittedClearConflict
+          ? 'Your order was received. A newer basket from another device has been kept.'
+          : 'A newer basket was saved on another device, so the older cleared basket was not restored.');
+      } else if (error.status === 409 && Array.isArray(error.data?.items)) {
         // Consume the newer revision but preserve this browser's latest intent.
         // The queue immediately retries that intent against the new revision.
         cartRevisionRef.current = Number(error.data.revision || 0);
@@ -422,13 +470,26 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       } else {
         cartSyncRetryCountRef.current += 1;
         setCartSyncStatus('error');
+        trackJourneyEvent('basket_sync_failed', {
+          journey: 'basket',
+          step: operation.type,
+          outcome: 'error',
+          metadata: { retry: cartSyncRetryCountRef.current },
+        });
       }
-      const latest = currentCartRef.current;
-      const nextOperation = makeCartSyncOperation(
-        accountId, latest.items, latest.activityAt, cartClearActivityAtRef.current,
-      );
-      if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
-      pendingCartSyncRef.current = nextOperation;
+      if (!restoreConflict && !submittedClearConflict) {
+        const latest = currentCartRef.current;
+        const latestFingerprint = cartFingerprint(latest.items);
+        const nextOperation = makeCartSyncOperation(
+          accountId,
+          latest.items,
+          latest.activityAt,
+          cartClearActivityAtRef.current,
+          cartRestoreFingerprintRef.current === latestFingerprint ? 'restore' : cartClearIntentRef.current,
+        );
+        if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
+        pendingCartSyncRef.current = nextOperation;
+      }
     } finally {
       cartSyncInFlightRef.current = false;
       if (cartAccountRef.current === accountId) {
@@ -436,7 +497,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         const latestFingerprint = cartFingerprint(latest.items);
         if (latestFingerprint !== lastSavedCartRef.current && !pendingCartSyncRef.current) {
           const nextOperation = makeCartSyncOperation(
-            accountId, latest.items, latest.activityAt, cartClearActivityAtRef.current,
+            accountId,
+            latest.items,
+            latest.activityAt,
+            cartClearActivityAtRef.current,
+            cartRestoreFingerprintRef.current === latestFingerprint ? 'restore' : cartClearIntentRef.current,
           );
           if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
           pendingCartSyncRef.current = nextOperation;
@@ -518,6 +583,12 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
         setCartSyncStatus('error');
+        trackJourneyEvent('basket_sync_failed', {
+          journey: 'basket',
+          step: 'hydrate',
+          outcome: 'error',
+          metadata: { retry: true },
+        });
         hydrationRetryTimer = window.setTimeout(hydrate, 3000);
       }
     };
@@ -540,7 +611,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     const fingerprint = cartFingerprint(cartItems);
     if (fingerprint === lastSavedCartRef.current) return undefined;
     const nextOperation = makeCartSyncOperation(
-      customer.id, cartItems, cartLastActivityAt, cartClearActivityAtRef.current,
+      customer.id,
+      cartItems,
+      cartLastActivityAt,
+      cartClearActivityAtRef.current,
+      cartRestoreFingerprintRef.current === fingerprint ? 'restore' : cartClearIntentRef.current,
     );
     if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
     pendingCartSyncRef.current = nextOperation;
@@ -575,6 +650,11 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     } catch {
       // Keep the device copy, but make the failed account sync visible.
       setCartSyncStatus('error');
+      trackJourneyEvent('basket_sync_failed', {
+        journey: 'basket',
+        step: 'refresh',
+        outcome: 'error',
+      });
     }
   }, []);
 
@@ -614,6 +694,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [customer?.id, refreshAccountCart, scheduleCartSync]);
 
   useEffect(() => {
+    setCartClock(Date.now());
     const timer = window.setInterval(() => setCartClock(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -675,7 +756,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   useEffect(() => {
     setPage(1);
-  }, [path.join('/')]);
+  }, [pathKey]);
 
   useEffect(() => {
     // Collection switches represent a new catalogue scope — restart pagination.
@@ -689,9 +770,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     if (path.length && !categories.some((c) => c.id === path[0])) {
       hashNavigate([]);
     }
-  }, [path, hashNavigate]);
-
-  const pathKey = path.join('/');
+  }, [path, hashNavigate, categories]);
 
   const handlePageChange = useCallback((nextPage) => {
     scrollToTop();
@@ -723,7 +802,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       entityLabel: label,
       customerId: customer?.id,
     });
-  }, [path.join('/'), customer?.id]);
+  }, [path, pathKey, categories, customer?.id]);
 
   useEffect(() => {
     if (!customer?.id) return;
@@ -884,7 +963,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       cancelled = true;
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
-  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
+  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -925,7 +1004,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, catalogTotal, loading, activeCollection, pathKey, customer?.id, customer?.email]);
+  }, [searchQuery, catalogTotal, loading, activeCollection, path, pathKey, customer?.id, customer?.email]);
 
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
@@ -940,7 +1019,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       node = (node.children || []).find((c) => c.id === path[i]) || null;
     }
     return node;
-  }, [path]);
+  }, [path, categories]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [orderStatus, setOrderStatus] = useState('idle');
@@ -959,9 +1038,25 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(now)); } catch { /* ignore */ }
   }, []);
 
-  const clearCart = useCallback(() => {
+  const clearCart = useCallback(({ allowUndo = true, intent = 'normal' } = {}) => {
     if (!cartHydratedRef.current) return;
     const clearedAt = Date.now();
+    if (allowUndo && cartItems.length) {
+      setClearedCartSnapshot({
+        accountId: cartAccountRef.current,
+        items: cartItems.map((item) => ({ ...item })),
+        clearedAt,
+      });
+      trackJourneyEvent('basket_cleared', {
+        journey: 'basket',
+        step: 'clear',
+        outcome: 'success',
+        metadata: { line_count: cartItems.length },
+      });
+    } else {
+      setClearedCartSnapshot(null);
+    }
+    cartClearIntentRef.current = intent;
     cartClearActivityAtRef.current = clearedAt;
     setCartItems([]);
     setCartLastActivityAt(null);
@@ -970,14 +1065,42 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       localStorage.removeItem(CART_STORAGE_KEY);
       localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
     } catch { /* ignore */ }
-  }, []);
+  }, [cartItems]);
+
+  const undoClearCart = useCallback(() => {
+    const snapshot = clearedCartSnapshot;
+    const belongsToAccount = snapshot?.accountId === cartAccountRef.current;
+    const stillSameClear = snapshot?.clearedAt === cartClearActivityAtRef.current;
+    if (!snapshot || !belongsToAccount || !stillSameClear || currentCartRef.current.items.length) {
+      setClearedCartSnapshot(null);
+      setCartAnnouncement('This basket changed on another device and could not be restored.');
+      return false;
+    }
+    const restoredAt = Date.now();
+    const restoredItems = snapshot.items.map((item) => ({ ...item }));
+    cartClearActivityAtRef.current = null;
+    cartClearIntentRef.current = 'normal';
+    cartRestoreFingerprintRef.current = cartFingerprint(restoredItems);
+    setCartItems(restoredItems);
+    setCartLastActivityAt(restoredAt);
+    currentCartRef.current = { items: restoredItems, activityAt: restoredAt };
+    try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(restoredAt)); } catch { /* ignore */ }
+    setClearedCartSnapshot(null);
+    setCartAnnouncement(`Order restored. ${restoredItems.length} product line${restoredItems.length === 1 ? '' : 's'}.`);
+    trackJourneyEvent('basket_restored', {
+      journey: 'basket',
+      step: 'undo_clear',
+      outcome: 'success',
+      metadata: { line_count: restoredItems.length },
+    });
+    return true;
+  }, [clearedCartSnapshot]);
 
   useEffect(() => {
-    if (!cartItems.length || !cartLastActivityAt) return;
-    if (cartClock - cartLastActivityAt < CART_INACTIVITY_WINDOW_MS) return;
-    clearCart();
-    setDrawerPeek(false);
-  }, [cartItems.length, cartLastActivityAt, cartClock, clearCart]);
+    if (!clearedCartSnapshot) return undefined;
+    const timeout = window.setTimeout(() => setClearedCartSnapshot(null), 30_000);
+    return () => window.clearTimeout(timeout);
+  }, [clearedCartSnapshot]);
 
   const addToCart = useCallback((product, qty, buttonPos = null) => {
     if (!cartHydratedRef.current) {
@@ -1123,7 +1246,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   }, [totalItemCount, cartTotal]);
 
   const sendOrderEmail = async (opts = {}) => {
-    if (!cartHydratedRef.current || !cartItems.length) return;
+    if (!cartHydratedRef.current || !cartItems.length) return { ok: false };
     const courierChoice = opts?.courierChoice || null;
     const customerNotes = String(opts?.customerNotes || '').trim();
     const promo = opts?.promo || null;
@@ -1136,12 +1259,52 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           : null;
 
     if (!deliveryMethod) {
+      trackJourneyEvent('checkout_validation_failed', {
+        journey: 'checkout',
+        step: 'delivery',
+        outcome: 'error',
+        metadata: { error_code: 'delivery_required' },
+      });
       setOrderError('Please choose a delivery option before submitting.');
       setOrderStatus('error');
       setModalOpen(true);
-      return;
+      return { ok: false };
     }
 
+    const liveFingerprint = cartFingerprint(cartItems);
+    const isRetry = Boolean(checkoutRefRef.current && lastCheckoutSubmissionRef.current);
+    if (isRetry && lastCheckoutSubmissionRef.current.fingerprint !== liveFingerprint) {
+      setOrderStatus('error');
+      setOrderError('Your basket changed after review. Close this message, review the current basket, and submit it as a new order request.');
+      checkoutRefRef.current = null;
+      lastCheckoutOptionsRef.current = null;
+      lastCheckoutSubmissionRef.current = null;
+      setModalOpen(true);
+      return { ok: false, cartChanged: true };
+    }
+    const checkoutOptions = isRetry
+      ? lastCheckoutOptionsRef.current
+      : { courierChoice, customerNotes, promo };
+    const submittedItems = isRetry
+      ? lastCheckoutSubmissionRef.current.items
+      : cartItems.map((item) => ({ ...item, product: { ...item.product } }));
+    const submittedTotal = isRetry ? lastCheckoutSubmissionRef.current.total : cartTotal;
+    lastCheckoutOptionsRef.current = checkoutOptions;
+    lastCheckoutSubmissionRef.current = {
+      items: submittedItems,
+      total: submittedTotal,
+      fingerprint: cartFingerprint(submittedItems),
+    };
+    trackJourneyEvent('checkout_started', {
+      journey: 'checkout',
+      step: 'submit',
+      outcome: 'started',
+      metadata: {
+        line_count: submittedItems.length,
+        retry: isRetry,
+        delivery_method: courierChoice,
+      },
+    });
     setOrderStatus('sending');
     setOrderError('');
     setSubmittedOrderNumber('');
@@ -1156,10 +1319,10 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
       const payload = {
         clientRef,
-        promoCode: promo?.code || null,
+        promoCode: checkoutOptions.promo?.code || null,
         deliveryMethod,
         customerNotes,
-        items: cartItems.map((item) => ({
+        items: submittedItems.map((item) => ({
           qty: item.qty,
           product: {
             id: item.product.id,
@@ -1189,7 +1352,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           void logSearchOrder({
             searchRowId: searchTrackRef.current.rowId,
             orderNumber: result?.orderId || '',
-            orderValue: cartTotal,
+            orderValue: submittedTotal,
           });
         }
       };
@@ -1197,15 +1360,61 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       const result = await submitOrder();
       setSubmittedOrderNumber(result.orderNumber || '');
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
-      clearCart();
+      trackJourneyEvent('order_submit_succeeded', {
+        journey: 'checkout',
+        step: 'submit',
+        outcome: result.emailDeliveryFailed ? 'saved_delivery_pending' : 'success',
+        metadata: {
+          line_count: submittedItems.length,
+          retry: isRetry,
+          delivery_method: courierChoice,
+        },
+      });
+      clearCart({ allowUndo: false, intent: 'submitted_clear' });
       setMobileCartOpen(false);
       setCartDrawerOpen(false);
       logConversion(result);
       if (customer?.id) fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+      lastCheckoutOptionsRef.current = null;
+      lastCheckoutSubmissionRef.current = null;
+      return { ok: true, result };
     } catch (err) {
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');
+      trackJourneyEvent('order_submit_failed', {
+        journey: 'checkout',
+        step: 'submit',
+        outcome: 'error',
+        metadata: {
+          line_count: submittedItems.length,
+          retry: isRetry,
+          delivery_method: courierChoice,
+          error_code: err?.code || 'request_failed',
+        },
+      });
+      return { ok: false };
     }
+  };
+
+  const retryLastOrderSubmission = () => {
+    if (!lastCheckoutOptionsRef.current || orderStatus === 'sending') return;
+    if (lastCheckoutSubmissionRef.current
+      && lastCheckoutSubmissionRef.current.fingerprint !== cartFingerprint(cartItems)) {
+      checkoutRefRef.current = null;
+      lastCheckoutOptionsRef.current = null;
+      lastCheckoutSubmissionRef.current = null;
+      setModalOpen(false);
+      setCartAnnouncement('Your basket changed after review. Review the current basket before sending a new order request.');
+      if (window.matchMedia?.('(max-width: 768px)').matches) setMobileCartOpen(true);
+      else setCartDrawerOpen(true);
+      return;
+    }
+    void sendOrderEmail(lastCheckoutOptionsRef.current);
+  };
+
+  const viewSubmittedOrder = () => {
+    setModalOpen(false);
+    onViewProfile?.();
   };
 
   const handleReorder = async (items) => {
@@ -1259,12 +1468,59 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
     return { added, missing, overflow };
   };
 
+  useEffect(() => {
+    if (!requestedReorder) return;
+    setLastOrder(requestedReorder);
+    setReorderModal(true);
+    onRequestedReorderHandled?.();
+  }, [requestedReorder, onRequestedReorderHandled]);
+
   const [previewProduct, setPreviewProduct] = useState(null);
+  const productDetailKey = String(refinements.product || '').trim();
+  const previewProductKey = productDetailId(previewProduct);
 
   const handleProductPreview = useCallback((product) => {
     dismissWelcome();
     setPreviewProduct(product);
-  }, [dismissWelcome]);
+    const id = productDetailId(product);
+    if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
+  }, [dismissWelcome, hashNavigate, path, refinements]);
+
+  const closeProductPreview = useCallback(() => {
+    setPreviewProduct(null);
+    if (!refinements.product) return;
+    const next = { ...refinements };
+    delete next.product;
+    hashNavigate(path, next, { scroll: false, replace: true });
+  }, [hashNavigate, path, refinements]);
+
+  useEffect(() => {
+    if (!productDetailKey) {
+      if (previewProductKey) setPreviewProduct(null);
+      return undefined;
+    }
+    if (previewProductKey === productDetailKey) return undefined;
+
+    const visible = catalogProducts.find((product) => productDetailId(product) === productDetailKey);
+    if (visible) {
+      setPreviewProduct(visible);
+      return undefined;
+    }
+
+    let cancelled = false;
+    void fetchProductsBySkus([productDetailKey]).then((products) => {
+      if (cancelled) return;
+      const product = products.get(productDetailKey.toUpperCase()) || null;
+      setPreviewProduct(product);
+      if (!product) {
+        const next = { ...refinements };
+        delete next.product;
+        setCartAnnouncement('That product is no longer available in the catalogue.');
+        hashNavigate(path, next, { scroll: false, replace: true });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [catalogProducts, hashNavigate, path, previewProductKey, productDetailKey, refinements]);
 
   const handleSearchProductClick = useCallback((product, index) => {
     const track = searchTrackRef.current;
@@ -1352,7 +1608,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
-            refinements={refinements}
+            refinements={catalogueRefinements}
           />
         </main>
 
@@ -1369,6 +1625,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             updateQty={updateQty}
             removeFromCart={removeFromCart}
             clearCart={clearCart}
+            onUndoClear={undoClearCart}
+            canUndoClear={Boolean(clearedCartSnapshot)}
             sendOrderEmail={sendOrderEmail}
             customer={customer}
             autoCloseProgress={cartExpiryProgress}
@@ -1384,6 +1642,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             initialScrollTop={cartScrollTop}
             onRevealItemHandled={handleCartRevealHandled}
             onScrollPositionChange={handleCartScrollPositionChange}
+            onEditDeliveryAddress={onViewProfile}
+            orderStatus={orderStatus}
           />}
         </aside>
       </div>
@@ -1395,6 +1655,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
           orderStatus={orderStatus}
           orderError={orderError}
           orderNumber={submittedOrderNumber}
+          onRetry={retryLastOrderSubmission}
+          onViewOrder={viewSubmittedOrder}
         />
       </Suspense>
 
@@ -1412,7 +1674,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             onCartQtyChange={handleCartQtyChange}
             special={specialsMap[previewProduct.id] || (previewProduct.isNew ? { deal: 'none' } : null)}
             initialZoomOpen={true}
-            onZoomClose={() => setPreviewProduct(null)}
+            onZoomClose={closeProductPreview}
           />
         </div>
       )}
@@ -1466,7 +1728,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 updateQty={updateQty}
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
-                sendOrderEmail={(opts) => { closeMobileCart({ restoreFocus: false }); sendOrderEmail(opts); }}
+                onUndoClear={undoClearCart}
+                canUndoClear={Boolean(clearedCartSnapshot)}
+                sendOrderEmail={sendOrderEmail}
                 customer={customer}
                 autoCloseProgress={cartExpiryProgress}
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
@@ -1480,6 +1744,8 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
                 initialScrollTop={cartScrollTop}
                 onRevealItemHandled={handleCartRevealHandled}
                 onScrollPositionChange={handleCartScrollPositionChange}
+                onEditDeliveryAddress={onViewProfile}
+                orderStatus={orderStatus}
               />
             </div>
           </div>

@@ -170,12 +170,22 @@
   flex-direction: column;
   align-items: stretch;
   gap: 2px;
-  min-height: 22px;
+  min-height: 38px;
   margin: 0;
   color: #94a3b8;
   font-size: 10.5px;
   font-weight: 650;
   letter-spacing: 0.03em;
+}
+
+.product-card .pc-order-quantity {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .product-card .pc-sku-top {
@@ -241,8 +251,43 @@
 }
 
 .product-card .pc-stock-slot {
-  min-height: 32px;
+  min-height: 70px;
   margin-top: 8px;
+}
+
+.product-card .pc-orderability {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 22px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.product-card .pc-orderability small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.product-card .pc-orderability--in,
+.product-card .pc-orderability--low {
+  color: #15803d;
+}
+
+.product-card .pc-orderability--toorder {
+  color: #b45309;
+}
+
+.product-card .pc-orderability--out {
+  color: #6b7280;
+}
+
+.pz-order-quantity {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .product-card .pc-stock-badge {
@@ -447,6 +492,22 @@
     min-height: 44px;
     margin-top: 6px;
     padding-top: 6px;
+  }
+
+  .product-card .pc-sku {
+    min-height: 34px;
+  }
+
+  .product-card .pc-stock-slot {
+    min-height: 30px;
+    margin-top: 4px;
+  }
+
+  .product-card .pc-orderability {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+    line-height: 1.25;
   }
 
   .product-card .add-button {

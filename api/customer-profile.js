@@ -39,7 +39,10 @@ export default async function handler(req, res) {
       .single();
     if (error) {
       // whatsapp_opt_in_at column may not exist yet (migration 007) — retry without it
-      const { whatsapp_opt_in_at: _at, ...patchWithoutTs } = patch;
+      const patchWithoutTs = {
+        accept_whatsapp: patch.accept_whatsapp,
+        ...(patch.phone ? { phone: patch.phone } : {}),
+      };
       const retry = await supabase
         .from('customers')
         .update(patchWithoutTs)

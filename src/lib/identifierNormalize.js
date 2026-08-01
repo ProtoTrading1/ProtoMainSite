@@ -2,7 +2,7 @@
 export function normalizeIdentifier(value) {
   return String(value || '')
     .toUpperCase()
-    .replace(/[\s\-_\/.]/g, '')
+    .replace(/[\s_/.-]/g, '')
     .replace(/[^A-Z0-9]/g, '');
 }
 
@@ -23,8 +23,8 @@ export function isIdentifierQuery(query) {
   if (!parts.some((part) => /\d/.test(part))) return false;
 
   for (const part of parts) {
-    if (!/^[\w\-_\/.]+$/i.test(part)) return false;
-    const stripped = part.replace(/[\-_/\.]/g, '');
+    if (!/^[\w_/.-]+$/i.test(part)) return false;
+    const stripped = part.replace(/[-_/.]/g, '');
     if (!/\d/.test(part)) {
       if (!/^[a-z]+$/i.test(stripped) || stripped.length > 4) return false;
     }

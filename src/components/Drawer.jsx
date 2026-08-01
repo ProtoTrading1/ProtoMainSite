@@ -16,12 +16,13 @@ import {
 import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
+import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
 
 const MIN_ORDER = 1000;
 
 function formatCartExpiry(remainingMs) {
   if (remainingMs === null || remainingMs === undefined) return '';
-  if (remainingMs <= 0) return 'expired';
+  if (remainingMs <= 0) return '7d+ old';
 
   const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
   const days = Math.floor(totalMinutes / (24 * 60));
@@ -32,30 +33,54 @@ function formatCartExpiry(remainingMs) {
   return `${hours}h ${minutes}m left`;
 }
 
-function QuantityInput({ item, updateQty, disabled = false }) {
+function QuantityStepper({ item, updateQty, disabled = false }) {
   // Over-ordering is allowed (backorder request); the shortfall is surfaced by
   // the per-line advisory below, so the input only enforces a sane ceiling.
-  const maxQty = 9999;
   const [draftQty, setDraftQty] = useState(() => String(item.qty));
-  const commitQty = () => {
-    const nextQty = Math.max(1, Math.min(maxQty, Number(draftQty) || 1));
+  useEffect(() => setDraftQty(String(item.qty)), [item.qty]);
+
+  const commitQty = (value = draftQty) => {
+    const nextQty = normalizeCartQuantity(value, item.qty);
     setDraftQty(String(nextQty));
     updateQty(item.product.id, nextQty);
   };
 
+  const stepQty = (delta) => {
+    const nextQty = stepCartQuantity(draftQty, item.qty, delta);
+    commitQty(nextQty);
+  };
+
   return (
-    <input
-      aria-label={`Quantity for ${item.product.code}`}
-      inputMode="numeric"
-      min="1"
-      max={maxQty}
-      type="number"
-      value={draftQty}
-      disabled={disabled}
-      onBlur={commitQty}
-      onChange={(e) => setDraftQty(e.target.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-    />
+    <div className="mini-stepper">
+      <button
+        onClick={() => stepQty(-1)}
+        type="button"
+        disabled={disabled}
+        aria-label={`Decrease quantity for ${item.product.name}`}
+      >
+        -
+      </button>
+      <input
+        aria-label={`Quantity for ${item.product.code}`}
+        inputMode="numeric"
+        min="1"
+        max="9999"
+        type="number"
+        value={draftQty}
+        disabled={disabled}
+        onBlur={() => commitQty()}
+        onChange={(e) => setDraftQty(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      />
+      <button
+        onClick={() => stepQty(1)}
+        type="button"
+        disabled={disabled}
+        aria-label={`Increase quantity for ${item.product.name}`}
+      >
+        +
+      </button>
+    </div>
   );
 }
 
@@ -80,6 +105,10 @@ export default function Drawer({
   initialScrollTop = 0,
   onRevealItemHandled,
   onScrollPositionChange,
+  onUndoClear,
+  canUndoClear = false,
+  onEditDeliveryAddress,
+  orderStatus = 'idle',
 }) {
   const progress = Math.min((cartTotal / MIN_ORDER) * 100, 100);
   const remaining = Math.max(0, MIN_ORDER - cartTotal);
@@ -110,6 +139,8 @@ export default function Drawer({
   const onScrollPositionChangeRef = useRef(onScrollPositionChange);
   const courierDialogRef = useRef(null);
   const courierPreviousFocusRef = useRef(null);
+  const undoButtonRef = useRef(null);
+  const shouldFocusUndoRef = useRef(false);
   const courierDialogTitleId = useId();
 
   const inclVatEstimate = cartTotal;
@@ -119,6 +150,20 @@ export default function Drawer({
   useEffect(() => {
     setAppliedPromo(null);
   }, [cartTotal]);
+
+  useEffect(() => {
+    if (orderStatus !== 'sent' && orderStatus !== 'saved') return;
+    setShowCourierPicker(false);
+    setCourierChoice(null);
+    setCustomerNotes('');
+    setAppliedPromo(null);
+  }, [orderStatus]);
+
+  useEffect(() => {
+    if (!canUndoClear || !shouldFocusUndoRef.current) return;
+    shouldFocusUndoRef.current = false;
+    window.requestAnimationFrame(() => undoButtonRef.current?.focus());
+  }, [canUndoClear]);
 
   useEffect(() => {
     const el = itemsRef.current;
@@ -168,21 +213,24 @@ export default function Drawer({
   const handleConfirmCourier = async () => {
     setSubmitting(true);
     try {
-      await sendOrderEmail({
+      const result = await sendOrderEmail({
         courierChoice,
         customerNotes: customerNotes.trim(),
         promo: appliedPromo,
       });
-      setShowCourierPicker(false);
-      setCourierChoice(null);
-      setCustomerNotes('');
-      setAppliedPromo(null);
+      if (result?.ok) {
+        setShowCourierPicker(false);
+        setCourierChoice(null);
+        setCustomerNotes('');
+        setAppliedPromo(null);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const closeCourierPicker = () => {
+    if (submitting) return;
     setShowCourierPicker(false);
     setCourierChoice(null);
     setCustomerNotes('');
@@ -211,6 +259,7 @@ export default function Drawer({
 
     const onGlobalKeyDown = (event) => {
       if (event.key === 'Escape') {
+        if (submitting) return;
         event.preventDefault();
         event.stopImmediatePropagation();
         setShowCourierPicker(false);
@@ -253,7 +302,7 @@ export default function Drawer({
       document.body.style.overscrollBehavior = prevOverscroll;
       courierPreviousFocusRef.current?.focus?.();
     };
-  }, [showCourierPicker]);
+  }, [showCourierPicker, submitting]);
 
   return (
     <div className="order-drawer" style={{ position: 'relative' }}>
@@ -269,9 +318,10 @@ export default function Drawer({
         <div className="drawer-header-actions">
           {isReady && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
-            <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>
-              {syncLabel} · {expiryLabel}
-            </span>
+            <>
+              <span className="cart-saved-pill">{syncLabel}</span>
+              <span className={`cart-expiry-pill cart-expiry-pill--${cartExpiryTone}`}>{expiryLabel}</span>
+            </>
           )}
           {onClose && (
             <button
@@ -288,7 +338,14 @@ export default function Drawer({
       </div>
 
       {showAutoCloseBar && (
-        <div className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`} aria-hidden="true">
+        <div
+          className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`}
+          role="progressbar"
+          aria-label="Basket age within the seven-day reminder period"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={Math.round(Math.max(0, Math.min(100, autoCloseProgress)))}
+        >
           <div style={{ width: `${Math.max(0, Math.min(100, autoCloseProgress))}%` }} />
         </div>
       )}
@@ -326,25 +383,7 @@ export default function Drawer({
               <span>{item.product.code}</span>
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
-                <div className="mini-stepper">
-                  <button
-                    onClick={() => updateQty(item.product.id, item.qty - 1)}
-                    type="button"
-                    disabled={basketLoading}
-                    aria-label={`Decrease quantity for ${item.product.name}`}
-                  >
-                    -
-                  </button>
-                  <QuantityInput key={`${item.product.id}-${item.qty}`} item={item} updateQty={updateQty} disabled={basketLoading} />
-                  <button
-                    onClick={() => updateQty(item.product.id, item.qty + 1)}
-                    type="button"
-                    disabled={basketLoading}
-                    aria-label={`Increase quantity for ${item.product.name}`}
-                  >
-                    +
-                  </button>
-                </div>
+                <QuantityStepper item={item} updateQty={updateQty} disabled={basketLoading} />
                 <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" disabled={basketLoading} aria-label={`Remove ${item.product.name} from cart`}>
                   <Trash2 size={14} />
                 </button>
@@ -379,11 +418,11 @@ export default function Drawer({
         )}
         {showExpiryNote && (
           <div className={`cart-expiry-note cart-expiry-note--${cartExpiryTone}`}>
-            <span>Inactivity timer</span>
+            <span>Basket reminder</span>
             <strong>
               {cartExpiryTone === 'danger'
-                ? `Expires soon (${expiryLabel})`
-                : `Reset by updating cart (${expiryLabel})`}
+                ? 'Older than seven days — kept until you clear or submit it'
+                : `Update an item to refresh this reminder (${expiryLabel})`}
             </strong>
           </div>
         )}
@@ -392,7 +431,7 @@ export default function Drawer({
             <span>{isReady ? 'Minimum reached' : 'Minimum order'}</span>
             <strong>{isReady ? 'Ready to submit' : `R${remaining.toFixed(2)} remaining`}</strong>
           </div>
-          <div className="progress-track">
+          <div className="progress-track" role="progressbar" aria-label="Minimum order progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(progress)}>
             <div style={{ width: `${progress}%` }} />
           </div>
         </div>
@@ -412,10 +451,19 @@ export default function Drawer({
             Continue shopping — R{remaining.toFixed(2)} remaining
           </button>
         )}
-        <button className="clear-button" onClick={() => { if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button" disabled={basketLoading}>
-          <Trash2 size={13} />
-          Clear order
-        </button>
+        {canUndoClear ? (
+          <div className="cart-undo" role="status" aria-live="polite">
+            <span>Order cleared.</span>
+            <button ref={undoButtonRef} type="button" onClick={onUndoClear}>Undo</button>
+          </div>
+        ) : (
+          cartItems.length > 0 && (
+            <button className="clear-button" onClick={() => { shouldFocusUndoRef.current = true; if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button" disabled={basketLoading}>
+              <Trash2 size={13} />
+              Clear order
+            </button>
+          )
+        )}
         <div className="drawer-trust">
           <PackageCheck size={14} />
           No payment now. We send a pro-forma after confirming your request.
@@ -438,6 +486,7 @@ export default function Drawer({
         onPromoClear={() => setAppliedPromo(null)}
         onKeepShopping={handleContinueShopping}
         onContinue={handleCheckoutContinue}
+        onEditDeliveryAddress={onEditDeliveryAddress}
       />
 
       {showCourierPicker && createPortal(
@@ -509,7 +558,7 @@ export default function Drawer({
                 {submitting && <Loader2 size={17} className="spin-icon" aria-hidden />}
                 {submitting ? 'Sending your order request…' : 'Send order request — no payment now'}
               </button>
-              <button type="button" onClick={closeCourierPicker} className="courier-cancel-button">
+              <button type="button" onClick={closeCourierPicker} className="courier-cancel-button" disabled={submitting}>
                 Cancel
               </button>
             </div>

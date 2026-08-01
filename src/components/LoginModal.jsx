@@ -1,26 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { resetPassword, signIn } from '../lib/auth';
+import { trackJourneyEvent } from '../lib/journeyAnalytics';
 import ProtoLogo from './ProtoLogo';
 
-export default function LoginModal({ onLogin, onClose, onApply }) {
-  const [mode, setMode] = useState('login');
-  const [email, setEmail] = useState('');
+export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '', initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode === 'forgot' ? 'forgot' : 'login');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const backdropRef = useRef(null);
+  const cardRef = useRef(null);
   const mouseDownOrigin = useRef(null);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const previouslyFocused = document.activeElement;
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...(cardRef.current?.querySelectorAll(focusableSelector) || [])];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    window.requestAnimationFrame(() => cardRef.current?.querySelector('input')?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
   }, [onClose]);
 
@@ -31,12 +56,15 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
       if (mode === 'forgot') {
         if (!email) { setError('Enter your email address.'); setLoading(false); return; }
         await resetPassword(email);
-        setInfo('Password reset email sent. Check your inbox.');
-        setMode('login');
+        setInfo('If an online account exists for that email, we’ll send a reset link. Check your inbox and spam folder.');
+        trackJourneyEvent('password_reset_requested', { journey: 'authentication', outcome: 'accepted' });
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
         const { session } = await signIn(email, password);
-        if (session) await onLogin(session);
+        if (session) {
+          trackJourneyEvent('login_succeeded', { journey: 'authentication', outcome: 'success' });
+          await onLogin(session);
+        }
       }
     } catch (err) {
       const raw = err?.message || 'Authentication failed.';
@@ -47,6 +75,10 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
       setError(/email not confirmed|not confirmed|pending approval|not approved/i.test(raw)
         ? 'Proto is still reviewing your application. We will notify you when you have been approved.'
         : raw);
+      trackJourneyEvent(mode === 'forgot' ? 'password_reset_failed' : 'login_failed', {
+        journey: 'authentication',
+        outcome: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -61,6 +93,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
     >
       <div
         className="lm-card"
+        ref={cardRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="login-modal-heading"
@@ -83,22 +116,27 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
           </div>
 
           {/* Alerts */}
-          {error && <div className="lm-alert lm-alert-err">{error}</div>}
-          {info  && <div className="lm-alert lm-alert-ok">{info}</div>}
+          {error && <div id="login-modal-error" className="lm-alert lm-alert-err" role="alert">{error}</div>}
+          {info  && <div id="login-modal-info" className="lm-alert lm-alert-ok" role="status">{info}</div>}
 
           {/* Form */}
           <form className="lm-form" onSubmit={handleSubmit}>
             <div className="lm-field">
-              <label>Email address</label>
+              <label htmlFor="login-email">Email address</label>
               <div className="lm-input-wrap">
                 <Mail size={16} className="lm-input-icon" />
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@business.co.za"
                   autoFocus
+                  aria-describedby={[error && 'login-modal-error', info && 'login-modal-info'].filter(Boolean).join(' ') || undefined}
                   required
+                  aria-required="true"
                 />
               </div>
             </div>
@@ -106,7 +144,7 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
             {mode !== 'forgot' && (
               <div className="lm-field">
                 <div className="lm-label-row">
-                  <label>Password</label>
+                  <label htmlFor="login-password">Password</label>
                   {mode === 'login' && (
                     <button type="button" className="lm-forgot-link" onClick={() => { setMode('forgot'); setError(''); setInfo(''); }}>
                       Forgot password?
@@ -116,11 +154,15 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
                 <div className="lm-input-wrap">
                   <Lock size={16} className="lm-input-icon" />
                   <input
+                    id="login-password"
+                    name="password"
                     type={showPw ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    aria-required="true"
                   />
                   <button
                     type="button"
@@ -153,9 +195,13 @@ export default function LoginModal({ onLogin, onClose, onApply }) {
 
           {/* Apply link */}
           {mode === 'login' && onApply && (
-            <button type="button" className="lm-apply-link" onClick={onApply}>
-              Not registered on the new website? Re-register or apply ↓
-            </button>
+            <div className="lm-account-options" aria-label="Other account options">
+              <p><strong>Bought from Proto before, but not online?</strong> Re-register for the new website.</p>
+              <p><strong>New trade customer?</strong> Apply for online trade access.</p>
+              <button type="button" className="lm-apply-link" onClick={onApply}>
+                Re-register or apply
+              </button>
+            </div>
           )}
 
           {/* Footer note */}

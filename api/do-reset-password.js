@@ -1,4 +1,6 @@
+import { createHash } from 'crypto';
 import {
+  consumeResetToken,
   findUserByEmail,
   getResetSecret,
   getResetTokenVersion,
@@ -7,6 +9,7 @@ import {
   verifyResetToken,
 } from './_password-reset.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
+import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -14,7 +17,8 @@ export default async function handler(req, res) {
 
   const { token, password } = req.body || {};
   if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
-  if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const passwordError = passwordPolicyError(password);
+  if (passwordError) return res.status(400).json({ error: passwordError });
 
   const secret = getResetSecret();
   if (!secret) return res.status(500).json({ error: 'Server misconfigured' });
@@ -46,6 +50,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'This reset link has already been used or replaced. Request a new one.' });
     }
 
+    // A unique insert in migration 060 is the compare-and-swap boundary. Only
+    // one concurrent redemption of this signed token can proceed.
+    const tokenHash = createHash('sha256').update(String(token)).digest('hex');
+    const consumed = await consumeResetToken(supabase, tokenHash, user.id, claim.exp);
+    if (!consumed) {
+      return res.status(400).json({ error: 'This reset link has already been used or replaced. Request a new one.' });
+    }
+
+    // Revoke before changing the password and fail closed if the security RPC
+    // is unavailable. The customer is never told every device was signed out
+    // unless the existing GoTrue sessions were actually deleted.
+    await revokeUserSessions(supabase, user.id);
+
     // Atomic single-use: rotate the password AND bump reset_token_version in the
     // SAME write, so a partial failure can never leave the link replayable (a
     // separate bump could fail after the password changed, keeping the link
@@ -56,9 +73,6 @@ export default async function handler(req, res) {
       app_metadata: { ...(user.app_metadata || {}), reset_token_version: nextVersion },
     });
     if (error) return res.status(400).json({ error: error.message });
-
-    // Then force-logout every existing session.
-    await revokeUserSessions(supabase, user.id);
 
     return res.status(200).json({ ok: true });
   } catch (err) {

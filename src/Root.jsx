@@ -33,8 +33,14 @@ export default function Root() {
   const [route, setRoute] = useState(window.location.hash);
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [requestedReorder, setRequestedReorder] = useState(null);
+  const [loginOptions, setLoginOptions] = useState({ initialEmail: '', initialMode: 'login' });
   const authBootstrapped = useRef(false);
   const loadNonce = useRef(0);
+
+  useEffect(() => {
+    setRequestedReorder(null);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (adminHost) document.title = 'Proto Admin';
@@ -111,6 +117,19 @@ export default function Root() {
       window.sessionStorage.setItem('proto-surface', next);
     }
   }, []);
+
+  const openLogin = useCallback((options = {}) => {
+    setLoginOptions({
+      initialEmail: String(options?.initialEmail || '').trim(),
+      initialMode: options?.initialMode === 'forgot' ? 'forgot' : 'login',
+    });
+    setSurface('login');
+  }, [setSurface]);
+
+  const closeLogin = useCallback(() => {
+    setLoginOptions({ initialEmail: '', initialMode: 'login' });
+    setSurface('landing');
+  }, [setSurface]);
 
   useEffect(() => {
     scrollToTop();
@@ -249,6 +268,7 @@ export default function Root() {
   }, [loadCustomer]);
 
   const handleLogin = async (sess) => {
+    setLoginOptions({ initialEmail: '', initialMode: 'login' });
     setSession(sess);
     try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
@@ -268,6 +288,8 @@ export default function Root() {
     setCustomer(null);
     setCustomerLoading(false);
     setMonitoringUser(null);
+    setRequestedReorder(null);
+    setLoginOptions({ initialEmail: '', initialMode: 'login' });
     window.sessionStorage.removeItem('proto-surface');
     setView('landing');
     window.location.hash = '';
@@ -286,7 +308,7 @@ export default function Root() {
     <>
       <LandingPage
         registrationMode
-        onLogin={() => setSurface('login')}
+        onLogin={openLogin}
         onApply={() => {
           document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
         }}
@@ -295,9 +317,11 @@ export default function Root() {
         <Suspense fallback={null}>
           <LoginModal
             onLogin={handleLogin}
-            onClose={() => setSurface('landing')}
+            onClose={closeLogin}
+            initialEmail={loginOptions.initialEmail}
+            initialMode={loginOptions.initialMode}
             onApply={() => {
-              setSurface('landing');
+              closeLogin();
               window.requestAnimationFrame(() => {
                 document.getElementById('lp-apply')?.scrollIntoView({ behavior: 'smooth' });
               });
@@ -362,16 +386,18 @@ export default function Root() {
     }
   }
 
-  if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={() => setSurface('login')} /></Suspense>;
+  if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={openLogin} /></Suspense>;
   if (!adminHost && route.startsWith('#/worldclass')) return <Suspense fallback={authSurfaceFallback}><WorldClassPortal /></Suspense>;
   if (passwordRecovery) {
     return (
       <Suspense fallback={authSurfaceFallback}>
         <ResetPasswordPage
           token={null}
+          recoverySession
           onDone={() => {
             setPasswordRecovery(false);
             window.location.hash = '';
+            setLoginOptions({ initialEmail: '', initialMode: 'login' });
             setSurface('login');
           }}
         />
@@ -388,6 +414,7 @@ export default function Root() {
           token={token}
           onDone={() => {
             window.location.hash = '';
+            setLoginOptions({ initialEmail: '', initialMode: 'login' });
             setSurface('login');
           }}
         />
@@ -470,6 +497,18 @@ export default function Root() {
           customer={customer}
           onBack={() => setSurface('portal')}
           onProfileUpdate={(updated) => setCustomer(updated)}
+          onReorderOrder={(order) => {
+            setRequestedReorder({
+              id: order.id,
+              order_number: order.order_number,
+              items: (order.items || []).map((item) => ({
+                productId: item.productId,
+                code: item.code,
+                qty: item.qty,
+              })),
+            });
+            setSurface('portal');
+          }}
         />
       </Suspense>
     );
@@ -484,6 +523,8 @@ export default function Root() {
             onLogout={handleLogout}
             onViewProfile={() => setSurface('profile')}
             onViewAdmin={null}
+            requestedReorder={requestedReorder}
+            onRequestedReorderHandled={() => setRequestedReorder(null)}
           />
         </Suspense>
       </PortalErrorBoundary>
@@ -515,6 +556,8 @@ export default function Root() {
               onLogin={handleLogin}
               onClose={() => {}}
               onApply={() => {}}
+              initialEmail={loginOptions.initialEmail}
+              initialMode={loginOptions.initialMode}
             />
           </Suspense>
         )}
@@ -525,7 +568,7 @@ export default function Root() {
   return (
     <>
       <LandingPage
-        onLogin={() => setSurface('login')}
+        onLogin={openLogin}
         onApply={() => {
           const el = document.getElementById('lp-apply');
           if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -535,8 +578,10 @@ export default function Root() {
         <Suspense fallback={null}>
           <LoginModal
             onLogin={handleLogin}
-            onClose={() => setSurface('landing')}
-            onApply={() => { setSurface('landing'); scrollToApply(); }}
+            onClose={closeLogin}
+            onApply={() => { closeLogin(); scrollToApply(); }}
+            initialEmail={loginOptions.initialEmail}
+            initialMode={loginOptions.initialMode}
           />
         </Suspense>
       )}

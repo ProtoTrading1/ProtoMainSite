@@ -25,7 +25,7 @@ window.addEventListener('unhandledrejection', (event) => {
   }
   if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === '1') return;
   event.preventDefault();
-  try { window.sessionStorage.setItem(CHUNK_RELOAD_KEY, '1'); } catch {}
+  try { window.sessionStorage.setItem(CHUNK_RELOAD_KEY, '1'); } catch { /* storage may be unavailable */ }
   window.location.reload();
 });
 

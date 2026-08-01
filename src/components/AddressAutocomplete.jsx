@@ -21,7 +21,21 @@ function loadScript() {
 
 import { parseGooglePlaceComponents } from '../lib/addressUtils';
 
-export default function AddressAutocomplete({ value, onChange, onPlaceSelect, className, placeholder, required, style, onKeyDown }) {
+export default function AddressAutocomplete({
+  value,
+  onChange,
+  onPlaceSelect,
+  className,
+  placeholder,
+  required,
+  style,
+  onKeyDown,
+  id,
+  name,
+  autoComplete = 'street-address',
+  ariaRequired,
+  ariaInvalid,
+}) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
@@ -58,13 +72,17 @@ export default function AddressAutocomplete({ value, onChange, onPlaceSelect, cl
   return (
     <input
       ref={inputRef}
+      id={id}
+      name={name}
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={className}
       placeholder={placeholder || 'Start typing your address…'}
       required={required}
-      autoComplete="off"
+      aria-required={ariaRequired}
+      aria-invalid={ariaInvalid}
+      autoComplete={autoComplete}
       style={style}
       onKeyDown={onKeyDown}
     />

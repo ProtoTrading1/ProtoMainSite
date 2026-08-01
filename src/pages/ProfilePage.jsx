@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail, MessageCircle,
-  MapPin, Package, Phone, ShieldCheck, Store, User,
+  MapPin, Package, Phone, RotateCcw, ShieldCheck, Store, Truck, User,
 } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
 import { fetchOrderHistory } from '../lib/orders';
+import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
 import { MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { SADC_COUNTRIES, SA_PROVINCES } from '../lib/sadcCountries';
 import {
@@ -61,7 +62,7 @@ function Field({ label, hint, children, full = false }) {
   );
 }
 
-export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
+export default function ProfilePage({ customer, onBack, onProfileUpdate, onReorderOrder }) {
   const [form, setForm] = useState(() => buildProfileForm(customer));
   const [orders, setOrders] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -292,8 +293,10 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
             <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>No orders placed yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {orders.map((order, i) => (
-                <div key={order.id} style={{ border: '1px solid #e8eaed', borderRadius: 12, padding: 16, background: '#fafafa' }}>
+              {orders.map((order, i) => {
+                const totals = orderVatSummary(order);
+                return (
+                <article key={order.id} style={{ border: '1px solid #e8eaed', borderRadius: 12, padding: 16, background: '#fafafa' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
@@ -305,9 +308,17 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 900, fontSize: 16, color: '#8B1A1A', fontFamily: 'Outfit, sans-serif' }}>R{Number(order.total_ex_vat || 0).toFixed(2)}</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8' }}>excl. VAT</div>
+                      <div style={{ fontWeight: 900, fontSize: 16, color: '#8B1A1A', fontFamily: 'Outfit, sans-serif' }}>R{totals.totalInclVat.toFixed(2)}</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>estimated total incl. VAT</div>
                     </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 6, margin: '0 0 12px', padding: '10px 12px', borderRadius: 8, background: '#fff', color: '#475569', fontSize: 12 }}>
+                    <div><strong>Status:</strong> {customerOrderStatus(order.status)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Truck size={14} aria-hidden /><strong>Delivery:</strong> {order.delivery_method || 'To be confirmed'}</div>
+                    {order.customer_notes && <div><strong>PO/reference or notes:</strong> {order.customer_notes}</div>}
+                    {order.promo_code && <div><strong>Promotion:</strong> {order.promo_code} — R{totals.discount.toFixed(2)} discount</div>}
+                    <div><strong>VAT:</strong> Includes approximately R{totals.vatIncluded.toFixed(2)} VAT at 15%.</div>
+                    <div><strong>Pro-forma:</strong> Emailed after Proto confirms stock, final pricing and delivery. Do not pay from this request summary.</div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {(order.items || []).map((item, j) => (
@@ -316,8 +327,18 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate }) {
                       </div>
                     ))}
                   </div>
-                </div>
-              ))}
+                  {onReorderOrder && Array.isArray(order.items) && order.items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onReorderOrder(order)}
+                      style={{ minHeight: 44, marginTop: 12, padding: '9px 14px', display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #8B1A1A', borderRadius: 9, background: '#fff', color: '#8B1A1A', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      <RotateCcw size={16} aria-hidden /> Reorder these products
+                    </button>
+                  )}
+                </article>
+                );
+              })}
             </div>
           )}
         </div>

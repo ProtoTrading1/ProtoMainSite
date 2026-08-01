@@ -2495,6 +2495,21 @@ textarea:focus-visible,
 .catalog-filter-control input:focus-visible {
   outline-color: #8b1a1a;
 }
+.catalog-filter-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.catalog-filter-copy strong {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 750;
+}
+.catalog-filter-copy small {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+}
 .sort-control {
   display: flex;
   align-items: center;
@@ -3397,6 +3412,16 @@ textarea:focus-visible,
   font-weight: 900;
   letter-spacing: 0.03em;
 }
+.cart-saved-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
 .cart-expiry-pill--ok {
   background: #dcfce7;
   color: #166534;
@@ -3522,10 +3547,10 @@ textarea:focus-visible,
   border-radius: 6px;
   padding: 4px 8px;
 }
-.mini-stepper { height: 36px; }
-.mini-stepper button { width: 36px; font-size: 15px; }
+.drawer-line .mini-stepper { height: 44px; }
+.drawer-line .mini-stepper button { width: 44px; font-size: 17px; }
 .mini-stepper span { width: 20px; font-size: 11px; }
-.mini-stepper input { width: 40px; font-size: 12px; }
+.drawer-line .mini-stepper input { width: 44px; font-size: 12px; }
 .remove-button {
   min-width: 36px;
   min-height: 36px;
@@ -3723,6 +3748,31 @@ textarea:focus-visible,
   font-weight: 800;
 }
 .clear-button:hover { color: #374151; }
+.cart-undo {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 4px 4px 4px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+.cart-undo button {
+  min-width: 64px;
+  min-height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
 .drawer-trust {
   display: flex;
   justify-content: center;
@@ -3977,6 +4027,19 @@ textarea:focus-visible,
 .checkout-address-warning span {
   font-size: 12px;
   line-height: 1.5;
+}
+.checkout-address-edit {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid #92400e;
+  border-radius: 8px;
+  background: #fff;
+  color: #78350f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
 }
 .checkout-review-heading,
 .checkout-review-total {
@@ -6101,6 +6164,29 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 2px;
   margin-bottom: 8px;
+}
+.pz-share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pz-share-btn:hover,
+.pz-share-btn:focus-visible {
+  border-color: #8b1a1a;
+  color: #8b1a1a;
 }
 .pz-code {
   display: block;

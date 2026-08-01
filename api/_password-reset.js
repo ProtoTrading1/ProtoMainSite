@@ -32,7 +32,7 @@ export function makeResetToken(email, secret, tokenVersion = 0, ttlMs = DEFAULT_
   return signResetToken({ email, v: tokenVersion, scope: 'customer' }, secret, ttlMs);
 }
 
-/** Returns { email, v }; throws on tamper/expiry/scope/format failure. */
+/** Returns { email, v, exp }; throws on tamper/expiry/scope/format failure. */
 export function verifyResetToken(token, secret) {
   const data = verifyResetTokenRaw(token, secret);
   // Scope isolation: a customer link must not be redeemable via an admin token
@@ -40,7 +40,7 @@ export function verifyResetToken(token, secret) {
   if (data.scope !== 'customer') throw new Error('Invalid or expired reset link.');
   const email = String(data.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) throw new Error('Invalid or expired reset link.');
-  return { email, v: Number(data.v) || 0 };
+  return { email, v: Number(data.v) || 0, exp: Number(data.exp) || 0 };
 }
 
 /** Per-user token version in server-controlled app_metadata. */
@@ -58,17 +58,23 @@ export async function bumpResetTokenVersion(supabase, user) {
 }
 
 /**
- * Force-logout: deletes the user's GoTrue sessions (migration 029 RPC). Best-
- * effort — logs and continues if the RPC is unavailable so a completed reset
- * never 500s here.
+ * Force-logout: deletes the user's GoTrue sessions (migration 029 RPC). This is
+ * fail-closed because password reset must not promise a global sign-out while
+ * a stale or stolen session remains usable.
  */
 export async function revokeUserSessions(supabase, userId) {
-  try {
-    const { error } = await supabase.rpc('revoke_user_sessions', { p_user_id: userId });
-    if (error) console.error('revoke_user_sessions:', error.message);
-  } catch (err) {
-    console.error('revoke_user_sessions:', err.message);
-  }
+  const { error } = await supabase.rpc('revoke_user_sessions', { p_user_id: userId });
+  if (error) throw error;
+}
+
+export async function consumeResetToken(supabase, tokenHash, userId, expiresAt) {
+  const { data, error } = await supabase.rpc('consume_password_reset_token', {
+    p_token_hash: tokenHash,
+    p_user_id: userId,
+    p_expires_at: new Date(expiresAt).toISOString(),
+  });
+  if (error) throw error;
+  return data === true;
 }
 
 export async function findUserByEmail(supabase, email) {

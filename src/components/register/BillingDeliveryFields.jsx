@@ -24,60 +24,87 @@ function StructuredAddressFields({
   const fieldClass = (key) => (
     `lp-quiz-field${fieldHasIssue(key) ? ' lp-quiz-field--error' : ''}${locked ? ' lp-quiz-field--locked' : ''}`
   );
+  const inputId = (key) => `trade-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
 
   return (
     <>
       <div className={fieldClass(fieldKeys.street)}>
-        <label>Street name</label>
+        <label htmlFor={inputId(fieldKeys.street)}>Street name</label>
         {streetUsesAutocomplete ? (
           <AddressAutocomplete
             value={street}
+            id={inputId(fieldKeys.street)}
+            name={fieldKeys.street}
             onChange={setStreet}
             onPlaceSelect={onPlaceSelect}
             onKeyDown={onKeyDown}
             placeholder="Street name and number"
+            required
+            ariaRequired="true"
+            ariaInvalid={fieldHasIssue(fieldKeys.street)}
           />
         ) : (
           <input
+            id={inputId(fieldKeys.street)}
+            name={fieldKeys.street}
+            autoComplete="street-address"
             value={street}
             onChange={(e) => setStreet(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Street name and number"
             required
+            aria-required="true"
+            aria-invalid={fieldHasIssue(fieldKeys.street)}
             {...lockProps}
           />
         )}
       </div>
       <div className={fieldClass(fieldKeys.suburb)}>
-        <label>Suburb</label>
+        <label htmlFor={inputId(fieldKeys.suburb)}>Suburb</label>
         <input
+          id={inputId(fieldKeys.suburb)}
+          name={fieldKeys.suburb}
+          autoComplete="address-level3"
           value={suburb}
           onChange={(e) => setSuburb(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Suburb"
           required
+          aria-required="true"
+          aria-invalid={fieldHasIssue(fieldKeys.suburb)}
           {...lockProps}
         />
       </div>
       <div className={fieldClass(fieldKeys.postalCode)}>
-        <label>Postal code</label>
+        <label htmlFor={inputId(fieldKeys.postalCode)}>Postal code</label>
         <input
+          id={inputId(fieldKeys.postalCode)}
+          name={fieldKeys.postalCode}
+          autoComplete="postal-code"
+          inputMode="numeric"
           value={postalCode}
           onChange={(e) => setPostalCode(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Postal code"
           required
+          aria-required="true"
+          aria-invalid={fieldHasIssue(fieldKeys.postalCode)}
           {...lockProps}
         />
       </div>
       <div className={fieldClass(fieldKeys.city)}>
-        <label>City</label>
+        <label htmlFor={inputId(fieldKeys.city)}>City</label>
         <input
+          id={inputId(fieldKeys.city)}
+          name={fieldKeys.city}
+          autoComplete="address-level2"
           value={city}
           onChange={(e) => setCity(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="City"
           required
+          aria-required="true"
+          aria-invalid={fieldHasIssue(fieldKeys.city)}
           {...lockProps}
         />
       </div>
@@ -157,13 +184,14 @@ export default function BillingDeliveryFields({
 
       <div className={subheadClassName}>Delivery address</div>
 
-      <label className="lp-register-same-address">
+      <label className="lp-register-same-address" htmlFor="trade-delivery-same-as-billing">
         <input
+          id="trade-delivery-same-as-billing"
           type="checkbox"
           checked={deliverySameAsBilling}
           onChange={(e) => onDeliverySameAsBillingChange(e.target.checked)}
         />
-        <span>Same as billing address</span>
+        <span>Use billing address for delivery <small>(untick to enter a different address)</small></span>
       </label>
 
       <StructuredAddressFields
@@ -187,8 +215,8 @@ export default function BillingDeliveryFields({
       />
 
       <div className="lp-quiz-field lp-quiz-field--full">
-        <div className={subheadClassName}>Building type</div>
-        <div className={`${buildingTypesClassName}${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`}>
+        <div id="trade-building-type-label" className={subheadClassName}>Building type <span className="lp-register-required">(required)</span></div>
+        <div className={`${buildingTypesClassName}${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`} role="group" aria-labelledby="trade-building-type-label" aria-required="true">
           {BUILDING_TYPES.map((type) => (
             <button
               key={type}
@@ -199,6 +227,7 @@ export default function BillingDeliveryFields({
                 if (type !== 'Apartments') setUnitNumber('');
                 if (type !== 'Other') setOtherBuildingType('');
               }}
+              aria-pressed={buildingType === type}
             >
               {type}
             </button>
@@ -206,10 +235,11 @@ export default function BillingDeliveryFields({
           <button
             type="button"
             className={`lp-quiz-type-card${buildingType === 'Other' ? ' selected' : ''}`}
-            onClick={() => {
+          onClick={() => {
               setBuildingType('Other');
               setUnitNumber('');
-            }}
+          }}
+          aria-pressed={buildingType === 'Other'}
           >
             Other
           </button>
@@ -218,26 +248,35 @@ export default function BillingDeliveryFields({
 
       {buildingType === 'Other' && (
         <div className={`lp-quiz-field${fieldHasIssue('otherBuildingType') ? ' lp-quiz-field--error' : ''}`}>
-          <label>Describe building type</label>
+          <label htmlFor="trade-other-building-type">Describe building type</label>
           <input
+            id="trade-other-building-type"
+            name="other-building-type"
             value={otherBuildingType}
             onChange={(e) => setOtherBuildingType(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="e.g. Warehouse, Industrial unit"
             required
+            aria-required="true"
+            aria-invalid={fieldHasIssue('otherBuildingType')}
           />
         </div>
       )}
 
       {buildingType === 'Apartments' && (
         <div className={`lp-quiz-field${fieldHasIssue('unitNumber') ? ' lp-quiz-field--error' : ''}`}>
-          <label>Unit / apartment number</label>
+          <label htmlFor="trade-unit-number">Unit / apartment number</label>
           <input
+            id="trade-unit-number"
+            name="unit-number"
+            autoComplete="address-line2"
             value={unitNumber}
             onChange={(e) => setUnitNumber(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Unit number"
             required
+            aria-required="true"
+            aria-invalid={fieldHasIssue('unitNumber')}
           />
         </div>
       )}
@@ -253,7 +292,7 @@ export default function BillingDeliveryFields({
         ) : (
           <>
             <div className={subheadClassName}>Country</div>
-            <div className={countriesClassName}>
+            <div className={countriesClassName} role="group" aria-label="Country" aria-required="true">
               {SADC_COUNTRIES.map((c) => (
                 <button
                   key={c}
@@ -264,6 +303,7 @@ export default function BillingDeliveryFields({
                     if (c !== 'South Africa') setProvince('');
                     if (c === 'South Africa') setCountryPickerOpen(false);
                   }}
+                  aria-pressed={country === c}
                 >
                   {c}
                 </button>
@@ -271,8 +311,11 @@ export default function BillingDeliveryFields({
             </div>
             {country === 'South Africa' && (
               <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('province') ? ' lp-quiz-field--error' : ''}`}>
-                <label>Province <span className="lp-register-optional">(optional — filled from address search)</span></label>
+                <label htmlFor="trade-province">Province <span className="lp-register-optional">(optional — filled from address search)</span></label>
                 <select
+                  id="trade-province"
+                  name="province"
+                  autoComplete="address-level1"
                   value={province}
                   onChange={(e) => {
                     setProvince(e.target.value);

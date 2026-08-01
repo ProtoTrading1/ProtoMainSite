@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { scrollToTop } from '../lib/scrollToTop';
 
 /** Parse window.location.hash into path + refinements */
@@ -51,7 +51,7 @@ export function useHashNav() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  const navigate = (newPath, newRefinements = {}, options = {}) => {
+  const navigate = useCallback((newPath, newRefinements = {}, options = {}) => {
     const shouldScroll = options.scroll !== false;
     const nextHash = buildHash(newPath, newRefinements, state.routePrefix);
     if (window.location.hash === nextHash) {
@@ -61,8 +61,15 @@ export function useHashNav() {
       return;
     }
     shouldScrollOnHashChangeRef.current = shouldScroll;
+    if (options.replace) {
+      window.history.replaceState(null, '', nextHash);
+      if (shouldScroll) scrollToTop();
+      shouldScrollOnHashChangeRef.current = true;
+      setState(parseHash());
+      return;
+    }
     window.location.hash = nextHash;
-  };
+  }, [state.routePrefix]);
 
   const back = () => {
     const { path, refinements } = state;

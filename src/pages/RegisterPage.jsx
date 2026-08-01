@@ -6,6 +6,7 @@ import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresse
 import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 import ProtoLogo from '../components/ProtoLogo';
 import '../landing.css';
 
@@ -104,8 +105,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (phone.replace(/\D/g, '').length < 8) {
       issues.push({ key: 'phone', message: 'Phone number (at least 8 digits)', section: 'contact' });
     }
-    if (password.trim().length < 8) {
-      issues.push({ key: 'password', message: 'Password (minimum 8 characters)', section: 'contact' });
+    if (passwordPolicyError(password)) {
+      issues.push({ key: 'password', message: `Password (minimum ${MIN_PASSWORD_LENGTH} characters)`, section: 'contact' });
     }
     if (confirmPassword.trim().length < 8) {
       issues.push({ key: 'confirmPassword', message: 'Confirm password', section: 'contact' });
@@ -354,35 +355,51 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   {!standalone && <h2>Contact details</h2>}
                   <div className="lp-register-grid">
                     <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('contactName') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Contact person name and surname</label>
+                      <label htmlFor="register-contact-name">Contact person name and surname</label>
                       <input
+                        id="register-contact-name"
+                        name="contact-name"
+                        autoComplete="name"
                         value={contactName}
                         onChange={(e) => setContactName(e.target.value)}
                         placeholder="Full contact name"
                         required
+                        aria-required="true"
+                        aria-invalid={fieldHasIssue('contactName')}
                       />
                     </div>
                     <div className={`lp-quiz-field${fieldHasIssue('email') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Email address</label>
+                      <label htmlFor="register-email">Email address</label>
                       <input
+                        id="register-email"
+                        name="email"
+                        autoComplete="email"
                         type="email"
                         value={email}
                         onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
                         onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
                         placeholder="name@business.co.za"
-                        aria-invalid={!!emailError}
+                        aria-invalid={!!emailError || fieldHasIssue('email')}
+                        aria-describedby={emailError ? 'register-email-error' : undefined}
                         required
+                        aria-required="true"
                       />
-                      {emailError && <span className="lp-register-field-error">{emailError}</span>}
+                      {emailError && <span id="register-email-error" className="lp-register-field-error">{emailError}</span>}
                     </div>
                     <div className={`lp-quiz-field${fieldHasIssue('phone') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Phone number</label>
+                      <label htmlFor="register-phone">Phone number</label>
                       <input
+                        id="register-phone"
+                        name="phone"
                         type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="+27"
                         required
+                        aria-required="true"
+                        aria-invalid={fieldHasIssue('phone')}
                       />
                     </div>
                     {phone.replace(/\D/g, '').length >= 8 && (
@@ -415,34 +432,44 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
                     )}
                     <div className={`lp-quiz-field${fieldHasIssue('password') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Password <span className="lp-register-optional">(min. 8 characters)</span></label>
+                      <label htmlFor="register-password">Password <span className="lp-register-optional">(min. {MIN_PASSWORD_LENGTH} characters)</span></label>
                       <div className="lp-quiz-pw-wrap">
                         <input
                           type={showPw ? 'text' : 'password'}
+                          id="register-password"
+                          name="password"
+                          autoComplete="new-password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="At least 8 characters"
+                          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                           required
-                          minLength={8}
+                          aria-required="true"
+                          aria-invalid={fieldHasIssue('password')}
+                          minLength={MIN_PASSWORD_LENGTH}
                         />
-                        <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowPw((s) => !s)}>
-                          {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                        <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}>
+                          {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                         </button>
                       </div>
                     </div>
                     <div className={`lp-quiz-field${fieldHasIssue('confirmPassword') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Confirm password</label>
+                      <label htmlFor="register-confirm-password">Confirm password</label>
                       <div className="lp-quiz-pw-wrap">
                         <input
                           type={showConfirmPw ? 'text' : 'password'}
+                          id="register-confirm-password"
+                          name="confirm-password"
+                          autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="Re-enter password"
                           required
-                          minLength={8}
+                          aria-required="true"
+                          aria-invalid={fieldHasIssue('confirmPassword')}
+                          minLength={MIN_PASSWORD_LENGTH}
                         />
-                        <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowConfirmPw((s) => !s)}>
-                          {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                        <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowConfirmPw((s) => !s)} aria-label={showConfirmPw ? 'Hide confirmed password' : 'Show confirmed password'} aria-pressed={showConfirmPw}>
+                          {showConfirmPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                         </button>
                       </div>
                     </div>
@@ -467,25 +494,34 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   )}
                   <div className="lp-register-grid">
                     <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('businessName') ? ' lp-quiz-field--error' : ''}`}>
-                      <label>Company / trading name</label>
+                      <label htmlFor="register-business-name">Company / trading name</label>
                       <input
+                        id="register-business-name"
+                        name="business-name"
+                        autoComplete="organization"
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
                         placeholder="Name"
                         required
+                        aria-required="true"
+                        aria-invalid={fieldHasIssue('businessName')}
                       />
                     </div>
                     <div className="lp-quiz-field">
-                      <label>VAT number <span className="lp-register-optional">(optional)</span></label>
+                      <label htmlFor="register-vat-number">VAT number <span className="lp-register-optional">(optional)</span></label>
                       <input
+                        id="register-vat-number"
+                        name="vat-number"
                         value={vatNumber}
                         onChange={(e) => setVatNumber(e.target.value)}
                         placeholder="VAT registration number"
                       />
                     </div>
                     <div className="lp-quiz-field">
-                      <label>Website or social media <span className="lp-register-optional">(optional)</span></label>
+                      <label htmlFor="register-website">Website or social media <span className="lp-register-optional">(optional)</span></label>
                       <input
+                        id="register-website"
+                        name="website"
                         value={website}
                         onChange={(e) => setWebsite(e.target.value)}
                         placeholder="www.yourshop.co.za or @yourshop"
@@ -512,7 +548,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       <div id="register-business-type-label" className="lp-register-subhead">
                         Nature of business <span className="lp-register-required">(required — select all that apply)</span>
                       </div>
-                      <div className="lp-quiz-types" role="group" aria-labelledby="register-business-type-label">
+                      <div className="lp-quiz-types" role="group" aria-labelledby="register-business-type-label" aria-required="true">
                         {BUSINESS_TYPES.map((t) => (
                           <button
                             key={t}
@@ -625,7 +661,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                   <div className="lp-quiz-error" role="alert">
                     <span>{submitError}</span>
                     {showAccountRecovery && onLogin && (
-                      <button type="button" className="lp-register-recovery-action" onClick={onLogin}>
+                      <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim() })}>
                         Sign in or reset password
                       </button>
                     )}

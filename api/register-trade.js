@@ -6,6 +6,7 @@ import {
   lookupProtoActiveCustomer,
 } from './_customer-onboard.js';
 import { PUBLIC_SITE_URL } from './_public-site-url.js';
+import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
 
 const BREVO_SENDER = {
   name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -303,9 +304,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: emailCheck.error });
   }
 
-  if (String(password).length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-  }
+  const passwordError = passwordPolicyError(password);
+  if (passwordError) return res.status(400).json({ error: passwordError });
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,

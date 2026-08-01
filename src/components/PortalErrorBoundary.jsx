@@ -24,7 +24,7 @@ export default class PortalErrorBoundary extends Component {
   };
 
   handleHardRefresh = () => {
-    try { window.sessionStorage.removeItem('proto-lazy-retry'); } catch {}
+    try { window.sessionStorage.removeItem('proto-lazy-retry'); } catch { /* storage may be unavailable */ }
     const url = new URL(window.location.href);
     url.searchParams.set('v', String(Date.now()));
     window.location.replace(url.toString());

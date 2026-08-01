@@ -27,7 +27,8 @@ describe('basket viewing space', () => {
     assert.match(drawer, /Saved to account/);
     assert.match(drawer, /Saving…/);
     assert.match(drawer, /Saved on this device/);
-    assert.match(drawer, /\{syncLabel\} · \{expiryLabel\}/);
+    assert.match(drawer, /className="cart-saved-pill">\{syncLabel\}/);
+    assert.match(drawer, /cart-expiry-pill--\$\{cartExpiryTone\}`}>\{expiryLabel\}/);
     assert.doesNotMatch(drawer, /Cart expires:/);
     assert.match(styles, /\.drawer-header \{[\s\S]*?background: #000;[\s\S]*?border-bottom: 1px solid rgba\(200, 154, 60, 0\.7\);/);
     assert.match(styles, /\.drawer-header-actions \{[\s\S]*?white-space: nowrap;/);

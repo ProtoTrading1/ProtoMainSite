@@ -11,11 +11,6 @@ function getStockClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-function labelToSlug(label) {
-  if (label === null || label === undefined) return '';
-  return String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-}
-
 function cleanText(value, fallback = '') {
   return String(value ?? fallback).replace(/\s+/g, ' ').trim();
 }

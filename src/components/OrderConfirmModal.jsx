@@ -7,10 +7,15 @@ export default function OrderConfirmModal({
   orderStatus = 'idle',
   orderError = '',
   orderNumber = '',
+  onRetry,
+  onViewOrder,
 }) {
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const isSending = orderStatus === 'sending';
+  const isSuccess = orderStatus === 'sent' || orderStatus === 'saved';
+  const isError = orderStatus === 'error';
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -18,9 +23,15 @@ export default function OrderConfirmModal({
   useEffect(() => {
     if (!isOpen) return undefined;
     returnFocusRef.current = document.activeElement;
-    window.requestAnimationFrame(() => dialogRef.current?.querySelector('.ocm-close')?.focus());
+    window.requestAnimationFrame(() => {
+      const target = isSending
+        ? dialogRef.current
+        : dialogRef.current?.querySelector('.ocm-close');
+      target?.focus();
+    });
     const handler = (event) => {
       if (event.key === 'Escape') {
+        if (isSending) return;
         event.preventDefault();
         onCloseRef.current?.();
         return;
@@ -46,16 +57,12 @@ export default function OrderConfirmModal({
       const returnTarget = returnFocusRef.current;
       window.requestAnimationFrame(() => returnTarget?.focus());
     };
-  }, [isOpen]);
+  }, [isOpen, isSending]);
 
   if (!isOpen) return null;
 
-  const isSending = orderStatus === 'sending';
-  const isSuccess = orderStatus === 'sent' || orderStatus === 'saved';
-  const isError = orderStatus === 'error';
-
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={isSending ? undefined : onClose}>
       <section
         ref={dialogRef}
         className="order-modal-v2 order-modal-v2--simple"
@@ -63,8 +70,9 @@ export default function OrderConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="order-confirm-title"
+        tabIndex={-1}
       >
-        <button className="ocm-close" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
+        <button className="ocm-close" onClick={onClose} type="button" aria-label="Close" disabled={isSending}><X size={18} /></button>
 
         <div className={`ocm-header ${isSuccess ? 'ocm-header--sent' : isError ? 'ocm-header--error' : 'ocm-header--sending'}`}>
           <div className="ocm-header-icon">
@@ -109,7 +117,16 @@ export default function OrderConfirmModal({
 
         {(isSuccess || isError) && (
           <div className="ocm-actions ocm-actions--simple">
-            <button className="ocm-copy-btn ocm-done-btn" onClick={onClose} type="button">
+            {isSuccess && onViewOrder && (
+              <button className="ocm-copy-btn ocm-done-btn" onClick={onViewOrder} type="button">
+                View order
+              </button>
+            )}
+            <button
+              className={`ocm-copy-btn ${isError ? 'ocm-done-btn' : ''}`}
+              onClick={isError ? onRetry : onClose}
+              type="button"
+            >
               {isSuccess ? 'Close' : 'Try again'}
             </button>
           </div>

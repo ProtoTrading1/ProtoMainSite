@@ -12,7 +12,13 @@ test('names the mobile sign-in dialog controls and explains registration routes'
   assert.match(modal, /aria-labelledby="login-modal-heading"/);
   assert.match(modal, /aria-label="Close sign-in"/);
   assert.match(modal, /aria-label=\{showPw \? 'Hide password' : 'Show password'\}/);
-  assert.match(modal, /Not registered on the new website\? Re-register or apply/);
+  assert.match(modal, /Bought from Proto before, but not online\?/);
+  assert.match(modal, /New trade customer\?/);
+  assert.match(modal, /Re-register or apply/);
+  assert.match(modal, /focusableSelector/);
+  assert.match(modal, /previouslyFocused\.focus\(\)/);
+  assert.match(modal, /htmlFor="login-email"/);
+  assert.match(modal, /htmlFor="login-password"/);
 });
 
 test('keeps all secondary sign-in actions at least 44px tall', async () => {

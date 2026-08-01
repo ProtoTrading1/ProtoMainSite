@@ -1,112 +1,192 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import ProtoLogo from '../components/ProtoLogo';
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
+import { trackJourneyEvent } from '../lib/journeyAnalytics';
+import './ResetPasswordPage.css';
 
-export default function ResetPasswordPage({ token, onDone }) {
+export default function ResetPasswordPage({ token, recoverySession = false, onDone }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [tokenState, setTokenState] = useState(recoverySession ? 'valid' : token ? 'checking' : 'invalid');
+  const [error, setError] = useState(recoverySession || token ? '' : 'This reset link is missing or invalid. Request a new one from sign in.');
   const [done, setDone] = useState(false);
 
-  const submit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    let cancelled = false;
+    if (recoverySession || !token) return undefined;
+
+    fetch('/api/validate-reset-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.valid) throw new Error(data.error || 'This reset link is no longer valid.');
+        if (!cancelled) setTokenState('valid');
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setTokenState('invalid');
+          trackJourneyEvent('password_reset_failed', {
+            journey: 'authentication',
+            step: 'link_validation',
+            outcome: 'invalid_link',
+          });
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [token, recoverySession]);
+
+  const submit = async (event) => {
+    event.preventDefault();
     setError('');
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    const policyError = passwordPolicyError(password);
+    if (policyError) { setError(policyError); return; }
     if (password !== confirm) { setError('Passwords do not match.'); return; }
     setLoading(true);
     try {
-      const res = await fetch('/api/do-reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Reset failed');
+      if (recoverySession) {
+        const { supabase } = await import('../lib/supabase');
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) throw updateError;
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' });
+        if (signOutError) throw signOutError;
+      } else {
+        const res = await fetch('/api/do-reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Password reset failed.');
+      }
       setDone(true);
+      trackJourneyEvent('password_reset_completed', {
+        journey: 'authentication',
+        step: 'password_update',
+        outcome: 'success',
+      });
     } catch (err) {
       setError(err.message);
+      trackJourneyEvent('password_reset_failed', {
+        journey: 'authentication',
+        step: 'password_update',
+        outcome: 'error',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', padding: '24px' }}>
-      <div style={{ width: '100%', maxWidth: '420px', background: '#111', border: '1px solid #2a2a2a', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}>
-        <div style={{ height: '6px', background: '#c40000' }} />
-        <div style={{ padding: '40px 36px' }}>
+    <main className="reset-password-page">
+      <section className="reset-password-card" aria-labelledby="reset-password-heading">
+        <div className="reset-password-accent" />
+        <div className="reset-password-body">
           <ProtoLogo variant="full" size="md" tagline={false} className="reset-password-logo" />
 
           {done ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-              <h2 style={{ color: '#fff', fontFamily: 'Outfit, sans-serif', fontWeight: '900', margin: '0 0 12px' }}>Password updated</h2>
-              <p style={{ color: '#94a3b8', margin: '0 0 28px', lineHeight: 1.6 }}>Your password has been changed successfully.</p>
-              <button onClick={onDone} style={{ width: '100%', padding: '14px', background: '#c40000', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '15px', cursor: 'pointer' }}>
-                Back to sign in
-              </button>
+            <div className="reset-password-result">
+              <div className="reset-password-result-icon" aria-hidden="true">✓</div>
+              <h1 id="reset-password-heading">Password updated</h1>
+              <p>Your password has been changed. Sign in again on every device using the new password.</p>
+              <button type="button" className="reset-password-primary" onClick={onDone}>Back to sign in</button>
             </div>
           ) : (
             <>
-              <h2 style={{ color: '#fff', fontFamily: 'Outfit, sans-serif', fontWeight: '900', margin: '0 0 8px', fontSize: '26px' }}>Set new password</h2>
-              <p style={{ color: '#64748b', margin: '0 0 28px', fontSize: '14px', lineHeight: 1.5 }}>Enter a new password for your account.</p>
+              <h1 id="reset-password-heading">Set new password</h1>
+              <p className="reset-password-intro">Use at least {MIN_PASSWORD_LENGTH} characters for your Proto Trading Online account.</p>
 
-              {error && (
-                <div style={{ background: 'rgba(196,0,0,0.12)', border: '1px solid rgba(196,0,0,0.3)', color: '#ff6b6b', borderRadius: '8px', padding: '12px 14px', marginBottom: '20px', fontSize: '14px' }}>
-                  {error}
-                </div>
+              {tokenState === 'checking' && (
+                <div className="reset-password-status" role="status">Checking your reset link…</div>
               )}
 
-              <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>New password</label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type={showPw ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 6 characters"
-                      autoFocus
-                      required
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 44px', background: '#1a1a2e', border: '1.5px solid #2a2a3a', borderRadius: '10px', color: '#fff', fontSize: '15px', outline: 'none' }}
-                    />
-                    <button type="button" onClick={() => setShowPw(s => !s)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}>
-                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+              {error && (
+                <div id="reset-password-error" className="reset-password-error" role="alert">{error}</div>
+              )}
+
+              {tokenState === 'valid' ? (
+                <form onSubmit={submit} className="reset-password-form">
+                  <div className="reset-password-field">
+                    <label htmlFor="reset-new-password">New password</label>
+                    <div className="reset-password-input-wrap">
+                      <Lock size={16} aria-hidden="true" />
+                      <input
+                        id="reset-new-password"
+                        name="new-password"
+                        type={showPw ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                        minLength={MIN_PASSWORD_LENGTH}
+                        aria-describedby={error ? 'reset-password-requirements reset-password-error' : 'reset-password-requirements'}
+                        autoFocus
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="reset-password-reveal"
+                        onClick={() => setShowPw((shown) => !shown)}
+                        aria-label={showPw ? 'Hide new password' : 'Show new password'}
+                        aria-pressed={showPw}
+                      >
+                        {showPw ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
+                    <span id="reset-password-requirements" className="reset-password-hint">Minimum {MIN_PASSWORD_LENGTH} characters</span>
                   </div>
-                </div>
 
-                <div>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Confirm password</label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type={showPw ? 'text' : 'password'}
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="Repeat password"
-                      required
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 44px', background: '#1a1a2e', border: '1.5px solid #2a2a3a', borderRadius: '10px', color: '#fff', fontSize: '15px', outline: 'none' }}
-                    />
+                  <div className="reset-password-field">
+                    <label htmlFor="reset-confirm-password">Confirm password</label>
+                    <div className="reset-password-input-wrap">
+                      <Lock size={16} aria-hidden="true" />
+                      <input
+                        id="reset-confirm-password"
+                        name="confirm-password"
+                        type={showConfirm ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        value={confirm}
+                        onChange={(event) => setConfirm(event.target.value)}
+                        placeholder="Repeat password"
+                        minLength={MIN_PASSWORD_LENGTH}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="reset-password-reveal"
+                        onClick={() => setShowConfirm((shown) => !shown)}
+                        aria-label={showConfirm ? 'Hide confirmed password' : 'Show confirmed password'}
+                        aria-pressed={showConfirm}
+                      >
+                        {showConfirm ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <button type="submit" disabled={loading} style={{ padding: '14px', background: '#c40000', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '15px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: '4px' }}>
-                  {loading ? 'Updating…' : 'Set new password'}
-                </button>
-              </form>
+                  <button type="submit" className="reset-password-primary" disabled={loading}>
+                    {loading ? 'Updating…' : 'Set new password'}
+                  </button>
+                </form>
+              ) : tokenState === 'invalid' ? (
+                <button type="button" className="reset-password-primary" onClick={onDone}>Back to sign in</button>
+              ) : null}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '24px', color: '#475569', fontSize: '12px' }}>
-                <ShieldCheck size={13} />
-                B2B wholesale — accounts require admin approval
+              <div className="reset-password-note">
+                <ShieldCheck size={13} aria-hidden="true" />
+                Reset links expire after 15 minutes and can only be used once.
               </div>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
