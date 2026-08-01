@@ -19,6 +19,7 @@ for replay history; superseded ones are **not deleted** so the history stays int
 | `005_whatsapp_sessions.sql` | WhatsApp session tracking |
 | `006_accept_whatsapp.sql` | WhatsApp opt-in acceptance |
 | `007_whatsapp_opt_in_at.sql` | WhatsApp opt-in timestamp |
+| `058_order_delivery_safety.sql` | Fail-closed order idempotency readiness contract plus an inert, service-role-only delivery retry ledger. Requires a separately reviewed worker and explicit activation gates; applying the migration sends and queues nothing. |
 
 ## Stock project (catalogue)
 
