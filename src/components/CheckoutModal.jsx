@@ -7,6 +7,7 @@ import { updateWhatsappOptIn } from '../lib/auth';
 import { getDeliveryAddressReview } from '../lib/checkoutReview';
 import { validatePromoCode } from '../lib/promoCode';
 import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
+import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 
 function ReviewField({
   icon: Icon, label, value, describedBy,
@@ -228,7 +229,7 @@ export default function CheckoutModal({
                 <div className="checkout-review-line" key={item.product.id}>
                   <div>
                     <strong>{item.product.name}</strong>
-                    <span>{item.product.code} · Qty {item.qty}</span>
+                    <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
                   </div>
                   <b>R{(item.product.price * item.qty).toFixed(2)}</b>
                 </div>

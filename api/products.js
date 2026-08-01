@@ -8,6 +8,7 @@ import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
+import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 
 const PAGE_SIZE = 1000;
 const TAXONOMY_FILE = 'taxonomy/categories.json';
@@ -16,6 +17,7 @@ const STOCK_SELECT = [
   'sku', 'barcode', 'title', 'original_description', 'price',
   'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
   'stock_qty', 'available_stock', 'keep_live_when_oos', 'to_order', 'created_at',
+  'units_of_issue', 'pack_description',
   'is_new_arrival',
   'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four', 'subcategory_extra',
   'mottaro_path',
@@ -270,6 +272,8 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
   ].filter(Boolean);
   const deptSlug = labelToSlug(row.category);
   const categoryPath = deptSlug ? [deptSlug, ...subLabels.map(labelToSlug)] : [];
+  const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
+  const sellingUnit = sellingUnitDetails(unitsOfIssue);
   const base = {
     id: row.sku,
     code: row.barcode,
@@ -289,6 +293,8 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     title: row.title,
     description: row.original_description || '',
     originalDescription: row.original_description || '',
+    packDescription: String(row.pack_description || '').trim(),
+    unitsOfIssue,
     price: Number(row.price) || 0,
     images,
     image: images[0] || '',
@@ -309,7 +315,8 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     isArchived: false,
     sortOrder: 0,
     minQty: 1,
-    casePack: '',
+    casePack: sellingUnit.label,
+    sellingUnit,
     marginCue: '',
     leadTime: '',
     tradeNote: '',

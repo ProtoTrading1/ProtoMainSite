@@ -17,6 +17,7 @@ import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
+import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 
 const MIN_ORDER = 1000;
 
@@ -381,6 +382,7 @@ export default function Drawer({
             <div className="drawer-line-body">
               <h3>{item.product.name}</h3>
               <span>{item.product.code}</span>
+              <span>Sold as: {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <QuantityStepper item={item} updateQty={updateQty} disabled={basketLoading} />
