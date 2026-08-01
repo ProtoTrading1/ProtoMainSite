@@ -6,47 +6,56 @@ import {
   makeResetToken,
 } from './_password-reset.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
-import { PUBLIC_SITE_URL, PUBLIC_ASSET_URL } from './_public-site-url.js';
+import { PUBLIC_SITE_URL } from './_public-site-url.js';
 
-const RESET_HTML = (link) => `<!DOCTYPE html>
+export const RESET_HTML = (link) => `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Reset Your Password</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;"><tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
-<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td style="padding:24px 34px 28px;background:#111111;">
-  <table cellpadding="0" cellspacing="0" style="margin-bottom:22px;"><tr>
-    <td style="vertical-align:middle;padding-right:13px;"><img src="${PUBLIC_ASSET_URL}/proto-logo.png" width="42" height="42" alt="Proto Trading" style="display:block;border-radius:8px;"></td>
-    <td style="vertical-align:middle;"><span style="font-size:25px;font-weight:900;color:#ffffff;letter-spacing:0.5px;">PROTO</span><span style="font-size:25px;font-weight:900;color:#dc2626;letter-spacing:0.5px;"> TRADING</span></td>
-  </tr></table>
-  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">Reset your password</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Secure password reset for your Proto Trading Online account</p>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="x-apple-disable-message-reformatting"/>
+  <title>Reset your Proto Trading password</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Your secure Proto Trading password reset link expires in 15 minutes.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f3f4f6;border-collapse:collapse;"><tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-collapse:separate;border-spacing:0;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+<tr><td style="height:5px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td align="center" style="padding:30px 32px 28px;background:#111111;">
+  <p style="margin:0 0 22px;color:#ffffff;font-size:22px;line-height:1.1;font-weight:900;letter-spacing:0.4px;">PROTO <span style="color:#ef2b2d;">TRADING</span><span style="display:block;margin-top:6px;color:#b8b8b8;font-size:10px;line-height:1.2;font-weight:700;letter-spacing:3px;">ONLINE</span></p>
+  <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.25;font-weight:900;letter-spacing:-0.3px;">Reset your password</h1>
+  <p style="margin:10px 0 0;color:#d1d5db;font-size:14px;line-height:1.6;">Secure access to your Proto Trading Online account</p>
 </td></tr>
-<tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;font-weight:700;">Hi there,</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">We received a request to reset the password for your Proto Trading Online account.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Click the button below to create a new password. This link expires in 15 minutes and can be used once.</p>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;"><tr><td align="center">
-    <a href="${link}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:16px 42px;border-radius:10px;">Reset Password</a>
+<tr><td style="padding:36px 34px 32px;background:#ffffff;">
+  <p style="margin:0 0 16px;color:#111827;font-size:18px;line-height:1.5;font-weight:700;">Hi there,</p>
+  <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">We received a request to reset the password for your Proto Trading Online account.</p>
+  <p style="margin:0 0 28px;color:#4b5563;font-size:15px;line-height:1.7;">Use the secure button below to choose a new password.</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 28px;border-collapse:collapse;"><tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr>
+      <td align="center" bgcolor="#c40000" style="background:#c40000;border-radius:8px;mso-padding-alt:15px 34px;">
+        <a href="${link}" style="display:block;padding:15px 34px;border:1px solid #c40000;border-radius:8px;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:800;text-align:center;">Reset my password</a>
+      </td>
+    </tr></table>
   </td></tr></table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#111111;border-radius:12px;border-left:5px solid #c40000;">
-    <tr><td style="padding:20px 22px;">
-      <p style="margin:0 0 8px;color:#ffffff;font-size:15px;font-weight:800;">Security Notice</p>
-      <p style="margin:0;color:#d8d8d8;font-size:14px;line-height:1.7;">If you did not request this password reset, you can safely ignore this email.</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 26px;background:#fff7f7;border:1px solid #fecaca;border-left:4px solid #c40000;border-collapse:separate;border-spacing:0;border-radius:8px;">
+    <tr><td style="padding:16px 18px;">
+      <p style="margin:0 0 4px;color:#7f1d1d;font-size:14px;line-height:1.5;font-weight:800;">Secure, single-use link</p>
+      <p style="margin:0;color:#7f1d1d;font-size:13px;line-height:1.65;">This link expires in 15 minutes and can only be used once.</p>
     </td></tr>
   </table>
-  <p style="margin:28px 0 10px;color:#666666;font-size:13px;">If the button does not work, copy and paste this link into your browser:</p>
-  <p style="margin:0;word-break:break-all;font-size:13px;"><a href="${link}" style="color:#c40000;">${link}</a></p>
+  <p style="margin:0 0 6px;color:#374151;font-size:13px;line-height:1.6;font-weight:700;">Didn&rsquo;t request this?</p>
+  <p style="margin:0 0 26px;color:#6b7280;font-size:13px;line-height:1.65;">You can safely ignore this email. Your password will not change unless the secure link is used.</p>
+  <p style="margin:0 0 8px;color:#6b7280;font-size:12px;line-height:1.6;">If the button does not work, copy and paste this address into your browser:</p>
+  <p style="margin:0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;word-break:break-all;font-size:11px;line-height:1.6;"><a href="${link}" style="color:#9f1239;text-decoration:underline;">${link}</a></p>
 </td></tr>
-<tr><td align="center" style="padding:30px 34px;background:#181818;border-top:1px solid #292929;">
-  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0 0 12px;color:#cfcfcf;font-size:14px;">
-    <a href="tel:+27214615883" style="color:#ff3333;text-decoration:none;font-weight:700;">+27 21 461 5883</a>
-    &nbsp;|&nbsp;
-    <a href="mailto:online@proto.co.za" style="color:#ff3333;text-decoration:none;font-weight:700;">online@proto.co.za</a>
+<tr><td align="center" style="padding:24px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+  <p style="margin:0 0 7px;color:#111827;font-size:15px;line-height:1.5;font-weight:800;">Proto Trading Online</p>
+  <p style="margin:0 0 8px;color:#6b7280;font-size:12px;line-height:1.7;">
+    <a href="tel:+27214615883" style="color:#9f1239;text-decoration:none;font-weight:700;">+27 21 461 5883</a>
+    <span style="color:#d1d5db;"> &nbsp;&bull;&nbsp; </span>
+    <a href="mailto:online@proto.co.za" style="color:#9f1239;text-decoration:none;font-weight:700;">online@proto.co.za</a>
   </p>
-  <p style="margin:0;color:#a9a9a9;font-size:13px;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
+  <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.6;">De Roos Street, District Six, Cape Town, South Africa</p>
 </td></tr>
 </table>
 </td></tr></table>
