@@ -14,7 +14,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
@@ -844,6 +844,28 @@ export default function App({
 
   useEffect(() => {
     return subscribeCatalogRefresh(() => setCatalogRefreshKey((k) => k + 1));
+  }, []);
+
+  useEffect(() => {
+    const refreshCatalogue = () => {
+      void refreshProductCache().catch(() => {
+        // Keep the last known-good catalogue visible during a transient outage.
+      });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshCatalogue();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+
+    window.addEventListener('focus', refreshCatalogue);
+    window.addEventListener('online', refreshCatalogue);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshCatalogue);
+      window.removeEventListener('online', refreshCatalogue);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   // Category counts describe the catalogue scope, not the current browse
