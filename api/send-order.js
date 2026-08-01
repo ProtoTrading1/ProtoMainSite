@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
+import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -208,12 +209,13 @@ async function resolveAuthoritativePrices(items) {
       throw error;
     }
     const row = productBySku.get(sku) || (barcode ? productByBarcode.get(barcode) : null);
-    const price = Number(row?.price);
-    if (!row || !Number.isFinite(price) || price < 0) {
+    const rawPrice = Number(row?.price);
+    if (!row || !Number.isFinite(rawPrice) || rawPrice < 0) {
       const error = new Error(`Product on order line ${index + 1} is unavailable.`);
       error.status = 400;
       throw error;
     }
+    const price = customerFacingCataloguePrice(rawPrice);
     const authoritativeSku = cleanText(row.sku);
     const authoritativeBarcode = cleanText(row.barcode);
     const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
