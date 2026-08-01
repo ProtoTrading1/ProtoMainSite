@@ -10,6 +10,12 @@ import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './
 import { hasCustomerUsedPromo, recordPromoRedemption, validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
+import {
+  assertOrderCaptureSchemaReady,
+  enqueueFailedOrderDeliveries,
+  isMissingClientRefSchema,
+  OrderDeliverySchemaError,
+} from './_order-delivery-safety.js';
 
 // Brevo rejects a message over ~10 MB, and base64 inflates the PDF by ~33%.
 // Stay well under so the HTML body and headers always fit.
@@ -862,22 +868,17 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
   }
 }
 
-function isMissingClientRefColumn(error) {
-  const msg = String(error?.message || '');
-  return (error?.code === 'PGRST204' || error?.code === '42703' || /column|schema/i.test(msg))
-    && msg.includes('client_ref');
-}
-
 /** Persist a verified order. Idempotency is scoped to the authenticated user. */
-async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
+export async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
   try {
     if (clientRef) {
-      const { data: existing } = await supabase
+      const { data: existing, error: lookupError } = await supabase
         .from('orders')
         .select('*')
         .eq('client_ref', clientRef)
         .eq('customer_id', userId)
         .maybeSingle();
+      if (lookupError) throw lookupError;
       if (existing) return existing;
     }
 
@@ -896,7 +897,7 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
       };
     });
 
-    let insertRow = {
+    const insertRow = {
       customer_id: userId,
       items: rows,
       original_items: rows,
@@ -913,20 +914,15 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
       ...(clientRef ? { client_ref: clientRef } : {}),
     };
 
-    let { data, error } = await supabase.from('orders').insert([insertRow]).select().single();
-    if (error && isMissingClientRefColumn(error)) {
-      const withoutRef = { ...insertRow };
-      delete withoutRef.client_ref;
-      insertRow = withoutRef;
-      ({ data, error } = await supabase.from('orders').insert([insertRow]).select().single());
-    }
+    const { data, error } = await supabase.from('orders').insert([insertRow]).select().single();
     if (error && error.code === '23505' && clientRef) {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('orders')
         .select('*')
         .eq('client_ref', clientRef)
         .eq('customer_id', userId)
         .maybeSingle();
+      if (existingError) throw existingError;
       if (existing) return existing;
     }
     if (error) {
@@ -935,6 +931,11 @@ async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMeth
     }
     return data;
   } catch (err) {
+    if (isMissingClientRefSchema(err)) {
+      throw new OrderDeliverySchemaError(
+        'Ordering is temporarily unavailable while duplicate-order protection is restored. Your basket is safe — please try again shortly.',
+      );
+    }
     console.error('send-order: server-side order capture failed:', err?.message || err);
     return null;
   }
@@ -983,6 +984,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid checkout reference.' });
   }
 
+  const portal = getPortalAdminClient();
+  try {
+    await assertOrderCaptureSchemaReady(portal);
+  } catch (error) {
+    console.error('send-order: order capture schema is not ready:', error?.message || error);
+    return res.status(error?.status || 503).json({
+      error: error?.message || 'Ordering is temporarily unavailable. Your basket is safe — please try again shortly.',
+      code: error?.code || 'ORDER_CAPTURE_SCHEMA_NOT_READY',
+    });
+  }
+
   let orderItems;
   try {
     orderItems = await resolveAuthoritativePrices(items);
@@ -1019,7 +1031,6 @@ export default async function handler(req, res) {
 
   const notifyEmails = resolveOrderNotifyRecipients();
 
-  const portal = getPortalAdminClient();
   const { data: profile, error: profileError } = await portal
     .from('customers')
     .select('*')
@@ -1070,16 +1081,24 @@ export default async function handler(req, res) {
     region: cleanText([profile.city, profile.province, profile.country].filter(Boolean).join(', '), 'To confirm'),
   };
 
-  const captured = await captureOrderRow({
-    supabase: portal,
-    userId: user.id,
-    items: orderItems,
-    subtotal,
-    deliveryMethod,
-    customerNotes,
-    promo,
-    clientRef,
-  });
+  let captured;
+  try {
+    captured = await captureOrderRow({
+      supabase: portal,
+      userId: user.id,
+      items: orderItems,
+      subtotal,
+      deliveryMethod,
+      customerNotes,
+      promo,
+      clientRef,
+    });
+  } catch (error) {
+    if (error instanceof OrderDeliverySchemaError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    throw error;
+  }
   if (!captured?.id) {
     return res.status(500).json({
       error: 'Your order could not be submitted. Nothing was lost from your cart — please try again.',
@@ -1168,13 +1187,7 @@ export default async function handler(req, res) {
           : 'Every line is listed below — open the order in the admin portal for the PDF.'}
       </p>`;
 
-  let emailDeliveryFailed = false;
-  let emailFailReason = null;
-  let emailMessageId = null;
-  let emailAttemptCount = 0;
-  let emailProviderStatus = null;
-  {
-    const teamEmailResult = await sendTeamEmailWithRetry({
+  const teamEmailResult = await sendTeamEmailWithRetry({
       sender: {
         name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
         email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
@@ -1189,32 +1202,32 @@ export default async function handler(req, res) {
       // Brevo applies this key when a timed-out request is retried, preventing
       // the same order email from being delivered twice.
       headers: { 'Idempotency-Key': `proto-team-order-${orderNumber}` },
-    }, orderNumber);
+  }, orderNumber);
 
-    emailDeliveryFailed = !teamEmailResult.ok;
-    emailFailReason = teamEmailResult.error;
-    emailMessageId = teamEmailResult.messageId;
-    emailAttemptCount = teamEmailResult.attemptCount;
-    emailProviderStatus = teamEmailResult.status;
+  const emailDeliveryFailed = !teamEmailResult.ok;
+  const emailFailReason = teamEmailResult.error;
+  const emailMessageId = teamEmailResult.messageId;
+  const emailAttemptCount = teamEmailResult.attemptCount;
+  const emailProviderStatus = teamEmailResult.status;
 
-    if (teamEmailResult.ok) {
-      console.info('send-order: team email accepted by Brevo', {
-        orderNumber,
-        recipients: notifyEmails,
-        lineCount: orderItems.length,
-        pdfAttached: Boolean(attachment),
-        pdfBytes: pdfBuffer?.length ?? 0,
-        pdfTooLarge,
-        pdfLinkSent: !attachment && Boolean(pdfLink),
-        pdfSource,
-        attemptCount: emailAttemptCount,
-        providerStatus: emailProviderStatus,
-        messageId: emailMessageId || null,
-      });
-    }
+  if (teamEmailResult.ok) {
+    console.info('send-order: team email accepted by Brevo', {
+      orderNumber,
+      recipients: notifyEmails,
+      lineCount: orderItems.length,
+      pdfAttached: Boolean(attachment),
+      pdfBytes: pdfBuffer?.length ?? 0,
+      pdfTooLarge,
+      pdfLinkSent: !attachment && Boolean(pdfLink),
+      pdfSource,
+      attemptCount: emailAttemptCount,
+      providerStatus: emailProviderStatus,
+      messageId: emailMessageId || null,
+    });
   }
 
   let notifyResult = null;
+  let customerAckResult;
   if (orderId) {
     try {
       const supabase = getPortalAdminClient();
@@ -1294,6 +1307,9 @@ export default async function handler(req, res) {
     } else {
       console.error('send-order: team notify failed:', notifySettled.reason?.message || notifySettled.reason);
     }
+    customerAckResult = ackSettled.status === 'fulfilled'
+      ? ackSettled.value
+      : { sent: false, error: ackSettled.reason?.message || 'Customer acknowledgement failed' };
     // Keep a server-side trace for the other two as well — allSettled would
     // otherwise swallow them, leaving a missing acknowledgement email or a
     // silently-skipped tier upgrade with no evidence in the logs.
@@ -1308,9 +1324,7 @@ export default async function handler(req, res) {
     // evidence written by runOrderTeamNotify while adding the independently
     // delivered customer acknowledgement result.
     try {
-      const customerAck = ackSettled.status === 'fulfilled'
-        ? ackSettled.value
-        : { sent: false, recipient: cleanText(user?.email) || null, error: ackSettled.reason?.message || 'Customer acknowledgement failed' };
+      const customerAck = customerAckResult;
       const currentLog = await readOrderNotifyLog(orderId) || { orderId };
       await saveOrderNotifyLog(orderId, {
         ...currentLog,
@@ -1323,6 +1337,30 @@ export default async function handler(req, res) {
       });
     } catch (err) {
       console.error('send-order: failed to persist customer acknowledgement audit:', err?.message || err);
+    }
+
+    try {
+      const failures = [
+        emailDeliveryFailed ? { channel: 'team_email' } : null,
+        notifyResult?.pdfStored === true ? null : { channel: 'pdf' },
+        customerAckResult?.sent === true ? null : { channel: 'customer_email' },
+      ].filter(Boolean);
+      const queueResult = await enqueueFailedOrderDeliveries({
+        supabase: portal,
+        orderId,
+        orderCreatedAt: captured.created_at,
+        failures,
+      });
+      if (queueResult.queued) {
+        console.warn('send-order: delivery failures queued for durable retry', {
+          orderId,
+          count: queueResult.count,
+        });
+      }
+    } catch (err) {
+      // Queueing never changes the fact that the order itself was captured.
+      // The existing notify log remains the manual reconciliation source.
+      console.error('send-order: failed to enqueue durable delivery retry:', err?.message || err);
     }
   }
 
