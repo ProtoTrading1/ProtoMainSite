@@ -448,7 +448,7 @@
 .vhero-support-note {
   margin: 2px 0 0;
   max-width: 46ch;
-  color: #a1a1aa;
+  color: #c4c4cc;
   font-size: clamp(11px, 0.85vw, 13px);
   font-weight: 500;
   line-height: 1.45;
@@ -3368,6 +3368,20 @@
   }
 
   /* Hero compact — not full screen height on a phone */
+  .vhero-section {
+    min-height: 0;
+  }
+
+  .vhero-copy {
+    padding: 52px 20px 36px;
+    gap: 26px;
+  }
+
+  .vhero-headline {
+    font-size: clamp(36px, 10.5vw, 40px);
+    line-height: 0.98;
+  }
+
   .access-hero {
     min-height: 0;
     padding: 36px 20px 32px;
@@ -3433,12 +3447,22 @@
      not shift the layout as lines changed. The message is static now, so the
      wrap sizes to its content instead of clipping the second line. */
   .vhero-support-wrap {
-    gap: 9px;
+    gap: 8px;
   }
 
   .vhero-support-message {
     font-size: 15px;
-    line-height: 1.3;
+    line-height: 1.25;
+  }
+
+  .vhero-support-note {
+    margin-top: 1px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .vhero-trust-strip {
+    padding-top: 22px;
   }
 
   /* Scroll hint */
