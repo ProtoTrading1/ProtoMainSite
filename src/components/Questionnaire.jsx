@@ -414,9 +414,9 @@ export default function Questionnaire({ onLogin }) {
 
         {step === 3 && (
           <div className="lp-quiz-step">
-            <h3>Optional: add any extra business details.</h3>
+            <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              These details help the team, but they are not required to submit your trade request.
+              Select at least one nature of business. Monthly spend, website and customer code are optional.
             </p>
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
             <div className="lp-quiz-types">
@@ -432,14 +432,17 @@ export default function Questionnaire({ onLogin }) {
               ))}
             </div>
             <div style={{ height: '18px' }} />
-            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Business category <span style={{ opacity: 0.55, fontWeight: 400 }}>(select all that apply)</span></div>
-            <div className="lp-quiz-types">
+            <div id="questionnaire-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
+              Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="questionnaire-business-type-label">
               {BUSINESS_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
                   onClick={() => toggleBusinessType(t)}
+                  aria-pressed={businessType.includes(t)}
                 >
                   {t}
                 </button>
@@ -452,12 +455,14 @@ export default function Questionnaire({ onLogin }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <label>Describe your business</label>
+                <label htmlFor="questionnaire-other-business-type">Describe your business</label>
                 <input
+                  id="questionnaire-other-business-type"
                   value={otherType}
                   onChange={(e) => setOtherType(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="Tell us what type of business you run"
+                  required
                 />
               </motion.div>
             )}
