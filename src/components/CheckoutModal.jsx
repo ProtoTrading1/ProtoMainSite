@@ -6,6 +6,7 @@ import {
 import { updateWhatsappOptIn } from '../lib/auth';
 import { getDeliveryAddressReview } from '../lib/checkoutReview';
 import { validatePromoCode } from '../lib/promoCode';
+import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
 
 function ReviewField({
   icon: Icon, label, value, describedBy,
@@ -46,7 +47,9 @@ export default function CheckoutModal({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  const showWhatsapp = customer && customer.accept_whatsapp !== true;
+  // Ask only when no preference has ever been recorded. A deliberate "No"
+  // remains a valid choice and must not interrupt every future checkout.
+  const showWhatsapp = Boolean(customer) && isWhatsappConsentUnset(customer.accept_whatsapp);
   const addressReview = getDeliveryAddressReview(customer);
 
   // Reset the modal to its first step only when it OPENS. Depending on
