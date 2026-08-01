@@ -5,15 +5,14 @@ import { ArrowDown, CheckCircle2 } from 'lucide-react';
 // seconds cannot do it. Set like the campaign banner — uppercase and bold,
 // with the action itself in red.
 const SUPPORT_LINES = [
-  ['Existing customers must ', 're-register', '.'],
+  ['Previous online customers must ', 're-register', '.'],
   ['New customers can apply for ', 'online access', '.'],
 ];
 
 // Sets expectations before anyone applies: an online account is not an account
 // at the physical store. Quieter than the lines above — it qualifies them, it
 // does not compete with them.
-const APPROVAL_NOTE = 'Online approval is for purchasing on Proto Trading Online only. '
-  + 'It does not create an account at our physical store.';
+const APPROVAL_NOTE = 'Online approval applies to website purchases only and does not create an in-store account.';
 
 export default function LandingHero({ onApply }) {
   return (
@@ -44,7 +43,7 @@ export default function LandingHero({ onApply }) {
         </div>
         <div className="access-hero-buttons">
           <button className="access-apply large" type="button" onClick={onApply}>
-            Apply for a Trade Account <ArrowDown size={18} />
+            Apply for Online Access <ArrowDown size={18} />
           </button>
         </div>
         <div className="vhero-trust-strip" role="list" aria-label="Wholesale platform highlights">
