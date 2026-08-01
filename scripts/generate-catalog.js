@@ -1,3 +1,4 @@
+/* global process */
 /**
  * Generates public/products.json at build time from website_stock (stock project).
  * Run: node scripts/generate-catalog.js

@@ -23,8 +23,6 @@ function ProtoLogoFallback({ variant, size, tagline, className, style }) {
   const height = typeof size === 'number' ? size : (SIZE_HEIGHT[size] ?? SIZE_HEIGHT.md);
   const showTagline = tagline !== false;
   const taglineText = tagline === true || tagline == null ? PROTO_TAGLINE : tagline;
-  const isOnlineTagline = taglineText === PROTO_TAGLINE;
-
   if (variant === 'icon') {
     return (
       <span

@@ -54,9 +54,20 @@ export function buildImageCandidates(url, { variant = 'card' } = {}) {
   return [...new Set([card, full, raw].filter(Boolean))];
 }
 
+/**
+ * Avoid optional catalogue/image warming when the browser tells us that the
+ * customer is saving data or is on a very slow connection. User-initiated
+ * searches and visible images still load normally.
+ */
+export function shouldPrefetchData(connection = globalThis.navigator?.connection) {
+  if (!connection) return true;
+  if (connection.saveData === true) return false;
+  return !['slow-2g', '2g'].includes(String(connection.effectiveType || '').toLowerCase());
+}
+
 /** Warm browser cache for catalogue thumbnails (non-blocking). */
 export function preloadProductImages(urls, { limit = 60 } = {}) {
-  if (typeof window === 'undefined' || !urls?.length) return;
+  if (typeof window === 'undefined' || !urls?.length || !shouldPrefetchData()) return;
   const seen = new Set();
   let count = 0;
   for (const url of urls) {

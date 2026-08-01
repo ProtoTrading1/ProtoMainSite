@@ -1,21 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
-  Flame,
-  PackageCheck,
   Search,
-  Tag,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import { ProductGridSkeleton } from './ProductCardSkeleton';
 import CategoryLanding from './CategoryLanding';
 import { slugToLabel } from '../lib/taxonomy';
-
-// Labels are driven by the imported taxonomy (categories.json) so site, admin,
-// and nav stay in sync with a single source of truth.
-export function catLabel(slug) {
-  return slugToLabel(slug);
-}
 
 function cartQtyForProduct(product, cartQtyMap) {
   if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length) {
@@ -23,12 +14,6 @@ function cartQtyForProduct(product, cartQtyMap) {
   }
   return cartQtyMap[product.id] || 0;
 }
-
-const shortcuts = [
-  { id: 'start', icon: PackageCheck, title: 'All Products' },
-  { id: 'hot', icon: Flame, title: 'Hot Sellers' },
-  { id: 'clearance', icon: Tag, title: 'Clearance' },
-];
 
 // A flagged product (isNew, backed by is_new_arrival) that has no explicit
 // Specials-panel deal still shows the generic "This Week's Special" ribbon.
@@ -47,7 +32,6 @@ export default function MainContent({
   specialsMap = {},
   path,
   navigate,
-  breadcrumb,
   searchQuery = '',
   setSearchQuery = () => {},
   sort = 'best-selling',
@@ -55,18 +39,15 @@ export default function MainContent({
   onShortcut = () => {},
   activeCollection = 'all',
   collectionLabel = 'All Products',
-  recommendationProducts = [],
   loading = false,
   page = 1,
   totalPages = 1,
   onPageChange = () => {},
-  usingFallback = false,
   browseCategories = [],
   categoryCounts = {},
   categoryNode = null,
   categories = [],
   onProductPreview = null,
-  bannerConfig = null,
   searchActive = false,
   onSearchProductClick = null,
   showWelcome = false,
@@ -87,10 +68,10 @@ export default function MainContent({
   const isAllProductsPage = !isCategoryPage && activeCollection === 'all';
   const showCategoryGrid = false; // removed: department pills now live in the sidebar
   const currentLabel = isCategoryPage
-    ? catLabel(path[path.length - 1])
+    ? slugToLabel(path[path.length - 1])
     : isAllProductsPage ? 'All Wholesale Products' : collectionLabel;
   const backPath = path && path.length > 1 ? path.slice(0, -1) : [];
-  const backLabel = backPath.length ? catLabel(backPath[backPath.length - 1]) : 'All departments';
+  const backLabel = backPath.length ? slugToLabel(backPath[backPath.length - 1]) : 'All departments';
 
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
@@ -253,6 +234,7 @@ export default function MainContent({
   const holdWhileEmptyLoading = loading && products.length === 0 && !showDelayedSkeleton;
   const showResultsControl = !showCategoryGrid || searchQuery || isCategoryPage || activeCollection !== 'all';
   const inStockOnlyId = useId();
+  const orderableHelpId = useId();
   const sortSelectId = useId();
   const resultsControl = showResultsControl ? (
     <div className="results-control">
@@ -263,8 +245,12 @@ export default function MainContent({
             type="checkbox"
             checked={inStockOnly}
             onChange={(e) => onInStockOnlyChange(e.target.checked)}
+            aria-describedby={orderableHelpId}
           />
-          <span>Available</span>
+          <span className="catalog-filter-copy">
+            <strong>Orderable</strong>
+            <small id={orderableHelpId}>In stock or available to order</small>
+          </span>
         </label>
         <label className="sort-control" htmlFor={sortSelectId}>
           <select id={sortSelectId} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
@@ -316,7 +302,7 @@ export default function MainContent({
                 onClick={() => navigate([cat])}
                 type="button"
               >
-                <span className="cat-pill-name">{catLabel(cat)}</span>
+                <span className="cat-pill-name">{slugToLabel(cat)}</span>
                 <span className="cat-pill-count">{categoryCounts[cat] ?? 0}</span>
               </button>
             ))}
@@ -408,10 +394,11 @@ export default function MainContent({
                       special={specialForProduct(product, specialsMap)}
                       priority={false}
                       onSearchEngage={null}
+                      onProductPreview={onProductPreview}
                     />
                   )),
                 ])
-              : products.map((product, idx) => (
+              : displayedProducts.map((product, idx) => (
                   <ProductCard
                     key={product.id}
                     product={product}
@@ -421,6 +408,7 @@ export default function MainContent({
                     special={specialForProduct(product, specialsMap)}
                     priority={idx < 16}
                     onSearchEngage={searchActive && onSearchProductClick ? () => onSearchProductClick(product, idx) : null}
+                    onProductPreview={onProductPreview}
                   />
                 ))
             }

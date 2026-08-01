@@ -12,6 +12,7 @@ import ProtoLogo from './ProtoLogo';
 import AboutModal from './AboutModal';
 import { openIntercom } from '../lib/intercom';
 import { authHeaders } from '../lib/authHeaders';
+import { shouldPrefetchData } from '../lib/imageUrl';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -319,7 +320,7 @@ function SearchPanel({
           <span className="sp-search-intro-icon"><Search size={18} /></span>
           <div>
             <strong>Find anything in seconds</strong>
-            <span>Search by product name or barcode.</span>
+            <span>Search by product name, SKU or barcode.</span>
           </div>
         </div>
 
@@ -709,6 +710,7 @@ export default function Header({
   }, [openSearch]);
 
   useEffect(() => {
+    if (!shouldPrefetchData()) return undefined;
     const prefetch = () => { void loadProductsOnce().catch(() => {}); };
     if (typeof window.requestIdleCallback === 'function') {
       const idleId = window.requestIdleCallback(prefetch, { timeout: 2200 });
@@ -1014,12 +1016,12 @@ export default function Header({
               ref={inputRef}
               type="text"
               className="header-search-premium__input"
-              placeholder="Search products…"
+              placeholder="Product name, SKU or barcode…"
               value={inputValue}
               onFocus={focusSearch}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              aria-label="Search products"
+              aria-label="Search by product name, SKU or barcode"
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={searchOpen}
@@ -1204,7 +1206,7 @@ export default function Header({
         <input
           ref={mobileSearchInputRef}
           type="search"
-          placeholder="Search products…"
+          placeholder="Product name, SKU or barcode…"
           value={mobileInput}
           onChange={(e) => handleMobileInput(e.target.value)}
           onKeyDown={(e) => {
@@ -1232,7 +1234,7 @@ export default function Header({
               commitMobileSearch(mobileInput.trim());
             }
           }}
-          aria-label="Search products"
+          aria-label="Search by product name, SKU or barcode"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={mobileSearchOpen && Boolean(mobileInput.trim())}

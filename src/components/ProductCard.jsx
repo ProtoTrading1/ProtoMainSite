@@ -1,11 +1,12 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageOff, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { ImageOff, Link, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
 import { authHeaders } from '../lib/authHeaders';
+import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import './ProductCard.css';
 
 // At or below this quantity we warn "Low stock". Configurable in one place.
@@ -111,18 +112,38 @@ function catalogStockState(product) {
 }
 
 const STOCK_BADGE_LABEL = {
-  in: 'In stock',
+  in: 'Orderable',
   low: 'Low stock',
   out: 'Out of stock',
-  toorder: 'Available to order',
+  toorder: 'To order',
 };
+
+const STOCK_BADGE_GUIDANCE = {
+  in: 'Check live quantity',
+  low: 'Check live quantity',
+  out: 'Cannot be added',
+  toorder: 'Extra lead time',
+};
+
+function orderQuantityLabel(product) {
+  const minimum = Math.max(1, Number(product?.minQty) || 1);
+  const pack = String(product?.casePack || '').trim();
+  const parts = [`Minimum ${minimum}`];
+  if (pack) parts.push(`Pack: ${pack}`);
+  return parts.join(' · ');
+}
 
 function StockBadge({ product }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
   if (!sku) return null;
+  const { state } = catalogStockState(product);
 
   return (
     <div className="pc-stock-slot">
+      <div className={`pc-orderability pc-orderability--${state}`}>
+        <span>{STOCK_BADGE_LABEL[state]}</span>
+        <small>{STOCK_BADGE_GUIDANCE[state]}</small>
+      </div>
       <StockCheck sku={sku} />
     </div>
   );
@@ -304,7 +325,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const defaultVariant = variants[0] || null;
@@ -318,6 +339,7 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const addButtonRef = useRef(null);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -347,21 +369,25 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
 
   const openPreview = () => {
     onSearchEngage?.();
-    if (isVariantGroup && defaultVariant) {
-      selectVariant(defaultVariant);
-    }
-    setZoomOpen(true);
     trackEvent({
       eventType: 'product_view',
       entityId: product?.id || product?.code,
       entityLabel: product?.name || product?.code,
     });
+    if (onProductPreview) {
+      onProductPreview(product);
+      return;
+    }
+    if (isVariantGroup && defaultVariant) {
+      selectVariant(defaultVariant);
+    }
+    setZoomOpen(true);
   };
-  const closePreview = () => {
+  const closePreview = useCallback(() => {
     setZoomOpen(false);
     setSelectedVariant(null);
     onZoomClose?.();
-  };
+  }, [onZoomClose]);
 
   const handleAdd = () => {
     if (isVariantGroup) {
@@ -372,6 +398,22 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
     addToCart(activeProduct, qty, pos);
+  };
+
+  const shareProduct = async () => {
+    const url = buildProductDetailUrl(activeProduct);
+    if (!url) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: activeProduct.name, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1800);
+    } catch (error) {
+      if (error?.name !== 'AbortError') setLinkCopied(false);
+    }
   };
 
   useEffect(() => {
@@ -414,7 +456,7 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
         lastFocusedElementRef.current.focus();
       }
     };
-  }, [zoomOpen]);
+  }, [closePreview, zoomOpen]);
 
   return (
     <>
@@ -463,6 +505,7 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
                 <span className="pc-variant-count">{variantCount} options</span>
               )}
             </div>
+            <span className="pc-order-quantity">{orderQuantityLabel(activeProduct)}</span>
           </div>
 
           <div className="pc-price-block">
@@ -579,6 +622,9 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
                 <div className="pz-code-block">
                   <span className="pz-code">{productSkuLabel(activeProduct)}</span>
                   <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>
+                  <button type="button" className="pz-share-btn" onClick={shareProduct}>
+                    <Link size={14} aria-hidden="true" /> {linkCopied ? 'Link copied' : 'Share product'}
+                  </button>
                 </div>
                 <h2 className="pz-name" id={`pz-name-${activeProduct.id || product.id}`}>{displayProductText(activeProduct.name)}</h2>
 
@@ -594,6 +640,8 @@ function ProductCard({ product, addToCart, cartQty = 0, onCartQtyChange, special
                     {product.leadTime && <span>{product.leadTime}</span>}
                   </div>
                 )}
+
+                <p className="pz-order-quantity">{orderQuantityLabel(activeProduct)}</p>
 
                 {/* "To order" disclaimer — item is orderable even without stock on hand. */}
                 {(activeProduct.toOrder || product.toOrder) && (

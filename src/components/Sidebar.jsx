@@ -5,6 +5,8 @@ import { openIntercom } from '../lib/intercom';
 import { authHeaders } from '../lib/authHeaders';
 let megaMenuPreloadPromise = null;
 
+// Exported so pointer/focus intent can warm the same lazy chunk before render.
+// eslint-disable-next-line react-refresh/only-export-components
 export function preloadMegaMenu() {
   if (!megaMenuPreloadPromise) {
     megaMenuPreloadPromise = import('./MegaMenu');

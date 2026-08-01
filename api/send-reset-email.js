@@ -54,10 +54,21 @@ const RESET_HTML = (link) => `<!DOCTYPE html>
 
 // Identical response for every input — no account-existence oracle.
 const GENERIC_OK = { ok: true };
+const GENERIC_RESPONSE_FLOOR_MS = 1400;
+
+async function waitForGenericResponse(startedAt) {
+  // Existing accounts do extra Supabase and email-provider work. A fixed floor
+  // plus small jitter makes the public response timing much less useful as an
+  // account-existence oracle while the visible response remains identical.
+  const targetMs = GENERIC_RESPONSE_FLOOR_MS + Math.floor(Math.random() * 251);
+  const remainingMs = targetMs - (Date.now() - startedAt);
+  if (remainingMs > 0) await new Promise((resolve) => setTimeout(resolve, remainingMs));
+}
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
+  const startedAt = Date.now();
 
   const email = String(req.body?.email || '').trim().toLowerCase();
 
@@ -122,5 +133,6 @@ export default async function handler(req, res) {
     console.error('send-reset-email:', err.message);
   }
 
+  await waitForGenericResponse(startedAt);
   return res.status(200).json(GENERIC_OK);
 }

@@ -28,7 +28,7 @@ const BRANDS = [
   { name: 'Keep Smiling', slug: 'keepsmiling' },
 ];
 
-export default function LandingDepartmentsSection() {
+export default function LandingDepartmentsSection({ onApply }) {
   return (
     <section className="lp-departments" id="lp-departments">
       <motion.div
@@ -40,19 +40,26 @@ export default function LandingDepartmentsSection() {
       >
         <span className="lp-eyebrow">Catalogue departments</span>
         <h2>12 buying departments, 5,000+ products.</h2>
+        <p className="lp-departments-access-note">
+          Browse trade prices, live stock and the full catalogue after your online trade account is approved.
+        </p>
       </motion.div>
-      <div className="lp-dept-tags">
+      <ul className="lp-dept-tags" aria-label="Proto Trading departments">
         {DEPARTMENTS.map((dept) => (
-          <span className="lp-dept-tag" key={dept.name}>{dept.name}</span>
+          <li className="lp-dept-tag" key={dept.name}>{dept.name}</li>
         ))}
-      </div>
-      <ul className="lp-dept-list" role="list">
+      </ul>
+      <ul className="lp-dept-list" aria-label="Proto Trading departments">
         {DEPARTMENTS.map((dept) => (
           <li key={dept.name}>
             <span className="lp-dept-list-item">{dept.name}</span>
           </li>
         ))}
       </ul>
+      <div className="lp-departments-access">
+        <span>Catalogue access is for approved trade customers.</span>
+        <a href="#lp-apply" onClick={(event) => { event.preventDefault(); onApply?.(); }}>Apply for online access</a>
+      </div>
 
       {/* ── Brands we work with (endless right-moving marquee) ── */}
       <div className="lp-brands">

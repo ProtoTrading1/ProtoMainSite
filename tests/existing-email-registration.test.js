@@ -59,8 +59,11 @@ test('active registration journey offers a direct account-recovery action', () =
   const source = read('src/pages/LandingPage.jsx');
 
   assert.match(source, /err\.recovery === 'SIGN_IN_OR_RESET_PASSWORD'/);
-  assert.match(source, /Sign in or reset password/);
-  assert.match(source, /className="lp-register-recovery-action" onClick=\{onLogin\}/);
+  assert.match(source, />Sign in</);
+  assert.match(source, /Reset password/);
+  assert.match(source, /className="lp-register-recovery-action" onClick=\{\(\) => \{/);
+  assert.match(source, /onLogin\(\{ initialEmail: email\.trim\(\), initialMode: 'login' \}\)/);
+  assert.match(source, /onLogin\(\{ initialEmail: email\.trim\(\), initialMode: 'forgot' \}\)/);
   assert.match(source, /className="lp-quiz-error" role="alert"/);
 
   const styles = read('src/landing.css');

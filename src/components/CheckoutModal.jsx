@@ -33,6 +33,7 @@ export default function CheckoutModal({
   onPromoClear,
   onKeepShopping,
   onContinue,
+  onEditDeliveryAddress,
 }) {
   const [step, setStep] = useState('review');
   const [promoInput, setPromoInput] = useState('');
@@ -202,6 +203,18 @@ export default function CheckoutModal({
                 <div>
                   <strong>Check your delivery address</strong>
                   <span>{addressReview.warning}</span>
+                  {onEditDeliveryAddress && (
+                    <button
+                      type="button"
+                      className="checkout-address-edit"
+                      onClick={() => {
+                        onClose?.();
+                        onEditDeliveryAddress();
+                      }}
+                    >
+                      Edit delivery address
+                    </button>
+                  )}
                 </div>
               </div>
             )}

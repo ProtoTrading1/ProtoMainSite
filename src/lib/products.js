@@ -89,7 +89,7 @@ export function prefetchCatalog() {
 }
 
 function saveToLocalCache(data) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch { /* cache is optional */ }
 }
 function loadFromLocalCache() {
   try {
@@ -235,7 +235,7 @@ export function invalidateProductCache() {
   _categoryCountsMemo = new WeakMap();
   _persistentCachePromise = null;
   invalidateFeaturedCache();
-  try { localStorage.removeItem(LS_KEY); } catch {}
+  try { localStorage.removeItem(LS_KEY); } catch { /* cache is optional */ }
   void clearIndexedCache();
 }
 
@@ -306,7 +306,7 @@ export async function fetchProductsBySkus(skus) {
       batches.map((batch) => fetchJsonWithTimeout(
         `/api/products?skus=${encodeURIComponent(batch.join(','))}`,
         15000,
-        { cache: 'no-store' },
+        { cache: 'no-store', authenticated: true },
       )),
     );
     for (const settled of responses) {

@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Eye, EyeOff, MessageCircle } from 'lucide-rea
 import { motion } from 'motion/react';
 import BillingDeliveryFields from './register/BillingDeliveryFields';
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 
@@ -124,7 +125,7 @@ export default function Questionnaire({ onLogin }) {
     if (step === 1) {
       const phoneOk = phone.replace(/\D/g, '').length >= 8;
       const whatsappAnswered = typeof whatsappOptIn === 'boolean';
-      return email.trim() && !validateEmailField(email) && phoneOk && password.trim().length >= 8 && whatsappAnswered;
+      return email.trim() && !validateEmailField(email) && phoneOk && !passwordPolicyError(password) && whatsappAnswered;
     }
     if (step === 2) {
       const billingOk = billingStreet.trim()
@@ -238,8 +239,11 @@ export default function Questionnaire({ onLogin }) {
             <h3>Start with the core company details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
-                <label>Company name</label>
+                <label htmlFor="questionnaire-company-name">Company name</label>
                 <input
+                  id="questionnaire-company-name"
+                  name="business-name"
+                  autoComplete="organization"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   onKeyDown={handleKey}
@@ -247,8 +251,11 @@ export default function Questionnaire({ onLogin }) {
                 />
               </div>
               <div className="lp-quiz-field">
-                <label>Contact person name and surname</label>
+                <label htmlFor="questionnaire-contact-name">Contact person name and surname</label>
                 <input
+                  id="questionnaire-contact-name"
+                  name="contact-name"
+                  autoComplete="name"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   onKeyDown={handleKey}
@@ -273,15 +280,21 @@ export default function Questionnaire({ onLogin }) {
             <h3>Add the account and contact details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
-                <label>Email address</label>
+                <label htmlFor="questionnaire-email">Email address</label>
                 <input
+                  id="questionnaire-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
                   onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
                   aria-invalid={!!emailError}
+                  required
+                  aria-required="true"
                 />
                 {emailError && (
                   <span style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
@@ -290,9 +303,13 @@ export default function Questionnaire({ onLogin }) {
                 )}
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Phone number</label>
+                <label htmlFor="questionnaire-phone">Phone number</label>
                 <input
+                  id="questionnaire-phone"
+                  name="phone"
                   type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={handleKey}
@@ -354,17 +371,23 @@ export default function Questionnaire({ onLogin }) {
               )}
 
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label>Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
+                <label htmlFor="questionnaire-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. {MIN_PASSWORD_LENGTH} characters)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
                     type={showPw ? 'text' : 'password'}
+                    id="questionnaire-password"
+                    name="password"
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKey}
-                    placeholder="At least 8 characters"
+                    placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                    minLength={MIN_PASSWORD_LENGTH}
+                    required
+                    aria-required="true"
                   />
-                  <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowPw((s) => !s)}>
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <button type="button" className="lp-quiz-pw-eye" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}>
+                    {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -435,7 +458,7 @@ export default function Questionnaire({ onLogin }) {
             <div id="questionnaire-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
               Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="questionnaire-business-type-label">
+            <div className="lp-quiz-types" role="group" aria-labelledby="questionnaire-business-type-label" aria-required="true">
               {BUSINESS_TYPES.map((t) => (
                 <button
                   key={t}
