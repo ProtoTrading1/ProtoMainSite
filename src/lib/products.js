@@ -41,18 +41,26 @@ const _identifierRequests = new Map();
 const _browseRequests = new Map();
 let _categoryCountsMemo = new WeakMap();
 let _persistentCachePromise = null;
+let _refreshPromise = null;
+let _lastLiveRefreshAt = 0;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
-const LS_KEY = 'proto_catalog_v10';
+// Bump both persistent-cache versions whenever a release changes the catalogue
+// contract. This prevents an older price/unit payload becoming the first paint
+// after a customer reloads onto the new application bundle.
+const LS_KEY = 'proto_catalog_v11';
+const LEGACY_LS_KEYS = ['proto_catalog_v10'];
 const IDB_NAME = 'proto-catalogue';
 const IDB_STORE = 'catalogue';
-const IDB_KEY = 'approved-customer-v1';
+const IDB_VERSION = 2;
+const IDB_KEY = 'approved-customer-v2';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
 // instead of staring at a spinner while 6MB re-downloads. Logout clears the
 // cache (Root.handleLogout -> invalidateProductCache).
 const LS_TTL = 24 * 60 * 60 * 1000;
+const CATALOG_REFRESH_MIN_MS = 30_000;
 
 const _refreshListeners = new Set();
 
@@ -91,8 +99,14 @@ export function prefetchCatalog() {
 function saveToLocalCache(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch { /* cache is optional */ }
 }
+function clearLegacyLocalCaches() {
+  try {
+    for (const key of LEGACY_LS_KEYS) localStorage.removeItem(key);
+  } catch { /* cache is optional */ }
+}
 function loadFromLocalCache() {
   try {
+    clearLegacyLocalCaches();
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
@@ -103,10 +117,16 @@ function loadFromLocalCache() {
 function openCatalogueDb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   return new Promise((resolve) => {
-    const request = indexedDB.open(IDB_NAME, 1);
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      } else {
+        // A schema/version release must not resurrect the previous catalogue
+        // snapshot from IndexedDB after the localStorage cache was invalidated.
+        request.transaction.objectStore(IDB_STORE).clear();
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => resolve(null);
@@ -185,6 +205,10 @@ function startCatalogFetch() {
   // server-side rebuild. Prices/stock stay authoritative; the 6 MB payload is
   // only transferred when the catalogue has actually changed.
   return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
+    .then((products) => {
+      _lastLiveRefreshAt = Date.now();
+      return products;
+    })
     .catch(() => {
       const local = loadFromLocalCache();
       if (local) return local;
@@ -197,6 +221,7 @@ function startCatalogFetch() {
       void saveToIndexedCache(products);
       if (hadPrior) {
         _browseRequests.clear();
+        _featuredResolved = null;
         emitCatalogRefresh();
       }
       return _cache;
@@ -234,9 +259,30 @@ export function invalidateProductCache() {
   _browseRequests.clear();
   _categoryCountsMemo = new WeakMap();
   _persistentCachePromise = null;
+  _refreshPromise = null;
+  _lastLiveRefreshAt = 0;
   invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch { /* cache is optional */ }
+  clearLegacyLocalCaches();
   void clearIndexedCache();
+}
+
+/**
+ * Silently revalidate the approved-customer catalogue when a browser becomes
+ * active again. Calls are coalesced and throttled: unchanged catalogues use the
+ * API ETag path, while changed prices/stock/units replace every client cache and
+ * notify the currently visible grid without touching basket state.
+ */
+export function refreshProductCache({ maxAgeMs = CATALOG_REFRESH_MIN_MS } = {}) {
+  if (_refreshPromise) return _refreshPromise;
+  if (_lastLiveRefreshAt && Date.now() - _lastLiveRefreshAt < maxAgeMs) {
+    return Promise.resolve(_cache);
+  }
+
+  _refreshPromise = startCatalogFetch().finally(() => {
+    _refreshPromise = null;
+  });
+  return _refreshPromise;
 }
 
 async function getSortOrders() {
