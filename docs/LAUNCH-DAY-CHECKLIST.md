@@ -11,8 +11,11 @@ Supabase — Portal project (the one `VITE_SUPABASE_URL` points at):
 - [ ] Apply `Proto-Website-/migrations/029_auth_security_hardening.sql`
       (identical to admin's `051` — apply ONCE; it is idempotent).
       Provides the rate-limit table/RPC + `revoke_user_sessions`.
-- [ ] Apply `Proto-Website-/migrations/030_orders_client_ref.sql`
-      (order idempotency key; everything degrades gracefully until applied).
+- [ ] Apply `Proto-Website-/migrations/030_orders_client_ref.sql`, then
+      `058_order_delivery_safety.sql` before releasing the matching storefront
+      code. Ordering now fails closed if the idempotency column/unique index or
+      readiness contract is unavailable; it must never degrade to an insert
+      without `client_ref`.
 - [ ] Confirm migration `028_orders_promo.sql` is applied (promo columns on orders).
 - [ ] Confirm migration `019_search_analytics.sql` + `020` grants are applied —
       the storefront write-path is live and silently no-ops if the table is missing.
