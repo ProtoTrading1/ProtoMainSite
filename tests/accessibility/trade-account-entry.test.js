@@ -15,6 +15,8 @@ test('uses one clear label for each trade-account journey', async () => {
   assert.match(landing, />Sign in</);
   assert.match(hero, /Apply for a Trade Account/);
   assert.match(hero, /ArrowDown/);
+  assert.match(hero, /Previous online customers must /);
+  assert.doesNotMatch(hero, /Existing customers must /);
   assert.doesNotMatch(hero, /Sign In/);
   assert.doesNotMatch(hero, /onLogin/);
   assert.match(login, /Sign in to your trade account/);
