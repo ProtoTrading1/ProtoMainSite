@@ -325,6 +325,10 @@ export default async function handler(req, res) {
   const normalizedBuildingType = caps(buildingType);
   const normalizedUnitNumber = caps(unitNumber);
   const normalizedVatNumber = vatNumber?.trim() || null;
+  // Keep the code the applicant supplied separate from the customer code that
+  // Proto eventually allocates. It is evidence for reconciliation only and
+  // must never grant access or become the account's live customer_code.
+  const claimedCustomerCode = caps(customerCode) || null;
 
   let protoActiveMatch = null;
   let protoActive = null;
@@ -409,6 +413,7 @@ export default async function handler(req, res) {
       business_type: businessType || null,
       monthly_spend: monthlySpend || null,
       website: website || null,
+      claimed_customer_code: claimedCustomerCode,
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
       is_approved: shouldApprove,
@@ -464,11 +469,16 @@ export default async function handler(req, res) {
         'last_purchase_date',
         'contact_name',
         'first_name',
+        'claimed_customer_code',
       ].includes(key)),
+    );
+    const payloadWithoutClaimedCode = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => key !== 'claimed_customer_code'),
     );
 
     const upsertAttempts = [
       fullPayload,
+      payloadWithoutClaimedCode,
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
@@ -527,7 +537,7 @@ export default async function handler(req, res) {
       province,
       city,
       businessType,
-      customerCode: allocatedCustomerCode,
+      customerCode: claimedCustomerCode,
       vatNumber: normalizedVatNumber,
       monthlySpend: monthlySpend || null,
       website: website || null,
