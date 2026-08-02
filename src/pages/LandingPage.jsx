@@ -455,11 +455,6 @@ function Questionnaire({ onLogin }) {
 
   return (
     <div className="lp-quiz">
-      <div className="lp-account-choice" aria-label="Choose the right account action">
-        <p><strong>Already registered on Proto Trading Online?</strong> <button type="button" onClick={() => onLogin({ initialMode: 'login' })}>Sign in</button> or <button type="button" onClick={() => onLogin({ initialMode: 'forgot' })}>reset your password</button>.</p>
-        <p><strong>Bought from our physical store before?</strong> Complete this form to register for the new website.</p>
-        <p><strong>New trade customer?</strong> Complete this form to apply for online trade access.</p>
-      </div>
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />

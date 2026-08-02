@@ -62,12 +62,12 @@ test('account recovery is honest, preserves email and does not reveal account ex
   assert.match(landing, /initialEmail: email\.trim\(\), initialMode: 'forgot'/);
 });
 
-test('active registration journey explains all three customer states and required business nature', async () => {
+test('active registration journey starts directly with the form and requires business nature', async () => {
   const landing = await readSource('src/pages/LandingPage.jsx');
 
-  assert.match(landing, /Already registered on Proto Trading Online\?/);
-  assert.match(landing, /Bought from our physical store before\?/);
-  assert.match(landing, /New trade customer\?/);
+  assert.doesNotMatch(landing, /lp-account-choice/);
+  assert.doesNotMatch(landing, /Bought from our physical store before\?/);
+  assert.match(landing, /Step \{step \+ 1\} of \{STEP_LABELS\.length\}/);
   assert.match(landing, /aria-labelledby="landing-business-type-label" aria-required="true"/);
   assert.match(landing, /businessType\.length > 0/);
 });

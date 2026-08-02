@@ -4791,43 +4791,6 @@
   line-height: 1.5;
 }
 
-.lp-account-choice {
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  border: 1px solid rgba(243, 199, 111, 0.28);
-  border-radius: 12px;
-  background: rgba(243, 199, 111, 0.07);
-}
-
-.lp-account-choice p {
-  margin: 5px 0;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.lp-account-choice strong { color: #fff; }
-
-.lp-account-choice button {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin: 0 2px;
-  padding: 8px 4px;
-  border: 0;
-  background: transparent;
-  color: #f3c76f;
-  font: inherit;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.lp-account-choice button:focus-visible {
-  outline: 2px solid #f3c76f;
-  outline-offset: 2px;
-}
-
 .lp-register-validation-summary strong {
   display: block;
   color: #fff;
