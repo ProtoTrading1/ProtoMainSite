@@ -7,6 +7,7 @@ test('normalises Positill selling units', () => {
   assert.equal(normalizeUnitsOfIssue('pack10'), 'PACK 10');
   assert.equal(normalizeUnitsOfIssue('pkt x 20'), 'PACK 20');
   assert.equal(normalizeUnitsOfIssue('box of 12'), 'BOX 12');
+  assert.equal(normalizeUnitsOfIssue('card,10'), 'CARD 10');
 });
 
 test('explains what one basket quantity represents', () => {
@@ -17,4 +18,5 @@ test('explains what one basket quantity represents', () => {
     unitsPerSellingUnit: 10,
   });
   assert.equal(sellingUnitDetails('').label, 'Each');
+  assert.equal(sellingUnitDetails('CARD,10').label, 'Card of 10');
 });
