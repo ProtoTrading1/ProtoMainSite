@@ -246,7 +246,10 @@ function TruckScrollbar() {
 }
 
 function Questionnaire({ onLogin }) {
-  const [step, setStep] = useState(0);
+  const previewBusinessStep = typeof window !== 'undefined'
+    && window.location.hostname.endsWith('.vercel.app')
+    && new URLSearchParams(window.location.search).get('previewStep') === 'business';
+  const [step, setStep] = useState(previewBusinessStep ? 3 : 0);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);

@@ -24,4 +24,10 @@ describe('business description registration contract', () => {
     assert.doesNotMatch(read('src/lib/businessTypes.js'), /^\s*'Gift shop',/m);
     assert.doesNotMatch(read('src/pages/LandingPage.jsx'), /^\s*'Gift shop',/m);
   });
+
+  it('allows an inert Step 4 visual check on Vercel previews only', () => {
+    const page = read('src/pages/LandingPage.jsx');
+    assert.match(page, /hostname\.endsWith\('\.vercel\.app'\)/);
+    assert.match(page, /get\('previewStep'\) === 'business'/);
+  });
 });
