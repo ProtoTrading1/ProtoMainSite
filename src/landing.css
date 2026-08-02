@@ -4730,13 +4730,6 @@
   letter-spacing: 0;
 }
 
-.lp-register-field-help {
-  display: block;
-  margin-top: 6px;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.45;
-}
 
 .lp-register-required {
   color: #f3c76f;
