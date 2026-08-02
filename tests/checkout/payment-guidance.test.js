@@ -20,7 +20,8 @@ test('checkout includes a pre-submit review of customer, delivery and order line
   assert.match(checkoutSource, /customer\?\.business_name/);
   assert.match(checkoutSource, /customer\?\.customer_code/);
   assert.match(checkoutSource, /Delivery address/);
-  assert.match(checkoutSource, /cartItems\.map/);
+  assert.match(checkoutSource, /groupedItems\.available\.map/);
+  assert.match(checkoutSource, /groupedItems\.toOrder\.map/);
   assert.match(checkoutSource, /Subtotal incl\. VAT/);
   assert.match(checkoutSource, /Nothing is submitted from this screen\./);
 });

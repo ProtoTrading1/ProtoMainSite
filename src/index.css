@@ -4063,6 +4063,38 @@ textarea:focus-visible,
   border: 1px solid #e2e8f0;
   border-radius: 10px;
 }
+.checkout-review-group + .checkout-review-group {
+  border-top: 2px solid #f59e0b;
+}
+.checkout-review-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.checkout-review-group-heading > div,
+.checkout-review-group-heading strong,
+.checkout-review-group-heading small {
+  display: block;
+}
+.checkout-review-group-heading small {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.checkout-review-group-heading--to-order {
+  background: #fffbeb;
+  color: #92400e;
+}
 .checkout-review-line {
   display: flex;
   align-items: flex-start;
@@ -4074,7 +4106,21 @@ textarea:focus-visible,
 .checkout-review-line:last-child {
   border-bottom: 0;
 }
+.checkout-review-group--to-order .checkout-review-line:last-of-type {
+  border-bottom: 1px solid #fde68a;
+}
+.checkout-review-line--to-order {
+  background: #fffdf5;
+}
 .checkout-review-line div {
+  min-width: 0;
+}
+.checkout-review-line-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.checkout-review-line-title strong {
   min-width: 0;
 }
 .checkout-review-line strong,
@@ -4098,6 +4144,32 @@ textarea:focus-visible,
   flex: 0 0 auto;
   color: #0f172a;
   font-size: 13px;
+}
+.checkout-to-order-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.checkout-review-line .checkout-to-order-guidance {
+  color: #92400e;
+  font-weight: 700;
+}
+.checkout-to-order-note {
+  margin: 0;
+  padding: 9px 12px 10px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 .checkout-review-total {
   margin: 10px 0 16px;
