@@ -68,8 +68,10 @@ test('active registration journey starts directly with the form and requires bus
   assert.doesNotMatch(landing, /lp-account-choice/);
   assert.doesNotMatch(landing, /Bought from our physical store before\?/);
   assert.match(landing, /Step \{step \+ 1\} of \{STEP_LABELS\.length\}/);
-  assert.match(landing, /aria-labelledby="landing-business-type-label" aria-required="true"/);
-  assert.match(landing, /businessType\.length > 0/);
+  assert.match(landing, /aria-labelledby="landing-trading-channel-label" aria-required="true"/);
+  assert.match(landing, /aria-labelledby="landing-product-category-label" aria-required="true"/);
+  assert.match(landing, /tradingChannels\.length > 0/);
+  assert.match(landing, /productCategories\.length > 0/);
 });
 
 test('registration address controls have names, labels and accessible selection state', async () => {

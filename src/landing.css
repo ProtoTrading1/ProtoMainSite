@@ -2520,9 +2520,38 @@
 }
 
 .lp-quiz-type-card.selected {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
+  background: rgba(107, 20, 20, 0.42);
+  color: #fff;
+  border-color: #f3c76f;
+  box-shadow: 0 0 0 1px rgba(243, 199, 111, 0.18), 0 8px 22px rgba(0, 0, 0, 0.2);
+}
+
+.lp-quiz-type-card--multi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.lp-quiz-type-card--multi svg {
+  flex: 0 0 auto;
+  color: #f3c76f;
+}
+
+.lp-quiz-question-label {
+  margin: 0 0 10px;
+  color: rgba(255,255,255,0.92);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lp-quiz-question-label span {
+  color: #f3c76f;
+  font-weight: 650;
+}
+
+.lp-quiz-question-label--second {
+  margin-top: 20px;
 }
 
 .lp-quiz-other-field {
@@ -4108,9 +4137,10 @@
 }
 
 .lp-register-page--standalone .lp-biz-category-card.selected {
-  background: rgba(220, 38, 38, 0.08);
-  border-color: rgba(220, 38, 38, 0.45);
+  background: rgba(107, 20, 20, 0.42);
+  border-color: #f3c76f;
   color: #fff;
+  box-shadow: 0 0 0 1px rgba(243, 199, 111, 0.16);
 }
 
 .lp-register-page--standalone .lp-biz-category-icon {
@@ -4127,9 +4157,20 @@
 }
 
 .lp-register-page--standalone .lp-biz-category-card.selected .lp-biz-category-icon {
-  border-color: #dc2626;
-  background: rgba(220, 38, 38, 0.16);
-  color: #f87171;
+  border-color: rgba(243, 199, 111, 0.72);
+  background: rgba(243, 199, 111, 0.12);
+  color: #f3c76f;
+}
+
+.lp-register-page--standalone .lp-biz-category-head--second {
+  margin-top: 10px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lp-register-page--standalone .lp-biz-category-check {
+  flex: 0 0 auto;
+  color: #f3c76f;
 }
 
 .lp-register-page--standalone .lp-biz-category-text {

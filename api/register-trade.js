@@ -13,6 +13,41 @@ const BREVO_SENDER = {
   email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
 };
 
+const VALID_TRADING_CHANNELS = new Set([
+  'Physical retail store',
+  'Online shop / e-commerce',
+  'Market trader / spaza shop',
+  'Wholesaler',
+  'Importer / distributor',
+  'School, church or institution',
+  'Events / service business',
+]);
+
+const VALID_PRODUCT_CATEGORIES = new Set([
+  'Art, craft & beads',
+  'Stationery & educational products',
+  'Gifts & novelty products',
+  'Homeware & kitchenware',
+  'Fashion & accessories',
+  'Beauty & personal care',
+  'Party, events & packaging',
+  'Toys, baby & children',
+  'Hardware',
+  'Food & drinks',
+  'Pet products',
+  'Promotional products',
+  'General merchandise / variety',
+  'Other',
+]);
+
+function normalizeSelections(value, allowed) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => String(item || '').trim().slice(0, 80))
+    .filter((item) => item && allowed.has(item)))]
+    .slice(0, 20);
+}
+
 export function accountCreationFailureResponse() {
   return {
     error: 'We could not create a new account with these details. If you have registered before, sign in or use Forgot password. Otherwise, check your details and try again.',
@@ -60,6 +95,8 @@ function buildAdminSignupHtml({
   province,
   city,
   businessType,
+  salesChannels,
+  productCategories,
   businessDescription,
   customerCode,
   vatNumber,
@@ -88,6 +125,8 @@ function buildAdminSignupHtml({
     ['Province', caps(province)],
     ['City', caps(city)],
     ['Business type', caps(businessType)],
+    ['How they trade', salesChannels?.join(', ')],
+    ['What they sell', productCategories?.join(', ')],
     ['Business description', String(businessDescription || '').trim()],
     ['Customer code', caps(customerCode)],
   ].filter(([, value]) => value);
@@ -253,6 +292,9 @@ export default async function handler(req, res) {
     province,
     city,
     businessType,
+    salesChannels,
+    productCategories,
+    otherProductCategory,
     businessDescription,
     monthlySpend,
     website,
@@ -275,8 +317,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
-  if (!String(businessType || '').trim()) {
-    return res.status(400).json({ error: 'Please select at least one nature of business option.' });
+  const normalizedSalesChannels = normalizeSelections(salesChannels, VALID_TRADING_CHANNELS);
+  const selectedProductCategories = normalizeSelections(productCategories, VALID_PRODUCT_CATEGORIES);
+  const normalizedOtherProductCategory = String(otherProductCategory || '').trim().slice(0, 80);
+  const normalizedProductCategories = selectedProductCategories
+    .map((category) => (category === 'Other' ? normalizedOtherProductCategory : category))
+    .filter(Boolean);
+
+  if (normalizedSalesChannels.length === 0) {
+    return res.status(400).json({ error: 'Please select at least one way that you trade.' });
+  }
+  if (selectedProductCategories.length === 0) {
+    return res.status(400).json({ error: 'Please select at least one product category.' });
+  }
+  if (selectedProductCategories.includes('Other') && !normalizedOtherProductCategory) {
+    return res.status(400).json({ error: 'Please name the other product category.' });
   }
 
   const normalizedBusinessDescription = String(businessDescription || '').trim().slice(0, 400);
@@ -367,6 +422,8 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      sales_channels: normalizedSalesChannels,
+      product_categories: normalizedProductCategories,
       business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
@@ -420,6 +477,8 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      sales_channels: normalizedSalesChannels,
+      product_categories: normalizedProductCategories,
       business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
@@ -447,6 +506,8 @@ export default async function handler(req, res) {
       province: _pr,
       city: _ci,
       business_type: _bt,
+      sales_channels: _sc,
+      product_categories: _pcat,
       business_description: _bd,
       customer_code: _cc,
       sales_last_12_months: _sl,
@@ -474,6 +535,8 @@ export default async function handler(req, res) {
         'province',
         'city',
         'business_type',
+        'sales_channels',
+        'product_categories',
         'business_description',
         'customer_code',
         'sales_last_12_months',
@@ -485,15 +548,19 @@ export default async function handler(req, res) {
       ].includes(key)),
     );
     const payloadWithoutNewColumns = Object.fromEntries(
-      Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'business_description'].includes(key)),
+      Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'business_description', 'sales_channels', 'product_categories'].includes(key)),
+    );
+    const payloadWithoutClassification = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => !['sales_channels', 'product_categories'].includes(key)),
     );
 
     const upsertAttempts = [
       fullPayload,
-      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => key !== 'claimed_customer_code')),
-      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => key !== 'business_description')),
+      payloadWithoutClassification,
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'sales_channels', 'product_categories'].includes(key))),
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => !['business_description', 'sales_channels', 'product_categories'].includes(key))),
       payloadWithoutNewColumns,
-      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, business_description: _bd, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, sales_channels: _sc, product_categories: _pcat, business_description: _bd, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
@@ -551,6 +618,8 @@ export default async function handler(req, res) {
       province,
       city,
       businessType,
+      salesChannels: normalizedSalesChannels,
+      productCategories: normalizedProductCategories,
       businessDescription: normalizedBusinessDescription,
       customerCode: claimedCustomerCode,
       vatNumber: normalizedVatNumber,
