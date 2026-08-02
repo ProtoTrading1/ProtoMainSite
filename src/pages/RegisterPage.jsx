@@ -39,6 +39,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [monthlySpend, setMonthlySpend] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
+  const [existingCustomerCode, setExistingCustomerCode] = useState('');
   const [country, setCountry] = useState('South Africa');
   const [province, setProvince] = useState('');
   const [companyFax, setCompanyFax] = useState('');
@@ -286,6 +287,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           .join(', ') || null,
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
+        customerCode: existingCustomerCode.trim().toUpperCase() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         company_fax: companyFax,
       });
@@ -526,6 +528,18 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         onChange={(e) => setWebsite(e.target.value)}
                         placeholder="www.yourshop.co.za or @yourshop"
                       />
+                    </div>
+                    <div className="lp-quiz-field lp-quiz-field--full">
+                      <label htmlFor="register-existing-customer-code">Previous Proto customer code <span className="lp-register-optional">(optional)</span></label>
+                      <input
+                        id="register-existing-customer-code"
+                        name="existing-customer-code"
+                        value={existingCustomerCode}
+                        onChange={(e) => setExistingCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
+                        placeholder="If you bought from Proto before"
+                        autoComplete="off"
+                      />
+                      <span className="lp-register-field-help">This helps us find your existing trading history. Leave it blank if you do not know it.</span>
                     </div>
                   </div>
 
