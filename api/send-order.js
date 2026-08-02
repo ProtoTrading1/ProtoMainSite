@@ -178,7 +178,7 @@ async function resolveAuthoritativePrices(items) {
     if (skus.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, stock_qty, available_stock, to_order')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order')
         .in('sku', skus);
       if (error) throw error;
       for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
@@ -186,7 +186,7 @@ async function resolveAuthoritativePrices(items) {
     if (barcodes.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, stock_qty, available_stock, to_order')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order')
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
@@ -229,6 +229,13 @@ async function resolveAuthoritativePrices(items) {
       throw error;
     }
     const price = customerFacingCataloguePrice(rawPrice);
+    const minQty = Math.max(1, Math.min(MAX_QTY_PER_LINE, Math.floor(Number(row.min_order_qty) || 1)));
+    if (qty < minQty) {
+      const unitLabel = sellingUnitDetails(row.units_of_issue || 'EACH').label.toLowerCase();
+      const error = new Error(`${cleanText(row.title, `Product on line ${index + 1}`)} has a minimum order of ${minQty} ${unitLabel}.`);
+      error.status = 400;
+      throw error;
+    }
     const authoritativeSku = cleanText(row.sku);
     const authoritativeBarcode = cleanText(row.barcode);
     const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
@@ -246,6 +253,7 @@ async function resolveAuthoritativePrices(items) {
         unitsOfIssue,
         casePack: sellingUnitDetails(unitsOfIssue).label,
         packDescription: cleanText(row.pack_description),
+        minQty,
         availabilityState: availability.state,
         availabilityLabel: availability.label,
       },

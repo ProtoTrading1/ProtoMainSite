@@ -756,7 +756,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   <>
                     <div className="pz-qty-row">
                       <div className="qty-stepper" aria-label="Quantity in preview">
-                        <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                        <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease" disabled={qty <= (activeProduct.minQty || 1)}>
                           <Minus size={14} />
                         </button>
                         <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />

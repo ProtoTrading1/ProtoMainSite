@@ -16,6 +16,8 @@ test('quantity stepping uses the current typed draft instead of stale persisted 
   assert.equal(stepCartQuantity('12', 3, -1), 11);
   assert.equal(stepCartQuantity('', 8, 1), 9);
   assert.equal(normalizeCartQuantity('10000'), 9999);
+  assert.equal(normalizeCartQuantity('2', 4, 4), 4);
+  assert.equal(stepCartQuantity('4', 4, -1, 4), 4);
 });
 
 test('checkout failure can retry the retained options with one idempotency key', () => {
