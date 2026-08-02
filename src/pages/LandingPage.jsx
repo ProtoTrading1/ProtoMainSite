@@ -9,40 +9,17 @@ import LandingDepartmentsSection from '../components/landing/LandingDepartmentsS
 import LandingApplySection from '../components/landing/LandingApplySection';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
+import { PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Eye,
   EyeOff,
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
-
-const BUSINESS_TYPES = [
-  'Retail store',
-  'Online shop / e-commerce',
-  'Wholesaler',
-  'Importer / distributor',
-  'Craft & hobby shop',
-  'Gift & novelty store',
-  'Pharmacy / health & beauty',
-  'Hardware & home store',
-  'Stationery & office supply',
-  "Baby & children's store",
-  'Fashion & clothing boutique',
-  'Dollar / variety store',
-  'Market trader / spaza shop',
-  'School or institution',
-  'Events, parties & décor',
-  'Craft & bead shop',
-  'Packaging supplier',
-  'Gift shop',
-  'Educational supplier',
-  'Religious / church store',
-  'Promotional products',
-  'Other',
-];
 
 const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
@@ -52,7 +29,7 @@ const MONTHLY_SPEND_BANDS = [
   'R50,000+',
 ];
 
-const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
+const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Business'];
 
 function CustomerIcon() {
   return (
@@ -247,7 +224,10 @@ function TruckScrollbar() {
 }
 
 function Questionnaire({ onLogin }) {
-  const [step, setStep] = useState(0);
+  const previewBusinessStep = typeof window !== 'undefined'
+    && window.location.hostname.endsWith('.vercel.app')
+    && new URLSearchParams(window.location.search).get('previewStep') === 'business';
+  const [step, setStep] = useState(previewBusinessStep ? 3 : 0);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -296,10 +276,14 @@ function Questionnaire({ onLogin }) {
     buildStructuredDeliveryAddress,
     deliveryFieldsLocked,
   } = addresses;
-  const [businessType, setBusinessType] = useState([]); // multi-select
-  const [otherType, setOtherType] = useState('');
-  const toggleBusinessType = (t) =>
-    setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  const [tradingChannels, setTradingChannels] = useState([]);
+  const [productCategories, setProductCategories] = useState([]);
+  const [otherProductCategory, setOtherProductCategory] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
+  const toggleTradingChannel = (value) =>
+    setTradingChannels((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
+  const toggleProductCategory = (value) =>
+    setProductCategories((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
   const [monthlySpend, setMonthlySpend] = useState('');
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
@@ -344,8 +328,10 @@ function Questionnaire({ onLogin }) {
       return country.trim() && billingOk && deliveryOk;
     }
     if (step === 3) {
-      return businessType.length > 0
-        && (!businessType.includes('Other') || otherType.trim());
+      return tradingChannels.length > 0
+        && productCategories.length > 0
+        && businessDescription.trim().length >= 20
+        && (!productCategories.includes('Other') || otherProductCategory.trim());
     }
     return false;
   };
@@ -361,7 +347,7 @@ function Questionnaire({ onLogin }) {
         'Enter your company name and the contact person’s full name.',
         `Enter a valid email and phone number, choose Yes or No for WhatsApp, and use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
         'Complete the required billing and delivery address fields, including building type.',
-        'Select at least one nature of business. If you choose Other, describe it.',
+        'Select at least one way you trade, at least one product category, and describe your business in at least 20 characters.',
       ];
       setStepError(messages[step]);
       trackJourneyEvent('registration_validation_failed', {
@@ -405,10 +391,14 @@ function Questionnaire({ onLogin }) {
         country: country || null,
         province: province || null,
         city: billingCity.trim() || null,
-        businessType: businessType
-          .map((t) => (t === 'Other' ? otherType.trim() : t))
+        salesChannels: tradingChannels,
+        productCategories,
+        otherProductCategory: otherProductCategory.trim() || null,
+        businessType: productCategories
+          .map((category) => (category === 'Other' ? otherProductCategory.trim() : category))
           .filter(Boolean)
           .join(', ') || null,
+        businessDescription: businessDescription.trim(),
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -455,11 +445,6 @@ function Questionnaire({ onLogin }) {
 
   return (
     <div className="lp-quiz">
-      <div className="lp-account-choice" aria-label="Choose the right account action">
-        <p><strong>Already registered on Proto Trading Online?</strong> <button type="button" onClick={() => onLogin({ initialMode: 'login' })}>Sign in</button> or <button type="button" onClick={() => onLogin({ initialMode: 'forgot' })}>reset your password</button>.</p>
-        <p><strong>Bought from our physical store before?</strong> Complete this form to register for the new website.</p>
-        <p><strong>New trade customer?</strong> Complete this form to apply for online trade access.</p>
-      </div>
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />
@@ -517,6 +502,23 @@ function Questionnaire({ onLogin }) {
                   onKeyDown={handleKey}
                   placeholder="VAT registration number"
                 />
+              </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label htmlFor="trade-customer-code">Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
+                <input
+                  id="trade-customer-code"
+                  name="customer_code"
+                  autoComplete="off"
+                  value={customerCode}
+                  onChange={(e) => setCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                  onKeyDown={handleKey}
+                  placeholder="6-character code, e.g. ETOSHA"
+                  maxLength={6}
+                  style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
+                />
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
+                  This helps us find your previous Proto purchasing history. Leave it blank if you do not know it.
+                </p>
               </div>
             </div>
           </div>
@@ -696,9 +698,84 @@ function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              Select at least one nature of business. Monthly spend, website and customer code are optional.
+              Three quick details are required. Monthly spend and website are optional.
             </p>
-            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
+            <div id="landing-trading-channel-label" className="lp-quiz-question-label">
+              1. How do you trade? <span>(required — select all that apply)</span>
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-trading-channel-label" aria-required="true">
+              {TRADING_CHANNELS.map((channel) => {
+                const selected = tradingChannels.includes(channel);
+                return (
+                <button
+                  key={channel}
+                  type="button"
+                  className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`}
+                  onClick={() => toggleTradingChannel(channel)}
+                  aria-pressed={selected}
+                >
+                  <span>{channel}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
+                </button>
+              );})}
+            </div>
+            <div id="landing-product-category-label" className="lp-quiz-question-label lp-quiz-question-label--second">
+              2. What do you mainly sell? <span>(required — select all that apply)</span>
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-product-category-label" aria-required="true">
+              {PRODUCT_CATEGORIES.map((category) => {
+                const selected = productCategories.includes(category);
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`}
+                    onClick={() => toggleProductCategory(category)}
+                    aria-pressed={selected}
+                  >
+                    <span>{category}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
+                  </button>
+                );})}
+            </div>
+            {productCategories.includes('Other') && (
+              <motion.div
+                className="lp-quiz-field lp-quiz-other-field"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+              >
+                <label htmlFor="landing-other-product-category">Name the other product category</label>
+                <input
+                  id="landing-other-product-category"
+                  value={otherProductCategory}
+                  onChange={(e) => setOtherProductCategory(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="For example: Florist supplies"
+                  required
+                />
+              </motion.div>
+            )}
+            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+              <label htmlFor="landing-business-description">
+                3. What do you sell, and who do you normally sell to? <span style={{ opacity: 0.7 }}>(required)</span>
+              </label>
+              <textarea
+                id="landing-business-description"
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                placeholder="Example: Gifts and party supplies sold from our Bellville shop to walk-in customers and event planners."
+                minLength={20}
+                maxLength={400}
+                required
+                aria-describedby="landing-business-description-help"
+              />
+              <span id="landing-business-description-help" className="lp-quiz-field-help">
+                Tell us what you sell, where you sell — store, online or market — and who your typical customers are. {businessDescription.length}/400
+              </span>
+            </div>
+            <div style={{ height: '18px' }} />
+            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
+              Estimated monthly spend <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span>
+            </div>
             <div className="lp-quiz-types">
               {MONTHLY_SPEND_BANDS.map((band) => (
                 <button
@@ -711,41 +788,6 @@ function Questionnaire({ onLogin }) {
                 </button>
               ))}
             </div>
-            <div style={{ height: '18px' }} />
-            <div id="landing-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
-              Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
-            </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-business-type-label" aria-required="true">
-              {BUSINESS_TYPES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
-                  onClick={() => toggleBusinessType(t)}
-                  aria-pressed={businessType.includes(t)}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            {businessType.includes('Other') && (
-              <motion.div
-                className="lp-quiz-field lp-quiz-other-field"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.16, ease: 'easeOut' }}
-              >
-                <label htmlFor="landing-other-business-type">Describe your business</label>
-                <input
-                  id="landing-other-business-type"
-                  value={otherType}
-                  onChange={(e) => setOtherType(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Tell us what type of business you run"
-                  required
-                />
-              </motion.div>
-            )}
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
               <label>Website or social media <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
               <input
@@ -754,20 +796,6 @@ function Questionnaire({ onLogin }) {
                 onKeyDown={handleKey}
                 placeholder="e.g. www.yourshop.co.za or @yourshop"
               />
-            </div>
-            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
-              <label>Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
-              <input
-                value={customerCode}
-                onChange={(e) => setCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                onKeyDown={handleKey}
-                placeholder="6-character code, e.g. ETOSHA"
-                maxLength={6}
-                style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
-              />
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
-                If your email has changed since you last ordered, enter your account code so we can match your existing customer record.
-              </p>
             </div>
           </div>
         )}

@@ -13,6 +13,41 @@ const BREVO_SENDER = {
   email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
 };
 
+const VALID_TRADING_CHANNELS = new Set([
+  'Physical retail store',
+  'Online shop / e-commerce',
+  'Market trader / spaza shop',
+  'Wholesaler',
+  'Importer / distributor',
+  'School, church or institution',
+  'Events / service business',
+]);
+
+const VALID_PRODUCT_CATEGORIES = new Set([
+  'Art, craft & beads',
+  'Stationery & educational products',
+  'Gifts & novelty products',
+  'Homeware & kitchenware',
+  'Fashion & accessories',
+  'Beauty & personal care',
+  'Party, events & packaging',
+  'Toys, baby & children',
+  'Hardware',
+  'Food & drinks',
+  'Pet products',
+  'Promotional products',
+  'General merchandise / variety',
+  'Other',
+]);
+
+function normalizeSelections(value, allowed) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => String(item || '').trim().slice(0, 80))
+    .filter((item) => item && allowed.has(item)))]
+    .slice(0, 20);
+}
+
 export function accountCreationFailureResponse() {
   return {
     error: 'We could not create a new account with these details. If you have registered before, sign in or use Forgot password. Otherwise, check your details and try again.',
@@ -60,6 +95,9 @@ function buildAdminSignupHtml({
   province,
   city,
   businessType,
+  salesChannels,
+  productCategories,
+  businessDescription,
   customerCode,
   vatNumber,
   monthlySpend,
@@ -87,6 +125,9 @@ function buildAdminSignupHtml({
     ['Province', caps(province)],
     ['City', caps(city)],
     ['Business type', caps(businessType)],
+    ['How they trade', salesChannels?.join(', ')],
+    ['What they sell', productCategories?.join(', ')],
+    ['Business description', String(businessDescription || '').trim()],
     ['Customer code', caps(customerCode)],
   ].filter(([, value]) => value);
 
@@ -251,6 +292,10 @@ export default async function handler(req, res) {
     province,
     city,
     businessType,
+    salesChannels,
+    productCategories,
+    otherProductCategory,
+    businessDescription,
     monthlySpend,
     website,
     acceptWhatsapp,
@@ -272,8 +317,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Please complete all required fields' });
   }
 
-  if (!String(businessType || '').trim()) {
-    return res.status(400).json({ error: 'Please select at least one nature of business option.' });
+  const normalizedSalesChannels = normalizeSelections(salesChannels, VALID_TRADING_CHANNELS);
+  const selectedProductCategories = normalizeSelections(productCategories, VALID_PRODUCT_CATEGORIES);
+  const normalizedOtherProductCategory = String(otherProductCategory || '').trim().slice(0, 80);
+  const normalizedProductCategories = selectedProductCategories
+    .map((category) => (category === 'Other' ? normalizedOtherProductCategory : category))
+    .filter(Boolean);
+
+  if (normalizedSalesChannels.length === 0) {
+    return res.status(400).json({ error: 'Please select at least one way that you trade.' });
+  }
+  if (selectedProductCategories.length === 0) {
+    return res.status(400).json({ error: 'Please select at least one product category.' });
+  }
+  if (selectedProductCategories.includes('Other') && !normalizedOtherProductCategory) {
+    return res.status(400).json({ error: 'Please name the other product category.' });
+  }
+
+  const normalizedBusinessDescription = String(businessDescription || '').trim().slice(0, 400);
+  if (normalizedBusinessDescription.length < 20) {
+    return res.status(400).json({ error: 'Please describe your business in at least 20 characters.' });
   }
 
   // Throttling: registration creates an auth account and sends emails, so it
@@ -325,6 +388,10 @@ export default async function handler(req, res) {
   const normalizedBuildingType = caps(buildingType);
   const normalizedUnitNumber = caps(unitNumber);
   const normalizedVatNumber = vatNumber?.trim() || null;
+  // Keep the code the applicant supplied separate from the customer code that
+  // Proto eventually allocates. It is evidence for reconciliation only and
+  // must never grant access or become the account's live customer_code.
+  const claimedCustomerCode = caps(customerCode) || null;
 
   let protoActiveMatch = null;
   let protoActive = null;
@@ -355,6 +422,9 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      sales_channels: normalizedSalesChannels,
+      product_categories: normalizedProductCategories,
+      business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
     },
@@ -407,8 +477,12 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      sales_channels: normalizedSalesChannels,
+      product_categories: normalizedProductCategories,
+      business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
+      claimed_customer_code: claimedCustomerCode,
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
       is_approved: shouldApprove,
@@ -432,6 +506,9 @@ export default async function handler(req, res) {
       province: _pr,
       city: _ci,
       business_type: _bt,
+      sales_channels: _sc,
+      product_categories: _pcat,
+      business_description: _bd,
       customer_code: _cc,
       sales_last_12_months: _sl,
       invoice_count: _ic,
@@ -458,18 +535,32 @@ export default async function handler(req, res) {
         'province',
         'city',
         'business_type',
+        'sales_channels',
+        'product_categories',
+        'business_description',
         'customer_code',
         'sales_last_12_months',
         'invoice_count',
         'last_purchase_date',
         'contact_name',
         'first_name',
+        'claimed_customer_code',
       ].includes(key)),
+    );
+    const payloadWithoutNewColumns = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'business_description', 'sales_channels', 'product_categories'].includes(key)),
+    );
+    const payloadWithoutClassification = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => !['sales_channels', 'product_categories'].includes(key)),
     );
 
     const upsertAttempts = [
       fullPayload,
-      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
+      payloadWithoutClassification,
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'sales_channels', 'product_categories'].includes(key))),
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => !['business_description', 'sales_channels', 'product_categories'].includes(key))),
+      payloadWithoutNewColumns,
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, sales_channels: _sc, product_categories: _pcat, business_description: _bd, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
@@ -527,7 +618,10 @@ export default async function handler(req, res) {
       province,
       city,
       businessType,
-      customerCode: allocatedCustomerCode,
+      salesChannels: normalizedSalesChannels,
+      productCategories: normalizedProductCategories,
+      businessDescription: normalizedBusinessDescription,
+      customerCode: claimedCustomerCode,
       vatNumber: normalizedVatNumber,
       monthlySpend: monthlySpend || null,
       website: website || null,

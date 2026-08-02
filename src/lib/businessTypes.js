@@ -1,8 +1,5 @@
 import {
   Baby,
-  BookOpen,
-  Church,
-  Gem,
   Gift,
   GraduationCap,
   Home,
@@ -22,61 +19,63 @@ import {
 } from 'lucide-react';
 
 export const BUSINESS_TYPES = [
-  'Retail store',
-  'Online shop / e-commerce',
-  'Wholesaler',
-  'Importer / distributor',
-  'Craft & hobby shop',
-  'Gift & novelty store',
-  'Pharmacy / health & beauty',
-  'Hardware & home store',
-  'Stationery & office supply',
-  "Baby & children's store",
-  'Fashion & clothing boutique',
-  'Dollar / variety store',
-  'Market trader / spaza shop',
-  'School or institution',
-  'Events, parties & décor',
-  'Craft & bead shop',
-  'Packaging supplier',
-  'Gift shop',
-  'Educational supplier',
-  'Religious / church store',
+  'Art, craft & beads',
+  'Stationery & educational products',
+  'Gifts & novelty products',
+  'Homeware & kitchenware',
+  'Fashion & accessories',
+  'Beauty & personal care',
+  'Party, events & packaging',
+  'Toys, baby & children',
+  'Hardware',
+  'Food & drinks',
+  'Pet products',
   'Promotional products',
+  'General merchandise / variety',
   'Other',
 ];
 
+export const TRADING_CHANNELS = [
+  'Physical retail store',
+  'Online shop / e-commerce',
+  'Market trader / spaza shop',
+  'Wholesaler',
+  'Importer / distributor',
+  'School, church or institution',
+  'Events / service business',
+];
+
+export const PRODUCT_CATEGORIES = BUSINESS_TYPES;
+
 export const BUSINESS_TYPE_ICONS = {
-  'Retail store': ShoppingBag,
-  'Online shop / e-commerce': ShoppingCart,
-  Wholesaler: Package,
-  'Importer / distributor': Truck,
-  'Craft & hobby shop': Palette,
-  'Gift & novelty store': Gift,
-  'Pharmacy / health & beauty': Pill,
-  'Hardware & home store': Home,
-  'Stationery & office supply': Pencil,
-  "Baby & children's store": Baby,
-  'Fashion & clothing boutique': Shirt,
-  'Dollar / variety store': Tag,
-  'Market trader / spaza shop': ShoppingBasket,
-  'School or institution': GraduationCap,
-  'Events, parties & décor': PartyPopper,
-  'Craft & bead shop': Gem,
-  'Packaging supplier': PackageOpen,
-  'Gift shop': Gift,
-  'Educational supplier': BookOpen,
-  'Religious / church store': Church,
+  'Art, craft & beads': Palette,
+  'Stationery & educational products': Pencil,
+  'Gifts & novelty products': Gift,
+  'Homeware & kitchenware': Home,
+  'Fashion & accessories': Shirt,
+  'Beauty & personal care': Pill,
+  'Party, events & packaging': PartyPopper,
+  'Toys, baby & children': Baby,
+  Hardware: Home,
+  'Food & drinks': ShoppingBasket,
+  'Pet products': PackageOpen,
   'Promotional products': Megaphone,
+  'General merchandise / variety': Tag,
   Other: Pencil,
 };
 
+export const TRADING_CHANNEL_ICONS = {
+  'Physical retail store': ShoppingBag,
+  'Online shop / e-commerce': ShoppingCart,
+  'Market trader / spaza shop': ShoppingBasket,
+  Wholesaler: Package,
+  'Importer / distributor': Truck,
+  'School, church or institution': GraduationCap,
+  'Events / service business': PartyPopper,
+};
+
 /** Labels for register.proto.co.za only (standalone register host). */
-export const REGISTER_BUSINESS_TYPES = BUSINESS_TYPES.map((type) => {
-  if (type === 'Dollar / variety store') return 'General Dealer';
-  if (type === 'Religious / church store') return 'Religious institution';
-  return type;
-});
+export const REGISTER_BUSINESS_TYPES = BUSINESS_TYPES;
 
 export const REGISTER_BUSINESS_TYPE_ICONS = Object.fromEntries(
   REGISTER_BUSINESS_TYPES.map((type, index) => [type, BUSINESS_TYPE_ICONS[BUSINESS_TYPES[index]]]),

@@ -7,8 +7,8 @@ import {
 } from '../src/lib/profileForm.js';
 
 test('a known business type preselects its dropdown option', () => {
-  const form = buildProfileForm({ business_type: 'Retail store' });
-  assert.equal(form.business_type, 'Retail store');
+  const form = buildProfileForm({ business_type: 'Gifts & novelty products' });
+  assert.equal(form.business_type, 'Gifts & novelty products');
   assert.equal(form.business_type_other, '');
 });
 

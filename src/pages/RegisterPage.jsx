@@ -3,8 +3,8 @@ import BusinessCategoryPicker from '../components/register/BusinessCategoryPicke
 import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
-import { BUSINESS_TYPES, MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
-import { CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { MONTHLY_SPEND_BANDS, PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
+import { Check, CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 import ProtoLogo from '../components/ProtoLogo';
@@ -34,8 +34,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [phone, setPhone] = useState('');
   const [whatsappOptIn, setWhatsappOptIn] = useState(null);
   const [businessName, setBusinessName] = useState('');
-  const [businessType, setBusinessType] = useState([]);
-  const [otherType, setOtherType] = useState('');
+  const [tradingChannels, setTradingChannels] = useState([]);
+  const [productCategories, setProductCategories] = useState([]);
+  const [otherProductCategory, setOtherProductCategory] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
@@ -86,8 +88,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [customerCode, setCustomerCode] = useState('');
   const [standaloneStep, setStandaloneStep] = useState(0);
 
-  const toggleBusinessType = (t) =>
-    setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  const toggleTradingChannel = (value) =>
+    setTradingChannels((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
+  const toggleProductCategory = (value) =>
+    setProductCategories((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
 
   const resolvedDeliveryAddress = () => buildStructuredDeliveryAddress();
 
@@ -120,11 +124,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (!businessName.trim()) {
       issues.push({ key: 'businessName', message: 'Company / trading name', section: 'business' });
     }
-    if (businessType.length === 0) {
-      issues.push({ key: 'businessType', message: 'Nature of business — select at least one option', section: 'business' });
+    if (tradingChannels.length === 0) {
+      issues.push({ key: 'tradingChannels', message: 'How you trade — select at least one option', section: 'business' });
     }
-    if (businessType.includes('Other') && !otherType.trim()) {
-      issues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
+    if (productCategories.length === 0) {
+      issues.push({ key: 'productCategories', message: 'What you sell — select at least one option', section: 'business' });
+    }
+    if (productCategories.includes('Other') && !otherProductCategory.trim()) {
+      issues.push({ key: 'otherProductCategory', message: 'Name the other product category', section: 'business' });
+    }
+    if (businessDescription.trim().length < 20) {
+      issues.push({ key: 'businessDescription', message: 'Business description (at least 20 characters)', section: 'business' });
     }
     if (!country.trim()) {
       issues.push({ key: 'country', message: 'Country', section: 'addresses' });
@@ -174,11 +184,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (step === 1) return issues.filter((issue) => issue.key === 'businessName');
     if (step === 2) {
       const businessIssues = [];
-      if (businessType.length === 0) {
-        businessIssues.push({ key: 'businessType', message: 'Business category', section: 'business' });
+      if (tradingChannels.length === 0) {
+        businessIssues.push({ key: 'tradingChannels', message: 'How you trade', section: 'business' });
       }
-      if (businessType.includes('Other') && !otherType.trim()) {
-        businessIssues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
+      if (productCategories.length === 0) {
+        businessIssues.push({ key: 'productCategories', message: 'What you sell', section: 'business' });
+      }
+      if (productCategories.includes('Other') && !otherProductCategory.trim()) {
+        businessIssues.push({ key: 'otherProductCategory', message: 'Name the other product category', section: 'business' });
+      }
+      if (businessDescription.trim().length < 20) {
+        businessIssues.push({ key: 'businessDescription', message: 'Business description (at least 20 characters)', section: 'business' });
       }
       return businessIssues;
     }
@@ -231,8 +247,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         const stepForSection = {
           contact: 0,
           businessName: 1,
-          businessType: 2,
-          otherType: 2,
+          tradingChannels: 2,
+          productCategories: 2,
+          otherProductCategory: 2,
+          businessDescription: 2,
           addresses: 3,
           country: 3,
           billingStreet: 3,
@@ -280,10 +298,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         country: country || null,
         province: province || null,
         city: billingCity.trim() || null,
-        businessType: businessType
-          .map((t) => (t === 'Other' ? otherType.trim() : t))
+        salesChannels: tradingChannels,
+        productCategories,
+        otherProductCategory: otherProductCategory.trim() || null,
+        businessType: productCategories
+          .map((category) => (category === 'Other' ? otherProductCategory.trim() : category))
           .filter(Boolean)
           .join(', ') || null,
+        businessDescription: businessDescription.trim(),
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -545,34 +567,62 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         ))}
                       </div>
 
-                      <div id="register-business-type-label" className="lp-register-subhead">
-                        Nature of business <span className="lp-register-required">(required — select all that apply)</span>
+                      <div id="register-trading-channel-label" className="lp-register-subhead">
+                        1. How do you trade? <span className="lp-register-required">(required — select all that apply)</span>
                       </div>
-                      <div className="lp-quiz-types" role="group" aria-labelledby="register-business-type-label" aria-required="true">
-                        {BUSINESS_TYPES.map((t) => (
+                      <div className="lp-quiz-types" role="group" aria-labelledby="register-trading-channel-label" aria-required="true">
+                        {TRADING_CHANNELS.map((channel) => {
+                          const selected = tradingChannels.includes(channel);
+                          return (
                           <button
-                            key={t}
+                            key={channel}
                             type="button"
-                            className={`lp-quiz-type-card${businessType.includes(t) ? ' selected' : ''}`}
-                            onClick={() => toggleBusinessType(t)}
-                            aria-pressed={businessType.includes(t)}
+                            className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`}
+                            onClick={() => toggleTradingChannel(channel)}
+                            aria-pressed={selected}
                           >
-                            {t}
+                            <span>{channel}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
                           </button>
-                        ))}
+                        );})}
                       </div>
-                      {businessType.includes('Other') && (
+                      <div id="register-product-category-label" className="lp-register-subhead">
+                        2. What do you mainly sell? <span className="lp-register-required">(required — select all that apply)</span>
+                      </div>
+                      <div className="lp-quiz-types" role="group" aria-labelledby="register-product-category-label" aria-required="true">
+                        {PRODUCT_CATEGORIES.map((category) => {
+                          const selected = productCategories.includes(category);
+                          return (
+                            <button key={category} type="button" className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`} onClick={() => toggleProductCategory(category)} aria-pressed={selected}>
+                              <span>{category}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
+                            </button>
+                          );})}
+                      </div>
+                      {productCategories.includes('Other') && (
                         <div className="lp-quiz-field lp-quiz-other-field">
-                          <label htmlFor="register-other-business-type">Describe your business</label>
+                          <label htmlFor="register-other-product-category">Name the other product category</label>
                           <input
-                            id="register-other-business-type"
-                            value={otherType}
-                            onChange={(e) => setOtherType(e.target.value)}
-                            placeholder="Tell us what type of business you run"
+                            id="register-other-product-category"
+                            value={otherProductCategory}
+                            onChange={(e) => setOtherProductCategory(e.target.value)}
+                            placeholder="For example: Florist supplies"
                             required
                           />
                         </div>
                       )}
+                      <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+                        <label htmlFor="register-business-description">3. What do you sell, and who do you normally sell to? <span className="lp-register-required">(required)</span></label>
+                        <textarea
+                          id="register-business-description"
+                          value={businessDescription}
+                          onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                          placeholder="Example: Gifts and party supplies sold from our Bellville shop to walk-in customers and event planners."
+                          minLength={20}
+                          maxLength={400}
+                          required
+                          aria-invalid={fieldHasIssue('businessDescription')}
+                        />
+                        <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                      </div>
                     </>
                   )}
                 </section>
@@ -581,18 +631,34 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 {standalone && standaloneStep === 2 && (
                 <section
                   id="register-section-business"
-                  className={`lp-register-section lp-register-section--business-step${fieldHasIssue('businessType') || fieldHasIssue('otherType') ? ' lp-register-section--missing' : ''}`}
+                  className={`lp-register-section lp-register-section--business-step${fieldHasIssue('tradingChannels') || fieldHasIssue('productCategories') || fieldHasIssue('otherProductCategory') ? ' lp-register-section--missing' : ''}`}
                 >
                   <div className="lp-register-step-intro">
                     <h2>Tell us about your business</h2>
                     <p>This helps us give you the best wholesale experience.</p>
                   </div>
                   <BusinessCategoryPicker
-                    selected={businessType}
-                    onToggle={toggleBusinessType}
-                    otherValue={otherType}
-                    onOtherChange={setOtherType}
+                    selectedChannels={tradingChannels}
+                    onToggleChannel={toggleTradingChannel}
+                    selectedCategories={productCategories}
+                    onToggleCategory={toggleProductCategory}
+                    otherValue={otherProductCategory}
+                    onOtherChange={setOtherProductCategory}
                   />
+                  <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+                    <label htmlFor="standalone-business-description">3. What do you sell, and who do you normally sell to? <span className="lp-register-required">(required)</span></label>
+                    <textarea
+                      id="standalone-business-description"
+                      value={businessDescription}
+                      onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                      placeholder="Example: Gifts and party supplies sold from our Bellville shop to walk-in customers and event planners."
+                      minLength={20}
+                      maxLength={400}
+                      required
+                      aria-invalid={fieldHasIssue('businessDescription')}
+                    />
+                    <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                  </div>
                   <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
                 </section>
                 )}
