@@ -15,7 +15,7 @@ import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
-import { authHeaders } from './authHeaders';
+import { authenticatedGetJson } from './authHeaders';
 
 export const DEFAULT_SORT = 'featured';
 const FEATURED_PRODUCTS_BATCH_SIZE = 80;
@@ -41,18 +41,26 @@ const _identifierRequests = new Map();
 const _browseRequests = new Map();
 let _categoryCountsMemo = new WeakMap();
 let _persistentCachePromise = null;
+let _refreshPromise = null;
+let _lastLiveRefreshAt = 0;
 
 // ─── localStorage cache — instant repeat loads; refreshed in background ───────
-const LS_KEY = 'proto_catalog_v10';
+// Bump both persistent-cache versions whenever a release changes the catalogue
+// contract. This prevents an older price/unit payload becoming the first paint
+// after a customer reloads onto the new application bundle.
+const LS_KEY = 'proto_catalog_v12';
+const LEGACY_LS_KEYS = ['proto_catalog_v10', 'proto_catalog_v11'];
 const IDB_NAME = 'proto-catalogue';
 const IDB_STORE = 'catalogue';
-const IDB_KEY = 'approved-customer-v1';
+const IDB_VERSION = 3;
+const IDB_KEY = 'approved-customer-v3';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
 // instead of staring at a spinner while 6MB re-downloads. Logout clears the
 // cache (Root.handleLogout -> invalidateProductCache).
 const LS_TTL = 24 * 60 * 60 * 1000;
+const CATALOG_REFRESH_MIN_MS = 30_000;
 
 const _refreshListeners = new Set();
 
@@ -91,8 +99,14 @@ export function prefetchCatalog() {
 function saveToLocalCache(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ data, ts: Date.now() })); } catch { /* cache is optional */ }
 }
+function clearLegacyLocalCaches() {
+  try {
+    for (const key of LEGACY_LS_KEYS) localStorage.removeItem(key);
+  } catch { /* cache is optional */ }
+}
 function loadFromLocalCache() {
   try {
+    clearLegacyLocalCaches();
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
@@ -103,10 +117,16 @@ function loadFromLocalCache() {
 function openCatalogueDb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   return new Promise((resolve) => {
-    const request = indexedDB.open(IDB_NAME, 1);
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      } else {
+        // A schema/version release must not resurrect the previous catalogue
+        // snapshot from IndexedDB after the localStorage cache was invalidated.
+        request.transaction.objectStore(IDB_STORE).clear();
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => resolve(null);
@@ -159,14 +179,18 @@ async function clearIndexedCache() {
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
+  if (authenticated) {
+    const { response, data } = await authenticatedGetJson(url, { cache, timeoutMs });
+    if (!response.ok) throw new Error(`${url} ${response.status}`);
+    return data;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers = authenticated ? await authHeaders() : undefined;
     const response = await fetch(url, {
       signal: controller.signal,
       credentials: 'same-origin',
-      ...(headers ? { headers } : {}),
       ...(cache ? { cache } : {}),
     });
     if (!response.ok) throw new Error(`${url} ${response.status}`);
@@ -185,6 +209,10 @@ function startCatalogFetch() {
   // server-side rebuild. Prices/stock stay authoritative; the 6 MB payload is
   // only transferred when the catalogue has actually changed.
   return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
+    .then((products) => {
+      _lastLiveRefreshAt = Date.now();
+      return products;
+    })
     .catch(() => {
       const local = loadFromLocalCache();
       if (local) return local;
@@ -197,6 +225,7 @@ function startCatalogFetch() {
       void saveToIndexedCache(products);
       if (hadPrior) {
         _browseRequests.clear();
+        _featuredResolved = null;
         emitCatalogRefresh();
       }
       return _cache;
@@ -234,9 +263,30 @@ export function invalidateProductCache() {
   _browseRequests.clear();
   _categoryCountsMemo = new WeakMap();
   _persistentCachePromise = null;
+  _refreshPromise = null;
+  _lastLiveRefreshAt = 0;
   invalidateFeaturedCache();
   try { localStorage.removeItem(LS_KEY); } catch { /* cache is optional */ }
+  clearLegacyLocalCaches();
   void clearIndexedCache();
+}
+
+/**
+ * Silently revalidate the approved-customer catalogue when a browser becomes
+ * active again. Calls are coalesced and throttled: unchanged catalogues use the
+ * API ETag path, while changed prices/stock/units replace every client cache and
+ * notify the currently visible grid without touching basket state.
+ */
+export function refreshProductCache({ maxAgeMs = CATALOG_REFRESH_MIN_MS } = {}) {
+  if (_refreshPromise) return _refreshPromise;
+  if (_lastLiveRefreshAt && Date.now() - _lastLiveRefreshAt < maxAgeMs) {
+    return Promise.resolve(_cache);
+  }
+
+  _refreshPromise = startCatalogFetch().finally(() => {
+    _refreshPromise = null;
+  });
+  return _refreshPromise;
 }
 
 async function getSortOrders() {
@@ -408,7 +458,8 @@ export function isOrderableWhenOutOfStock(product) {
   return product.toOrder === true
     || product.to_order === true
     || product.orderableWhenOutOfStock === true
-    || product.orderable_when_out_of_stock === true;
+    || product.orderable_when_out_of_stock === true
+    || product.availability?.canOrder === true;
 }
 
 function productStockQty(product) {
@@ -419,17 +470,16 @@ function productStockQty(product) {
 
 /**
  * Whether a single product row is available to buy (pre-grouping).
- * Canonical rule shared with the admin's isPublishableOnWebsite
- * (protoportal-admin lib/catalog-stock.mjs): only EXACTLY-zero stock is
- * unavailable (unless keep_live_when_oos); negative SOH stays available —
- * backorder lines are live and orderable by business rule.
+ * Positive stock is immediately orderable. Zero and negative stock require an
+ * explicit business promise (made/sourced to order, landed stock, or an open
+ * pre-order); keep_live_when_oos controls visibility only.
  */
 export function isProductAvailable(product) {
   if (!product) return false;
   const qty = productStockQty(product);
-  if (qty !== null && qty !== 0) return true;
+  if (qty !== null && qty > 0) return true;
   if (isOrderableWhenOutOfStock(product)) return true;
-  if (qty !== null) return false;
+  if (qty !== null && qty <= 0) return false;
   if (product.inStock === false) return false;
   return true;
 }

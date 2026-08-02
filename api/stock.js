@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
+import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
 // Always hits the DB fresh (no-store) so a click never serves a cached number.
@@ -60,6 +61,8 @@ export default async function handler(req, res) {
     const avail = Number(row.available_stock);
     const raw = Number(row.stock_qty);
     const qty = Number.isFinite(avail) ? avail : (Number.isFinite(raw) ? raw : 0);
+    const incoming = await loadIncomingAvailability(supabase, row.sku);
+    const availability = availabilityForRow(row, incoming);
     return res.status(200).json({
       sku,
       qty,
@@ -67,6 +70,7 @@ export default async function handler(req, res) {
       to_order: !!row.to_order,
       available_stock: Number.isFinite(avail) ? avail : null,
       stock_qty: Number.isFinite(raw) ? raw : null,
+      availability,
       checked_at: new Date().toISOString(),
     });
   } catch (err) {

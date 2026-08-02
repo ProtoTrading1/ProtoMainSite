@@ -14,7 +14,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, subscribeCatalogRefresh } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
@@ -63,7 +63,10 @@ function readCartActivityAt() {
 }
 
 function readInStockOnly() {
-  try { return sessionStorage.getItem(IN_STOCK_ONLY_KEY) === '1'; } catch { return false; }
+  // Unavailable products stay discoverable and are visually disabled instead
+  // of disappearing. Clear the retired preference for returning customers.
+  try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
+  return false;
 }
 
 function readInitialSort() {
@@ -100,7 +103,8 @@ function productCanOrderWhenOos(product) {
   return product?.toOrder === true
     || product?.to_order === true
     || product?.orderableWhenOutOfStock === true
-    || product?.orderable_when_out_of_stock === true;
+    || product?.orderable_when_out_of_stock === true
+    || product?.availability?.canOrder === true;
 }
 
 function cartQtyCapForProduct(product) {
@@ -221,14 +225,6 @@ export default function App({
       window.removeEventListener('scroll', dismissOnScroll);
     };
   }, [dismissWelcome, showWelcome]);
-
-  const handleInStockOnlyChange = useCallback((next) => {
-    setInStockOnly(next);
-    try {
-      if (next) sessionStorage.setItem(IN_STOCK_ONLY_KEY, '1');
-      else sessionStorage.removeItem(IN_STOCK_ONLY_KEY);
-    } catch { /* ignore */ }
-  }, []);
 
   const handleSortChange = useCallback((next) => {
     const normalized = normalizeCatalogSort(next);
@@ -844,6 +840,28 @@ export default function App({
 
   useEffect(() => {
     return subscribeCatalogRefresh(() => setCatalogRefreshKey((k) => k + 1));
+  }, []);
+
+  useEffect(() => {
+    const refreshCatalogue = () => {
+      void refreshProductCache().catch(() => {
+        // Keep the last known-good catalogue visible during a transient outage.
+      });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshCatalogue();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+
+    window.addEventListener('focus', refreshCatalogue);
+    window.addEventListener('online', refreshCatalogue);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshCatalogue);
+      window.removeEventListener('online', refreshCatalogue);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   // Category counts describe the catalogue scope, not the current browse
@@ -1476,11 +1494,13 @@ export default function App({
   }, [requestedReorder, onRequestedReorderHandled]);
 
   const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewOptionsFirst, setPreviewOptionsFirst] = useState(false);
   const productDetailKey = String(refinements.product || '').trim();
   const previewProductKey = productDetailId(previewProduct);
 
-  const handleProductPreview = useCallback((product) => {
+  const handleProductPreview = useCallback((product, { focusOptions = false } = {}) => {
     dismissWelcome();
+    setPreviewOptionsFirst(Boolean(focusOptions));
     setPreviewProduct(product);
     const id = productDetailId(product);
     if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
@@ -1488,6 +1508,7 @@ export default function App({
 
   const closeProductPreview = useCallback(() => {
     setPreviewProduct(null);
+    setPreviewOptionsFirst(false);
     if (!refinements.product) return;
     const next = { ...refinements };
     delete next.product;
@@ -1497,6 +1518,7 @@ export default function App({
   useEffect(() => {
     if (!productDetailKey) {
       if (previewProductKey) setPreviewProduct(null);
+      setPreviewOptionsFirst(false);
       return undefined;
     }
     if (previewProductKey === productDetailKey) return undefined;
@@ -1604,7 +1626,6 @@ export default function App({
             onProductPreview={handleProductPreview}
             showWelcome={showWelcome}
             inStockOnly={inStockOnly}
-            onInStockOnlyChange={handleInStockOnlyChange}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
@@ -1674,6 +1695,7 @@ export default function App({
             onCartQtyChange={handleCartQtyChange}
             special={specialsMap[previewProduct.id] || (previewProduct.isNew ? { deal: 'none' } : null)}
             initialZoomOpen={true}
+            initialFocusOptions={previewOptionsFirst}
             onZoomClose={closeProductPreview}
           />
         </div>

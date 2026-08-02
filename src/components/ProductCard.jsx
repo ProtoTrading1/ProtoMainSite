@@ -5,13 +5,11 @@ import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
-import { authHeaders } from '../lib/authHeaders';
+import { authenticatedGetJson } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
 import './ProductCard.css';
-
-// At or below this quantity we warn "Low stock". Configurable in one place.
-const LOW_STOCK_THRESHOLD = 5;
 
 function productBarcode(product) {
   const explicitBarcode = String(
@@ -63,67 +61,50 @@ function catalogStockQty(product) {
   return Number(raw) || 0;
 }
 
-function catalogStockBadgeState(product) {
-  const qty = catalogStockQty(product);
-  if (qty !== null) {
-    // Only EXACTLY zero is out of stock — negative SOH is a live backorder
-    // line (canonical rule shared with the admin portal).
-    // A zero-stock product is orderable (shown "Available to order") only when
-    // marked "to order"; keep_live_when_oos alone shows plain "Out of stock".
-    if (qty === 0) return product.toOrder ? 'toorder' : 'out';
-    if (qty > 0 && qty <= LOW_STOCK_THRESHOLD) return 'low';
-    return 'in';
-  }
-  return product.inStock === false ? 'out' : 'in';
+function availabilityForProduct(product) {
+  if (product?.availability?.state) return product.availability;
+  return resolveProductAvailability({
+    stockQty: catalogStockQty(product),
+    toOrder: !!(product?.toOrder || product?.orderableWhenOutOfStock),
+    incoming: product,
+  });
 }
 
-function catalogStockBadge(product) {
+function groupedAvailability(product) {
   if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length > 1) {
-    const states = product.variants.map((variant) => catalogStockBadgeState(variant));
-    if (states.every((state) => state === 'out')) return 'out';
-    if (states.some((state) => state === 'low')) return 'low';
-    // No in-stock variants, but at least one is orderable-to-order.
-    if (states.every((state) => state === 'out' || state === 'toorder') && states.some((state) => state === 'toorder')) return 'toorder';
-    return 'in';
+    const options = product.variants.map(availabilityForProduct);
+    const canOrder = options.some((item) => item.canOrder);
+    return canOrder
+      ? {
+        state: 'options',
+        label: 'Stock varies by option',
+        guidance: 'Choose an option for live availability',
+        canOrder: true,
+      }
+      : {
+        state: 'out_of_stock',
+        label: 'Currently unavailable',
+        guidance: 'Choose an option for details',
+        canOrder: false,
+      };
   }
-  return catalogStockBadgeState(product);
+  return availabilityForProduct(product);
 }
 
 function catalogStockState(product) {
-  if (!product) return { state: 'in', qty: null, canOrder: true };
-
-  const qty = catalogStockQty(product);
-  const state = catalogStockBadge(product);
-
-  // "To order" products remain orderable at zero stock; keep_live_when_oos
-  // alone does NOT make a product orderable (it only keeps it visible).
-  if (product.toOrder || product.orderableWhenOutOfStock) {
-    return { state, qty, canOrder: true };
-  }
-
-  if (qty !== null) {
-    return { state, qty, canOrder: qty > 0 };
-  }
-
-  if (product.inStock === false) {
-    return { state, qty: null, canOrder: false };
-  }
-
-  return { state, qty, canOrder: true };
+  if (!product) return resolveProductAvailability();
+  return groupedAvailability(product);
 }
 
-const STOCK_BADGE_LABEL = {
-  in: 'Orderable',
-  low: 'Low stock',
-  out: 'Out of stock',
-  toorder: 'To order',
-};
-
-const STOCK_BADGE_GUIDANCE = {
-  in: 'Check live quantity',
-  low: 'Check live quantity',
-  out: 'Cannot be added',
-  toorder: 'Extra lead time',
+const STOCK_BADGE_CLASS = {
+  in_stock: 'in',
+  low_stock: 'low',
+  landed: 'landed',
+  to_order: 'toorder',
+  incoming_preorder: 'incoming',
+  incoming: 'incoming',
+  options: 'options',
+  out_of_stock: 'out',
 };
 
 function orderQuantityLabel(product) {
@@ -136,16 +117,17 @@ function orderQuantityLabel(product) {
 
 function StockBadge({ product }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
-  if (!sku) return null;
-  const { state } = catalogStockState(product);
+  if (!product) return null;
+  const availability = catalogStockState(product);
+  const badgeClass = STOCK_BADGE_CLASS[availability.state] || 'out';
 
   return (
-    <div className="pc-stock-slot">
-      <div className={`pc-orderability pc-orderability--${state}`}>
-        <span>{STOCK_BADGE_LABEL[state]}</span>
-        <small>{STOCK_BADGE_GUIDANCE[state]}</small>
+    <div className={`pc-stock-slot${product.isVariantGroup ? ' pc-stock-slot--options' : ''}`}>
+      <div className={`pc-orderability pc-orderability--${badgeClass}`}>
+        <span>{availability.label}</span>
+        <small>{availability.guidance}</small>
       </div>
-      <StockCheck sku={sku} />
+      {!product.isVariantGroup && sku ? <StockCheck sku={sku} /> : null}
     </div>
   );
 }
@@ -153,27 +135,40 @@ function StockBadge({ product }) {
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
 function StockCheck({ sku, autoCheck = false }) {
-  const [state, setState] = useState({ status: 'idle', qty: null, toOrder: false });
+  const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
+  const requestRef = useRef(null);
 
   const check = useCallback(async () => {
     if (!sku) return;
-    setState({ status: 'loading', qty: null, toOrder: false });
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setState({ status: 'loading', qty: null, availability: null });
     try {
-      const res = await fetch(`/api/stock?sku=${encodeURIComponent(sku)}`, {
+      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}`, {
         cache: 'no-store',
-        headers: await authHeaders(),
+        signal: controller.signal,
+        timeoutMs: 10000,
       });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
+      if (!response.ok) throw new Error(String(response.status));
+      if (requestRef.current !== controller) return;
       setState({
         status: 'done',
         qty: Number(data.qty) || 0,
-        toOrder: !!data.to_order,
+        availability: data.availability || null,
       });
     } catch {
-      setState({ status: 'error', qty: null, toOrder: false });
+      if (requestRef.current !== controller) return;
+      setState({ status: 'error', qty: null, availability: null });
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
     }
   }, [sku]);
+
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+  }, []);
 
   // A customer opening the detail view is already evaluating the product.
   // Start the same authenticated, no-store live lookup immediately so the
@@ -186,14 +181,13 @@ function StockCheck({ sku, autoCheck = false }) {
   let readout = null;
   if (state.status === 'done') {
     const qty = state.qty;
-    if (state.toOrder && qty <= 0) {
-      readout = <span className="stock-readout stock-readout--in">Available to order</span>;
-    } else if (qty <= 0) {
-      readout = <span className="stock-readout stock-readout--out">Out of stock</span>;
-    } else if (qty <= LOW_STOCK_THRESHOLD) {
+    const live = state.availability || resolveProductAvailability({ stockQty: qty });
+    if (live.state === 'in_stock') {
+      readout = <span className="stock-readout stock-readout--in">In stock: {qty}</span>;
+    } else if (live.state === 'low_stock') {
       readout = <span className="stock-readout stock-readout--low">Low stock: {qty} left</span>;
     } else {
-      readout = <span className="stock-readout stock-readout--in">In stock: {qty}</span>;
+      readout = <span className={`stock-readout stock-readout--${live.canOrder ? 'in' : 'out'}`}>{live.label}</span>;
     }
   } else if (state.status === 'error') {
     readout = (
@@ -215,7 +209,7 @@ function StockCheck({ sku, autoCheck = false }) {
         >
           {state.status === 'loading'
             ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
-            : <><PackageSearch size={14} /> Check Stock</>}
+            : <><PackageSearch size={14} /> Check live stock</>}
         </button>
       ) : null}
       <span className="stock-result" role="status" aria-live="polite">{readout}</span>
@@ -326,10 +320,9 @@ function ProductQtyInput({ qty, setQty, minQty }) {
   );
 }
 
-function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
-  const defaultVariant = variants[0] || null;
   const variantCount = product?.variantCount || variants.length;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
@@ -337,6 +330,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
+  const [focusOptionsOnOpen, setFocusOptionsOnOpen] = useState(initialFocusOptions);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
@@ -344,6 +338,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const addButtonRef = useRef(null);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const variantsRef = useRef(null);
   const lastFocusedElementRef = useRef(null);
 
   const activeProduct = selectedVariant || product;
@@ -351,8 +346,10 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     ? activeProduct.images
     : null;
   const inCart = cartQty > 0;
-  const { canOrder: cardCanOrder } = catalogStockState(product);
-  const { canOrder: modalCanOrder } = catalogStockState(activeProduct);
+  const cardAvailability = catalogStockState(product);
+  const modalAvailability = catalogStockState(activeProduct);
+  const cardCanOrder = cardAvailability.canOrder;
+  const modalCanOrder = modalAvailability.canOrder;
   const cardAdvisory = stockAdvisoryForQty(product, qty);
   const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 
@@ -368,7 +365,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     setActiveImageIdx(0);
   };
 
-  const openPreview = () => {
+  const showPreview = (focusOptions = false) => {
+    setFocusOptionsOnOpen(Boolean(focusOptions));
     onSearchEngage?.();
     trackEvent({
       eventType: 'product_view',
@@ -376,23 +374,23 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
       entityLabel: product?.name || product?.code,
     });
     if (onProductPreview) {
-      onProductPreview(product);
+      onProductPreview(product, { focusOptions });
       return;
-    }
-    if (isVariantGroup && defaultVariant) {
-      selectVariant(defaultVariant);
     }
     setZoomOpen(true);
   };
+  const openPreview = () => showPreview(false);
+  const openOptions = () => showPreview(true);
   const closePreview = useCallback(() => {
     setZoomOpen(false);
+    setFocusOptionsOnOpen(false);
     setSelectedVariant(null);
     onZoomClose?.();
   }, [onZoomClose]);
 
   const handleAdd = () => {
     if (isVariantGroup) {
-      openPreview();
+      openOptions();
       return;
     }
     if (!cardCanOrder) return;
@@ -459,9 +457,21 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     };
   }, [closePreview, zoomOpen]);
 
+  useEffect(() => {
+    if (!zoomOpen || !focusOptionsOnOpen || !isVariantGroup) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const variants = variantsRef.current;
+      variants?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      const option = variants?.querySelector('[aria-checked="true"]')
+        || variants?.querySelector('[role="radio"]');
+      option?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusOptionsOnOpen, isVariantGroup, zoomOpen]);
+
   return (
     <>
-      <article className="product-card">
+      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
         {/* Image */}
         <button
           className="product-image product-image-button"
@@ -520,38 +530,52 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
           <StockBadge product={product} />
 
-          <div className="buy-row">
-            <div className="qty-stepper" aria-label="Quantity">
+          <div className={`buy-row${isVariantGroup ? ' buy-row--options' : ''}`}>
+            {isVariantGroup ? (
               <button
-                onClick={() => setQty((current) => Math.max(product.minQty || 1, current - 1))}
+                ref={addButtonRef}
+                className="add-button add-button--choose"
+                onClick={openOptions}
                 type="button"
-                aria-label={`Decrease quantity from ${qty}`}
-                disabled={qty <= (product.minQty || 1)}
               >
-                <Minus size={14} />
+                <PackageSearch size={16} />
+                Choose option
               </button>
-              <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
-              <button
-                onClick={() => setQty((current) => Math.min(9999, current + 1))}
-                type="button"
-                aria-label={`Increase quantity from ${qty}`}
-                disabled={qty >= 9999}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            <button
-              ref={addButtonRef}
-              className="add-button"
-              onClick={handleAdd}
-              type="button"
-              disabled={!isVariantGroup && !cardCanOrder}
-            >
-              <ShoppingCart size={16} />
-              {isVariantGroup ? 'View options' : 'Add to Cart'}
-            </button>
+            ) : (
+              <>
+                <div className="qty-stepper" aria-label="Quantity">
+                  <button
+                    onClick={() => setQty((current) => Math.max(product.minQty || 1, current - 1))}
+                    type="button"
+                    aria-label={`Decrease quantity from ${qty}`}
+                    disabled={qty <= (product.minQty || 1)}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                  <button
+                    onClick={() => setQty((current) => Math.min(9999, current + 1))}
+                    type="button"
+                    aria-label={`Increase quantity from ${qty}`}
+                    disabled={qty >= 9999}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <button
+                  ref={addButtonRef}
+                  className="add-button"
+                  onClick={handleAdd}
+                  type="button"
+                  disabled={!cardCanOrder}
+                >
+                  <ShoppingCart size={16} />
+                  Add to Cart
+                </button>
+              </>
+            )}
           </div>
-          {cardAdvisory.isOverOrder && (
+          {!isVariantGroup && cardAdvisory.isOverOrder && (
             <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
           )}
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
@@ -642,22 +666,40 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   </div>
                 )}
 
-                <p className="pz-order-quantity">{orderQuantityLabel(activeProduct)}</p>
+                {isVariantGroup && !selectedVariant ? (
+                  <p className="pz-order-quantity">Choose an option to see its price, selling unit and live stock.</p>
+                ) : (
+                  <p className="pz-order-quantity">{orderQuantityLabel(activeProduct)}</p>
+                )}
 
                 {/* "To order" disclaimer — item is orderable even without stock on hand. */}
-                {(activeProduct.toOrder || product.toOrder) && (
+                {modalAvailability.state === 'to_order' && (
                   <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#b45309', fontWeight: 600 }}>
                     ⏳ Available to order — allow extra lead time. Place your order and we’ll confirm timing on your quote.
+                  </p>
+                )}
+                {modalAvailability.state === 'landed' && (
+                  <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#245aa7', fontWeight: 600 }}>
+                    🚢 This stock has landed and is being received. You can add it now; final quantity and timing will be confirmed on your quotation.
+                  </p>
+                )}
+                {['incoming', 'incoming_preorder'].includes(modalAvailability.state) && (
+                  <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#245aa7', fontWeight: 600 }}>
+                    🚢 Stock is on the way{modalAvailability.incomingEta ? ` and expected ${formatIncomingEta(modalAvailability.incomingEta)}` : ''}.
+                    {modalAvailability.canOrder ? ' Pre-orders are open and timing will be confirmed on your quotation.' : ' Pre-orders are not open yet.'}
                   </p>
                 )}
 
                 {/* Variant list for grouped products — click to swap image */}
                 {isVariantGroup && variants.length > 0 && (
-                  <div className="pz-variants">
+                  <div ref={variantsRef} className="pz-variants">
                     <span className="pz-variants-label">Select a variant</span>
+                    <span className="pz-variants-help">Choose one option to confirm live stock and order quantity.</span>
                     <div className="pz-variants-list" role="radiogroup" aria-label="Select a variant">
                       {variants.map((v) => {
                         const isSelected = selectedVariant?.id === v.id;
+                        const optionAvailability = availabilityForProduct(v);
+                        const optionClass = STOCK_BADGE_CLASS[optionAvailability.state] || 'out';
                         return (
                           <button
                             key={v.id}
@@ -675,7 +717,11 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                               <span className="pz-variant-code">{productSkuLabel(v, true)}</span>
                               <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
+                              <span className={`pz-variant-availability pz-variant-availability--${optionClass}`}>
+                                {optionAvailability.label}
+                              </span>
                             </div>
+                            {Number(v.price) > 0 && <span className="pz-variant-price">R{Number(v.price).toFixed(2)}</span>}
                           </button>
                         );
                       })}
@@ -685,56 +731,58 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
                 {product.tradeNote && <p className="pz-trade-note">{product.tradeNote}</p>}
 
-                {activeProduct.price > 0 && (
+                {(!isVariantGroup || selectedVariant) && activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
                     <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
                     <span>incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
                   </div>
                 )}
 
-                <div className="pz-stock-check">
-                  <StockCheck
-                    sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
-                    autoCheck
-                  />
-                </div>
+                {(!isVariantGroup || selectedVariant) && (
+                  <div className="pz-stock-check">
+                    <StockCheck
+                      sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
+                      autoCheck
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Fixed buy bar */}
               <div className="pz-buy-bar">
-                <div className="pz-qty-row">
-                  <div className="qty-stepper" aria-label="Quantity in preview">
-                    <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
-                      <Minus size={14} />
-                    </button>
-                    <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
-                    <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                </div>
-                {modalAdvisory.isOverOrder && (
-                  <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
-                )}
                 {isVariantGroup && !selectedVariant ? (
-                  <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', margin: 0 }}>
-                    Select a variant above to add to order
-                  </p>
+                  <p className="pz-options-prompt">Choose an option above to check live stock and continue.</p>
                 ) : (
-                  <button
-                    className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
-                    disabled={!modalCanOrder}
-                    onClick={() => {
-                      if (!modalCanOrder) return;
-                      addToCart(activeProduct, qty, null, true);
-                      setJustAdded(true);
-                      setTimeout(() => setJustAdded(false), 1800);
-                    }}
-                    type="button"
-                  >
-                    <ShoppingCart size={16} />
-                    {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
-                  </button>
+                  <>
+                    <div className="pz-qty-row">
+                      <div className="qty-stepper" aria-label="Quantity in preview">
+                        <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease">
+                          <Minus size={14} />
+                        </button>
+                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
+                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {modalAdvisory.isOverOrder && (
+                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
+                    )}
+                    <button
+                      className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
+                      disabled={!modalCanOrder}
+                      onClick={() => {
+                        if (!modalCanOrder) return;
+                        addToCart(activeProduct, qty, null, true);
+                        setJustAdded(true);
+                        setTimeout(() => setJustAdded(false), 1800);
+                      }}
+                      type="button"
+                    >
+                      <ShoppingCart size={16} />
+                      {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

@@ -12,6 +12,22 @@
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(15, 23, 42, 0.06);
 }
 
+.product-card.product-card--unavailable {
+  background: #f8fafc;
+  border-color: #d7dde5;
+}
+
+.product-card--unavailable .product-image,
+.product-card--unavailable .product-title-button,
+.product-card--unavailable .pc-sku,
+.product-card--unavailable .pc-price-block {
+  opacity: 0.58;
+}
+
+.product-card--unavailable .pc-product-img {
+  filter: grayscale(0.72);
+}
+
 .product-grid {
   align-items: stretch;
 }
@@ -255,6 +271,10 @@
   margin-top: 8px;
 }
 
+.product-card .pc-stock-slot--options {
+  min-height: 46px;
+}
+
 .product-card .pc-orderability {
   display: flex;
   align-items: baseline;
@@ -277,6 +297,15 @@
 
 .product-card .pc-orderability--toorder {
   color: #b45309;
+}
+
+.product-card .pc-orderability--landed,
+.product-card .pc-orderability--incoming {
+  color: #245aa7;
+}
+
+.product-card .pc-orderability--options {
+  color: #172554;
 }
 
 .product-card .pc-orderability--out {
@@ -343,6 +372,10 @@
   gap: 8px;
   margin-top: auto;
   padding-top: 12px;
+}
+
+.product-card .buy-row--options {
+  padding-top: 4px;
 }
 
 .product-card .qty-stepper {
@@ -499,7 +532,7 @@
   }
 
   .product-card .pc-stock-slot {
-    min-height: 30px;
+    min-height: 78px;
     margin-top: 4px;
   }
 

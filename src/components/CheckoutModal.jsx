@@ -8,6 +8,23 @@ import { getDeliveryAddressReview } from '../lib/checkoutReview';
 import { validatePromoCode } from '../lib/promoCode';
 import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { groupCartItemsByFulfilment } from '../../lib/cart-fulfilment.mjs';
+
+function CheckoutLine({ item, toOrder = false }) {
+  return (
+    <div className={`checkout-review-line${toOrder ? ' checkout-review-line--to-order' : ''}`}>
+      <div>
+        <div className="checkout-review-line-title">
+          <strong>{item.product.name}</strong>
+          {toOrder && <em className="checkout-to-order-badge">To order</em>}
+        </div>
+        <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+        {toOrder && <span className="checkout-to-order-guidance">Made or sourced on request · lead time confirmed before invoicing</span>}
+      </div>
+      <b>R{(item.product.price * item.qty).toFixed(2)}</b>
+    </div>
+  );
+}
 
 function ReviewField({
   icon: Icon, label, value, describedBy,
@@ -53,6 +70,7 @@ export default function CheckoutModal({
   // remains a valid choice and must not interrupt every future checkout.
   const showWhatsapp = Boolean(customer) && isWhatsappConsentUnset(customer.accept_whatsapp);
   const addressReview = getDeliveryAddressReview(customer);
+  const groupedItems = groupCartItemsByFulfilment(cartItems);
 
   // Reset the modal to its first step only when it OPENS. Depending on
   // appliedPromo?.code here was a bug: applying a valid code changed that value,
@@ -225,15 +243,34 @@ export default function CheckoutModal({
               <span>{cartItems.length} line{cartItems.length === 1 ? '' : 's'}</span>
             </div>
             <div className="checkout-review-lines">
-              {cartItems.map((item) => (
-                <div className="checkout-review-line" key={item.product.id}>
-                  <div>
-                    <strong>{item.product.name}</strong>
-                    <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+              {groupedItems.available.length > 0 && (
+                <section className="checkout-review-group" aria-labelledby="checkout-available-heading">
+                  <div className="checkout-review-group-heading" id="checkout-available-heading">
+                    <strong>Available products</strong>
+                    <span>{groupedItems.available.length} line{groupedItems.available.length === 1 ? '' : 's'}</span>
                   </div>
-                  <b>R{(item.product.price * item.qty).toFixed(2)}</b>
-                </div>
-              ))}
+                  {groupedItems.available.map((item) => (
+                    <CheckoutLine item={item} key={item.product.id} />
+                  ))}
+                </section>
+              )}
+              {groupedItems.toOrder.length > 0 && (
+                <section className="checkout-review-group checkout-review-group--to-order" aria-labelledby="checkout-to-order-heading">
+                  <div className="checkout-review-group-heading checkout-review-group-heading--to-order" id="checkout-to-order-heading">
+                    <div>
+                      <strong>To order</strong>
+                      <small>Not currently in stock</small>
+                    </div>
+                    <span>{groupedItems.toOrder.length} line{groupedItems.toOrder.length === 1 ? '' : 's'}</span>
+                  </div>
+                  {groupedItems.toOrder.map((item) => (
+                    <CheckoutLine item={item} toOrder key={item.product.id} />
+                  ))}
+                  <p className="checkout-to-order-note">
+                    We’ll confirm the expected lead time before invoicing. No payment is taken now.
+                  </p>
+                </section>
+              )}
             </div>
             <div className="checkout-review-total">
               <span>Subtotal incl. VAT</span>

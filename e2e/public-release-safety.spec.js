@@ -43,7 +43,11 @@ test('registration cannot advance without required contact details', async ({ pa
   await page.goto('/register');
 
   await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Enter your company name and the contact person’s full name.',
+  );
+  await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
 });
 
 test('registration requires at least one business category', async ({ page }) => {
@@ -65,15 +69,21 @@ test('registration requires at least one business category', async ({ page }) =>
   await addressesStep.getByPlaceholder('Suburb').first().fill('Safe Suburb');
   await addressesStep.getByPlaceholder('Postal code').first().fill('8001');
   await addressesStep.getByPlaceholder('City').first().fill('Cape Town');
-  await page.getByRole('checkbox', { name: 'Same as billing address' }).check();
+  await page.getByRole('checkbox', { name: /Use billing address for delivery/i }).check();
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   await expect(page.getByText('Step 4 of 4 — Additional')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Submit application' })).toBeDisabled();
+  const submitApplication = page.getByRole('button', { name: 'Submit application' });
+  await submitApplication.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Select at least one nature of business.',
+  );
+  await expect(page.getByText('Step 4 of 4 — Additional')).toBeVisible();
 
   await page.getByRole('button', { name: 'Retail store', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Submit application' })).toBeEnabled();
+  await submitApplication.click();
+  await expect(page.getByRole('alert')).toContainText('Blocked by non-destructive E2E suite');
 });
 
 test('policy route renders and returns to the public home', async ({ page }) => {

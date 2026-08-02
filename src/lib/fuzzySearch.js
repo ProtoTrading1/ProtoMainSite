@@ -301,11 +301,12 @@ function isAvailable(product) {
   const raw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
   if (raw !== undefined && raw !== null && raw !== '') {
     const qty = Number(raw);
-    if (Number.isFinite(qty) && qty !== 0) return true;
+    if (Number.isFinite(qty) && qty > 0) return true;
     return product?.toOrder === true
       || product?.to_order === true
       || product?.orderableWhenOutOfStock === true
-      || product?.orderable_when_out_of_stock === true;
+      || product?.orderable_when_out_of_stock === true
+      || product?.availability?.canOrder === true;
   }
   return product?.inStock !== false;
 }

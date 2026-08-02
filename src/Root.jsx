@@ -13,6 +13,7 @@ import {
   setIntercomLauncherVisibility,
 } from './lib/intercom';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
+import { rememberAuthSession } from './lib/authHeaders';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -186,6 +187,7 @@ export default function Root() {
     let unsubscribe = () => {};
     const finishBootstrap = (sess) => {
       authBootstrapped.current = true;
+      rememberAuthSession(sess);
       setSession(sess ?? null);
       if (sess?.user) {
         void import('./lib/products').then((m) => m.prefetchCatalog());
@@ -238,6 +240,7 @@ export default function Root() {
           const sess = withinPolicy(rawSession);
           authBootstrapped.current = true;
           clearTimeout(bootstrapTimer);
+          rememberAuthSession(sess);
           setSession(sess);
           if (sess?.user) {
             if (event === 'TOKEN_REFRESHED') {
@@ -269,6 +272,7 @@ export default function Root() {
 
   const handleLogin = async (sess) => {
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
+    rememberAuthSession(sess);
     setSession(sess);
     try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
@@ -284,6 +288,7 @@ export default function Root() {
     // Drop the Intercom contact too, or the next person on this browser
     // inherits the signed-out customer's identity — and their trade prices.
     resetIntercom();
+    rememberAuthSession(null);
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);

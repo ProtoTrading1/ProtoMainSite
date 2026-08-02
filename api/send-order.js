@@ -12,6 +12,7 @@ import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './
 import { hasCustomerUsedPromo, recordPromoRedemption, validatePromoCode } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
+import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
 import {
   assertOrderCaptureSchemaReady,
   enqueueFailedOrderDeliveries,
@@ -171,12 +172,13 @@ async function resolveAuthoritativePrices(items) {
     .filter(Boolean))];
   const productBySku = new Map();
   const productByBarcode = new Map();
+  let incomingBySku = new Map();
+  const sb = getStockClient();
   try {
-    const sb = getStockClient();
     if (skus.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, stock_qty, available_stock, to_order')
         .in('sku', skus);
       if (error) throw error;
       for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
@@ -184,13 +186,18 @@ async function resolveAuthoritativePrices(items) {
     if (barcodes.length) {
       const { data, error } = await sb
         .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description')
+        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, stock_qty, available_stock, to_order')
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
         if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
       }
     }
+    const resolvedSkus = [...new Set([
+      ...productBySku.values(),
+      ...productByBarcode.values(),
+    ].map((row) => row.sku).filter(Boolean))];
+    incomingBySku = await loadIncomingAvailabilityMap(sb, resolvedSkus);
   } catch (err) {
     console.error('send-order: authoritative product lookup failed:', err?.message || err);
     const unavailable = new Error('Current product pricing could not be verified. Please try again.');
@@ -215,6 +222,12 @@ async function resolveAuthoritativePrices(items) {
       error.status = 400;
       throw error;
     }
+    const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
+    if (!availability.canOrder) {
+      const error = new Error(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`);
+      error.status = 409;
+      throw error;
+    }
     const price = customerFacingCataloguePrice(rawPrice);
     const authoritativeSku = cleanText(row.sku);
     const authoritativeBarcode = cleanText(row.barcode);
@@ -233,6 +246,8 @@ async function resolveAuthoritativePrices(items) {
         unitsOfIssue,
         casePack: sellingUnitDetails(unitsOfIssue).label,
         packDescription: cleanText(row.pack_description),
+        availabilityState: availability.state,
+        availabilityLabel: availability.label,
       },
     };
   });

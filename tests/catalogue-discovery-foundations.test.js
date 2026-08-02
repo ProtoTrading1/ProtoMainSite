@@ -25,13 +25,42 @@ test('catalogue search explains all supported product identifiers', async () => 
   assert.equal((header.match(/Product name, SKU or barcode…/g) || []).length, 2);
 });
 
-test('orderability remains visible on mobile without automatic per-card stock requests', async () => {
-  const card = await readSource('src/components/ProductCard.jsx');
-  const cardCss = await readSource('src/components/ProductCard.css');
-  const siteCss = await readSource('src/index.css');
-  assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{state\}`\}/);
-  assert.match(card, /<StockCheck sku=\{sku\} \/>/, 'live grid stock remains customer initiated');
-  assert.match(siteCss, /\.product-card \.stock-check,[\s\S]*?display: none !important;/);
+test('unavailable products remain discoverable and are visually disabled', async () => {
+  const [app, content, card, cardCss] = await Promise.all([
+    readSource('src/App.jsx'),
+    readSource('src/components/MainContent.jsx'),
+    readSource('src/components/ProductCard.jsx'),
+    readSource('src/components/ProductCard.css'),
+  ]);
+  assert.match(app, /sessionStorage\.removeItem\(IN_STOCK_ONLY_KEY\)/);
+  assert.doesNotMatch(content, /Available only|<strong>Orderable<\/strong>/);
+  assert.match(card, /product-card--unavailable/);
+  assert.match(cardCss, /\.product-card\.product-card--unavailable/);
+  assert.match(cardCss, /filter: grayscale\(0\.72\)/);
+});
+
+test('orderability and customer-initiated live stock remain visible on mobile', async () => {
+  const [app, card, cardCss, siteCss] = await Promise.all([
+    readSource('src/App.jsx'),
+    readSource('src/components/ProductCard.jsx'),
+    readSource('src/components/ProductCard.css'),
+    readSource('src/index.css'),
+  ]);
+  assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{badgeClass\}`\}/);
+  assert.match(card, /label: 'Stock varies by option'/, 'variant groups use a neutral group-level stock message');
+  assert.match(card, /!product\.isVariantGroup && sku \? <StockCheck sku=\{sku\} \/>/, 'single-SKU live grid stock remains customer initiated');
+  assert.match(card, /<PackageSearch size=\{16\} \/>[\s\S]*Choose option/, 'variant groups expose one clear primary action');
+  assert.doesNotMatch(card, /Select option for live stock|View options/, 'duplicate option actions are removed');
+  assert.match(card, /isVariantGroup \? \([\s\S]*Choose option[\s\S]*\) : \([\s\S]*aria-label="Quantity"/, 'group quantity controls wait until an exact option is chosen');
+  assert.match(card, /Choose an option above to check live stock and continue/, 'the option modal explains the next step');
+  assert.match(card, /isVariantGroup && !selectedVariant \? \([\s\S]*pz-options-prompt[\s\S]*\) : \([\s\S]*pz-qty-row/, 'modal quantity and ordering wait for an explicit variant choice');
+  assert.doesNotMatch(card, /initialZoomOpen && isVariantGroup/, 'the first option is never silently selected for the customer');
+  assert.match(card, /optionAvailability\.label/, 'each option exposes its own catalogue availability before the live check');
+  assert.match(card, /variants\?\.scrollIntoView/, 'the mobile preview scrolls the exact choices into view');
+  assert.match(app, /initialFocusOptions=\{previewOptionsFirst\}/, 'the global product preview preserves the stock-action intent');
+  assert.match(siteCss, /\.product-card \.stock-check\s*\{[\s\S]*?min-height: 44px;/);
+  assert.match(siteCss, /\.product-card \.check-stock-btn\s*\{[\s\S]*?width: 100%;/);
+  assert.doesNotMatch(siteCss, /\.product-card \.stock-check,[\s\S]{0,160}?display: none !important;/);
   assert.match(cardCss, /@media \(max-width: 768px\)[\s\S]*?\.product-card \.pc-orderability/);
   assert.match(card, /Minimum \$\{minimum\}/);
 });
