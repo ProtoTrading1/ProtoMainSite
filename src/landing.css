@@ -2442,6 +2442,12 @@
   background: rgba(255,255,255,0.08);
 }
 
+.lp-quiz-field-help {
+  color: rgba(255,255,255,0.52);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .lp-quiz-field select option {
   background: #1e293b;
   color: #fff;

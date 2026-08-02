@@ -36,6 +36,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [website, setWebsite] = useState('');
@@ -126,6 +127,9 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (businessType.includes('Other') && !otherType.trim()) {
       issues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
     }
+    if (businessDescription.trim().length < 20) {
+      issues.push({ key: 'businessDescription', message: 'Business description (at least 20 characters)', section: 'business' });
+    }
     if (!country.trim()) {
       issues.push({ key: 'country', message: 'Country', section: 'addresses' });
     }
@@ -180,6 +184,9 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       if (businessType.includes('Other') && !otherType.trim()) {
         businessIssues.push({ key: 'otherType', message: 'Describe your business type', section: 'business' });
       }
+      if (businessDescription.trim().length < 20) {
+        businessIssues.push({ key: 'businessDescription', message: 'Business description (at least 20 characters)', section: 'business' });
+      }
       return businessIssues;
     }
     if (step === 3) return issues.filter((issue) => issue.section === 'addresses');
@@ -233,6 +240,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           businessName: 1,
           businessType: 2,
           otherType: 2,
+          businessDescription: 2,
           addresses: 3,
           country: 3,
           billingStreet: 3,
@@ -284,6 +292,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
           .join(', ') || null,
+        businessDescription: businessDescription.trim(),
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -573,6 +582,20 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                           />
                         </div>
                       )}
+                      <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+                        <label htmlFor="register-business-description">Briefly describe your business <span className="lp-register-required">(required)</span></label>
+                        <textarea
+                          id="register-business-description"
+                          value={businessDescription}
+                          onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                          placeholder="What do you sell, where do you sell, and who are your typical customers?"
+                          minLength={20}
+                          maxLength={400}
+                          required
+                          aria-invalid={fieldHasIssue('businessDescription')}
+                        />
+                        <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                      </div>
                     </>
                   )}
                 </section>
@@ -593,6 +616,20 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     otherValue={otherType}
                     onOtherChange={setOtherType}
                   />
+                  <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+                    <label htmlFor="standalone-business-description">Briefly describe your business <span className="lp-register-required">(required)</span></label>
+                    <textarea
+                      id="standalone-business-description"
+                      value={businessDescription}
+                      onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                      placeholder="What do you sell, where do you sell, and who are your typical customers?"
+                      minLength={20}
+                      maxLength={400}
+                      required
+                      aria-invalid={fieldHasIssue('businessDescription')}
+                    />
+                    <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                  </div>
                   <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
                 </section>
                 )}

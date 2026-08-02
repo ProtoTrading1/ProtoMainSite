@@ -25,7 +25,6 @@ const BUSINESS_TYPES = [
   'Events, parties & décor',
   'Craft & bead shop',
   'Packaging supplier',
-  'Gift shop',
   'Educational supplier',
   'Religious / church store',
   'Promotional products',
@@ -100,6 +99,7 @@ export default function Questionnaire({ onLogin }) {
   } = addresses;
   const [businessType, setBusinessType] = useState([]);
   const [otherType, setOtherType] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
   const [monthlySpend, setMonthlySpend] = useState('');
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
@@ -144,6 +144,7 @@ export default function Questionnaire({ onLogin }) {
     }
     if (step === 3) {
       return businessType.length > 0
+        && businessDescription.trim().length >= 20
         && (!businessType.includes('Other') || otherType.trim());
     }
     return false;
@@ -186,6 +187,7 @@ export default function Questionnaire({ onLogin }) {
         .filter(Boolean)
         .map((value) => value.trim().toUpperCase())
         .join(', ') || null,
+      businessDescription: businessDescription.trim(),
       monthlySpend: monthlySpend ? monthlySpend.toUpperCase() : null,
       website: website.trim() ? website.trim().toUpperCase() : null,
       acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -439,7 +441,7 @@ export default function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              Select at least one nature of business. Monthly spend, website and customer code are optional.
+              Select at least one nature of business and add a short description. The other details are optional.
             </p>
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
             <div className="lp-quiz-types">
@@ -489,6 +491,19 @@ export default function Questionnaire({ onLogin }) {
                 />
               </motion.div>
             )}
+            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+              <label htmlFor="questionnaire-business-description">Briefly describe your business <span style={{ opacity: 0.7 }}>(required)</span></label>
+              <textarea
+                id="questionnaire-business-description"
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                placeholder="What do you sell, where do you sell, and who are your typical customers?"
+                minLength={20}
+                maxLength={400}
+                required
+              />
+              <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+            </div>
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
               <label>Website or social media <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
               <input

@@ -37,7 +37,6 @@ const BUSINESS_TYPES = [
   'Events, parties & décor',
   'Craft & bead shop',
   'Packaging supplier',
-  'Gift shop',
   'Educational supplier',
   'Religious / church store',
   'Promotional products',
@@ -298,6 +297,7 @@ function Questionnaire({ onLogin }) {
   } = addresses;
   const [businessType, setBusinessType] = useState([]); // multi-select
   const [otherType, setOtherType] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
   const toggleBusinessType = (t) =>
     setBusinessType((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   const [monthlySpend, setMonthlySpend] = useState('');
@@ -345,6 +345,7 @@ function Questionnaire({ onLogin }) {
     }
     if (step === 3) {
       return businessType.length > 0
+        && businessDescription.trim().length >= 20
         && (!businessType.includes('Other') || otherType.trim());
     }
     return false;
@@ -361,7 +362,7 @@ function Questionnaire({ onLogin }) {
         'Enter your company name and the contact person’s full name.',
         `Enter a valid email and phone number, choose Yes or No for WhatsApp, and use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
         'Complete the required billing and delivery address fields, including building type.',
-        'Select at least one nature of business. If you choose Other, describe it.',
+        'Select at least one nature of business and describe your business in at least 20 characters. If you choose Other, name the business type.',
       ];
       setStepError(messages[step]);
       trackJourneyEvent('registration_validation_failed', {
@@ -409,6 +410,7 @@ function Questionnaire({ onLogin }) {
           .map((t) => (t === 'Other' ? otherType.trim() : t))
           .filter(Boolean)
           .join(', ') || null,
+        businessDescription: businessDescription.trim(),
         monthlySpend: monthlySpend || null,
         website: website.trim() || null,
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
@@ -708,24 +710,10 @@ function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              Select at least one nature of business. Monthly spend and website are optional.
+              Two quick details are required. Monthly spend and website are optional.
             </p>
-            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
-            <div className="lp-quiz-types">
-              {MONTHLY_SPEND_BANDS.map((band) => (
-                <button
-                  key={band}
-                  type="button"
-                  className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
-                  onClick={() => setMonthlySpend(band)}
-                >
-                  {band}
-                </button>
-              ))}
-            </div>
-            <div style={{ height: '18px' }} />
             <div id="landing-business-type-label" style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
-              Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
+              1. Nature of business <span style={{ opacity: 0.7, fontWeight: 600 }}>(required — select all that apply)</span>
             </div>
             <div className="lp-quiz-types" role="group" aria-labelledby="landing-business-type-label" aria-required="true">
               {BUSINESS_TYPES.map((t) => (
@@ -758,6 +746,40 @@ function Questionnaire({ onLogin }) {
                 />
               </motion.div>
             )}
+            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
+              <label htmlFor="landing-business-description">
+                2. Briefly describe your business <span style={{ opacity: 0.7 }}>(required)</span>
+              </label>
+              <textarea
+                id="landing-business-description"
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value.slice(0, 400))}
+                placeholder="For example: We sell gifts and party supplies from our shop in Bellville to walk-in customers and small event planners."
+                minLength={20}
+                maxLength={400}
+                required
+                aria-describedby="landing-business-description-help"
+              />
+              <span id="landing-business-description-help" className="lp-quiz-field-help">
+                Tell us what you sell, where you sell — store, online or market — and who your typical customers are. {businessDescription.length}/400
+              </span>
+            </div>
+            <div style={{ height: '18px' }} />
+            <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
+              Estimated monthly spend <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span>
+            </div>
+            <div className="lp-quiz-types">
+              {MONTHLY_SPEND_BANDS.map((band) => (
+                <button
+                  key={band}
+                  type="button"
+                  className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
+                  onClick={() => setMonthlySpend(band)}
+                >
+                  {band}
+                </button>
+              ))}
+            </div>
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
               <label>Website or social media <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
               <input

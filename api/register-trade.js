@@ -60,6 +60,7 @@ function buildAdminSignupHtml({
   province,
   city,
   businessType,
+  businessDescription,
   customerCode,
   vatNumber,
   monthlySpend,
@@ -87,6 +88,7 @@ function buildAdminSignupHtml({
     ['Province', caps(province)],
     ['City', caps(city)],
     ['Business type', caps(businessType)],
+    ['Business description', String(businessDescription || '').trim()],
     ['Customer code', caps(customerCode)],
   ].filter(([, value]) => value);
 
@@ -251,6 +253,7 @@ export default async function handler(req, res) {
     province,
     city,
     businessType,
+    businessDescription,
     monthlySpend,
     website,
     acceptWhatsapp,
@@ -274,6 +277,11 @@ export default async function handler(req, res) {
 
   if (!String(businessType || '').trim()) {
     return res.status(400).json({ error: 'Please select at least one nature of business option.' });
+  }
+
+  const normalizedBusinessDescription = String(businessDescription || '').trim().slice(0, 400);
+  if (normalizedBusinessDescription.length < 20) {
+    return res.status(400).json({ error: 'Please describe your business in at least 20 characters.' });
   }
 
   // Throttling: registration creates an auth account and sends emails, so it
@@ -359,6 +367,7 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
     },
@@ -411,6 +420,7 @@ export default async function handler(req, res) {
       province: province || null,
       city: city || null,
       business_type: businessType || null,
+      business_description: normalizedBusinessDescription,
       monthly_spend: monthlySpend || null,
       website: website || null,
       claimed_customer_code: claimedCustomerCode,
@@ -437,6 +447,7 @@ export default async function handler(req, res) {
       province: _pr,
       city: _ci,
       business_type: _bt,
+      business_description: _bd,
       customer_code: _cc,
       sales_last_12_months: _sl,
       invoice_count: _ic,
@@ -463,6 +474,7 @@ export default async function handler(req, res) {
         'province',
         'city',
         'business_type',
+        'business_description',
         'customer_code',
         'sales_last_12_months',
         'invoice_count',
@@ -472,14 +484,16 @@ export default async function handler(req, res) {
         'claimed_customer_code',
       ].includes(key)),
     );
-    const payloadWithoutClaimedCode = Object.fromEntries(
-      Object.entries(fullPayload).filter(([key]) => key !== 'claimed_customer_code'),
+    const payloadWithoutNewColumns = Object.fromEntries(
+      Object.entries(fullPayload).filter(([key]) => !['claimed_customer_code', 'business_description'].includes(key)),
     );
 
     const upsertAttempts = [
       fullPayload,
-      payloadWithoutClaimedCode,
-      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => key !== 'claimed_customer_code')),
+      Object.fromEntries(Object.entries(fullPayload).filter(([key]) => key !== 'business_description')),
+      payloadWithoutNewColumns,
+      { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, business_description: _bd, company_address: _ca, street_name: _sn, suburb: _su, postal_code: _pc, building_type: _btp, unit_number: _un, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn, customer_code: _cc, sales_last_12_months: _sl, invoice_count: _ic, last_purchase_date: _lp, contact_name: _cn, first_name: _fn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt, company_address: _ca, vat_number: _vn },
       { ...basePayload, business_name: _bn, country: _co, province: _pr, city: _ci, business_type: _bt },
@@ -537,6 +551,7 @@ export default async function handler(req, res) {
       province,
       city,
       businessType,
+      businessDescription: normalizedBusinessDescription,
       customerCode: claimedCustomerCode,
       vatNumber: normalizedVatNumber,
       monthlySpend: monthlySpend || null,
