@@ -52,7 +52,7 @@ const MONTHLY_SPEND_BANDS = [
   'R50,000+',
 ];
 
-const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
+const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Business'];
 
 function CustomerIcon() {
   return (
@@ -518,6 +518,23 @@ function Questionnaire({ onLogin }) {
                   placeholder="VAT registration number"
                 />
               </div>
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label htmlFor="trade-customer-code">Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
+                <input
+                  id="trade-customer-code"
+                  name="customer_code"
+                  autoComplete="off"
+                  value={customerCode}
+                  onChange={(e) => setCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                  onKeyDown={handleKey}
+                  placeholder="6-character code, e.g. ETOSHA"
+                  maxLength={6}
+                  style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
+                />
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
+                  This helps us find your previous Proto purchasing history. Leave it blank if you do not know it.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -696,7 +713,7 @@ function Questionnaire({ onLogin }) {
           <div className="lp-quiz-step">
             <h3>Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
-              Select at least one nature of business. Monthly spend, website and customer code are optional.
+              Select at least one nature of business. Monthly spend and website are optional.
             </p>
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Estimated monthly spend</div>
             <div className="lp-quiz-types">
@@ -754,20 +771,6 @@ function Questionnaire({ onLogin }) {
                 onKeyDown={handleKey}
                 placeholder="e.g. www.yourshop.co.za or @yourshop"
               />
-            </div>
-            <div className="lp-quiz-field" style={{ marginTop: 18 }}>
-              <label>Existing Proto customer code <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
-              <input
-                value={customerCode}
-                onChange={(e) => setCustomerCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                onKeyDown={handleKey}
-                placeholder="6-character code, e.g. ETOSHA"
-                maxLength={6}
-                style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}
-              />
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '8px 0 0', lineHeight: 1.5 }}>
-                If your email has changed since you last ordered, enter your account code so we can match your existing customer record.
-              </p>
             </div>
           </div>
         )}
