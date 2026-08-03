@@ -48,7 +48,7 @@ test('sign-in validates locally and reset mail is safely intercepted', async ({ 
 });
 
 test('registration cannot advance without required contact details', async ({ page }) => {
-  await page.goto('/register');
+  await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -59,7 +59,7 @@ test('registration cannot advance without required contact details', async ({ pa
 });
 
 test('registration requires structured business details', async ({ page }) => {
-  await page.goto('/register');
+  await page.goto('/');
 
   await page.getByPlaceholder('Name', { exact: true }).fill('Safe Test Company');
   await page.getByPlaceholder('Full contact name').fill('Safe Browser Test');

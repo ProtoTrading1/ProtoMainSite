@@ -6,12 +6,6 @@
   "redirects": [
     {
       "source": "/register",
-      "has": [
-        {
-          "type": "host",
-          "value": "register.proto.co.za"
-        }
-      ],
       "destination": "/",
       "permanent": false
     },
@@ -21,17 +15,6 @@
         {
           "type": "host",
           "value": "register.proto.co.za"
-        }
-      ],
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/register",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.register.proto.co.za"
         }
       ],
       "destination": "/",
