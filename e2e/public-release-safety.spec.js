@@ -3,6 +3,14 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   // The release suite must never create a customer, authenticate, or send mail.
   await page.route('**/api/**', async (route) => {
+    if (new URL(route.request().url()).pathname === '/api/check-registration-email') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ available: true, exists: false, recovery: null }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 503,
       contentType: 'application/json',

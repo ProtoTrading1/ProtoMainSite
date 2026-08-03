@@ -9,6 +9,7 @@ import LandingDepartmentsSection from '../components/landing/LandingDepartmentsS
 import LandingApplySection from '../components/landing/LandingApplySection';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
+import { checkRegistrationEmail } from '../lib/registrationEmailCheck';
 import { PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
 import { motion } from 'motion/react';
 import {
@@ -288,6 +289,8 @@ function Questionnaire({ onLogin }) {
   const [website, setWebsite] = useState('');
   const [customerCode, setCustomerCode] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [emailCheck, setEmailCheck] = useState({ status: 'idle', checkedEmail: '', message: '' });
+  const emailCheckSequence = useRef(0);
   const [stepError, setStepError] = useState('');
 
   useEffect(() => {
@@ -304,6 +307,34 @@ function Questionnaire({ onLogin }) {
     const domain = v.split('@')[1];
     if (BLOCKED_DOMAINS.includes(domain)) return 'Please use your real business email address.';
     return '';
+  };
+
+  const checkEmailAvailability = async () => {
+    const normalized = email.trim().toLowerCase();
+    const validationError = validateEmailField(normalized);
+    setEmailError(validationError);
+    if (validationError) {
+      setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+      return false;
+    }
+    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return true;
+    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'existing') return false;
+    const sequence = ++emailCheckSequence.current;
+    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
+    try {
+      const result = await checkRegistrationEmail(normalized);
+      if (sequence !== emailCheckSequence.current) return false;
+      if (result.exists) {
+        setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
+        return false;
+      }
+      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
+      return true;
+    } catch (error) {
+      if (sequence !== emailCheckSequence.current) return false;
+      setEmailCheck({ status: 'error', checkedEmail: normalized, message: error.message });
+      return false;
+    }
   };
 
   const canNext = () => {
@@ -338,9 +369,7 @@ function Questionnaire({ onLogin }) {
 
   const advance = async () => {
     if (step === 1) {
-      const err = validateEmailField(email);
-      setEmailError(err);
-      if (err) return;
+      if (!(await checkEmailAvailability())) return;
     }
     if (!canNext()) {
       const messages = [
@@ -537,8 +566,13 @@ function Questionnaire({ onLogin }) {
                   autoComplete="email"
                   inputMode="email"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
-                  onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
+                  onChange={(e) => {
+                    emailCheckSequence.current += 1;
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError('');
+                    setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+                  }}
+                  onBlur={() => { if (email.trim()) void checkEmailAvailability(); }}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
                   aria-invalid={!!emailError}
@@ -550,6 +584,20 @@ function Questionnaire({ onLogin }) {
                   <span id="trade-email-error" style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
                     {emailError}
                   </span>
+                )}
+                {!emailError && emailCheck.status !== 'idle' && (
+                  <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
+                    <span>{emailCheck.message}</span>
+                    {emailCheck.status === 'existing' && onLogin && (
+                      <div className="lp-register-recovery-actions">
+                        <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'login' })}>Sign in</button>
+                        <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'forgot' })}>Reset password</button>
+                      </div>
+                    )}
+                    {emailCheck.status === 'error' && (
+                      <button type="button" className="lp-register-email-retry" onClick={() => void checkEmailAvailability()}>Try again</button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
@@ -834,7 +882,7 @@ function Questionnaire({ onLogin }) {
         <button
           type="button"
           className="lp-quiz-next"
-          disabled={submitting}
+          disabled={submitting || emailCheck.status === 'checking' || (step === 1 && emailCheck.status === 'existing')}
           onClick={() => void advance()}
         >
           {submitting ? 'Submitting…' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}

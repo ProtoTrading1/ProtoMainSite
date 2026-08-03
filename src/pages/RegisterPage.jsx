@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import BusinessCategoryPicker from '../components/register/BusinessCategoryPicker';
 import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import MonthlySpendOptional from '../components/register/MonthlySpendOptional';
@@ -7,6 +7,7 @@ import { MONTHLY_SPEND_BANDS, PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../li
 import { Check, CheckCircle2, Eye, EyeOff, Lock, MessageCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { submitTradeApplication } from '../lib/tradeApplication';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
+import { checkRegistrationEmail } from '../lib/registrationEmailCheck';
 import ProtoLogo from '../components/ProtoLogo';
 import '../landing.css';
 
@@ -79,6 +80,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   } = addresses;
 
   const [emailError, setEmailError] = useState('');
+  const [emailCheck, setEmailCheck] = useState({ status: 'idle', checkedEmail: '', message: '' });
+  const emailCheckSequence = useRef(0);
   const [validationIssues, setValidationIssues] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -204,11 +207,37 @@ export default function RegisterPage({ onLogin, standalone = false }) {
 
   const canAdvanceStandalone = () => standaloneStepIssues(standaloneStep).length === 0;
 
-  const advanceStandalone = () => {
+  const checkEmailAvailability = async () => {
+    const normalized = email.trim().toLowerCase();
+    const validationError = validateEmailField(normalized);
+    setEmailError(validationError);
+    if (validationError) {
+      setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+      return false;
+    }
+    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return true;
+    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'existing') return false;
+    const sequence = ++emailCheckSequence.current;
+    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
+    try {
+      const result = await checkRegistrationEmail(normalized);
+      if (sequence !== emailCheckSequence.current) return false;
+      if (result.exists) {
+        setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
+        return false;
+      }
+      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
+      return true;
+    } catch (error) {
+      if (sequence !== emailCheckSequence.current) return false;
+      setEmailCheck({ status: 'error', checkedEmail: normalized, message: error.message });
+      return false;
+    }
+  };
+
+  const advanceStandalone = async () => {
     if (standaloneStep === 0) {
-      const err = validateEmailField(email);
-      setEmailError(err);
-      if (err) return;
+      if (!(await checkEmailAvailability())) return;
     }
 
     const issues = standaloneStepIssues(standaloneStep);
@@ -235,7 +264,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (standalone && standaloneStep < STANDALONE_STEPS.length - 1) {
-      advanceStandalone();
+      await advanceStandalone();
       return;
     }
 
@@ -398,8 +427,13 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         autoComplete="email"
                         type="email"
                         value={email}
-                        onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
-                        onBlur={() => setEmailError(email.trim() ? validateEmailField(email) : '')}
+                        onChange={(e) => {
+                          emailCheckSequence.current += 1;
+                          setEmail(e.target.value);
+                          if (emailError) setEmailError('');
+                          setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+                        }}
+                        onBlur={() => { if (email.trim()) void checkEmailAvailability(); }}
                         placeholder="name@business.co.za"
                         aria-invalid={!!emailError || fieldHasIssue('email')}
                         aria-describedby={emailError ? 'register-email-error' : undefined}
@@ -407,6 +441,20 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         aria-required="true"
                       />
                       {emailError && <span id="register-email-error" className="lp-register-field-error">{emailError}</span>}
+                      {!emailError && emailCheck.status !== 'idle' && (
+                        <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
+                          <span>{emailCheck.message}</span>
+                          {emailCheck.status === 'existing' && onLogin && (
+                            <div className="lp-register-recovery-actions">
+                              <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'login' })}>Sign in</button>
+                              <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'forgot' })}>Reset password</button>
+                            </div>
+                          )}
+                          {emailCheck.status === 'error' && (
+                            <button type="button" className="lp-register-email-retry" onClick={() => void checkEmailAvailability()}>Try again</button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className={`lp-quiz-field${fieldHasIssue('phone') ? ' lp-quiz-field--error' : ''}`}>
                       <label htmlFor="register-phone">Phone number</label>
@@ -745,7 +793,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                     <button
                       type="submit"
                       className="lp-register-step-continue"
-                      disabled={submitting || !canAdvanceStandalone()}
+                      disabled={submitting || emailCheck.status === 'checking' || emailCheck.status === 'existing' || !canAdvanceStandalone()}
                     >
                       {submitting
                         ? 'Submitting your application…'

@@ -4793,6 +4793,35 @@
   font-weight: 600;
 }
 
+.lp-register-email-status {
+  grid-column: 1 / -1;
+  margin-top: 7px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.lp-register-email-status--available { border-color: rgba(74, 222, 128, 0.45); color: #86efac; }
+.lp-register-email-status--existing { border-color: rgba(248, 113, 113, 0.55); color: #fecaca; background: rgba(127, 29, 29, 0.18); }
+.lp-register-email-status--error { border-color: rgba(251, 191, 36, 0.5); color: #fde68a; }
+
+.lp-register-email-retry {
+  min-height: 44px;
+  margin: 10px 0 0;
+  padding: 8px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .lp-register-recovery-action {
   display: block;
   min-height: 44px;
