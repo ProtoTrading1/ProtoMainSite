@@ -76,7 +76,7 @@ test('registration requires structured business details', async ({ page }) => {
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
-  await expect(page.getByText('Step 4 of 4 — Additional')).toBeVisible();
+  await expect(page.getByText('Step 4 of 4 — Business')).toBeVisible();
   const submitApplication = page.getByRole('button', { name: 'Submit application' });
   await expect(submitApplication).toBeDisabled();
 
