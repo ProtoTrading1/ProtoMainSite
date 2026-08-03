@@ -106,7 +106,7 @@ export default function Root() {
     };
   }, [preRegisterHost]);
 
-  const isRegisterRoute = !adminHost && !preRegisterHost && (pathname === '/register' || pathname === '/pre-register');
+  const isPreRegisterRoute = !adminHost && !preRegisterHost && pathname === '/pre-register';
 
   const setSurface = useCallback((next) => {
     setView(next);
@@ -384,11 +384,9 @@ export default function Root() {
     return registrationLanding;
   }
 
-  if (isRegisterRoute) {
+  if (isPreRegisterRoute) {
     if (session === undefined) return authSurfaceFallback;
-    if (!session) {
-      return registrationLanding;
-    }
+    if (!session) return registrationLanding;
   }
 
   if (!adminHost && route.startsWith('#/policies')) return <Suspense fallback={authSurfaceFallback}><PoliciesPage onLogin={openLogin} /></Suspense>;
