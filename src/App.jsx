@@ -1127,7 +1127,8 @@ export default function App({
     }
     const maxQty = cartQtyCapForProduct(product);
     if (maxQty <= 0) return;
-    const requestedQty = normalizeCartQtyInput(qty);
+    const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
+    const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
 
     dismissWelcome();
     setCartItems((prev) => {
@@ -1172,7 +1173,8 @@ export default function App({
       if (item.product.id !== id) return [item];
       const maxQty = cartQtyCapForProduct(item.product);
       if (maxQty <= 0) return [];
-      const nextQty = Math.max(1, Math.min(maxQty, requestedQty));
+      const minimumQty = Math.max(1, Math.min(maxQty, Math.floor(Number(item.product?.minQty) || 1)));
+      const nextQty = Math.max(minimumQty, Math.min(maxQty, requestedQty));
       return [{ ...item, qty: nextQty }];
     }));
     markCartActivity();

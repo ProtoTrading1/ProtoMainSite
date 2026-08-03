@@ -38,16 +38,17 @@ function QuantityStepper({ item, updateQty, disabled = false }) {
   // Over-ordering is allowed (backorder request); the shortfall is surfaced by
   // the per-line advisory below, so the input only enforces a sane ceiling.
   const [draftQty, setDraftQty] = useState(() => String(item.qty));
+  const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(item.product?.minQty) || 1)));
   useEffect(() => setDraftQty(String(item.qty)), [item.qty]);
 
   const commitQty = (value = draftQty) => {
-    const nextQty = normalizeCartQuantity(value, item.qty);
+    const nextQty = normalizeCartQuantity(value, item.qty, minimumQty);
     setDraftQty(String(nextQty));
     updateQty(item.product.id, nextQty);
   };
 
   const stepQty = (delta) => {
-    const nextQty = stepCartQuantity(draftQty, item.qty, delta);
+    const nextQty = stepCartQuantity(draftQty, item.qty, delta, minimumQty);
     commitQty(nextQty);
   };
 
@@ -56,7 +57,7 @@ function QuantityStepper({ item, updateQty, disabled = false }) {
       <button
         onClick={() => stepQty(-1)}
         type="button"
-        disabled={disabled}
+        disabled={disabled || Number(draftQty) <= minimumQty}
         aria-label={`Decrease quantity for ${item.product.name}`}
       >
         -
@@ -64,7 +65,7 @@ function QuantityStepper({ item, updateQty, disabled = false }) {
       <input
         aria-label={`Quantity for ${item.product.code}`}
         inputMode="numeric"
-        min="1"
+        min={minimumQty}
         max="9999"
         type="number"
         value={draftQty}
@@ -383,6 +384,9 @@ export default function Drawer({
               <h3>{item.product.name}</h3>
               <span>{item.product.code}</span>
               <span>Sold as: {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+              {Number(item.product.minQty) > 1 && (
+                <span>Minimum: {item.product.minQty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+              )}
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <QuantityStepper item={item} updateQty={updateQty} disabled={basketLoading} />

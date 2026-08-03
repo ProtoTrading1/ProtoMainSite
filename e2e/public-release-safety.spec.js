@@ -50,7 +50,7 @@ test('registration cannot advance without required contact details', async ({ pa
   await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
 });
 
-test('registration requires at least one business category', async ({ page }) => {
+test('registration requires structured business details', async ({ page }) => {
   await page.goto('/register');
 
   await page.getByPlaceholder('Name', { exact: true }).fill('Safe Test Company');
@@ -69,19 +69,25 @@ test('registration requires at least one business category', async ({ page }) =>
   await addressesStep.getByPlaceholder('Suburb').first().fill('Safe Suburb');
   await addressesStep.getByPlaceholder('Postal code').first().fill('8001');
   await addressesStep.getByPlaceholder('City').first().fill('Cape Town');
-  await page.getByRole('checkbox', { name: /Use billing address for delivery/i }).check();
+  await addressesStep.getByPlaceholder('Street name and number').last().fill('1 Safety Street');
+  await addressesStep.getByPlaceholder('Suburb').last().fill('Safe Suburb');
+  await addressesStep.getByPlaceholder('Postal code').last().fill('8001');
+  await addressesStep.getByPlaceholder('City').last().fill('Cape Town');
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
-  await expect(page.getByText('Step 4 of 4 — Additional')).toBeVisible();
+  await expect(page.getByText('Step 4 of 4 — Business')).toBeVisible();
   const submitApplication = page.getByRole('button', { name: 'Submit application' });
   await submitApplication.click();
   await expect(page.getByRole('alert')).toContainText(
-    'Select at least one nature of business.',
+    'Select at least one way you trade, at least one product category, and describe your business in at least 20 characters.',
   );
-  await expect(page.getByText('Step 4 of 4 — Additional')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Retail store', exact: true }).click();
+  await page.getByRole('button', { name: 'Physical retail store', exact: true }).click();
+  await page.getByRole('button', { name: 'Art, craft & beads', exact: true }).click();
+  await page.getByPlaceholder(/Gifts and party supplies sold/).fill(
+    'We sell gifts and craft supplies to walk-in retail customers.',
+  );
   await submitApplication.click();
   await expect(page.getByRole('alert')).toContainText('Blocked by non-destructive E2E suite');
 });

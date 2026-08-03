@@ -19,6 +19,9 @@ function CheckoutLine({ item, toOrder = false }) {
           {toOrder && <em className="checkout-to-order-badge">To order</em>}
         </div>
         <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+        {Number(item.product.minQty) > 1
+          ? <span>Minimum order: {item.product.minQty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+          : null}
         {toOrder && <span className="checkout-to-order-guidance">Made or sourced on request · lead time confirmed before invoicing</span>}
       </div>
       <b>R{(item.product.price * item.qty).toFixed(2)}</b>
