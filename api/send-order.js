@@ -714,6 +714,15 @@ export function buildOrderEmailHtml({
 }) {
   const isTeam = audience === 'team';
   const name = escapeHtml(cleanText(customer?.name, 'there'));
+  const contactName = cleanText(customer?.name, 'Not provided');
+  const businessName = cleanText(customer?.business);
+  const distinctContact = businessName
+    && contactName
+    && businessName.toLowerCase() !== contactName.toLowerCase();
+  const teamCustomerPrimary = escapeHtml(businessName || contactName);
+  const teamCustomerContact = distinctContact
+    ? `<div style="font-size:13px;color:#475569;line-height:1.6;">Contact: ${escapeHtml(contactName)}</div>`
+    : '';
   const rows = buildOrderEmailRows(items);
   const itemCount = items.length;
   const ref = escapeHtml(cleanText(orderNumber, ''));
@@ -747,8 +756,9 @@ export function buildOrderEmailHtml({
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
         <tr>
           <td style="vertical-align:top;padding-right:10px;width:50%;">
-            <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Customer</div>
-            <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.5;">${escapeHtml(cleanText(customer?.name, 'Not provided'))}</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Company / customer</div>
+            <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.5;">${teamCustomerPrimary}</div>
+            ${teamCustomerContact}
             <div style="font-size:13px;color:#475569;line-height:1.6;">${escapeHtml(cleanText(customer?.email, 'No email'))}<br/>${escapeHtml(cleanText(customer?.phone, 'No phone'))}</div>
           </td>
           <td style="vertical-align:top;padding-left:10px;width:50%;">
@@ -835,6 +845,17 @@ export function buildOrderEmailHtml({
 </table>
 </td></tr></table>
 </body></html>`;
+}
+
+export function teamOrderSubject({ customer, orderNumber } = {}) {
+  const contactName = cleanText(customer?.name);
+  const businessName = cleanText(customer?.business);
+  const distinctContact = businessName
+    && contactName
+    && businessName.toLowerCase() !== contactName.toLowerCase();
+  const identity = businessName || contactName || 'a trade customer';
+  const contactSuffix = distinctContact ? ` (${contactName})` : '';
+  return `New order received from ${identity}${contactSuffix}${orderNumber ? ` — ${cleanText(orderNumber)}` : ''}`;
 }
 
 async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, totals, deliveryMethod, customerNotes, promo }) {
@@ -1231,7 +1252,7 @@ export default async function handler(req, res) {
       replyTo: customer.email ? { email: customer.email } : undefined,
       // Reads as what it is — a new order from a customer — and carries the
       // order number so the team can find it without opening the mail.
-      subject: `New order received from ${cleanText(customer.name, 'a trade customer')}${orderNumber ? ` — ${orderNumber}` : ''}`,
+      subject: teamOrderSubject({ customer, orderNumber }),
       htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo, notice: pdfNotice }),
       attachment,
       // Brevo applies this key when a timed-out request is retried, preventing
