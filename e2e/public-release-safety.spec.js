@@ -69,7 +69,10 @@ test('registration requires structured business details', async ({ page }) => {
   await addressesStep.getByPlaceholder('Suburb').first().fill('Safe Suburb');
   await addressesStep.getByPlaceholder('Postal code').first().fill('8001');
   await addressesStep.getByPlaceholder('City').first().fill('Cape Town');
-  await page.getByRole('checkbox', { name: /Use billing address for delivery/i }).check();
+  await addressesStep.getByPlaceholder('Street name and number').last().fill('1 Safety Street');
+  await addressesStep.getByPlaceholder('Suburb').last().fill('Safe Suburb');
+  await addressesStep.getByPlaceholder('Postal code').last().fill('8001');
+  await addressesStep.getByPlaceholder('City').last().fill('Cape Town');
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
