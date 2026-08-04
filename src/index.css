@@ -220,6 +220,98 @@ textarea:focus-visible,
   background: #ffffff;
 }
 
+.customer-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  border: 1px solid #e6e1d8;
+  border-left: 3px solid #8b1a1a;
+  border-radius: 12px;
+  background: linear-gradient(110deg, #fff 0%, #fff 62%, #faf8f4 100%);
+}
+
+.customer-welcome-copy { min-width: 0; }
+
+.customer-welcome h1 {
+  margin: 0;
+  color: #111827;
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(20px, 2vw, 27px);
+  line-height: 1.15;
+}
+
+.customer-welcome-company {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: #5f6773;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.customer-welcome-orders {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 275px;
+  min-height: 58px;
+  padding: 10px 13px;
+  border: 1px solid #ded8ce;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.customer-welcome-orders:hover {
+  border-color: #b79231;
+  box-shadow: 0 5px 18px rgba(44, 34, 10, .08);
+  transform: translateY(-1px);
+}
+
+.customer-welcome-orders:focus-visible {
+  outline: 3px solid rgba(139, 26, 26, .24);
+  outline-offset: 2px;
+}
+
+.customer-welcome-orders-icon {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 9px;
+  background: #f4eee1;
+  color: #8b1a1a;
+}
+
+.customer-welcome-orders-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.customer-welcome-orders-copy strong { font-size: 13px; }
+.customer-welcome-orders-copy small { color: #6b7280; font-size: 11px; }
+
+@media (max-width: 720px) {
+  .customer-welcome {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .customer-welcome-orders { min-width: 0; width: 100%; }
+}
+
 .cart-drawer {
   position: absolute;
   right: 0;

@@ -7,6 +7,7 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
+import CustomerWelcome from './components/CustomerWelcome';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -1597,6 +1598,11 @@ export default function App({
         </aside>
 
         <main className="content-area" onScroll={dismissWelcome}>
+          <CustomerWelcome
+            customer={customer}
+            hasLastOrder={Boolean(lastOrder)}
+            onViewOrders={onViewProfile}
+          />
           <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
