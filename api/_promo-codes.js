@@ -4,7 +4,7 @@ const PROMO_FILE = 'promo-codes.json';
 export const TEN_THOUSAND_CLUB_PROMO = 'PROTO75';
 export const TEN_THOUSAND_CLUB_MIN_SALES = 10000;
 export const TEN_THOUSAND_CLUB_DISCOUNT_PCT = 7.5;
-export const TEN_THOUSAND_CLUB_EXPIRES_AT = '2026-08-31T21:59:59.999Z';
+export const TEN_THOUSAND_CLUB_EXPIRES_AT = '2026-09-30T21:59:59.999Z';
 
 export function normalizePromoCode(code) {
   return String(code || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -31,7 +31,7 @@ export async function validatePromoCode(code, subtotal) {
     normalizePromoCode(entry.code) === normalized && entry.active !== false
   ));
   // PROTO75 is a protected campaign contract: the code means 7.5% (not 75%)
-  // and expires at the end of 31 August 2026 South African time. Eligibility
+  // and expires at the end of 30 September 2026 South African time. Eligibility
   // is checked separately against verified customer sales on the server.
   const match = normalized === TEN_THOUSAND_CLUB_PROMO
     ? {
