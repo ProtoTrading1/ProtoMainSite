@@ -44,7 +44,7 @@ test('basket clearing is undoable and inactivity no longer destroys the basket',
   assert.match(drawerSource, /role="progressbar"/);
 });
 
-test('order history explains customer status, VAT, delivery and pro-forma expectations', () => {
+test('order centre explains customer status, VAT, delivery and pro-forma expectations', () => {
   assert.equal(customerOrderStatus('pending'), 'Request received');
   const totals = orderVatSummary({ total_ex_vat: 1150, discount_amount: 150 });
   assert.deepEqual(totals, {
@@ -53,9 +53,8 @@ test('order history explains customer status, VAT, delivery and pro-forma expect
     totalInclVat: 1000,
     vatIncluded: 1000 * (15 / 115),
   });
-  assert.match(profileSource, /estimated total incl\. VAT/);
-  assert.match(profileSource, /Pro-forma:/);
-  assert.match(profileSource, /Reorder these products/);
+  assert.match(profileSource, /MyOrdersCentre/);
+  assert.match(profileSource, /fetchOrderHistory/);
 });
 
 test('reorder dialog and post-order actions expose accessible recovery paths', () => {

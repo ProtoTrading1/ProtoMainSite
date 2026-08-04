@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail, MessageCircle,
-  MapPin, Package, Phone, RotateCcw, ShieldCheck, Store, Truck, User,
+  MapPin, Phone, ShieldCheck, Store, User,
 } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
 import { fetchOrderHistory } from '../lib/orders';
-import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
+import MyOrdersCentre from '../components/MyOrdersCentre';
 import { MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { SADC_COUNTRIES, SA_PROVINCES } from '../lib/sadcCountries';
 import {
@@ -120,6 +120,8 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px', display: 'grid', gap: 20 }}>
+
+        <MyOrdersCentre orders={orders} onReorderOrder={onReorderOrder} />
 
         {/* Trade Profile card — read-only business details */}
         <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
@@ -281,66 +283,6 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
           >
             {saving ? <><Loader2 size={15} className="spin-icon" /> Saving…</> : saved ? <><CheckCircle2 size={15} /> Saved!</> : 'Save Changes'}
           </button>
-        </div>
-
-        {/* Order history */}
-        <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 800, fontFamily: 'Outfit, sans-serif', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Package size={20} style={{ color: '#8B1A1A' }} /> Order History
-          </h2>
-
-          {orders.length === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>No orders placed yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {orders.map((order, i) => {
-                const totals = orderVatSummary(order);
-                return (
-                <article key={order.id} style={{ border: '1px solid #e8eaed', borderRadius: 12, padding: 16, background: '#fafafa' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
-                        {order.order_number || order.id.slice(0, 8)}
-                        {i === 0 && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: '#8B1A1A', color: '#fff', borderRadius: 4, padding: '1px 6px' }}>Latest</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        {new Date(order.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 900, fontSize: 16, color: '#8B1A1A', fontFamily: 'Outfit, sans-serif' }}>R{totals.totalInclVat.toFixed(2)}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>estimated total incl. VAT</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gap: 6, margin: '0 0 12px', padding: '10px 12px', borderRadius: 8, background: '#fff', color: '#475569', fontSize: 12 }}>
-                    <div><strong>Status:</strong> {customerOrderStatus(order.status)}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Truck size={14} aria-hidden /><strong>Delivery:</strong> {order.delivery_method || 'To be confirmed'}</div>
-                    {order.customer_notes && <div><strong>PO/reference or notes:</strong> {order.customer_notes}</div>}
-                    {order.promo_code && <div><strong>Promotion:</strong> {order.promo_code} — R{totals.discount.toFixed(2)} discount</div>}
-                    <div><strong>VAT:</strong> Includes approximately R{totals.vatIncluded.toFixed(2)} VAT at 15%.</div>
-                    <div><strong>Pro-forma:</strong> Emailed after Proto confirms stock, final pricing and delivery. Do not pay from this request summary.</div>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {(order.items || []).map((item, j) => (
-                      <div key={j} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', fontSize: 12, color: '#475569', fontWeight: 600 }}>
-                        {item.code} ×{item.qty}
-                      </div>
-                    ))}
-                  </div>
-                  {onReorderOrder && Array.isArray(order.items) && order.items.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onReorderOrder(order)}
-                      style={{ minHeight: 44, marginTop: 12, padding: '9px 14px', display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #8B1A1A', borderRadius: 9, background: '#fff', color: '#8B1A1A', fontWeight: 800, cursor: 'pointer' }}
-                    >
-                      <RotateCcw size={16} aria-hidden /> Reorder these products
-                    </button>
-                  )}
-                </article>
-                );
-              })}
-            </div>
-          )}
         </div>
 
       </div>
