@@ -7,6 +7,7 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
+import FirstLoginBuyingAssistant from './components/FirstLoginBuyingAssistant';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -1562,6 +1563,7 @@ export default function App({
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+      <FirstLoginBuyingAssistant customer={customer} onChoose={handleShortcut} />
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
         cartItemCount={totalItemCount}
