@@ -121,6 +121,8 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px', display: 'grid', gap: 20 }}>
 
+        <MyOrdersCentre orders={orders} onReorderOrder={onReorderOrder} />
+
         {/* Trade Profile card — read-only business details */}
         <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
@@ -282,8 +284,6 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
             {saving ? <><Loader2 size={15} className="spin-icon" /> Saving…</> : saved ? <><CheckCircle2 size={15} /> Saved!</> : 'Save Changes'}
           </button>
         </div>
-
-        <MyOrdersCentre orders={orders} onReorderOrder={onReorderOrder} />
 
       </div>
     </div>
