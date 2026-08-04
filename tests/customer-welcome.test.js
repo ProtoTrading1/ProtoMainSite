@@ -8,6 +8,7 @@ const welcome = fs.readFileSync(new URL('../src/components/CustomerWelcome.jsx',
 test('signed-in customers receive a quiet in-page welcome', () => {
   assert.match(app, /<CustomerWelcome/);
   assert.match(welcome, /Welcome back, \{firstName\(customer\)\}/);
+  assert.doesNotMatch(welcome, /Your Proto trade account/);
   assert.match(welcome, /customer\.business_name/);
   assert.match(welcome, /if \(!customer\?\.id\) return null/);
 });
