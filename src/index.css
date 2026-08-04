@@ -7590,16 +7590,3 @@ textarea:focus-visible,
     overflow-wrap: anywhere;
   }
 }
-/* First-login Buying Assistant — optional, focused and visually consistent with checkout. */
-.buying-assistant-backdrop{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.78);backdrop-filter:blur(5px)}
-.buying-assistant{position:relative;width:min(620px,100%);padding:32px;border:1px solid #7f1d1d;border-radius:18px;background:#080808;color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.55)}
-.buying-assistant-close{position:absolute;right:16px;top:16px;width:44px;height:44px;display:grid;place-items:center;border:1px solid #333;border-radius:50%;background:#111;color:#fff}
-.buying-assistant-kicker{margin:0 52px 8px 0;color:#d8b64c;font-size:12px;font-weight:800;letter-spacing:.12em}
-.buying-assistant h2{margin:0 52px 10px 0;font-size:clamp(26px,5vw,38px);line-height:1.08}
-.buying-assistant-intro{margin:0 0 22px;color:#cbd5e1;line-height:1.55}
-.buying-assistant-options{display:grid;gap:10px}
-.buying-assistant-options button{min-height:76px;display:flex;align-items:center;gap:14px;padding:15px 16px;border:1px solid #333;border-radius:12px;background:#111;color:#fff;text-align:left}
-.buying-assistant-options button:hover,.buying-assistant-options button:focus-visible{border-color:#d8b64c;background:#18150d;outline:3px solid rgba(216,182,76,.25)}
-.buying-assistant-options strong,.buying-assistant-options small{display:block}.buying-assistant-options small{margin-top:3px;color:#aeb8c7;line-height:1.35}
-.buying-assistant-skip{width:100%;min-height:48px;margin-top:14px;border:0;background:transparent;color:#cbd5e1;text-decoration:underline;text-underline-offset:4px}
-@media(max-width:600px){.buying-assistant{padding:26px 18px 20px}.buying-assistant-backdrop{align-items:end;padding:10px}.buying-assistant h2{font-size:28px}}
