@@ -9,7 +9,14 @@ import { runOrderTeamNotify } from './_order-notify-core.js';
 import { generateAndStoreOrderPdf } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
-import { hasCustomerUsedPromo, recordPromoRedemption, validatePromoCode } from './_promo-codes.js';
+import {
+  claimPromoRedemption,
+  finalisePromoRedemption,
+  hasCustomerUsedPromo,
+  isCustomerEligibleForPromo,
+  releasePromoRedemption,
+  validatePromoCode,
+} from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
@@ -1059,6 +1066,7 @@ export default async function handler(req, res) {
   }
   const subtotal = computeSubtotal(orderItems);
   let promo = null;
+  let promoRedemptionId = null;
   const promoCode = cleanText(rawPromoCode).toUpperCase();
   if (promoCode) {
     const promoResult = await validatePromoCode(promoCode, subtotal);
@@ -1066,7 +1074,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: promoResult.error || 'Invalid promo code.' });
     }
     try {
-      if (await hasCustomerUsedPromo(getPortalAdminClient(), user.id, promoResult.code)) {
+      if (!await isCustomerEligibleForPromo(portal, user.id, promoResult.code)) {
+        return res.status(400).json({ error: 'PROTO75 is available only to eligible 10,000 Club customers.' });
+      }
+      if (await hasCustomerUsedPromo(portal, user.id, promoResult.code)) {
         return res.status(400).json({ error: 'This promo code has already been used on a previous order.' });
       }
     } catch (err) {
@@ -1137,6 +1148,17 @@ export default async function handler(req, res) {
     region: cleanText([profile.city, profile.province, profile.country].filter(Boolean).join(', '), 'To confirm'),
   };
 
+  if (promo?.code) {
+    try {
+      promoRedemptionId = await claimPromoRedemption(portal, { customerId: user.id, code: promo.code });
+      if (!promoRedemptionId) {
+        return res.status(400).json({ error: 'This promo code has already been used on a previous order.' });
+      }
+    } catch (error) {
+      return res.status(503).json({ error: error.message });
+    }
+  }
+
   let captured;
   try {
     captured = await captureOrderRow({
@@ -1150,12 +1172,14 @@ export default async function handler(req, res) {
       clientRef,
     });
   } catch (error) {
+    await releasePromoRedemption(portal, promoRedemptionId);
     if (error instanceof OrderDeliverySchemaError) {
       return res.status(error.status).json({ error: error.message, code: error.code });
     }
     throw error;
   }
   if (!captured?.id) {
+    await releasePromoRedemption(portal, promoRedemptionId);
     return res.status(500).json({
       error: 'Your order could not be submitted. Nothing was lost from your cart — please try again.',
     });
@@ -1163,16 +1187,9 @@ export default async function handler(req, res) {
   const orderId = String(captured.id);
   const orderNumber = cleanText(captured.order_number);
 
-  // Burn the promo the moment the order exists — the ledger survives order
-  // deletion, so cleaning up test orders can no longer resurrect a code.
-  if (promo?.code) {
-    await recordPromoRedemption(portal, {
-      customerId: user.id,
-      code: promo.code,
-      orderId,
-      orderNumber,
-    });
-  }
+  // The redemption was atomically reserved before order capture. Attach the
+  // resulting order without opening a race where two checkouts get one code.
+  await finalisePromoRedemption(portal, { redemptionId: promoRedemptionId, orderId, orderNumber });
 
   // Generate the polished order sheet first. If that renderer fails, fall back
   // to the independently maintained fulfilment PDF so the operational email is

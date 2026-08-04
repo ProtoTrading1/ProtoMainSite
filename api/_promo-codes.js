@@ -1,6 +1,10 @@
 import { readSiteConfigJson } from './_site-config.js';
 
 const PROMO_FILE = 'promo-codes.json';
+export const TEN_THOUSAND_CLUB_PROMO = 'PROTO75';
+export const TEN_THOUSAND_CLUB_MIN_SALES = 10000;
+export const TEN_THOUSAND_CLUB_DISCOUNT_PCT = 7.5;
+export const TEN_THOUSAND_CLUB_EXPIRES_AT = '2026-08-31T21:59:59.999Z';
 
 export function normalizePromoCode(code) {
   return String(code || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -23,9 +27,21 @@ export async function validatePromoCode(code, subtotal) {
   }
 
   const codes = await loadPromoCodes();
-  const match = codes.find((entry) => (
+  const configured = codes.find((entry) => (
     normalizePromoCode(entry.code) === normalized && entry.active !== false
   ));
+  // PROTO75 is a protected campaign contract: the code means 7.5% (not 75%)
+  // and expires at the end of 31 August 2026 South African time. Eligibility
+  // is checked separately against verified customer sales on the server.
+  const match = normalized === TEN_THOUSAND_CLUB_PROMO
+    ? {
+      ...configured,
+      code: TEN_THOUSAND_CLUB_PROMO,
+      discountPct: TEN_THOUSAND_CLUB_DISCOUNT_PCT,
+      expiresAt: TEN_THOUSAND_CLUB_EXPIRES_AT,
+      active: true,
+    }
+    : configured;
 
   if (!match) {
     return { valid: false, error: 'Invalid promo code.' };
@@ -59,10 +75,23 @@ export async function validatePromoCode(code, subtotal) {
   };
 }
 
+export async function isCustomerEligibleForPromo(supabase, customerId, code) {
+  const normalized = normalizePromoCode(code);
+  if (normalized !== TEN_THOUSAND_CLUB_PROMO) return true;
+  if (!customerId) return false;
+  const { data, error } = await supabase
+    .from('customers')
+    .select('sales_last_12_months')
+    .eq('id', customerId)
+    .maybeSingle();
+  if (error) throw new Error('Could not verify 10,000 Club eligibility. Please try again.');
+  return Number(data?.sales_last_12_months) >= TEN_THOUSAND_CLUB_MIN_SALES;
+}
+
 /**
- * One redemption per customer: true if this customer already has an order that
- * used the code. Checked at validation (so the cart says so immediately) AND
- * at order capture (authoritative — the cart check alone could be raced).
+ * One redemption per customer: true if this customer already has a ledger row
+ * for the code. Checked during cart validation for immediate feedback; order
+ * submission separately claims the unique row before capture.
  */
 export async function hasCustomerUsedPromo(supabase, customerId, code) {
   const normalized = String(code || '').trim().toUpperCase();
@@ -86,23 +115,34 @@ export async function hasCustomerUsedPromo(supabase, customerId, code) {
   return Boolean(data?.length);
 }
 
-/**
- * Record a redemption. Called after the order row is captured; the unique
- * index on (customer_id, upper(promo_code)) makes a duplicate structurally
- * impossible even if two submissions race past the pre-capture check.
- * Best-effort by design: the order already exists, so a logging failure must
- * not fail the order — the pre-capture check still guards the next attempt.
- */
-export async function recordPromoRedemption(supabase, { customerId, code, orderId, orderNumber }) {
-  const normalized = String(code || '').trim().toUpperCase();
-  if (!customerId || !normalized) return;
-  const { error } = await supabase.from('promo_redemptions').insert({
-    customer_id: customerId,
-    promo_code: normalized,
-    order_id: orderId || null,
-    order_number: orderNumber || null,
-  });
-  if (error && !/duplicate|unique/i.test(error.message || '')) {
-    console.error('promo redemption log failed:', error.message);
-  }
+export async function claimPromoRedemption(supabase, { customerId, code }) {
+  const normalized = normalizePromoCode(code);
+  if (!customerId || !normalized) throw new Error('Promo redemption could not be verified.');
+  const { data, error } = await supabase
+    .from('promo_redemptions')
+    .insert({ customer_id: customerId, promo_code: normalized })
+    .select('id')
+    .single();
+  if (error && /duplicate|unique/i.test(error.message || '')) return null;
+  if (error || !data?.id) throw new Error('Could not reserve this promo code. Please try again.');
+  return data.id;
+}
+
+export async function finalisePromoRedemption(supabase, { redemptionId, orderId, orderNumber }) {
+  if (!redemptionId) return;
+  const { error } = await supabase
+    .from('promo_redemptions')
+    .update({ order_id: orderId || null, order_number: orderNumber || null })
+    .eq('id', redemptionId);
+  if (error) console.error('promo redemption finalise failed:', error.message);
+}
+
+export async function releasePromoRedemption(supabase, redemptionId) {
+  if (!redemptionId) return;
+  const { error } = await supabase
+    .from('promo_redemptions')
+    .delete()
+    .eq('id', redemptionId)
+    .is('order_id', null);
+  if (error) console.error('promo redemption release failed:', error.message);
 }

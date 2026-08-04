@@ -1,4 +1,4 @@
-import { hasCustomerUsedPromo, validatePromoCode } from './_promo-codes.js';
+import { hasCustomerUsedPromo, isCustomerEligibleForPromo, validatePromoCode } from './_promo-codes.js';
 import { getPortalAdminClient } from './_site-config.js';
 import { requireAuth } from './_auth.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
@@ -26,6 +26,9 @@ export default async function handler(req, res) {
     const result = await validatePromoCode(code, subtotal);
     if (!result.valid) {
       return res.status(200).json({ valid: false, error: result.error });
+    }
+    if (!await isCustomerEligibleForPromo(getPortalAdminClient(), user.id, result.code)) {
+      return res.status(200).json({ valid: false, error: 'PROTO75 is available only to eligible 10,000 Club customers.' });
     }
     // One redemption per customer — tell them in the cart, not at submit.
     if (await hasCustomerUsedPromo(getPortalAdminClient(), user.id, result.code)) {
