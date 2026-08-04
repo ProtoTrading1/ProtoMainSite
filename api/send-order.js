@@ -442,8 +442,8 @@ function drawInternalPdfStaffNotes(doc, y) {
   }
 }
 
-function formatPdfAddress(value, fallback = 'To confirm') {
-  const text = cleanText(value, fallback);
+export function formatPdfAddress(value, fallback = 'To confirm') {
+  const text = (cleanText(value) || cleanText(fallback)).toUpperCase();
   const parts = text.split(/\s*,\s*/).map((part) => part.trim()).filter(Boolean);
   return parts.length > 1 ? parts.join('\n') : text;
 }
