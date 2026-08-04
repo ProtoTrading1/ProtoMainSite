@@ -137,14 +137,13 @@ export default function Root() {
   }, [view]);
 
   useEffect(() => {
-    const isCatalogueSurface = view === 'portal'
-      || view === 'profile'
-      || view === 'admin';
-    const showPublicLauncher = session !== undefined
-      && !adminHost
-      && !preRegisterHost
-      && !isCatalogueSurface;
-    setIntercomLauncherVisibility(showPublicLauncher);
+    // The launcher belongs to signed-in customers. It used to be hidden on
+    // exactly the surfaces they use (portal, profile) and shown only on public
+    // pages, which is why a logged-in customer never saw a chat button.
+    // `session !== undefined` only meant "auth has resolved" — it was true for
+    // signed-out visitors too.
+    const showLauncher = Boolean(session) && !adminHost && !preRegisterHost;
+    setIntercomLauncherVisibility(showLauncher);
   }, [adminHost, preRegisterHost, route, session, view]);
 
   const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {

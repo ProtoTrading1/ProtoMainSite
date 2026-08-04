@@ -1,4 +1,4 @@
-import { boot, shutdown, show, update } from '@intercom/messenger-js-sdk';
+import { Intercom, boot, shutdown, show, update } from '@intercom/messenger-js-sdk';
 
 export const INTERCOM_APP_ID = 'qk0xorsx';
 
@@ -12,6 +12,10 @@ let launcherVisible = false;
 // tear the Messenger down and rebuild it over and over.
 let identifiedUserId = null;
 let identifyInFlightFor = null;
+// The Messenger is not loaded until a customer signs in, so anonymous
+// visitors never fetch Intercom's script at all. Intercom() is the loader;
+// boot() assumes it has already run, so the first identify must use it.
+let loaded = false;
 
 function settings(extra = {}) {
   return {
@@ -24,11 +28,6 @@ function settings(extra = {}) {
   };
 }
 
-/** Settings for the initial anonymous boot in main.jsx — single source of truth. */
-export function intercomInitSettings() {
-  return settings();
-}
-
 export function openIntercom() {
   try {
     show();
@@ -39,6 +38,8 @@ export function openIntercom() {
 
 export function setIntercomLauncherVisibility(visible) {
   launcherVisible = Boolean(visible);
+  // Nothing to update before a customer signs in — the Messenger is not loaded.
+  if (!loaded) return;
   try {
     update(settings());
   } catch (error) {
@@ -71,15 +72,22 @@ export async function identifyIntercom(session) {
   try {
     const token = await fetchIdentityToken(session);
     if (!token) return false;
-    // Clear any anonymous/lead identity first, otherwise the self-declared
-    // email on the visitor record survives and Intercom keeps treating it as
-    // the contact's address.
-    try {
-      shutdown();
-    } catch {
-      /* nothing booted yet */
+    if (!loaded) {
+      // First sign-in on this page load: load the Messenger already identified,
+      // so there is never an anonymous contact to reconcile.
+      Intercom(settings({ intercom_user_jwt: token }));
+      loaded = true;
+    } else {
+      // Already loaded as someone else. Clear that identity first, otherwise
+      // the self-declared email on the visitor record survives and Intercom
+      // keeps treating it as the contact's address.
+      try {
+        shutdown();
+      } catch {
+        /* nothing booted yet */
+      }
+      boot(settings({ intercom_user_jwt: token }));
     }
-    boot(settings({ intercom_user_jwt: token }));
     identifiedUserId = userId;
     return true;
   } catch (error) {
@@ -118,9 +126,13 @@ export async function refreshIntercomIdentity(session) {
 export function resetIntercom() {
   identifiedUserId = null;
   identifyInFlightFor = null;
+  if (!loaded) return;
   try {
+    // Shut down without re-booting: the Messenger is for signed-in customers
+    // only, so after sign-out there should be nothing left on the page. A
+    // subsequent sign-in re-loads it via identifyIntercom.
     shutdown();
-    boot(settings());
+    loaded = false;
   } catch (error) {
     console.error('Unable to reset Intercom:', error);
   }

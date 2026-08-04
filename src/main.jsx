@@ -1,13 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-// Named import: the SDK is CommonJS and its `default` export does not survive
-// bundler interop (default-import threw "v.default is not a function" and
-// blanked the app). The named `Intercom` export is the init function.
-import { Intercom } from '@intercom/messenger-js-sdk'
 import './index.css'
 import Root from './Root.jsx'
 import { captureError, initMonitoring } from './lib/monitoring'
-import { intercomInitSettings } from './lib/intercom'
 
 initMonitoring();
 
@@ -39,12 +34,7 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// Boot Intercom after render and isolate any failure so the chat widget can
-// never block the app from mounting. This boot is deliberately ANONYMOUS —
-// Root.jsx re-boots with a signed JWT once a logged-in, approved customer is
-// known (see src/lib/intercom.js identifyIntercom).
-try {
-  Intercom(intercomInitSettings());
-} catch (err) {
-  console.error('Intercom init failed:', err);
-}
+// Intercom is NOT booted here any more. The Messenger is for signed-in
+// customers only, so it loads on first successful identify (Root.jsx ->
+// identifyIntercom). Booting anonymously fetched Intercom's script for every
+// visitor and created a lead contact for people who never signed in.
