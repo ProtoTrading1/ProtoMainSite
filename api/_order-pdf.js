@@ -54,7 +54,7 @@ export async function loadOrderForPdf(orderId) {
   const supabase = getPortalAdminClient();
   const { data: order, error } = await supabase
     .from('orders')
-    .select('*, customers(name, email, phone, business_name, business_type, city, province, country)')
+    .select('*, customers(name, email, phone, business_name, business_type, company_address, delivery_address, city, province, country)')
     .eq('id', orderId)
     .single();
   if (error || !order) throw new Error('Order not found');
@@ -95,6 +95,10 @@ function drawTableHeader(doc, y) {
   return y + 22;
 }
 
+export function uppercasePdfAddress(value, fallback = '') {
+  return (cleanText(value) || cleanText(fallback)).toUpperCase();
+}
+
 export function buildOrderPdfBuffer({ order, customer, items, categoryMap = {} }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: PAGE.margin, bufferPages: true });
@@ -130,12 +134,15 @@ export function buildOrderPdfBuffer({ order, customer, items, categoryMap = {} }
     const email = cleanText(customer.email, 'Not provided');
     const phone = cleanText(customer.phone, 'Not provided');
     const location = [customer.city, customer.province, customer.country].map((v) => cleanText(v)).filter(Boolean).join(', ');
+    const invoiceAddress = uppercasePdfAddress(customer.company_address);
+    const deliveryAddress = uppercasePdfAddress(customer.delivery_address || location);
 
     doc.text(`Name: ${name}`, PAGE.margin, y); y += 14;
     if (business) { doc.text(`Business: ${business}`, PAGE.margin, y); y += 14; }
     doc.text(`Email: ${email}`, PAGE.margin, y); y += 14;
     doc.text(`Phone: ${phone}`, PAGE.margin, y); y += 14;
-    if (location) { doc.text(`Location: ${location}`, PAGE.margin, y); y += 14; }
+    if (invoiceAddress) { doc.text(`Address: ${invoiceAddress}`, PAGE.margin, y); y += 14; }
+    if (deliveryAddress) { doc.text(`Delivery address: ${deliveryAddress}`, PAGE.margin, y); y += 14; }
     const deliveryMethod = cleanText(order.delivery_method, '');
     if (deliveryMethod) { doc.text(`Delivery: ${deliveryMethod}`, PAGE.margin, y); y += 14; }
     const customerNotes = cleanText(order.customer_notes, '');
