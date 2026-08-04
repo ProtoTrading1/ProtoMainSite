@@ -50,6 +50,11 @@ test('PROTO75 is 7.5% and restricted to verified 10,000 Club sales', () => {
   assert.match(sendOrder, /isCustomerEligibleForPromo\(portal, user\.id, promoResult\.code\)/);
 });
 
+test('PROTO75 remains available through 30 September 2026 South African time', () => {
+  assert.match(promoLib, /TEN_THOUSAND_CLUB_EXPIRES_AT = '2026-09-30T21:59:59\.999Z'/);
+  assert.match(promoLib, /end of 30 September 2026 South African time/);
+});
+
 test('the cart validator reports an already-used code up front', () => {
   assert.match(validate, /hasCustomerUsedPromo\(getPortalAdminClient\(\), user\.id, result\.code\)/);
   assert.match(validate, /already been used on a previous order/);
