@@ -13,7 +13,6 @@ export default function CustomerWelcome({ customer, hasLastOrder = false, onView
   return (
     <section className="customer-welcome" aria-labelledby="customer-welcome-title">
       <div className="customer-welcome-copy">
-        <p className="customer-welcome-eyebrow">Your Proto trade account</p>
         <h1 id="customer-welcome-title">Welcome back, {firstName(customer)}</h1>
         {company && (
           <p className="customer-welcome-company">
