@@ -21,6 +21,7 @@ const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-p
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
+const AccountReviewStatus = lazyWithRetry(() => import('./components/AccountReviewStatus'), 'root-account-review-status');
 
 const PORTAL_URL = getPortalUrl();
 
@@ -352,32 +353,12 @@ export default function Root() {
 
     if (session && customer && (customer.is_approved || customer.role === 'admin')) {
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px', padding: '24px' }}>
-          <div style={{ fontSize: '48px' }}>✓</div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Your account is ready</h1>
-          <p style={{ color: '#64748b', maxWidth: '420px', textAlign: 'center', margin: 0 }}>
-            Your trade account is live. We’ll notify you as soon as the site is launched.
-          </p>
-          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
-            Log out
-          </button>
-        </div>
+        <Suspense fallback={authSurfaceFallback}><AccountReviewStatus status="approved" onLogout={handleLogout} /></Suspense>
       );
     }
 
     if (session && customer && !customer.is_approved && customer.role !== 'admin') {
-      return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
-          <div style={{ fontSize: '48px' }}>⏳</div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
-          <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
-            Proto is still reviewing your application. We will notify you when you have been approved.
-          </p>
-          <button type="button" onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
-            Log Out
-          </button>
-        </div>
-      );
+      return <Suspense fallback={authSurfaceFallback}><AccountReviewStatus onLogout={handleLogout} /></Suspense>;
     }
 
     return registrationLanding;
@@ -444,18 +425,7 @@ export default function Root() {
   }
 
   if (session && customer && !customer.is_approved && customer.role !== 'admin') {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f1f5f9', fontFamily: 'Inter, sans-serif', gap: '16px' }}>
-        <div style={{ fontSize: '48px' }}>⏳</div>
-        <h1 style={{ fontSize: '24px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}>Account Pending Approval</h1>
-        <p style={{ color: '#64748b', maxWidth: '400px', textAlign: 'center' }}>
-          Proto is still reviewing your application. We will notify you when you have been approved.
-        </p>
-        <button onClick={handleLogout} style={{ padding: '10px 24px', background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
-          Log Out
-        </button>
-      </div>
-    );
+    return <Suspense fallback={authSurfaceFallback}><AccountReviewStatus onLogout={handleLogout} /></Suspense>;
   }
 
   if (adminHost && session && view === 'admin-denied') {
