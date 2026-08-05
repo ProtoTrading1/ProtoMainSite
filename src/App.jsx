@@ -42,7 +42,7 @@ const MAX_CART_LINES = 250;
 // preview visible for about one second: quick enough not to interrupt ordering,
 // but long enough to notice it and move the pointer over it.
 const DRAWER_PEEK_MS = 1200;
-const WELCOME_DISPLAY_MS = 3500;
+const WELCOME_DISPLAY_MS = 5500;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const WELCOME_SEEN_PREFIX = 'proto_welcome_seen:';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
@@ -104,6 +104,16 @@ function hasSeenWelcome(customerId) {
 function markWelcomeSeen(customerId) {
   if (!customerId) return;
   try { localStorage.setItem(welcomeSeenKey(customerId), '1'); } catch { /* ignore */ }
+}
+
+function welcomeDisplayMs(bannerConfig) {
+  const configured = Number(
+    bannerConfig?.welcomeDurationMs
+      ?? bannerConfig?.displayDurationMs
+      ?? (Number(bannerConfig?.displaySeconds) * 1000),
+  );
+  if (!Number.isFinite(configured) || configured <= 0) return WELCOME_DISPLAY_MS;
+  return Math.min(Math.max(configured, 1000), 30000);
 }
 
 function productStockQtyForCart(product) {
@@ -220,6 +230,7 @@ export default function App({
   // was the "typing is extremely slow" cause.
   const [searchQuery, setSearchQuery] = useState('');
   const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
+  const [bannerConfig, setBannerConfig] = useState(null);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
 
@@ -233,14 +244,14 @@ export default function App({
 
   useEffect(() => {
     if (!showWelcome) return undefined;
-    const dismissTimer = window.setTimeout(dismissWelcome, WELCOME_DISPLAY_MS);
+    const dismissTimer = window.setTimeout(dismissWelcome, welcomeDisplayMs(bannerConfig));
     const dismissOnScroll = () => dismissWelcome();
     window.addEventListener('scroll', dismissOnScroll, { passive: true, once: true });
     return () => {
       window.clearTimeout(dismissTimer);
       window.removeEventListener('scroll', dismissOnScroll);
     };
-  }, [dismissWelcome, showWelcome]);
+  }, [bannerConfig, dismissWelcome, showWelcome]);
 
   const handleSortChange = useCallback((next) => {
     const normalized = normalizeCatalogSort(next);
@@ -328,7 +339,6 @@ export default function App({
   const [lastOrderLoaded, setLastOrderLoaded] = useState(false);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
-  const [bannerConfig, setBannerConfig] = useState(null);
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
 
@@ -1838,13 +1848,3 @@ export default function App({
 
       {showPopup && popupConfig?.imageUrl && (
         <PopupSpecialModal
-          imageUrl={popupConfig.imageUrl}
-          onDismiss={() => {
-            dismissPopup(popupConfig);
-            setShowPopup(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
