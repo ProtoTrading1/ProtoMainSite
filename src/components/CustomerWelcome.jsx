@@ -13,7 +13,12 @@ export default function CustomerWelcome({ customer, hasLastOrder = false, onView
   return (
     <section className="customer-welcome" aria-labelledby="customer-welcome-title">
       <div className="customer-welcome-copy">
-        <h1 id="customer-welcome-title">Welcome back, {firstName(customer)}</h1>
+        <h1 id="customer-welcome-title">
+          {hasLastOrder ? `Welcome back, ${firstName(customer)}` : `Welcome to Proto, ${firstName(customer)}`}
+        </h1>
+        {!hasLastOrder && (
+          <p className="customer-welcome-first-order">Your approved account is ready — start building your first order below.</p>
+        )}
         {company && (
           <p className="customer-welcome-company">
             <Building2 size={14} aria-hidden="true" />
@@ -27,8 +32,8 @@ export default function CustomerWelcome({ customer, hasLastOrder = false, onView
           <Package size={18} />
         </span>
         <span className="customer-welcome-orders-copy">
-          <strong>{hasLastOrder ? 'View recent orders' : 'Your orders'}</strong>
-          <small>{hasLastOrder ? 'Review or reorder previous products' : 'Orders will appear here'}</small>
+          <strong>{hasLastOrder ? 'View recent orders' : 'Start your first order'}</strong>
+          <small>{hasLastOrder ? 'Review or reorder previous products' : 'Your order history will appear here'}</small>
         </span>
         <ArrowRight size={17} aria-hidden="true" />
       </button>
