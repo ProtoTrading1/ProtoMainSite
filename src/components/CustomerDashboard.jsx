@@ -175,19 +175,22 @@ export default function CustomerDashboard({
       </button>
     </div>}
 
-    {hasReturningContext && <div className="customer-dashboard-quickbar">
-      <button type="button" className="customer-dashboard-profile" onClick={() => setProfileOpen(true)}><UserRound size={19} /><span><b>Your details</b><small>{customer.business_name || customer.name || 'Trade account'}</small></span><ChevronRight size={18} /></button>
-      {hasOrders && <button type="button" className="customer-dashboard-quick-stat" onClick={onViewOrders}><span>OPEN ORDERS</span><b>{openOrders}</b><small>View order status</small></button>}
-      {hasOrders && <div className="customer-dashboard-quick-stat"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>}
-      <button type="button" className="customer-dashboard-help" onClick={openIntercom}><CircleHelp size={18} /><span><b>Need help?</b><small>Ask Proto</small></span></button>
-    </div>}
-
     {historyLoading || historyError ? <div className="customer-dashboard-history-notice" role={historyError ? 'alert' : 'status'}>{historyLoading ? 'Loading your order history…' : <>We couldn’t load your orders. <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>Try again</button></>}</div>
       : !hasReturningContext ? <div className="customer-dashboard-start"><div className="customer-dashboard-section-heading"><div><h2>Start with a department</h2><span>Browse the products you need most.</span></div></div><div className="customer-dashboard-departments">{categories.slice(0, 6).map((category) => <button type="button" key={category.id} onClick={() => onBrowseDepartment?.(category.id)}><Package size={17} /><span>{category.label}</span><ChevronRight size={15} /></button>)}</div></div>
       : hasOrders ? <div className="customer-dashboard-workspace">
       <div className="customer-dashboard-orders"><div className="customer-dashboard-section-heading"><h2>Recent orders</h2><button type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>{orders.slice(0, 5).map((order) => <div className="customer-dashboard-order" key={order.id}><b>{order.order_number || String(order.id).slice(0, 8)}</b><span>{formatDate(order.created_at)}</span><span className="customer-dashboard-status"><i />{customerOrderStatus(order.status)}</span><strong>{formatRand(orderVatSummary(order).totalInclVat)}</strong><button type="button" onClick={onViewOrders}>View order</button></div>)}</div>
       <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><div><h2>Buy again</h2><span>From your previous orders</span></div></div>{buyAgainState === 'loading' ? <p className="customer-dashboard-buy-empty">Finding products from your previous orders…</p> : buyAgain.length ? <div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>{formatRand(product.price_incl_vat ?? product.price)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div> : <p className="customer-dashboard-buy-empty">{orderedItems.length ? 'Previous products are not currently available online.' : 'Your previous order items will appear here when available.'} <button type="button" onClick={onViewOrders}>View orders</button></p>}</div>
+    </div> : hasCart ? <div className="customer-dashboard-basket-task">
+      <div><h2>Continue your order</h2><p>Your saved basket is ready to review.</p></div>
+      <button type="button" onClick={onOpenCart}><ShoppingCart size={17} /> Review basket <ChevronRight size={15} /></button>
     </div> : null}
+
+    {hasReturningContext && <div className="customer-dashboard-contextual-tools" aria-label="Account tools">
+      <button type="button" className="customer-dashboard-contextual-link" onClick={() => setProfileOpen(true)}><UserRound size={16} /><span>Account details</span></button>
+      {hasOrders && <button type="button" className="customer-dashboard-contextual-stat" onClick={onViewOrders}><span>Open orders</span><b>{openOrders}</b></button>}
+      {hasOrders && <span className="customer-dashboard-contextual-stat"><span>Last order</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b></span>}
+      <button type="button" className="customer-dashboard-contextual-link" onClick={openIntercom}><CircleHelp size={16} /><span>Help</span></button>
+    </div>}
 
     {profileOpen && <div className="customer-dashboard-modal-backdrop" onClick={() => setProfileOpen(false)}>
       <div className="customer-dashboard-profile-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-profile-title" onClick={(event) => event.stopPropagation()}>
