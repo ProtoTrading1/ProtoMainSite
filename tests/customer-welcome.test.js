@@ -9,6 +9,10 @@ const styles = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'ut
 test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(app, /<CustomerDashboard/);
   assert.match(dashboard, /hasReturningContext \? `Welcome back, \$\{firstName\(customer\)\}` : `Welcome, \$\{firstName\(customer\)\}`/);
+  assert.match(dashboard, /showGreeting/);
+  assert.match(dashboard, /setTimeout\(dismissGreeting, 5500\)/);
+  assert.match(dashboard, /onClick=\{dismissGreeting\}/);
+  assert.match(dashboard, /Your dashboard/);
   assert.match(dashboard, /Your order is ready to continue/);
   assert.match(dashboard, /Your first online order starts here/);
   assert.match(dashboard, /Choose products to sell/);
