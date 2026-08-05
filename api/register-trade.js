@@ -71,8 +71,11 @@ export function existingEmailResponse() {
 // New-signup notifications go to the Proto team. The old default pointed at
 // orders@prototrading.co.za — a different domain from the one Proto is
 // migrating to — so trade applications could land in a mailbox nobody reads.
+// danieljoffeinfo@gmail.com was removed by request — Daniel keeps the ORDER
+// alerts (a separate list, api/_order-alert-recipients.js in the admin) but no
+// longer wants a mail for every trade signup.
 const ADMIN_SIGNUP_RECIPIENTS = (process.env.SIGNUP_NOTIFY_EMAILS
-  || 'online@proto.co.za,george@proto.co.za,danieljoffeinfo@gmail.com')
+  || 'online@proto.co.za,george@proto.co.za')
   .split(',').map((part) => part.trim()).filter(Boolean);
 
 function caps(value) {
