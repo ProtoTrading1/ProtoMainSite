@@ -10,6 +10,7 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(app, /<CustomerDashboard/);
   assert.match(dashboard, /hasOrders \? `Welcome back, \$\{firstName\(customer\)\}` : `Welcome, \$\{firstName\(customer\)\}`/);
   assert.match(dashboard, /Your order is ready to continue/);
+  assert.match(dashboard, /Your order is ready to continue/);
   assert.match(dashboard, /Your first online order starts here/);
   assert.match(dashboard, /Continue order/);
   assert.match(dashboard, /Browse catalogue/);
