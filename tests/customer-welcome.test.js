@@ -39,7 +39,7 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /onBrowseDepartment=/);
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
-  assert.match(app, /lastOrderLoaded/);
+  assert.match(app, /lastOrderLoaded/);\n  assert.match(app, /cartHydrated/);
   assert.match(app, /showWelcome=\{showWelcome && Boolean\(customer\?\.id\) && lastOrderLoaded && !lastOrder && cartItems\.length === 0\}/);
   assert.match(app, /hasSeenWelcome\(customer\.id\) \|\| lastOrder \|\| cartItems\.length > 0/);
   assert.match(app, /WELCOME_SEEN_PREFIX/);
