@@ -14,9 +14,9 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /Continue order/);
   assert.match(dashboard, /Browse catalogue/);
   assert.match(dashboard, /Buy again/);
-  assert.match(dashboard, /Choose a department/);
-  assert.match(dashboard, /!hasOrders \? <div className="customer-dashboard-start">/);
-  assert.match(dashboard, /: <div className="customer-dashboard-workspace">/);
+  assert.match(dashboard, /!hasReturningContext \? null/);
+  assert.match(dashboard, /!hasOrders \? <div className="customer-dashboard-cart-start">/);
+  assert.match(dashboard, /hasReturningContext = hasOrders \|\| hasCart/);
   assert.match(dashboard, /Your details/);
   assert.doesNotMatch(dashboard, /Account status/i);
   assert.doesNotMatch(dashboard, /Popular with trade customers/);
@@ -28,7 +28,6 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /onViewOrders=\{onViewProfile\}/);
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
-  assert.match(app, /onBrowseDepartment=/);
   assert.match(dashboard, /Recent orders/);
   assert.match(dashboard, /View all orders/);
   assert.match(dashboard, /onClick=\{hasCart \? onOpenCart : onContinueShopping\}/);
