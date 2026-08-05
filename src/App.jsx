@@ -1682,6 +1682,7 @@ export default function App({
             activeCollection={activeCollection}
             collectionLabel={collectionLabel(activeCollection)}
             recommendationProducts={recommendationProducts}
+            welcomeDurationMs={welcomeDisplayMs(bannerConfig)}
             loading={loading}
             page={page}
             totalPages={totalPages}
@@ -1693,10 +1694,10 @@ export default function App({
             categoryNode={categoryNode}
             categories={categories}
             onProductPreview={handleProductPreview}
-            // Returning customers should never see the generic first-visit
-            // banner. Hold it back while the last-order check is in flight so
-            // the banner cannot flash before the customer history resolves.
-            showWelcome={showWelcome && (!customer?.id || (lastOrderLoaded && !lastOrder))}
+            // Only a newly approved, signed-in customer with no order history
+            // gets the one-time first-visit banner. Anonymous visitors and
+            // established customers should never see it.
+            showWelcome={showWelcome && Boolean(customer?.id) && lastOrderLoaded && !lastOrder}
             inStockOnly={inStockOnly}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
