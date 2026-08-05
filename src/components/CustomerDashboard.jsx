@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronRight, CircleHelp, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, CircleHelp, Package, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
 import { fetchOrderHistory } from '../lib/orders';
 import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
 import { openIntercom } from '../lib/intercom';
+import { fetchProductsBySkus } from '../lib/products';
 
 function firstName(customer) {
   return String(customer?.contact_name || customer?.name || '').trim().split(/\s+/)[0] || 'there';
@@ -24,6 +25,7 @@ function formatRand(value) {
 export default function CustomerDashboard({
   customer,
   products = [],
+  categories = [],
   cartItemCount = 0,
   cartTotal = 0,
   addToCart,
@@ -31,19 +33,29 @@ export default function CustomerDashboard({
   onViewOrders,
   onViewProfile,
   onContinueShopping,
+  onBrowseDepartment,
 }) {
   const [orders, setOrders] = useState([]);
+  const [historyState, setHistoryState] = useState('loading');
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  const [buyAgain, setBuyAgain] = useState([]);
+  const [buyAgainState, setBuyAgainState] = useState('idle');
   const [message, setMessage] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
     let active = true;
+    setHistoryState('loading');
     fetchOrderHistory(customer.id, 10)
-      .then((rows) => { if (active) setOrders(Array.isArray(rows) ? rows : []); })
-      .catch(() => { if (active) setOrders([]); });
+      .then((rows) => {
+        if (!active) return;
+        setOrders(Array.isArray(rows) ? rows : []);
+        setHistoryState('ready');
+      })
+      .catch(() => { if (active) setHistoryState('error'); });
     return () => { active = false; };
-  }, [customer?.id]);
+  }, [customer?.id, historyAttempt]);
 
   useEffect(() => {
     if (!profileOpen) return undefined;
@@ -53,24 +65,42 @@ export default function CustomerDashboard({
   }, [profileOpen]);
 
   const latest = orders[0];
-  const hasOrders = orders.length > 0;
+  const hasOrders = historyState === 'ready' && orders.length > 0;
   const hasCart = cartItemCount > 0;
-  const hasReturningContext = hasOrders || hasCart;
+  const hasReturningContext = historyState === 'ready' && (hasOrders || hasCart);
   const openOrders = orders.filter((order) => !['delivered', 'collected', 'cancelled', 'complete', 'completed'].includes(String(order.status || '').toLowerCase())).length;
-  const buyAgain = useMemo(() => {
+  const orderedItems = useMemo(() => {
     const used = new Set();
-    const items = orders.flatMap((order) => order.items || []).filter((item) => {
+    return orders.flatMap((order) => order.items || []).filter((item) => {
       const key = itemKey(item);
       if (!key || used.has(key)) return false;
       used.add(key);
       return true;
     });
-    return items
-      .map((item) => products.find((product) => String(product.id) === String(item.productId || item.product_id)
-        || String(product.code || '').toLowerCase() === String(item.code || item.sku || '').toLowerCase()))
-      .filter(Boolean)
-      .slice(0, 4);
-  }, [orders, products]);
+  }, [orders]);
+
+  useEffect(() => {
+    if (!hasOrders || !orderedItems.length) {
+      setBuyAgain([]);
+      setBuyAgainState('ready');
+      return undefined;
+    }
+    let active = true;
+    setBuyAgainState('loading');
+    const skus = orderedItems.map((item) => item.productId || item.product_id || item.code || item.sku);
+    fetchProductsBySkus(skus).then((bySku) => {
+      if (!active) return;
+      const resolved = orderedItems.map((item) => {
+        const keys = [item.productId, item.product_id, item.code, item.sku]
+          .map((value) => String(value || '').toUpperCase());
+        return keys.map((key) => bySku.get(key)).find(Boolean)
+          || products.find((product) => keys.includes(String(product.id || product.code || product.sku || '').toUpperCase()));
+      }).filter(Boolean).slice(0, 4);
+      setBuyAgain(resolved);
+      setBuyAgainState('ready');
+    }).catch(() => { if (active) setBuyAgainState('ready'); });
+    return () => { active = false; };
+  }, [hasOrders, orderedItems, products]);
 
   const add = (product) => {
     addToCart?.(product, 1);
@@ -80,10 +110,14 @@ export default function CustomerDashboard({
 
   if (!customer?.id) return null;
 
+  const historyLoading = historyState === 'loading';
+  const historyError = historyState === 'error';
   const heroTitle = hasReturningContext ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
   const heroCopy = hasCart
     ? `Your order is ready to continue · ${cartItemCount} item${cartItemCount === 1 ? '' : 's'} saved`
-    : hasOrders ? 'Pick up where you left off or discover something new.' : 'Your first online order starts here.';
+    : hasOrders ? 'Pick up where you left off or discover something new.'
+      : historyLoading ? 'Checking your account history.'
+        : historyError ? 'We could not load your account history.' : 'Your first online order starts here.';
 
   return <section className="customer-dashboard" aria-labelledby="customer-dashboard-title">
     <div className="customer-dashboard-hero">
@@ -94,7 +128,9 @@ export default function CustomerDashboard({
       </div>
       {hasCart ? <div className="customer-dashboard-order-value"><span>YOUR ORDER</span><b>{formatRand(cartTotal)}</b><small>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} ready to review</small></div>
         : hasOrders ? <div className="customer-dashboard-order-value"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>
-          : <div className="customer-dashboard-order-value"><span>FIRST ORDER</span><b>Start here</b><small>Choose products to sell</small></div>}
+          : historyLoading ? <div className="customer-dashboard-order-value"><span>ACCOUNT HISTORY</span><b>Loading</b><small>Checking previous orders</small></div>
+            : historyError ? <div className="customer-dashboard-order-value"><span>ACCOUNT HISTORY</span><b>Try again</b><button type="button" className="customer-dashboard-retry" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>Retry</button></div>
+              : <div className="customer-dashboard-order-value"><span>FIRST ORDER</span><b>Start here</b><small>Choose products to sell</small></div>}
       <button className="customer-dashboard-cta" type="button" onClick={hasCart ? onOpenCart : onContinueShopping}>
         {hasCart ? <ShoppingCart size={21} /> : <ShoppingBag size={21} />}
         <span><b>{hasCart ? 'Continue order' : 'Browse catalogue'}</b><small>{hasCart ? 'Review your basket' : 'Find products to sell'}</small></span>
@@ -108,12 +144,14 @@ export default function CustomerDashboard({
       <button type="button" className="customer-dashboard-help" onClick={openIntercom}><CircleHelp size={18} /><span><b>Need help?</b><small>Ask Proto</small></span></button>
     </div>}
 
-    {!hasReturningContext ? null : !hasOrders ? <div className="customer-dashboard-cart-start">
+    {historyLoading || historyError ? <div className="customer-dashboard-history-notice" role={historyError ? 'alert' : 'status'}>{historyLoading ? 'Loading your order history…' : <>We couldn’t load your orders. <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>Try again</button></>}</div>
+      : !hasReturningContext ? <div className="customer-dashboard-start"><div className="customer-dashboard-section-heading"><div><h2>Start with a department</h2><span>Browse the products you need most.</span></div></div><div className="customer-dashboard-departments">{categories.slice(0, 6).map((category) => <button type="button" key={category.id} onClick={() => onBrowseDepartment?.(category.id)}><Package size={17} /><span>{category.label}</span><ChevronRight size={15} /></button>)}</div></div>
+      : !hasOrders ? <div className="customer-dashboard-cart-start">
       <div><h2>Your order is ready</h2><p>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} saved. Review it whenever you’re ready.</p></div>
       <button type="button" onClick={onOpenCart}>Continue order <ChevronRight size={15} /></button>
     </div> : <div className="customer-dashboard-workspace">
       <div className="customer-dashboard-orders"><div className="customer-dashboard-section-heading"><h2>Recent orders</h2><button type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>{orders.slice(0, 5).map((order) => <div className="customer-dashboard-order" key={order.id}><b>{order.order_number || String(order.id).slice(0, 8)}</b><span>{formatDate(order.created_at)}</span><span className="customer-dashboard-status"><i />{customerOrderStatus(order.status)}</span><strong>{formatRand(orderVatSummary(order).totalInclVat)}</strong><button type="button" onClick={onViewOrders}>View order</button></div>)}</div>
-      <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><div><h2>Buy again</h2><span>From your previous orders</span></div></div><div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>{formatRand(product.price_incl_vat ?? product.price)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div></div>
+      <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><div><h2>Buy again</h2><span>From your previous orders</span></div></div>{buyAgainState === 'loading' ? <p className="customer-dashboard-buy-empty">Finding products from your previous orders…</p> : buyAgain.length ? <div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>{formatRand(product.price_incl_vat ?? product.price)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div> : <p className="customer-dashboard-buy-empty">{orderedItems.length ? 'Previous products are not currently available online.' : 'Your previous order items will appear here when available.'} <button type="button" onClick={onViewOrders}>View orders</button></p>}</div>
     </div>}
 
     {profileOpen && <div className="customer-dashboard-modal-backdrop" onClick={() => setProfileOpen(false)}>
