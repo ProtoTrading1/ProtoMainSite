@@ -51,6 +51,7 @@ export default function MainContent({
   searchActive = false,
   onSearchProductClick = null,
   showWelcome = false,
+  welcomeDurationMs = 5500,
   inStockOnly = false,
   onResetFilters = () => {},
   refinements = {},
@@ -259,7 +260,7 @@ export default function MainContent({
   return (
     <div className="catalog-page">
       {showWelcomeHome && (
-        <div className="site-hero-banner" role="status" aria-live="polite">
+        <div className="site-hero-banner" role="status" aria-live="polite" style={{ '--welcome-duration': `${welcomeDurationMs}ms` }}>
           <img
             src="/main-site-banner.jpg"
             alt="Thank you for registering — Welcome to Proto Trading Online"
