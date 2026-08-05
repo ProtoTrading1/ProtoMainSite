@@ -72,7 +72,6 @@ export default function CustomerDashboard({
       .slice(0, 4);
   }, [orders, products]);
 
-  const departments = categories.slice(0, 6);
   const add = (product) => {
     addToCart?.(product, 1);
     setMessage(`${product.name || product.description || 'Product'} added to your order`);
@@ -81,7 +80,7 @@ export default function CustomerDashboard({
 
   if (!customer?.id) return null;
 
-  const heroTitle = hasOrders ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
+  const heroTitle = hasReturningContext ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
   const heroCopy = hasCart
     ? `Your order is ready to continue · ${cartItemCount} item${cartItemCount === 1 ? '' : 's'} saved`
     : hasOrders ? 'Pick up where you left off or discover something new.' : 'Your first online order starts here.';
@@ -95,7 +94,7 @@ export default function CustomerDashboard({
       </div>
       {hasCart ? <div className="customer-dashboard-order-value"><span>YOUR ORDER</span><b>{formatRand(cartTotal)}</b><small>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} ready to review</small></div>
         : hasOrders ? <div className="customer-dashboard-order-value"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>
-          : <div className="customer-dashboard-order-value"><span>FIRST ORDER</span><b>Start here</b><small>Choose a department below</small></div>}
+          : <div className="customer-dashboard-order-value"><span>FIRST ORDER</span><b>Start here</b><small>Choose products to sell</small></div>}
       <button className="customer-dashboard-cta" type="button" onClick={hasCart ? onOpenCart : onContinueShopping}>
         {hasCart ? <ShoppingCart size={21} /> : <ShoppingBag size={21} />}
         <span><b>{hasCart ? 'Continue order' : 'Browse catalogue'}</b><small>{hasCart ? 'Review your basket' : 'Find products to sell'}</small></span>
