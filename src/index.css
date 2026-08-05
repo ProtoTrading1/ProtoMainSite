@@ -227,7 +227,7 @@ textarea:focus-visible,
 .customer-dashboard-eyebrow { display: block; color: #e2b84b; font: 700 10px 'Outfit', sans-serif; letter-spacing: .13em; }
 .customer-dashboard-identity h1 { margin: 5px 0 11px; color: #fff; font: 800 clamp(27px, 3vw, 42px)/1.05 'Outfit', sans-serif; letter-spacing: -.04em; }
 .customer-dashboard-greeting { transition: opacity .35s ease, transform .35s ease; }
-.customer-dashboard-greeting--dismissed { opacity: .78; transform: translateY(-4px); }
+.customer-dashboard-greeting--dismissed { height: 0; margin: 0; overflow: hidden; opacity: 0; transform: translateY(-8px); pointer-events: none; }
 .customer-dashboard-identity p { margin: 0; color: #c8cbd0; font-size: 13px; }
 .customer-dashboard-order-value { min-height: 106px; padding: 19px 23px; display: grid; align-content: center; gap: 5px; border-radius: 9px; background: #252627; }
 .customer-dashboard-order-value span { color: #e2b84b; font: 700 9px 'Outfit', sans-serif; letter-spacing: .12em; }
@@ -2248,7 +2248,7 @@ textarea:focus-visible,
   line-height: 0;
   box-shadow: 0 20px 50px rgba(0,0,0,0.25);
   pointer-events: none;
-  animation: welcome-banner-brief 3.5s ease forwards;
+  animation: welcome-banner-brief var(--welcome-duration, 5500ms) ease forwards;
 }
 .site-hero-banner img {
   width: 100%;
