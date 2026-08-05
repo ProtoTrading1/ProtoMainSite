@@ -27,10 +27,10 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /Start with a department/);
   assert.match(dashboard, /: hasOrders \? <div className="customer-dashboard-workspace">/);
   assert.match(dashboard, /hasReturningContext = historyState === 'ready' && \(hasOrders \|\| hasCart\)/);
-  assert.match(dashboard, /Account details/);
-  assert.match(dashboard, /customer-dashboard-contextual-tools/);
-  assert.match(dashboard, /customer-dashboard-basket-task/);
-  assert.match(dashboard, /Review basket/);
+  assert.doesNotMatch(dashboard, /Account details/);
+  assert.doesNotMatch(dashboard, /customer-dashboard-contextual-tools/);
+  assert.doesNotMatch(dashboard, /customer-dashboard-basket-task/);
+  assert.doesNotMatch(dashboard, /Review basket/);
   assert.doesNotMatch(dashboard, /<b>Your details<\/b>/);
   assert.doesNotMatch(dashboard, /<b>Need help\?<\/b>/);
   assert.doesNotMatch(dashboard, /Account status/i);
