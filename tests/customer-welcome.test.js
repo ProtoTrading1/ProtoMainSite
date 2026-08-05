@@ -8,17 +8,28 @@ const styles = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'ut
 
 test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(app, /<CustomerDashboard/);
-  assert.match(dashboard, /orders\.length \? firstName\(customer\) : 'Your trade account is ready'/);
+  assert.match(dashboard, /hasOrders \? `Welcome back, \$\{firstName\(customer\)\}` : `Welcome, \$\{firstName\(customer\)\}`/);
+  assert.match(dashboard, /Your order is ready to continue/);
+  assert.match(dashboard, /Your first online order starts here/);
+  assert.match(dashboard, /Continue order/);
+  assert.match(dashboard, /Browse catalogue/);
   assert.match(dashboard, /Buy again/);
-  assert.match(dashboard, /Popular with trade customers/);
+  assert.match(dashboard, /Choose a department/);
+  assert.match(dashboard, /Your details/);
+  assert.doesNotMatch(dashboard, /Account status/i);
+  assert.doesNotMatch(dashboard, /Popular with trade customers/);
   assert.match(dashboard, /if \(!customer\?\.id\) return null/);
   assert.doesNotMatch(dashboard, /R18,450/);
 });
 
 test('welcome links to existing order history without creating another customer flow', () => {
   assert.match(app, /onViewOrders=\{onViewProfile\}/);
+  assert.match(app, /cartItemCount=\{totalItemCount\}/);
+  assert.match(app, /onOpenCart=\{handleCartOpen\}/);
+  assert.match(app, /onBrowseDepartment=/);
   assert.match(dashboard, /Recent orders/);
   assert.match(dashboard, /View all orders/);
+  assert.match(dashboard, /onClick=\{hasCart \? onOpenCart : onContinueShopping\}/);
   assert.doesNotMatch(app, /FirstLoginBuyingAssistant/);
   assert.doesNotMatch(styles, /buying-assistant/);
   assert.equal(fs.existsSync(new URL('../migrations/064_customer_buying_assistant.sql', import.meta.url)), false);
