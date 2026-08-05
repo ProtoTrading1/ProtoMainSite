@@ -10,12 +10,13 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(app, /<CustomerDashboard/);
   assert.match(dashboard, /hasOrders \? `Welcome back, \$\{firstName\(customer\)\}` : `Welcome, \$\{firstName\(customer\)\}`/);
   assert.match(dashboard, /Your order is ready to continue/);
-  assert.match(dashboard, /Your order is ready to continue/);
   assert.match(dashboard, /Your first online order starts here/);
   assert.match(dashboard, /Continue order/);
   assert.match(dashboard, /Browse catalogue/);
   assert.match(dashboard, /Buy again/);
   assert.match(dashboard, /Choose a department/);
+  assert.match(dashboard, /!hasOrders \? <div className="customer-dashboard-start">/);
+  assert.match(dashboard, /: <div className="customer-dashboard-workspace">/);
   assert.match(dashboard, /Your details/);
   assert.doesNotMatch(dashboard, /Account status/i);
   assert.doesNotMatch(dashboard, /Popular with trade customers/);
