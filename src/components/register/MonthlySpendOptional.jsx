@@ -12,8 +12,8 @@ export default function MonthlySpendOptional({ value, onChange }) {
           <BarChart3 size={20} strokeWidth={2} />
         </div>
         <div className="lp-monthly-spend-copy">
-          <strong>Estimated monthly spend (optional)</strong>
-          <span>You can add this later in your profile.</span>
+          <strong>Expected monthly purchases from Proto (optional)</strong>
+          <span>Choose a typical monthly range, or add it later in your profile.</span>
         </div>
         <button
           type="button"
@@ -34,8 +34,8 @@ export default function MonthlySpendOptional({ value, onChange }) {
           <BarChart3 size={20} strokeWidth={2} />
         </div>
         <div className="lp-monthly-spend-copy">
-          <strong>Estimated monthly spend (optional)</strong>
-          <span>Select a range that best matches your typical orders.</span>
+          <strong>Expected monthly purchases from Proto (optional)</strong>
+          <span>Select the range that best matches what you expect to order from Proto each month.</span>
         </div>
         {!value && (
           <button
@@ -55,6 +55,7 @@ export default function MonthlySpendOptional({ value, onChange }) {
             type="button"
             className={`lp-monthly-spend-band${value === band ? ' selected' : ''}`}
             onClick={() => onChange(value === band ? '' : band)}
+            aria-pressed={value === band}
           >
             {band}
           </button>
