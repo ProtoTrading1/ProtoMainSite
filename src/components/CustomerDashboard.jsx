@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Box, ChevronRight, Heart, ShieldCheck, ShoppingBag, ShoppingCart, Tag, Truck } from 'lucide-react';
+import { ArrowRight, ChevronRight, CircleHelp, Package, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
 import { fetchOrderHistory } from '../lib/orders';
 import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
+import { openIntercom } from '../lib/intercom';
 
 function firstName(customer) {
   return String(customer?.contact_name || customer?.name || '').trim().split(/\s+/)[0] || 'there';
@@ -16,18 +17,46 @@ function itemKey(item) {
   return item?.productId || item?.product_id || item?.code || item?.sku || item?.name;
 }
 
-export default function CustomerDashboard({ customer, products = [], addToCart, onViewOrders, onViewProfile, onContinueShopping }) {
+function formatRand(value) {
+  return `R${Number(value || 0).toFixed(2)}`;
+}
+
+export default function CustomerDashboard({
+  customer,
+  products = [],
+  categories = [],
+  cartItemCount = 0,
+  cartTotal = 0,
+  addToCart,
+  onOpenCart,
+  onViewOrders,
+  onViewProfile,
+  onContinueShopping,
+  onBrowseDepartment,
+}) {
   const [orders, setOrders] = useState([]);
   const [message, setMessage] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
     let active = true;
-    fetchOrderHistory(customer.id, 10).then((rows) => { if (active) setOrders(Array.isArray(rows) ? rows : []); }).catch(() => {});
+    fetchOrderHistory(customer.id, 10)
+      .then((rows) => { if (active) setOrders(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (active) setOrders([]); });
     return () => { active = false; };
   }, [customer?.id]);
 
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const onKeyDown = (event) => { if (event.key === 'Escape') setProfileOpen(false); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [profileOpen]);
+
   const latest = orders[0];
+  const hasOrders = orders.length > 0;
+  const hasCart = cartItemCount > 0;
   const openOrders = orders.filter((order) => !['delivered', 'collected', 'cancelled', 'complete', 'completed'].includes(String(order.status || '').toLowerCase())).length;
   const buyAgain = useMemo(() => {
     const used = new Set();
@@ -37,10 +66,14 @@ export default function CustomerDashboard({ customer, products = [], addToCart, 
       used.add(key);
       return true;
     });
-    const matched = items.map((item) => products.find((product) => String(product.id) === String(item.productId || item.product_id) || String(product.code || '').toLowerCase() === String(item.code || item.sku || '').toLowerCase())).filter(Boolean);
-    return matched.length ? matched.slice(0, 4) : products.slice(0, 4);
+    return items
+      .map((item) => products.find((product) => String(product.id) === String(item.productId || item.product_id)
+        || String(product.code || '').toLowerCase() === String(item.code || item.sku || '').toLowerCase()))
+      .filter(Boolean)
+      .slice(0, 4);
   }, [orders, products]);
 
+  const departments = categories.slice(0, 6);
   const add = (product) => {
     addToCart?.(product, 1);
     setMessage(`${product.name || product.description || 'Product'} added to your order`);
@@ -49,32 +82,53 @@ export default function CustomerDashboard({ customer, products = [], addToCart, 
 
   if (!customer?.id) return null;
 
+  const heroTitle = hasCart ? 'Your order is ready to continue' : hasOrders ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
+  const heroCopy = hasCart
+    ? `${cartItemCount} item${cartItemCount === 1 ? '' : 's'} saved in your order`
+    : hasOrders ? 'Pick up where you left off or discover something new.' : 'Your first online order starts here.';
+
   return <section className="customer-dashboard" aria-labelledby="customer-dashboard-title">
     <div className="customer-dashboard-hero">
       <div className="customer-dashboard-identity">
-        <span className="customer-dashboard-eyebrow">{orders.length ? 'WELCOME BACK,' : 'WELCOME TO PROTO,'}</span>
-        <h1 id="customer-dashboard-title">{orders.length ? firstName(customer) : 'Your trade account is ready'}</h1>
-        <p>{orders.length ? <>Wholesale account <i>•</i> <strong><ShieldCheck size={14} /> Approved</strong></> : 'Approved wholesale access • Start building your first order'}</p>
+        <span className="customer-dashboard-eyebrow">PROTO TRADING ONLINE</span>
+        <h1 id="customer-dashboard-title">{heroTitle}</h1>
+        <p>{heroCopy}</p>
       </div>
-      <div className="customer-dashboard-next">
-        <span>{orders.length ? 'LAST ORDER' : 'YOUR NEXT STEP'}</span>
-        <b>{orders.length ? `R${orderVatSummary(latest).totalInclVat.toFixed(2)}` : 'Start shopping'}</b>
-        <small>{orders.length ? formatDate(latest.created_at) : 'Explore the catalogue and add products to your order'}</small>
-        <ChevronRight size={18} />
-      </div>
-      <button className="customer-dashboard-cta" type="button" onClick={onContinueShopping}><ShoppingBag size={21} /><span><b>{orders.length ? 'Continue shopping' : 'Start shopping'}</b><small>Browse catalogue</small></span></button>
+      {hasCart ? <div className="customer-dashboard-order-value"><span>YOUR ORDER</span><b>{formatRand(cartTotal)}</b><small>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} ready to review</small></div>
+        : hasOrders ? <div className="customer-dashboard-order-value"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>
+          : <div className="customer-dashboard-order-value"><span>FIRST ORDER</span><b>Start here</b><small>Choose a department below</small></div>}
+      <button className="customer-dashboard-cta" type="button" onClick={hasCart ? onOpenCart : onContinueShopping}>
+        {hasCart ? <ShoppingCart size={21} /> : <ShoppingBag size={21} />}
+        <span><b>{hasCart ? 'Continue order' : 'Browse catalogue'}</b><small>{hasCart ? 'Review your basket' : 'Find products to sell'}</small></span>
+      </button>
     </div>
 
-    <div className="customer-dashboard-summary">
-      <button type="button" className="customer-dashboard-profile" onClick={onViewProfile}><span className="customer-dashboard-round"><Truck size={20} /></span><span><b>Trade profile</b><small>{customer.business_name || 'Approved trade account'}</small><strong>View profile <ChevronRight size={13} /></strong></span><ChevronRight className="customer-dashboard-summary-end" size={18} /></button>
-      <div className="customer-dashboard-metrics"><div><span>ACCOUNT STATUS</span><b>Approved</b><small>Ready to shop</small></div><div><span>LAST ORDER</span><b>{latest ? `R${orderVatSummary(latest).totalInclVat.toFixed(2)}` : 'None yet'}</b><small>{latest ? formatDate(latest.created_at) : 'Your first order starts here'}</small></div><button type="button" onClick={onViewOrders}><span>OPEN ORDERS</span><b>{openOrders}</b><small>View orders</small></button></div>
+    <div className="customer-dashboard-quickbar">
+      <button type="button" className="customer-dashboard-profile" onClick={() => setProfileOpen(true)}><UserRound size={19} /><span><b>Your details</b><small>{customer.business_name || customer.name || 'Trade account'}</small></span><ChevronRight size={18} /></button>
+      {hasOrders && <button type="button" className="customer-dashboard-quick-stat" onClick={onViewOrders}><span>OPEN ORDERS</span><b>{openOrders}</b><small>View order status</small></button>}
+      {hasOrders && <div className="customer-dashboard-quick-stat"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>}
+      <button type="button" className="customer-dashboard-help" onClick={openIntercom}><CircleHelp size={18} /><span><b>Need help?</b><small>Ask Proto</small></span></button>
     </div>
 
-    <div className="customer-dashboard-workspace">
-      <div className="customer-dashboard-orders"><div className="customer-dashboard-section-heading"><h2>Recent orders</h2><button type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>{orders.length ? <>{orders.slice(0, 5).map((order) => <div className="customer-dashboard-order" key={order.id}><b>{order.order_number || String(order.id).slice(0, 8)}</b><span>{formatDate(order.created_at)}</span><span className="customer-dashboard-status"><i />{customerOrderStatus(order.status)}</span><strong>R{orderVatSummary(order).totalInclVat.toFixed(2)}</strong><button type="button" onClick={onViewOrders}>View order</button></div>)}</> : <div className="customer-dashboard-empty"><Box size={22} /><p>You have not placed an online order yet.</p><button type="button" onClick={onContinueShopping}>Start shopping <ArrowRight size={14} /></button></div>}<button className="customer-dashboard-bottom-link" type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>
-      <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><h2>{orders.length ? 'Buy again' : 'Popular with trade customers'}</h2><span className="customer-dashboard-section-note">{orders.length ? 'From your previous orders' : 'A simple place to start'}</span></div><div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><button className="customer-dashboard-heart" type="button" aria-label={`Save ${product.name || 'product'}`}><Heart size={15} /></button><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>R{Number(product.price_incl_vat ?? product.price ?? 0).toFixed(2)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div></div>
-    </div>
-    <div className="customer-dashboard-trust"><span><Tag /><b>Trade pricing</b></span><span><Truck /><b>Reliable delivery</b></span><span><ShoppingBag /><b>Easy repeat ordering</b></span></div>
+    {!hasOrders ? <div className="customer-dashboard-start">
+      <div className="customer-dashboard-section-heading"><div><h2>Choose a department</h2><span>Start with the products that fit your business.</span></div><button type="button" onClick={onContinueShopping}>View all products <ChevronRight size={14} /></button></div>
+      <div className="customer-dashboard-departments">
+        {departments.map((department) => <button key={department.id} type="button" onClick={() => onBrowseDepartment?.(department.id)}><Package size={17} /><span>{department.label}</span><ChevronRight size={15} /></button>)}
+      </div>
+    </div> : <div className="customer-dashboard-workspace">
+      <div className="customer-dashboard-orders"><div className="customer-dashboard-section-heading"><h2>Recent orders</h2><button type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>{orders.slice(0, 5).map((order) => <div className="customer-dashboard-order" key={order.id}><b>{order.order_number || String(order.id).slice(0, 8)}</b><span>{formatDate(order.created_at)}</span><span className="customer-dashboard-status"><i />{customerOrderStatus(order.status)}</span><strong>{formatRand(orderVatSummary(order).totalInclVat)}</strong><button type="button" onClick={onViewOrders}>View order</button></div>)}</div>
+      <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><div><h2>Buy again</h2><span>From your previous orders</span></div></div><div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>{formatRand(product.price_incl_vat ?? product.price)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div></div>
+    </div>}
+
+    {profileOpen && <div className="customer-dashboard-modal-backdrop" onClick={() => setProfileOpen(false)}>
+      <div className="customer-dashboard-profile-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-profile-title" onClick={(event) => event.stopPropagation()}>
+        <button className="customer-dashboard-modal-close" type="button" aria-label="Close profile" onClick={() => setProfileOpen(false)}><X size={18} /></button>
+        <UserRound size={23} />
+        <h2 id="dashboard-profile-title">Your details</h2>
+        <dl><div><dt>Business</dt><dd>{customer.business_name || 'Proto Trading'}</dd></div><div><dt>Contact</dt><dd>{customer.contact_name || customer.name || '—'}</dd></div><div><dt>Email</dt><dd>{customer.email || '—'}</dd></div><div><dt>Delivery</dt><dd>{customer.delivery_address || customer.address || 'Add delivery details'}</dd></div></dl>
+        <button type="button" className="customer-dashboard-profile-edit" onClick={() => { setProfileOpen(false); onViewProfile?.(); }}>Edit details <ArrowRight size={15} /></button>
+      </div>
+    </div>}
     {message && <div className="customer-dashboard-toast" role="status">{message}</div>}
   </section>;
 }
