@@ -50,12 +50,13 @@ describe('catalogue interaction accessibility', () => {
     const app = await readSource('src/App.jsx');
     const styles = await readSource('src/index.css');
     assert.match(app, /const WELCOME_DISPLAY_MS = 5500/);
-    assert.match(app, /window\.setTimeout\(dismissWelcome, WELCOME_DISPLAY_MS\)/);
+    assert.match(app, /window\.setTimeout\(dismissWelcome, welcomeDisplayMs\(bannerConfig\)\)/);
     assert.match(app, /onMouseEnter=\{dismissWelcome\}/);
     assert.match(app, /onScroll=\{dismissWelcome\}/);
     assert.doesNotMatch(app, /sessionStorage\.removeItem\(WELCOME_DISMISSED_KEY\)/);
-    assert.doesNotMatch(app, /setShowWelcome\(true\)/);
-    assert.match(styles, /animation: welcome-banner-brief 3\.5s ease forwards/);
+    assert.match(app, /if \(!customer\?\.id \|\| !lastOrderLoaded\) return;/);
+    assert.match(app, /setShowWelcome\(true\)/);
+    assert.match(styles, /animation: welcome-banner-brief var\(--welcome-duration, 5500ms\) ease forwards/);
     assert.match(styles, /85\.7%/);
     assert.match(styles, /max-height: 560px/);
     assert.match(styles, /pointer-events: none/);

@@ -12,6 +12,8 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /showGreeting/);
   assert.match(dashboard, /setTimeout\(dismissGreeting, 5500\)/);
   assert.match(dashboard, /onClick=\{dismissGreeting\}/);
+  assert.match(dashboard, /showGreeting && <div className="customer-dashboard-hero">/);
+  assert.doesNotMatch(dashboard, /customer-dashboard-cart-start/);
   assert.doesNotMatch(dashboard, /Your dashboard/);
   assert.match(dashboard, /Your order is ready to continue/);
   assert.match(dashboard, /Your first online order starts here/);
@@ -23,9 +25,14 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /Checking your account history/);
   assert.match(dashboard, /We couldn’t load your orders/);
   assert.match(dashboard, /Start with a department/);
-  assert.match(dashboard, /!hasOrders \? <div className="customer-dashboard-cart-start">/);
+  assert.match(dashboard, /: hasOrders \? <div className="customer-dashboard-workspace">/);
   assert.match(dashboard, /hasReturningContext = historyState === 'ready' && \(hasOrders \|\| hasCart\)/);
-  assert.match(dashboard, /Your details/);
+  assert.doesNotMatch(dashboard, /Account details/);
+  assert.doesNotMatch(dashboard, /customer-dashboard-contextual-tools/);
+  assert.doesNotMatch(dashboard, /customer-dashboard-basket-task/);
+  assert.doesNotMatch(dashboard, /Review basket/);
+  assert.doesNotMatch(dashboard, /<b>Your details<\/b>/);
+  assert.doesNotMatch(dashboard, /<b>Need help\?<\/b>/);
   assert.doesNotMatch(dashboard, /Account status/i);
   assert.doesNotMatch(dashboard, /Popular with trade customers/);
   assert.match(dashboard, /if \(!customer\?\.id\) return null/);
@@ -38,7 +45,8 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
   assert.match(app, /lastOrderLoaded/);
-  assert.match(app, /showWelcome=\{showWelcome && Boolean\(customer\?\.id\) && lastOrderLoaded && !lastOrder\}/);
+  assert.match(app, /showWelcome=\{showWelcome && Boolean\(customer\?\.id\) && lastOrderLoaded && !lastOrder && cartItems\.length === 0\}/);
+  assert.match(app, /hasSeenWelcome\(customer\.id\) \|\| lastOrder \|\| cartItems\.length > 0/);
   assert.match(app, /WELCOME_SEEN_PREFIX/);
   assert.match(app, /markWelcomeSeen\(customer\.id\)/);
   assert.match(app, /WELCOME_DISPLAY_MS = 5500/);
