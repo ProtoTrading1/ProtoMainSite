@@ -5,6 +5,7 @@ const DEFAULTS = {
   title: 'Built for retailers who need stock that moves.',
   body: 'Browse core wholesale lines, build a quote-ready basket, and send a clean request to the Proto Trading sales team for stock, VAT, and delivery confirmation.',
   imageUrl: '/campaign-hero-v2.png?v=2',
+  welcomeDurationMs: 5500,
 };
 
 export default async function handler(req, res) {
