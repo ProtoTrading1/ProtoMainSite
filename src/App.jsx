@@ -1798,3 +1798,53 @@ export default function App({
               <button
                 type="button"
                 className="mobile-cart-sheet-close"
+                onClick={() => closeMobileCart()}
+                aria-label="Close cart"
+                data-cart-close
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mobile-cart-sheet-body">
+              <Drawer
+                cartItems={cartItems}
+                cartTotal={cartTotal}
+                updateQty={updateQty}
+                removeFromCart={removeFromCart}
+                clearCart={clearCart}
+                onUndoClear={undoClearCart}
+                canUndoClear={Boolean(clearedCartSnapshot)}
+                sendOrderEmail={sendOrderEmail}
+                customer={customer}
+                autoCloseProgress={cartExpiryProgress}
+                showAutoCloseBar={cartExpiryRemainingMs !== null}
+                cartExpiryRemainingMs={cartExpiryRemainingMs}
+                cartExpiryTone={cartExpiryTone}
+                cartSyncStatus={cartSyncStatus}
+                onRetryCartSync={retryCartSync}
+                cartReady={cartHydrated}
+                onContinueShopping={() => setMobileCartOpen(false)}
+                revealItemRequest={cartRevealRequest}
+                initialScrollTop={cartScrollTop}
+                onRevealItemHandled={handleCartRevealHandled}
+                onScrollPositionChange={handleCartScrollPositionChange}
+                onEditDeliveryAddress={onViewProfile}
+                orderStatus={orderStatus}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPopup && popupConfig?.imageUrl && (
+        <PopupSpecialModal
+          imageUrl={popupConfig.imageUrl}
+          onDismiss={() => {
+            dismissPopup(popupConfig);
+            setShowPopup(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
