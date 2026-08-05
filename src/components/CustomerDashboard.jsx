@@ -82,9 +82,9 @@ export default function CustomerDashboard({
 
   if (!customer?.id) return null;
 
-  const heroTitle = hasCart ? 'Your order is ready to continue' : hasOrders ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
+  const heroTitle = hasOrders ? `Welcome back, ${firstName(customer)}` : `Welcome, ${firstName(customer)}`;
   const heroCopy = hasCart
-    ? `${cartItemCount} item${cartItemCount === 1 ? '' : 's'} saved in your order`
+    ? `Your order is ready to continue · ${cartItemCount} item${cartItemCount === 1 ? '' : 's'} saved`
     : hasOrders ? 'Pick up where you left off or discover something new.' : 'Your first online order starts here.';
 
   return <section className="customer-dashboard" aria-labelledby="customer-dashboard-title">
