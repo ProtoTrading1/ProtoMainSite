@@ -7,7 +7,7 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
-import CustomerWelcome from './components/CustomerWelcome';
+import CustomerDashboard from './components/CustomerDashboard';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -1598,10 +1598,13 @@ export default function App({
         </aside>
 
         <main className="content-area" onScroll={dismissWelcome}>
-          <CustomerWelcome
+          <CustomerDashboard
             customer={customer}
-            hasLastOrder={Boolean(lastOrder)}
+            products={catalogProducts}
+            addToCart={addToCart}
             onViewOrders={onViewProfile}
+            onViewProfile={onViewProfile}
+            onContinueShopping={() => handleShortcut('start')}
           />
           <MainContent
             products={catalogProducts}
