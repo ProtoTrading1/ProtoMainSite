@@ -27,7 +27,12 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /Start with a department/);
   assert.match(dashboard, /: hasOrders \? <div className="customer-dashboard-workspace">/);
   assert.match(dashboard, /hasReturningContext = historyState === 'ready' && \(hasOrders \|\| hasCart\)/);
-  assert.match(dashboard, /Your details/);
+  assert.match(dashboard, /Account details/);
+  assert.match(dashboard, /customer-dashboard-contextual-tools/);
+  assert.match(dashboard, /customer-dashboard-basket-task/);
+  assert.match(dashboard, /Review basket/);
+  assert.doesNotMatch(dashboard, /<b>Your details<\/b>/);
+  assert.doesNotMatch(dashboard, /<b>Need help\?<\/b>/);
   assert.doesNotMatch(dashboard, /Account status/i);
   assert.doesNotMatch(dashboard, /Popular with trade customers/);
   assert.match(dashboard, /if \(!customer\?\.id\) return null/);
@@ -39,7 +44,7 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /onBrowseDepartment=/);
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
-  assert.match(app, /lastOrderLoaded/);\n  assert.match(app, /cartHydrated/);
+  assert.match(app, /lastOrderLoaded/);
   assert.match(app, /showWelcome=\{showWelcome && Boolean\(customer\?\.id\) && lastOrderLoaded && !lastOrder && cartItems\.length === 0\}/);
   assert.match(app, /hasSeenWelcome\(customer\.id\) \|\| lastOrder \|\| cartItems\.length > 0/);
   assert.match(app, /WELCOME_SEEN_PREFIX/);
