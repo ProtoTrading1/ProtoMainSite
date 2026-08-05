@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronRight, CircleHelp, Package, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, CircleHelp, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
 import { fetchOrderHistory } from '../lib/orders';
 import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
 import { openIntercom } from '../lib/intercom';
@@ -24,7 +24,6 @@ function formatRand(value) {
 export default function CustomerDashboard({
   customer,
   products = [],
-  categories = [],
   cartItemCount = 0,
   cartTotal = 0,
   addToCart,
@@ -32,7 +31,6 @@ export default function CustomerDashboard({
   onViewOrders,
   onViewProfile,
   onContinueShopping,
-  onBrowseDepartment,
 }) {
   const [orders, setOrders] = useState([]);
   const [message, setMessage] = useState('');
@@ -57,6 +55,7 @@ export default function CustomerDashboard({
   const latest = orders[0];
   const hasOrders = orders.length > 0;
   const hasCart = cartItemCount > 0;
+  const hasReturningContext = hasOrders || hasCart;
   const openOrders = orders.filter((order) => !['delivered', 'collected', 'cancelled', 'complete', 'completed'].includes(String(order.status || '').toLowerCase())).length;
   const buyAgain = useMemo(() => {
     const used = new Set();
@@ -103,18 +102,16 @@ export default function CustomerDashboard({
       </button>
     </div>
 
-    <div className="customer-dashboard-quickbar">
+    {hasReturningContext && <div className="customer-dashboard-quickbar">
       <button type="button" className="customer-dashboard-profile" onClick={() => setProfileOpen(true)}><UserRound size={19} /><span><b>Your details</b><small>{customer.business_name || customer.name || 'Trade account'}</small></span><ChevronRight size={18} /></button>
       {hasOrders && <button type="button" className="customer-dashboard-quick-stat" onClick={onViewOrders}><span>OPEN ORDERS</span><b>{openOrders}</b><small>View order status</small></button>}
       {hasOrders && <div className="customer-dashboard-quick-stat"><span>LAST ORDER</span><b>{formatRand(orderVatSummary(latest).totalInclVat)}</b><small>{formatDate(latest.created_at)}</small></div>}
       <button type="button" className="customer-dashboard-help" onClick={openIntercom}><CircleHelp size={18} /><span><b>Need help?</b><small>Ask Proto</small></span></button>
-    </div>
+    </div>}
 
-    {!hasOrders ? <div className="customer-dashboard-start">
-      <div className="customer-dashboard-section-heading"><div><h2>Choose a department</h2><span>Start with the products that fit your business.</span></div><button type="button" onClick={onContinueShopping}>View all products <ChevronRight size={14} /></button></div>
-      <div className="customer-dashboard-departments">
-        {departments.map((department) => <button key={department.id} type="button" onClick={() => onBrowseDepartment?.(department.id)}><Package size={17} /><span>{department.label}</span><ChevronRight size={15} /></button>)}
-      </div>
+    {!hasReturningContext ? null : !hasOrders ? <div className="customer-dashboard-cart-start">
+      <div><h2>Your order is ready</h2><p>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} saved. Review it whenever you’re ready.</p></div>
+      <button type="button" onClick={onOpenCart}>Continue order <ChevronRight size={15} /></button>
     </div> : <div className="customer-dashboard-workspace">
       <div className="customer-dashboard-orders"><div className="customer-dashboard-section-heading"><h2>Recent orders</h2><button type="button" onClick={onViewOrders}>View all orders <ChevronRight size={14} /></button></div>{orders.slice(0, 5).map((order) => <div className="customer-dashboard-order" key={order.id}><b>{order.order_number || String(order.id).slice(0, 8)}</b><span>{formatDate(order.created_at)}</span><span className="customer-dashboard-status"><i />{customerOrderStatus(order.status)}</span><strong>{formatRand(orderVatSummary(order).totalInclVat)}</strong><button type="button" onClick={onViewOrders}>View order</button></div>)}</div>
       <div className="customer-dashboard-buy"><div className="customer-dashboard-section-heading"><div><h2>Buy again</h2><span>From your previous orders</span></div></div><div className="customer-dashboard-products">{buyAgain.map((product) => <article key={product.id} className="customer-dashboard-product"><img src={product.image_url || product.image || product.imageUrl || ''} alt={product.name || product.description || ''} /><b>{product.name || product.description}</b><small>{product.unitsOfIssue || product.selling_unit || product.unit || 'Each'}</small><strong>{formatRand(product.price_incl_vat ?? product.price)}</strong><em>Incl. VAT</em><button className="customer-dashboard-add" type="button" onClick={() => add(product)}>Add to order <ShoppingCart size={13} /></button></article>)}</div></div>
