@@ -44,6 +44,7 @@ const MAX_CART_LINES = 250;
 const DRAWER_PEEK_MS = 1200;
 const WELCOME_DISPLAY_MS = 3500;
 const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
+const WELCOME_SEEN_PREFIX = 'proto_welcome_seen:';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
 const CART_STORAGE_KEY = 'proto_cart';
@@ -89,6 +90,20 @@ function readInitialShowWelcome() {
     if (sessionStorage.getItem(WELCOME_DISMISSED_KEY)) return false;
   } catch { /* ignore */ }
   return !hashHasCategoryPath();
+}
+
+function welcomeSeenKey(customerId) {
+  return `${WELCOME_SEEN_PREFIX}${String(customerId || '').trim()}`;
+}
+
+function hasSeenWelcome(customerId) {
+  if (!customerId) return false;
+  try { return localStorage.getItem(welcomeSeenKey(customerId)) === '1'; } catch { return false; }
+}
+
+function markWelcomeSeen(customerId) {
+  if (!customerId) return;
+  try { localStorage.setItem(welcomeSeenKey(customerId), '1'); } catch { /* ignore */ }
 }
 
 function productStockQtyForCart(product) {
@@ -310,6 +325,7 @@ export default function App({
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
+  const [lastOrderLoaded, setLastOrderLoaded] = useState(false);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
   const [bannerConfig, setBannerConfig] = useState(null);
@@ -802,9 +818,32 @@ export default function App({
   }, [path, pathKey, categories, customer?.id]);
 
   useEffect(() => {
-    if (!customer?.id) return;
-    fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+    if (!customer?.id) {
+      setLastOrder(null);
+      setLastOrderLoaded(true);
+      return undefined;
+    }
+    setLastOrderLoaded(false);
+    fetchLastOrder(customer.id)
+      .then(setLastOrder)
+      .catch(() => setLastOrder(null))
+      .finally(() => setLastOrderLoaded(true));
+    return undefined;
   }, [customer?.id]);
+
+  // The welcome banner is an account-level first-visit moment, not a
+  // per-session promotion. Keep it hidden until we know whether this account
+  // has already seen it, and never show it to an established customer.
+  useEffect(() => {
+    if (!customer?.id || !lastOrderLoaded) return;
+    if (hasSeenWelcome(customer.id) || lastOrder) {
+      markWelcomeSeen(customer.id);
+      setShowWelcome(false);
+      return;
+    }
+    markWelcomeSeen(customer.id);
+    setShowWelcome(true);
+  }, [customer?.id, lastOrderLoaded, lastOrder]);
 
   useEffect(() => {
     fetchDistinctCategories().then(setBrowseCategories).catch(() => {});
@@ -1601,6 +1640,7 @@ export default function App({
           <CustomerDashboard
             customer={customer}
             products={catalogProducts}
+            categories={categories}
             cartItemCount={totalItemCount}
             cartTotal={cartTotal}
             addToCart={addToCart}
@@ -1608,6 +1648,11 @@ export default function App({
             onViewOrders={onViewProfile}
             onViewProfile={onViewProfile}
             onContinueShopping={() => handleShortcut('start')}
+            onBrowseDepartment={(departmentId) => {
+              setActiveCollection('all');
+              setSearchQuery('');
+              navigate([departmentId]);
+            }}
           />
           <MainContent
             products={catalogProducts}
@@ -1638,7 +1683,10 @@ export default function App({
             categoryNode={categoryNode}
             categories={categories}
             onProductPreview={handleProductPreview}
-            showWelcome={showWelcome}
+            // Returning customers should never see the generic first-visit
+            // banner. Hold it back while the last-order check is in flight so
+            // the banner cannot flash before the customer history resolves.
+            showWelcome={showWelcome && (!customer?.id || (lastOrderLoaded && !lastOrder))}
             inStockOnly={inStockOnly}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
@@ -1750,53 +1798,3 @@ export default function App({
               <button
                 type="button"
                 className="mobile-cart-sheet-close"
-                onClick={() => closeMobileCart()}
-                aria-label="Close cart"
-                data-cart-close
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="mobile-cart-sheet-body">
-              <Drawer
-                cartItems={cartItems}
-                cartTotal={cartTotal}
-                updateQty={updateQty}
-                removeFromCart={removeFromCart}
-                clearCart={clearCart}
-                onUndoClear={undoClearCart}
-                canUndoClear={Boolean(clearedCartSnapshot)}
-                sendOrderEmail={sendOrderEmail}
-                customer={customer}
-                autoCloseProgress={cartExpiryProgress}
-                showAutoCloseBar={cartExpiryRemainingMs !== null}
-                cartExpiryRemainingMs={cartExpiryRemainingMs}
-                cartExpiryTone={cartExpiryTone}
-                cartSyncStatus={cartSyncStatus}
-                onRetryCartSync={retryCartSync}
-                cartReady={cartHydrated}
-                onContinueShopping={() => setMobileCartOpen(false)}
-                revealItemRequest={cartRevealRequest}
-                initialScrollTop={cartScrollTop}
-                onRevealItemHandled={handleCartRevealHandled}
-                onScrollPositionChange={handleCartScrollPositionChange}
-                onEditDeliveryAddress={onViewProfile}
-                orderStatus={orderStatus}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPopup && popupConfig?.imageUrl && (
-        <PopupSpecialModal
-          imageUrl={popupConfig.imageUrl}
-          onDismiss={() => {
-            dismissPopup(popupConfig);
-            setShowPopup(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
