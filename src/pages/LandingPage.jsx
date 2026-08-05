@@ -751,7 +751,10 @@ function Questionnaire({ onLogin }) {
             <div id="landing-trading-channel-label" className="lp-quiz-question-label">
               1. How do you trade? <span>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-trading-channel-label" aria-required="true">
+            <div id="landing-trading-channel-count" className="lp-quiz-selection-count" aria-live="polite">
+              {tradingChannels.length === 0 ? 'None selected yet' : `${tradingChannels.length} selected`}
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-trading-channel-label" aria-describedby="landing-trading-channel-count" aria-required="true">
               {TRADING_CHANNELS.map((channel) => {
                 const selected = tradingChannels.includes(channel);
                 return (
@@ -761,6 +764,7 @@ function Questionnaire({ onLogin }) {
                   className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`}
                   onClick={() => toggleTradingChannel(channel)}
                   aria-pressed={selected}
+                  aria-label={`${channel}${selected ? ', selected' : ''}`}
                 >
                   <span>{channel}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
                 </button>
@@ -769,7 +773,10 @@ function Questionnaire({ onLogin }) {
             <div id="landing-product-category-label" className="lp-quiz-question-label lp-quiz-question-label--second">
               2. What do you mainly sell? <span>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-product-category-label" aria-required="true">
+            <div id="landing-product-category-count" className="lp-quiz-selection-count" aria-live="polite">
+              {productCategories.length === 0 ? 'None selected yet' : `${productCategories.length} selected`}
+            </div>
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-product-category-label" aria-describedby="landing-product-category-count" aria-required="true">
               {PRODUCT_CATEGORIES.map((category) => {
                 const selected = productCategories.includes(category);
                 return (
@@ -779,6 +786,7 @@ function Questionnaire({ onLogin }) {
                     className={`lp-quiz-type-card lp-quiz-type-card--multi${selected ? ' selected' : ''}`}
                     onClick={() => toggleProductCategory(category)}
                     aria-pressed={selected}
+                    aria-label={`${category}${selected ? ', selected' : ''}`}
                   >
                     <span>{category}</span>{selected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
                   </button>
@@ -822,7 +830,7 @@ function Questionnaire({ onLogin }) {
             </div>
             <div style={{ height: '18px' }} />
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
-              Estimated monthly spend <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span>
+              Expected monthly purchases from Proto <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span>
             </div>
             <div className="lp-quiz-types">
               {MONTHLY_SPEND_BANDS.map((band) => (
@@ -831,6 +839,7 @@ function Questionnaire({ onLogin }) {
                   type="button"
                   className={`lp-quiz-type-card${monthlySpend === band ? ' selected' : ''}`}
                   onClick={() => setMonthlySpend(band)}
+                  aria-pressed={monthlySpend === band}
                 >
                   {band}
                 </button>
