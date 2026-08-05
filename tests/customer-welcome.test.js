@@ -15,9 +15,12 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /Continue order/);
   assert.match(dashboard, /Browse catalogue/);
   assert.match(dashboard, /Buy again/);
-  assert.match(dashboard, /!hasReturningContext \? null/);
+  assert.match(dashboard, /historyState, setHistoryState/);
+  assert.match(dashboard, /Checking your account history/);
+  assert.match(dashboard, /We couldn’t load your orders/);
+  assert.match(dashboard, /Start with a department/);
   assert.match(dashboard, /!hasOrders \? <div className="customer-dashboard-cart-start">/);
-  assert.match(dashboard, /hasReturningContext = hasOrders \|\| hasCart/);
+  assert.match(dashboard, /hasReturningContext = historyState === 'ready' && \(hasOrders \|\| hasCart\)/);
   assert.match(dashboard, /Your details/);
   assert.doesNotMatch(dashboard, /Account status/i);
   assert.doesNotMatch(dashboard, /Popular with trade customers/);
@@ -27,12 +30,23 @@ test('signed-in customers receive a useful in-page dashboard', () => {
 
 test('welcome links to existing order history without creating another customer flow', () => {
   assert.match(app, /onViewOrders=\{onViewProfile\}/);
+  assert.match(app, /onBrowseDepartment=/);
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
+  assert.match(app, /lastOrderLoaded/);
+  assert.match(app, /showWelcome=\{showWelcome && \(!customer\?\.id \|\| \(lastOrderLoaded && !lastOrder\)\)\}/);
+  assert.match(app, /WELCOME_SEEN_PREFIX/);
+  assert.match(app, /markWelcomeSeen\(customer\.id\)/);
   assert.match(dashboard, /Recent orders/);
   assert.match(dashboard, /View all orders/);
   assert.match(dashboard, /onClick=\{hasCart \? onOpenCart : onContinueShopping\}/);
   assert.doesNotMatch(app, /FirstLoginBuyingAssistant/);
   assert.doesNotMatch(styles, /buying-assistant/);
   assert.equal(fs.existsSync(new URL('../migrations/064_customer_buying_assistant.sql', import.meta.url)), false);
+});
+
+test('dashboard resolves repeat products beyond the visible catalogue page', () => {
+  assert.match(dashboard, /fetchProductsBySkus/);
+  assert.match(dashboard, /item\.productId \|\| item\.product_id \|\| item\.code \|\| item\.sku/);
+  assert.match(dashboard, /Previous products are not currently available online/);
 });
