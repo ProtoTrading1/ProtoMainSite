@@ -272,6 +272,10 @@ textarea:focus-visible,
 .customer-dashboard-quick-stat small { margin-top: 3px; color: #858b94; font-size: 10px; }
 .customer-dashboard-help { color: #26303b; }
 .customer-dashboard-start { margin-top: 16px; padding: 18px; border: 1px solid #e6e8eb; border-radius: 8px; background: #fff; }
+.customer-dashboard-cart-start { margin-top: 16px; padding: 18px 20px; border: 1px solid #eadfc8; border-left: 3px solid #c99a2e; border-radius: 8px; background: #fffaf0; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.customer-dashboard-cart-start h2 { margin: 0; font: 700 18px 'Outfit', sans-serif; }
+.customer-dashboard-cart-start p { margin: 4px 0 0; color: #69717b; font-size: 12px; }
+.customer-dashboard-cart-start button { padding: 10px 14px; border: 0; border-radius: 6px; background: #8b1a1a; color: #fff; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
 .customer-dashboard-section-heading > div { min-width: 0; }
 .customer-dashboard-section-heading span { display: block; margin-top: 3px; color: #7b838e; font-size: 11px; }
 .customer-dashboard-departments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
@@ -385,6 +389,7 @@ textarea:focus-visible,
   .customer-dashboard-hero { grid-template-columns: 1fr; padding: 24px 20px; }
   .customer-dashboard-hero::after { left: 55%; top: 65px; }
   .customer-dashboard-quickbar { grid-template-columns: 1fr 1fr; }
+  .customer-dashboard-cart-start { align-items: stretch; flex-direction: column; }
   .customer-dashboard-profile { grid-column: span 2; }
   .customer-dashboard-profile, .customer-dashboard-help { min-height: 70px; }
   .customer-dashboard-workspace { grid-template-columns: 1fr; }
