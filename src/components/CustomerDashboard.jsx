@@ -159,8 +159,8 @@ export default function CustomerDashboard({
     <div className="customer-dashboard-hero">
       <div className="customer-dashboard-identity">
         <span className="customer-dashboard-eyebrow">PROTO TRADING ONLINE</span>
-        <h1 id="customer-dashboard-title" className={`customer-dashboard-greeting${showGreeting ? '' : ' customer-dashboard-greeting--dismissed'}`}>
-          {showGreeting ? heroTitle : hasReturningContext ? 'Your dashboard' : heroTitle}
+        <h1 id="customer-dashboard-title" aria-hidden={!showGreeting} className={`customer-dashboard-greeting${showGreeting ? '' : ' customer-dashboard-greeting--dismissed'}`}>
+          {heroTitle}
         </h1>
         <p>{heroCopy}</p>
       </div>
