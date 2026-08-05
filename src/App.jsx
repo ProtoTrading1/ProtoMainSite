@@ -1848,3 +1848,13 @@ export default function App({
 
       {showPopup && popupConfig?.imageUrl && (
         <PopupSpecialModal
+          imageUrl={popupConfig.imageUrl}
+          onDismiss={() => {
+            dismissPopup(popupConfig);
+            setShowPopup(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
