@@ -14,7 +14,7 @@ let identifiedUserId = null;
 let identifyInFlightFor = null;
 // The Messenger is not loaded until a customer signs in, so anonymous
 // visitors never fetch Intercom's script at all. Intercom() is the loader;
-// boot() assumes it has already run, so the first identify must use it.
+// boot() assumes it has already run, so the first mount must use it.
 let loaded = false;
 
 function settings(extra = {}) {
@@ -28,8 +28,38 @@ function settings(extra = {}) {
   };
 }
 
+/**
+ * Put the Messenger on the page, or re-boot it under a new identity.
+ *
+ * The first call has to go through Intercom() — that is the loader that injects
+ * the script. boot() only re-configures an already-loaded Messenger, so calling
+ * it first is a no-op that silently leaves the page with no chat at all.
+ */
+function mount(extra = {}) {
+  if (!loaded) {
+    Intercom(settings(extra));
+    loaded = true;
+    return;
+  }
+  // Already loaded, possibly as someone else. Clear that identity first,
+  // otherwise the self-declared email on the visitor record survives and
+  // Intercom keeps treating it as the contact's address.
+  try {
+    shutdown();
+  } catch {
+    /* nothing booted yet */
+  }
+  boot(settings(extra));
+}
+
 export function openIntercom() {
   try {
+    // "Ask Proto" has to open something. The Messenger normally loads as part of
+    // identifying the customer, but when that identity call cannot complete
+    // (secret not configured, rate limited, endpoint down) nothing was on the
+    // page and the button threw into the console. An unverified chat is a
+    // degraded chat; a missing one is no chat.
+    if (!loaded) mount();
     show();
   } catch (error) {
     console.error('Unable to open Intercom:', error);
@@ -38,7 +68,8 @@ export function openIntercom() {
 
 export function setIntercomLauncherVisibility(visible) {
   launcherVisible = Boolean(visible);
-  // Nothing to update before a customer signs in — the Messenger is not loaded.
+  // Nothing to update before the Messenger loads — the next mount() reads the
+  // flag straight out of settings().
   if (!loaded) return;
   try {
     update(settings());
@@ -50,17 +81,25 @@ export function setIntercomLauncherVisibility(visible) {
 async function fetchIdentityToken(session) {
   const { authHeaders } = await import('./authHeaders');
   const res = await fetch('/api/intercom/jwt', { headers: await authHeaders(session) });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Worth naming: 503 means INTERCOM_MESSENGER_SECRET is missing on the
+    // deployment, 403 means the account is not an approved trade account, 429
+    // is the rate limiter. Without this the widget just quietly ran unverified.
+    console.warn(`Intercom identity unavailable (HTTP ${res.status}) — chat will run unverified.`);
+    return null;
+  }
   const json = await res.json();
   return json?.token || null;
 }
 
 /**
- * Re-boot the Messenger as the signed-in, approved customer.
+ * Boot the Messenger as the signed-in, approved customer.
  *
- * Returns false and leaves the Messenger anonymous if the customer isn't
- * approved yet or the endpoint is unavailable — Fin's catalogue connector then
- * correctly refuses to hand out prices rather than failing open.
+ * If the signed identity cannot be issued the Messenger is still loaded, just
+ * unverified — the customer keeps a working chat button, and because no
+ * verified email reaches Intercom, Fin's catalogue connector still refuses to
+ * hand out prices rather than failing open. `identifiedUserId` stays null in
+ * that case so a later auth event retries the upgrade.
  */
 export async function identifyIntercom(session) {
   const userId = session?.user?.id || null;
@@ -71,27 +110,22 @@ export async function identifyIntercom(session) {
   identifyInFlightFor = userId;
   try {
     const token = await fetchIdentityToken(session);
-    if (!token) return false;
-    if (!loaded) {
-      // First sign-in on this page load: load the Messenger already identified,
-      // so there is never an anonymous contact to reconcile.
-      Intercom(settings({ intercom_user_jwt: token }));
-      loaded = true;
-    } else {
-      // Already loaded as someone else. Clear that identity first, otherwise
-      // the self-declared email on the visitor record survives and Intercom
-      // keeps treating it as the contact's address.
-      try {
-        shutdown();
-      } catch {
-        /* nothing booted yet */
-      }
-      boot(settings({ intercom_user_jwt: token }));
+    if (!token) {
+      if (!loaded) mount();
+      return false;
     }
+    mount({ intercom_user_jwt: token });
     identifiedUserId = userId;
     return true;
   } catch (error) {
     console.error('Unable to identify Intercom user:', error);
+    // Same fallback as a missing token: a signed-in customer should never be
+    // left staring at a chat button that does nothing.
+    try {
+      if (!loaded) mount();
+    } catch {
+      /* the SDK is unavailable; nothing further to do */
+    }
     return false;
   } finally {
     identifyInFlightFor = null;
@@ -104,7 +138,12 @@ export async function identifyIntercom(session) {
  * its verified identity when the JWT expires.
  */
 export async function refreshIntercomIdentity(session) {
-  if (!identifiedUserId || session?.user?.id !== identifiedUserId) return false;
+  // Never identified (or identified as someone else): treat the refresh as a
+  // chance to try again, rather than leaving the tab unverified for its whole
+  // lifetime because one identity call failed at sign-in.
+  if (!identifiedUserId || session?.user?.id !== identifiedUserId) {
+    return identifyIntercom(session);
+  }
   try {
     const token = await fetchIdentityToken(session);
     if (!token) return false;
@@ -117,7 +156,7 @@ export async function refreshIntercomIdentity(session) {
 }
 
 /**
- * Wipe the Intercom contact on logout and re-boot anonymously.
+ * Wipe the Intercom contact on logout.
  *
  * Without this the Messenger keeps the previous customer's identity after
  * sign-out — on a shared shop machine the next person inherits it, and with the
