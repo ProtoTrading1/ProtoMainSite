@@ -1601,10 +1601,19 @@ export default function App({
           <CustomerDashboard
             customer={customer}
             products={catalogProducts}
+            categories={categories}
+            cartItemCount={totalItemCount}
+            cartTotal={cartTotal}
             addToCart={addToCart}
+            onOpenCart={handleCartOpen}
             onViewOrders={onViewProfile}
             onViewProfile={onViewProfile}
             onContinueShopping={() => handleShortcut('start')}
+            onBrowseDepartment={(departmentId) => {
+              setActiveCollection('all');
+              setSearchQuery('');
+              navigate([departmentId]);
+            }}
           />
           <MainContent
             products={catalogProducts}
