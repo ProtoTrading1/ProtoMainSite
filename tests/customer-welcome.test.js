@@ -12,7 +12,7 @@ test('signed-in customers receive a useful in-page dashboard', () => {
   assert.match(dashboard, /showGreeting/);
   assert.match(dashboard, /setTimeout\(dismissGreeting, 5500\)/);
   assert.match(dashboard, /onClick=\{dismissGreeting\}/);
-  assert.match(dashboard, /Your dashboard/);
+  assert.doesNotMatch(dashboard, /Your dashboard/);
   assert.match(dashboard, /Your order is ready to continue/);
   assert.match(dashboard, /Your first online order starts here/);
   assert.match(dashboard, /Choose products to sell/);
@@ -38,7 +38,7 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /cartItemCount=\{totalItemCount\}/);
   assert.match(app, /onOpenCart=\{handleCartOpen\}/);
   assert.match(app, /lastOrderLoaded/);
-  assert.match(app, /showWelcome=\{showWelcome && \(!customer\?\.id \|\| \(lastOrderLoaded && !lastOrder\)\)\}/);
+  assert.match(app, /showWelcome=\{showWelcome && Boolean\(customer\?\.id\) && lastOrderLoaded && !lastOrder\}/);
   assert.match(app, /WELCOME_SEEN_PREFIX/);
   assert.match(app, /markWelcomeSeen\(customer\.id\)/);
   assert.match(app, /WELCOME_DISPLAY_MS = 5500/);
