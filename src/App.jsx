@@ -846,14 +846,14 @@ export default function App({
   // has already seen it, and never show it to an established customer.
   useEffect(() => {
     if (!customer?.id || !lastOrderLoaded) return;
-    if (hasSeenWelcome(customer.id) || lastOrder) {
+    if (hasSeenWelcome(customer.id) || lastOrder || cartItems.length > 0) {
       markWelcomeSeen(customer.id);
       setShowWelcome(false);
       return;
     }
     markWelcomeSeen(customer.id);
     setShowWelcome(true);
-  }, [customer?.id, lastOrderLoaded, lastOrder]);
+  }, [customer?.id, lastOrderLoaded, lastOrder, cartItems.length]);
 
   useEffect(() => {
     fetchDistinctCategories().then(setBrowseCategories).catch(() => {});
@@ -1697,7 +1697,7 @@ export default function App({
             // Only a newly approved, signed-in customer with no order history
             // gets the one-time first-visit banner. Anonymous visitors and
             // established customers should never see it.
-            showWelcome={showWelcome && Boolean(customer?.id) && lastOrderLoaded && !lastOrder}
+            showWelcome={showWelcome && Boolean(customer?.id) && lastOrderLoaded && !lastOrder && cartItems.length === 0}
             inStockOnly={inStockOnly}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
