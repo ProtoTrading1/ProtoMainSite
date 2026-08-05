@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronRight, CircleHelp, Package, ShoppingBag, ShoppingCart, UserRound, X } from 'lucide-react';
 import { fetchOrderHistory } from '../lib/orders';
 import { customerOrderStatus, orderVatSummary } from '../lib/orderPresentation';
@@ -22,6 +22,20 @@ function formatRand(value) {
   return `R${Number(value || 0).toFixed(2)}`;
 }
 
+const GREETING_SEEN_PREFIX = 'proto_dashboard_greeting_seen:';
+
+function greetingSeenKey(customerId) {
+  return `${GREETING_SEEN_PREFIX}${String(customerId || '').trim()}`;
+}
+
+function hasSeenGreeting(customerId) {
+  try { return localStorage.getItem(greetingSeenKey(customerId)) === '1'; } catch { return false; }
+}
+
+function markGreetingSeen(customerId) {
+  try { localStorage.setItem(greetingSeenKey(customerId), '1'); } catch { /* ignore */ }
+}
+
 export default function CustomerDashboard({
   customer,
   products = [],
@@ -42,6 +56,7 @@ export default function CustomerDashboard({
   const [buyAgainState, setBuyAgainState] = useState('idle');
   const [message, setMessage] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showGreeting, setShowGreeting] = useState(false);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
@@ -108,6 +123,27 @@ export default function CustomerDashboard({
     window.setTimeout(() => setMessage(''), 2400);
   };
 
+  const dismissGreeting = useCallback(() => {
+    if (!customer?.id) return;
+    markGreetingSeen(customer.id);
+    setShowGreeting(false);
+  }, [customer?.id]);
+
+  useEffect(() => {
+    if (!customer?.id || !hasReturningContext || hasSeenGreeting(customer.id)) {
+      setShowGreeting(false);
+      return undefined;
+    }
+    setShowGreeting(true);
+    const timer = window.setTimeout(dismissGreeting, 5500);
+    const dismissOnScroll = () => dismissGreeting();
+    window.addEventListener('scroll', dismissOnScroll, { passive: true, once: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('scroll', dismissOnScroll);
+    };
+  }, [customer?.id, dismissGreeting, hasReturningContext]);
+
   if (!customer?.id) return null;
 
   const historyLoading = historyState === 'loading';
@@ -119,11 +155,13 @@ export default function CustomerDashboard({
       : historyLoading ? 'Checking your account history.'
         : historyError ? 'We could not load your account history.' : 'Your first online order starts here.';
 
-  return <section className="customer-dashboard" aria-labelledby="customer-dashboard-title">
+  return <section className="customer-dashboard" aria-labelledby="customer-dashboard-title" onClick={dismissGreeting}>
     <div className="customer-dashboard-hero">
       <div className="customer-dashboard-identity">
         <span className="customer-dashboard-eyebrow">PROTO TRADING ONLINE</span>
-        <h1 id="customer-dashboard-title">{heroTitle}</h1>
+        <h1 id="customer-dashboard-title" className={`customer-dashboard-greeting${showGreeting ? '' : ' customer-dashboard-greeting--dismissed'}`}>
+          {showGreeting ? heroTitle : hasReturningContext ? 'Your dashboard' : heroTitle}
+        </h1>
         <p>{heroCopy}</p>
       </div>
       {hasCart ? <div className="customer-dashboard-order-value"><span>YOUR ORDER</span><b>{formatRand(cartTotal)}</b><small>{cartItemCount} item{cartItemCount === 1 ? '' : 's'} ready to review</small></div>
