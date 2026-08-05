@@ -37,6 +37,8 @@ test('welcome links to existing order history without creating another customer 
   assert.match(app, /showWelcome=\{showWelcome && \(!customer\?\.id \|\| \(lastOrderLoaded && !lastOrder\)\)\}/);
   assert.match(app, /WELCOME_SEEN_PREFIX/);
   assert.match(app, /markWelcomeSeen\(customer\.id\)/);
+  assert.match(app, /WELCOME_DISPLAY_MS = 5500/);
+  assert.match(app, /welcomeDurationMs/);
   assert.match(dashboard, /Recent orders/);
   assert.match(dashboard, /View all orders/);
   assert.match(dashboard, /onClick=\{hasCart \? onOpenCart : onContinueShopping\}/);
