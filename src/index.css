@@ -282,6 +282,9 @@ textarea:focus-visible,
 .customer-dashboard-departments button { min-height: 58px; padding: 10px 12px; border: 1px solid #e3e6ea; border-radius: 7px; background: #fff; color: #26303b; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
 .customer-dashboard-departments button:hover, .customer-dashboard-departments button:focus-visible { border-color: #c32724; box-shadow: 0 3px 12px rgba(139, 26, 26, .08); }
 .customer-dashboard-departments span { flex: 1; font-size: 12px; }
+.customer-dashboard-history-notice, .customer-dashboard-buy-empty { margin: 16px 0 0; padding: 14px 16px; border: 1px solid #e6e8eb; border-radius: 8px; background: #fff; color: #69717b; font-size: 12px; }
+.customer-dashboard-history-notice button, .customer-dashboard-buy-empty button { padding: 0; border: 0; background: none; color: #b21e1b; font: inherit; font-weight: 700; cursor: pointer; }
+.customer-dashboard-retry { width: max-content; margin-top: 5px; padding: 0; border: 0; background: none; color: #e2b84b; font: 700 11px 'Outfit', sans-serif; cursor: pointer; }
 .customer-dashboard-modal-backdrop { position: fixed; inset: 0; z-index: 450; padding: 20px; display: grid; place-items: center; background: rgba(12, 14, 17, .5); }
 .customer-dashboard-profile-modal { position: relative; width: min(100%, 420px); padding: 28px; border-radius: 12px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .25); }
 .customer-dashboard-profile-modal > svg { color: #8b1a1a; }
