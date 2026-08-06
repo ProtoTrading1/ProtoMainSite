@@ -644,7 +644,7 @@ function Questionnaire({ onLogin }) {
                         onClick={() => setWhatsappOptIn(true)}
                         aria-pressed={whatsappOptIn === true}
                         style={{
-                          flex: 1, padding: '11px', borderRadius: '8px', border: 'none',
+                          flex: 1, minHeight: '48px', padding: '11px', borderRadius: '8px', border: 'none',
                           fontFamily: 'inherit', fontWeight: '700', fontSize: '13px', cursor: 'pointer',
                           background: whatsappOptIn === true ? '#16a34a' : 'rgba(22,163,74,0.2)',
                           color: whatsappOptIn === true ? '#fff' : '#4ade80',
@@ -658,7 +658,7 @@ function Questionnaire({ onLogin }) {
                         onClick={() => setWhatsappOptIn(false)}
                         aria-pressed={whatsappOptIn === false}
                         style={{
-                          flex: 1, padding: '11px', borderRadius: '8px',
+                          flex: 1, minHeight: '48px', padding: '11px', borderRadius: '8px',
                           border: whatsappOptIn === false ? '1px solid #fff' : '1px solid rgba(255,255,255,0.15)',
                           fontFamily: 'inherit', fontWeight: '700', fontSize: '13px', cursor: 'pointer',
                           background: whatsappOptIn === false ? '#fff' : 'transparent',
