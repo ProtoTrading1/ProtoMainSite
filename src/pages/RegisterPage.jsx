@@ -487,15 +487,17 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                               type="button"
                               className={whatsappOptIn === true ? 'selected yes' : ''}
                               onClick={() => setWhatsappOptIn(true)}
+                              aria-pressed={whatsappOptIn === true}
                             >
-                              Yes
+                              {whatsappOptIn === true ? '✓ Yes, send updates' : 'Yes, send updates'}
                             </button>
                             <button
                               type="button"
                               className={whatsappOptIn === false ? 'selected no' : ''}
                               onClick={() => setWhatsappOptIn(false)}
+                              aria-pressed={whatsappOptIn === false}
                             >
-                              No
+                              {whatsappOptIn === false ? '✓ No WhatsApp updates' : 'No WhatsApp updates'}
                             </button>
                           </div>
                         </div>

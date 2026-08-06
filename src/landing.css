@@ -4949,6 +4949,7 @@
 
 .lp-register-whatsapp-actions button {
   flex: 1;
+  min-height: 48px;
   padding: 11px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -4968,8 +4969,10 @@
 }
 
 .lp-register-whatsapp-actions button.selected.no {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: #fff;
+  border-color: #fff;
+  color: #0f172a;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 
 .lp-register-checkbox {
