@@ -27,8 +27,8 @@ function ProfileField({ icon: Icon, label, value }) {
 }
 
 function whatsappLabel(value) {
-  if (value === true) return 'Yes — stock updates & specials';
-  if (value === false) return 'No';
+  if (value === true) return 'On — order updates, stock alerts & specials';
+  if (value === false) return 'Off — no WhatsApp updates';
   return null;
 }
 
