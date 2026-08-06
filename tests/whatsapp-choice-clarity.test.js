@@ -25,7 +25,10 @@ test('selected negative choices have an unmistakable visual state', () => {
   for (const source of [landing, questionnaire]) {
     assert.match(source, /whatsappOptIn === false \? '#fff' : 'transparent'/);
     assert.match(source, /✓ No WhatsApp updates/);
+    assert.match(source, /minHeight: '48px'/);
   }
+  assert.match(landingCss, /lp-register-whatsapp-actions button[\s\S]*min-height: 48px/);
+  assert.match(indexCss, /checkout-modal-whatsapp-actions \.checkout-modal-btn[\s\S]*min-height: 48px/);
 });
 
 test('the customer profile explains both stored consent states', () => {
