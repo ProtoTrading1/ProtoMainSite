@@ -362,7 +362,7 @@ export default function CheckoutModal({
                     onClick={() => setWhatsappChoice(true)}
                     aria-pressed={whatsappChoice === true}
                   >
-                    Yes, join
+                    {whatsappChoice === true ? '✓ Yes, send updates' : 'Yes, send updates'}
                   </button>
                   <button
                     type="button"
@@ -370,7 +370,7 @@ export default function CheckoutModal({
                     onClick={() => setWhatsappChoice(false)}
                     aria-pressed={whatsappChoice === false}
                   >
-                    No thanks
+                    {whatsappChoice === false ? '✓ No WhatsApp updates' : 'No WhatsApp updates'}
                   </button>
                 </div>
               </div>
