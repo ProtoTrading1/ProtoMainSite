@@ -4949,6 +4949,7 @@
 
 .lp-register-whatsapp-actions button {
   flex: 1;
+  min-height: 48px;
   padding: 11px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
