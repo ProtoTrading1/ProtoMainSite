@@ -4309,6 +4309,9 @@ textarea:focus-visible,
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.checkout-modal-whatsapp-actions .checkout-modal-btn {
+  min-height: 48px;
+}
 .checkout-modal-btn {
   padding: 12px 14px;
   border-radius: 10px;
