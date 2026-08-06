@@ -4351,10 +4351,17 @@ textarea:focus-visible,
   flex-shrink: 0;
   min-width: 72px;
 }
-.checkout-modal-btn--wa.selected,
-.checkout-modal-btn--secondary.selected {
+.checkout-modal-whatsapp-actions .checkout-modal-btn--wa.selected {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
+}
+.checkout-modal-whatsapp-actions .checkout-modal-btn--secondary.selected {
   border-color: #0f172a;
-  background: #f8fafc;
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.16);
 }
 .checkout-modal-btn--wa {
   position: relative;
