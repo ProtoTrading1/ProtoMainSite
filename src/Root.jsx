@@ -7,6 +7,7 @@ import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
 import {
+  ensurePublicIntercom,
   identifyIntercom,
   refreshIntercomIdentity,
   resetIntercom,
@@ -137,13 +138,22 @@ export default function Root() {
   }, [view]);
 
   useEffect(() => {
-    // The launcher belongs to signed-in customers. It used to be hidden on
-    // exactly the surfaces they use (portal, profile) and shown only on public
-    // pages, which is why a logged-in customer never saw a chat button.
-    // `session !== undefined` only meant "auth has resolved" — it was true for
-    // signed-out visitors too.
-    const showLauncher = Boolean(session) && !adminHost && !preRegisterHost;
-    setIntercomLauncherVisibility(showLauncher);
+    // Everyone on the customer-facing site gets a chat button — a visitor on
+    // the landing page can ask about trading hours and how to open an account,
+    // a signed-in customer can ask about stock. What differs is who Intercom
+    // thinks they are, which is set at boot (see lib/intercom.js) and is what
+    // Fin and the catalogue connector gate on.
+    //
+    // The trade sign-up host counts as public: someone filling in the
+    // application is exactly the prospect this chat is for. Only the admin
+    // deployment stays out of it.
+    const publicSite = !adminHost;
+    setIntercomLauncherVisibility(publicSite);
+
+    // Wait for auth to resolve (session is undefined until then), or a
+    // returning customer is booted as a lead for a moment and then re-booted
+    // as themselves.
+    if (publicSite && session === null) ensurePublicIntercom();
   }, [adminHost, preRegisterHost, route, session, view]);
 
   const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {

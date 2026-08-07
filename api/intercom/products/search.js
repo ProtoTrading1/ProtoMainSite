@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireIntercomSecret } from '../_auth.js';
+import { requireVerifiedTradeContact } from '../_contact.js';
 
 const MAX_RESULTS = 25;
 const SELECT_COLS = 'sku, barcode, title, category, subcategory_one, subcategory_two, price, image_url_one, available_stock, stock_qty, keep_live_when_oos';
@@ -102,6 +103,11 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   if (!requireIntercomSecret(req, res)) return;
+
+  // The shared secret proves the request came from Intercom; it says nothing
+  // about who is in the conversation. Since the Messenger now loads for
+  // logged-out visitors too, that second question has to be asked here.
+  if (!(await requireVerifiedTradeContact(req, res))) return;
 
   const q = String(req.query.q || '').trim();
   const sku = String(req.query.sku || '').trim();

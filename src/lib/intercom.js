@@ -12,10 +12,21 @@ let launcherVisible = false;
 // tear the Messenger down and rebuild it over and over.
 let identifiedUserId = null;
 let identifyInFlightFor = null;
-// The Messenger is not loaded until a customer signs in, so anonymous
-// visitors never fetch Intercom's script at all. Intercom() is the loader;
-// boot() assumes it has already run, so the first mount must use it.
+// Intercom() is the loader; boot() assumes it has already run, so the first
+// mount must use it.
 let loaded = false;
+
+/**
+ * `signed_in` is the audience switch.
+ *
+ * Logged-out visitors get the Messenger as an anonymous lead so they can ask
+ * about trading hours, delivery and how to open an account. Fin decides what
+ * it may answer from this attribute, and the catalogue connector refuses
+ * anyone without a verified `user_id` regardless (api/intercom/_contact.js) —
+ * so a lead cannot be talked into a stock level or a price.
+ */
+const PUBLIC_ATTRIBUTES = { signed_in: false };
+const CUSTOMER_ATTRIBUTES = { signed_in: true };
 
 function settings(extra = {}) {
   return {
@@ -24,6 +35,7 @@ function settings(extra = {}) {
     horizontal_padding: 20,
     vertical_padding: 20,
     hide_default_launcher: !launcherVisible,
+    ...PUBLIC_ATTRIBUTES,
     ...extra,
   };
 }
@@ -50,6 +62,25 @@ function mount(extra = {}) {
     /* nothing booted yet */
   }
   boot(settings(extra));
+}
+
+/**
+ * Put the Messenger on the page for a visitor who is not signed in.
+ *
+ * No `user_id` and no JWT: Intercom records an anonymous lead, which is what
+ * keeps the audience split honest — Fin can tell a prospect from a customer
+ * without taking the browser's word for it.
+ *
+ * Safe to call repeatedly; it only mounts once, and never downgrades a
+ * customer who has already been identified.
+ */
+export function ensurePublicIntercom() {
+  if (loaded || identifiedUserId || identifyInFlightFor) return;
+  try {
+    mount();
+  } catch (error) {
+    console.error('Unable to load Intercom for a public visitor:', error);
+  }
 }
 
 export function openIntercom() {
@@ -114,7 +145,7 @@ export async function identifyIntercom(session) {
       if (!loaded) mount();
       return false;
     }
-    mount({ intercom_user_jwt: token });
+    mount({ intercom_user_jwt: token, ...CUSTOMER_ATTRIBUTES });
     identifiedUserId = userId;
     return true;
   } catch (error) {
@@ -147,7 +178,7 @@ export async function refreshIntercomIdentity(session) {
   try {
     const token = await fetchIdentityToken(session);
     if (!token) return false;
-    update({ intercom_user_jwt: token });
+    update({ intercom_user_jwt: token, ...CUSTOMER_ATTRIBUTES });
     return true;
   } catch (error) {
     console.error('Unable to refresh Intercom identity:', error);
@@ -156,22 +187,23 @@ export async function refreshIntercomIdentity(session) {
 }
 
 /**
- * Wipe the Intercom contact on logout.
+ * Drop the customer's identity on logout and fall back to the public visitor.
  *
- * Without this the Messenger keeps the previous customer's identity after
- * sign-out — on a shared shop machine the next person inherits it, and with the
- * catalogue connector live that means someone else's trade prices.
+ * The shutdown is the important half: without it the Messenger keeps the
+ * previous customer's identity after sign-out, so on a shared shop machine the
+ * next person inherits it — and with the catalogue connector live, their trade
+ * prices. Re-booting anonymously afterwards is what leaves a signed-out visitor
+ * the same limited chat a first-time visitor gets, rather than no chat at all.
  */
 export function resetIntercom() {
   identifiedUserId = null;
   identifyInFlightFor = null;
   if (!loaded) return;
   try {
-    // Shut down without re-booting: the Messenger is for signed-in customers
-    // only, so after sign-out there should be nothing left on the page. A
-    // subsequent sign-in re-loads it via identifyIntercom.
     shutdown();
     loaded = false;
+    // Fresh anonymous session: no user_id, no JWT, signed_in false.
+    mount();
   } catch (error) {
     console.error('Unable to reset Intercom:', error);
   }
