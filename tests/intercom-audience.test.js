@@ -111,8 +111,8 @@ test('the connector fails closed', () => {
 
 test('the refusal tells Fin what to say instead of looking broken', () => {
   assert.match(contact, /access: 'sign_in_required'/);
-  assert.match(contact, /register at https:\/\/proto\.co\.za/i,
-    'the prospect is pointed at registration');
+  assert.match(contact, /register at \$\{PUBLIC_SITE_URL\}/,
+    'the prospect is pointed at registration on whichever host the portal currently uses');
   assert.match(contact, /res\.status\(200\)/,
     'Fin relays a tool message but treats an error status as a broken tool');
 });

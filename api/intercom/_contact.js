@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SITE_URL } from '../_public-site-url.js';
 
 /**
  * Who is Fin talking to?
@@ -20,7 +21,10 @@ import { createClient } from '@supabase/supabase-js';
  * for the cost of guessing a customer's email.
  */
 
-const SIGN_IN_REQUIRED = 'This person is not signed in to a Proto Trading account, so stock levels and prices must not be shared. Tell them our range and pricing are for approved trade customers, and invite them to register at https://proto.co.za.';
+// The registration URL follows PUBLIC_SITE_URL, the same source the emailed
+// "go to the portal" links use, so Fin cannot end up sending prospects to a
+// host the portal has already moved off.
+const SIGN_IN_REQUIRED = `This person is not signed in to a Proto Trading account, so stock levels and prices must not be shared. Tell them our range and pricing are for approved trade customers, and invite them to register at ${PUBLIC_SITE_URL}.`;
 
 function getServiceClient() {
   return createClient(
