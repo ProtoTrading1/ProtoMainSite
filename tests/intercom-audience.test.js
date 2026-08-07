@@ -55,7 +55,9 @@ test('signed_in is the audience attribute on both sides', () => {
 });
 
 test('the launcher is shown across the customer-facing site', () => {
-  assert.match(root, /const publicSite = !adminHost && !preRegisterHost;/);
+  // Including the trade sign-up host — a prospect mid-application is the
+  // audience this chat exists for. Only the admin deployment is excluded.
+  assert.match(root, /const publicSite = !adminHost;/);
   assert.match(root, /setIntercomLauncherVisibility\(publicSite\)/,
     'visitors and customers both get a chat button');
   assert.match(root, /if \(publicSite && session === null\) ensurePublicIntercom\(\)/,

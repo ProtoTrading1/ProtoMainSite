@@ -142,9 +142,12 @@ export default function Root() {
     // the landing page can ask about trading hours and how to open an account,
     // a signed-in customer can ask about stock. What differs is who Intercom
     // thinks they are, which is set at boot (see lib/intercom.js) and is what
-    // Fin and the catalogue connector gate on. The admin and pre-register
-    // hosts stay out of it entirely.
-    const publicSite = !adminHost && !preRegisterHost;
+    // Fin and the catalogue connector gate on.
+    //
+    // The trade sign-up host counts as public: someone filling in the
+    // application is exactly the prospect this chat is for. Only the admin
+    // deployment stays out of it.
+    const publicSite = !adminHost;
     setIntercomLauncherVisibility(publicSite);
 
     // Wait for auth to resolve (session is undefined until then), or a
