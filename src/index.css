@@ -4369,15 +4369,18 @@ textarea:focus-visible,
 .checkout-modal-btn--wa {
   position: relative;
   overflow: hidden;
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  color: #fff;
+  border-color: #16a34a;
+  box-shadow: 0 10px 20px rgba(16, 148, 86, 0.3);
 }
 .checkout-modal-btn--wa:hover {
-  background: #0f172a;
-  color: #fff;
-  border-color: #0f172a;
-  box-shadow: 0 0 16px rgba(15, 23, 42, 0.25);
+  background: linear-gradient(180deg, #4ade80, #16a34a);
+  box-shadow: 0 12px 26px rgba(16, 148, 86, 0.35);
 }
 .checkout-modal-btn--wa:active {
   transform: translateY(1px);
+  box-shadow: 0 6px 12px rgba(16, 148, 86, 0.25);
 }
 .checkout-modal-btn--full {
   width: 100%;
