@@ -283,7 +283,6 @@ export default function Root() {
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
     rememberAuthSession(sess);
     setSession(sess);
-    try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
     void identifyIntercom(sess);
     await loadCustomer(sess.user.id, sess);

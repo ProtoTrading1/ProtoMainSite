@@ -259,7 +259,7 @@ export default function MainContent({
   return (
     <div className="catalog-page">
       {showWelcomeHome && (
-        <div className="site-hero-banner" role="status" aria-live="polite">
+        <div className="site-hero-banner">
           <img
             src="/main-site-banner.jpg"
             alt="Thank you for registering — Welcome to Proto Trading Online"
