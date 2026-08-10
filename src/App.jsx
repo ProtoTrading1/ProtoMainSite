@@ -54,6 +54,8 @@ const CART_EXPIRY_WARN_MS = 72 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
 const CART_QTY_UNLIMITED = 9999;
 const CUSTOMER_JOURNEY_SESSION_KEY_PREFIX = 'proto_customer_journey_session_v1';
+const BASKET_REMINDER_SCROLL_DISMISS_PX = 96;
+const CUSTOMER_JOURNEY_EXIT_MS = 180;
 
 function customerFirstName(customer) {
   const candidate = customer?.first_name
@@ -1318,13 +1320,18 @@ export default function App({
     orderHistoryResolved,
   ]);
 
-  const dismissCustomerJourney = useCallback((event) => {
+  const journeyDismissTimerRef = useRef(null);
+
+  const dismissCustomerJourney = useCallback((event, { animate = false } = {}) => {
     const restoreCartFocus = customerJourney?.presentation === 'basket' && (
       event?.key === 'Escape'
       || event?.currentTarget?.classList?.contains('customer-journey-prompt__close')
     );
-    setCustomerJourney(null);
-    if (restoreCartFocus) {
+
+    const finishDismissal = () => {
+      journeyDismissTimerRef.current = null;
+      setCustomerJourney(null);
+      if (!restoreCartFocus) return;
       window.requestAnimationFrame(() => {
         document.querySelector(
           window.innerWidth <= 900
@@ -1332,8 +1339,25 @@ export default function App({
             : '[data-cart-trigger="desktop"]',
         )?.focus();
       });
+    };
+
+    if (!animate) {
+      if (journeyDismissTimerRef.current) window.clearTimeout(journeyDismissTimerRef.current);
+      finishDismissal();
+      return;
     }
+
+    setCustomerJourney((current) => {
+      if (!current || current.dismissing) return current;
+      return { ...current, dismissing: true };
+    });
+    if (journeyDismissTimerRef.current) window.clearTimeout(journeyDismissTimerRef.current);
+    journeyDismissTimerRef.current = window.setTimeout(finishDismissal, CUSTOMER_JOURNEY_EXIT_MS);
   }, [customerJourney?.presentation]);
+
+  useEffect(() => () => {
+    if (journeyDismissTimerRef.current) window.clearTimeout(journeyDismissTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!customerJourney || !Number.isFinite(customerJourney.dismissAfterMs)) return undefined;
@@ -1350,6 +1374,36 @@ export default function App({
     window.addEventListener('pointerdown', dismissAfterOutsideInteraction, { passive: true });
     return () => window.removeEventListener('pointerdown', dismissAfterOutsideInteraction);
   }, [customerJourney, dismissCustomerJourney]);
+
+  useEffect(() => {
+    if (customerJourney?.presentation !== 'basket' || customerJourney.dismissing) return undefined;
+
+    const targets = [window, document.querySelector('.content-area')].filter(Boolean);
+    const initialPositions = new Map(targets.map((target) => [
+      target,
+      target === window
+        ? (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0)
+        : target.scrollTop,
+    ]));
+    const dismissAfterMeaningfulScroll = (event) => {
+      const target = event.currentTarget;
+      const currentPosition = target === window
+        ? (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0)
+        : target.scrollTop;
+      if (Math.abs(currentPosition - (initialPositions.get(target) || 0)) < BASKET_REMINDER_SCROLL_DISMISS_PX) return;
+      dismissCustomerJourney(null, { animate: true });
+    };
+
+    targets.forEach((target) => target.addEventListener('scroll', dismissAfterMeaningfulScroll, { passive: true }));
+    return () => targets.forEach((target) => target.removeEventListener('scroll', dismissAfterMeaningfulScroll));
+  }, [customerJourney?.dismissing, customerJourney?.presentation, dismissCustomerJourney]);
+
+  useEffect(() => {
+    if (customerJourney?.presentation !== 'basket' || customerJourney.dismissing) return;
+    if (!loginBasketSnapshot?.fingerprint) return;
+    if (cartFingerprint(cartItems) === loginBasketSnapshot.fingerprint) return;
+    dismissCustomerJourney(null, { animate: true });
+  }, [cartItems, customerJourney?.dismissing, customerJourney?.presentation, dismissCustomerJourney, loginBasketSnapshot]);
 
   const handleCustomerJourneyPrimary = useCallback((event) => {
     if (customerJourney?.presentation === 'basket') handleCartOpen(event);
