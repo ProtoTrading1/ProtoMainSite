@@ -67,6 +67,24 @@ export async function updateWhatsappOptIn(acceptWhatsapp, whatsappPhone = null) 
   return data.profile;
 }
 
+export async function markPortalWelcomeSeen() {
+  const { authHeaders } = await import('./authHeaders');
+  const res = await fetch('/api/customer-profile', {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ markPortalWelcomeSeen: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(data.error || 'Failed to record the portal welcome');
+    error.status = res.status;
+    error.code = data.code || 'PORTAL_WELCOME_MARK_FAILED';
+    error.data = data;
+    throw error;
+  }
+  return data.portalWelcomeSeenAt;
+}
+
 export function onAuthChange(callback) {
   return supabase.auth.onAuthStateChange((_event, session) => {
     callback(session);

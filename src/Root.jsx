@@ -531,6 +531,7 @@ export default function Root() {
         <Suspense fallback={authSurfaceFallback}>
           <App
             customer={customer}
+            loginSessionKey={session?.user?.last_sign_in_at || String(session?.expires_at || '')}
             onLogout={handleLogout}
             onViewProfile={() => setSurface('profile')}
             onViewAdmin={null}

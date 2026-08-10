@@ -19,7 +19,57 @@ export default async function handler(req, res) {
 
   // PATCH: user updates their own WhatsApp opt-in preference
   if (req.method === 'PATCH') {
-    const { acceptWhatsapp, whatsappPhone } = req.body || {};
+    const { markPortalWelcomeSeen, acceptWhatsapp, whatsappPhone } = req.body || {};
+    if (markPortalWelcomeSeen === true) {
+      const supabase = getAdminClient();
+      const markedAt = new Date().toISOString();
+      const markResult = await supabase
+        .from('customers')
+        .update({ portal_welcome_seen_at: markedAt })
+        .eq('id', user.id)
+        .is('portal_welcome_seen_at', null)
+        .select('id, portal_welcome_seen_at')
+        .maybeSingle();
+
+      if (markResult.error) {
+        console.error('portal welcome update error:', markResult.error.message, '| userId:', user.id);
+        return res.status(500).json({
+          error: 'Failed to record the portal welcome.',
+          code: 'PORTAL_WELCOME_MARK_FAILED',
+        });
+      }
+
+      let profile = markResult.data;
+      if (!profile) {
+        const currentResult = await supabase
+          .from('customers')
+          .select('id, portal_welcome_seen_at')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (currentResult.error) {
+          console.error('portal welcome read error:', currentResult.error.message, '| userId:', user.id);
+          return res.status(500).json({
+            error: 'Failed to read the portal welcome status.',
+            code: 'PORTAL_WELCOME_READ_FAILED',
+          });
+        }
+        profile = currentResult.data;
+      }
+
+      if (!profile?.portal_welcome_seen_at) {
+        return res.status(404).json({
+          error: 'Customer profile not found.',
+          code: 'CUSTOMER_PROFILE_NOT_FOUND',
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        portalWelcomeSeenAt: profile.portal_welcome_seen_at,
+      });
+    }
+
     if (typeof acceptWhatsapp !== 'boolean') {
       return res.status(400).json({ error: 'acceptWhatsapp must be true or false' });
     }

@@ -50,7 +50,6 @@ export default function MainContent({
   onProductPreview = null,
   searchActive = false,
   onSearchProductClick = null,
-  showWelcome = false,
   inStockOnly = false,
   onResetFilters = () => {},
   refinements = {},
@@ -74,7 +73,6 @@ export default function MainContent({
 
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
-  const showWelcomeHome = showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage;
   const pathKey = path.join('/');
   const searchKey = searchQuery.trim().toLowerCase();
   const refinementsKey = useMemo(
@@ -258,19 +256,6 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
-      {showWelcomeHome && (
-        <div className="site-hero-banner">
-          <img
-            src="/main-site-banner.jpg"
-            alt="Thank you for registering — Welcome to Proto Trading Online"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-          />
-        </div>
-      )}
-
-
       {/* Category browse pills */}
       {showCategoryGrid && (
         <section className="cat-browse">

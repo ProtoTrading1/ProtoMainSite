@@ -1,0 +1,286 @@
+.customer-journey-prompt {
+  --journey-black: var(--header-dark, #000000);
+  --journey-surface: #121212;
+  --journey-surface-raised: #1b1b1b;
+  --journey-gold: var(--proto-gold, #c89a3c);
+  --journey-red: var(--accent, #7f1d1d);
+  --journey-white: var(--text-white, #f8fafc);
+  --journey-muted: #cbd5e1;
+
+  position: fixed;
+  z-index: 1200;
+  right: clamp(16px, 3vw, 40px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  width: min(430px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid rgb(200 154 60 / 38%);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 95% 0%, rgb(200 154 60 / 13%), transparent 40%),
+    linear-gradient(145deg, var(--journey-surface-raised), var(--journey-black));
+  color: var(--journey-white);
+  box-shadow: 0 22px 60px rgb(0 0 0 / 34%);
+  isolation: isolate;
+  animation: customer-journey-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.customer-journey-prompt--toast {
+  top: calc(var(--header-height, 84px) + 18px);
+  padding: 18px 48px 18px 18px;
+}
+
+.customer-journey-prompt--basket {
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: min(510px, calc(100vw - 32px));
+  padding: 22px 52px 22px 22px;
+  border-color: rgb(200 154 60 / 62%);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 42%), 0 0 0 1px rgb(200 154 60 / 8%);
+}
+
+.customer-journey-prompt__accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #f0c96a, var(--journey-gold) 58%, var(--journey-red));
+}
+
+.customer-journey-prompt__timer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 4px;
+  height: 3px;
+  background: linear-gradient(90deg, #f0c96a, var(--journey-gold));
+  transform-origin: left center;
+  animation: customer-journey-timer var(--customer-journey-duration) linear both;
+}
+
+.customer-journey-prompt__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgb(200 154 60 / 30%);
+  border-radius: 50%;
+  background: rgb(200 154 60 / 12%);
+  color: #efc766;
+}
+
+.customer-journey-prompt--basket .customer-journey-prompt__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgb(200 154 60 / 22%), rgb(200 154 60 / 8%));
+}
+
+.customer-journey-prompt__content {
+  min-width: 0;
+}
+
+.customer-journey-prompt__eyebrow {
+  margin: 0 0 5px;
+  color: #e5bd5b;
+  font-size: 0.69rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.13em;
+}
+
+.customer-journey-prompt__title {
+  margin: 0;
+  color: var(--journey-white);
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.17rem;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.customer-journey-prompt--basket .customer-journey-prompt__title {
+  font-size: clamp(1.3rem, 2.2vw, 1.55rem);
+}
+
+.customer-journey-prompt__message {
+  margin: 5px 0 0;
+  color: var(--journey-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.customer-journey-prompt__basket-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: baseline;
+  margin-top: 13px;
+  color: #e2e8f0;
+  font-size: 0.88rem;
+}
+
+.customer-journey-prompt__basket-summary strong {
+  color: #f3d27c;
+  font-weight: 750;
+}
+
+.customer-journey-prompt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.customer-journey-prompt__button {
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.customer-journey-prompt__button--primary {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0b551, var(--journey-gold));
+  color: #111111;
+  box-shadow: 0 8px 24px rgb(200 154 60 / 20%);
+}
+
+.customer-journey-prompt__button--primary:hover {
+  background: linear-gradient(135deg, #edca72, #d1a344);
+  transform: translateY(-1px);
+}
+
+.customer-journey-prompt__button--secondary {
+  border-color: rgb(255 255 255 / 22%);
+  background: rgb(255 255 255 / 6%);
+  color: var(--journey-white);
+}
+
+.customer-journey-prompt__button--secondary:hover {
+  border-color: rgb(200 154 60 / 58%);
+  background: rgb(200 154 60 / 10%);
+}
+
+.customer-journey-prompt__button:focus-visible,
+.customer-journey-prompt__close:focus-visible {
+  outline: 3px solid #f7d77d;
+  outline-offset: 3px;
+}
+
+.customer-journey-prompt__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #e2e8f0;
+}
+
+.customer-journey-prompt__close:hover {
+  background: rgb(255 255 255 / 9%);
+  color: #ffffff;
+}
+
+@keyframes customer-journey-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes customer-journey-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (max-width: 600px) {
+  .customer-journey-prompt,
+  .customer-journey-prompt--basket {
+    --customer-journey-mobile-nav-height: 65px;
+
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(
+      100dvh - var(--header-height, 72px) - var(--customer-journey-mobile-nav-height) -
+      env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px
+    );
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 11px;
+    padding: 17px 46px 17px 16px;
+    overflow-y: auto;
+    border-radius: 14px;
+    overscroll-behavior: contain;
+  }
+
+  .customer-journey-prompt--toast {
+    top: calc(var(--header-height, 72px) + 10px + env(safe-area-inset-top, 0px));
+  }
+
+  .customer-journey-prompt--basket {
+    bottom: calc(
+      var(--customer-journey-mobile-nav-height) + 12px + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  .customer-journey-prompt__icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .customer-journey-prompt--basket .customer-journey-prompt__icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .customer-journey-prompt__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .customer-journey-prompt__button {
+    width: 100%;
+  }
+
+  .customer-journey-prompt__close {
+    top: 7px;
+    right: 7px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-journey-prompt {
+    animation: none;
+  }
+
+  .customer-journey-prompt__timer {
+    animation: none;
+  }
+
+  .customer-journey-prompt__button,
+  .customer-journey-prompt__close {
+    scroll-behavior: auto;
+    transition: none;
+  }
+
+  .customer-journey-prompt__button--primary:hover {
+    transform: none;
+  }
+}
