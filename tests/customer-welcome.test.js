@@ -3,22 +3,22 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
-const welcome = fs.readFileSync(new URL('../src/components/CustomerWelcome.jsx', import.meta.url), 'utf8');
 const styles = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 
-test('signed-in customers receive a quiet in-page welcome', () => {
-  assert.match(app, /<CustomerWelcome/);
-  assert.match(welcome, /Welcome back, \{firstName\(customer\)\}/);
-  assert.doesNotMatch(welcome, /Your Proto trade account/);
-  assert.match(welcome, /customer\.business_name/);
-  assert.match(welcome, /if \(!customer\?\.id\) return null/);
+test('the temporary welcome leaves no permanent dashboard strip behind', () => {
+  assert.doesNotMatch(app, /CustomerWelcome/);
+  assert.doesNotMatch(app, /Welcome back,/);
+  assert.doesNotMatch(styles, /\.customer-welcome/);
+  assert.doesNotMatch(app, /components\/CustomerWelcome/);
 });
 
-test('welcome links to existing order history without creating another customer flow', () => {
-  assert.match(app, /onViewOrders=\{onViewProfile\}/);
-  assert.match(welcome, /View recent orders/);
-  assert.match(welcome, /Review or reorder previous products/);
+test('the welcome is account-scoped, campaign-scoped and remembered on this device', () => {
+  assert.match(app, /const WELCOME_CAMPAIGN_ID = 'trade-welcome-2026-08'/);
+  assert.match(app, /localStorage\.getItem\(welcomeSeenKey\(accountId\)\)/);
+  assert.match(app, /localStorage\.setItem\(welcomeSeenKey\(customerId\)/);
+  assert.match(app, /if \(!accountId\) return false/);
+  assert.doesNotMatch(app, /sessionStorage\.setItem\(WELCOME_DISMISSED_KEY/);
+  assert.doesNotMatch(app, /setShowWelcome\(true\)/);
   assert.doesNotMatch(app, /FirstLoginBuyingAssistant/);
   assert.doesNotMatch(styles, /buying-assistant/);
-  assert.equal(fs.existsSync(new URL('../migrations/064_customer_buying_assistant.sql', import.meta.url)), false);
 });

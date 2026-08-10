@@ -7,7 +7,6 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
-import CustomerWelcome from './components/CustomerWelcome';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -42,8 +41,9 @@ const MAX_CART_LINES = 250;
 // preview visible for about one second: quick enough not to interrupt ordering,
 // but long enough to notice it and move the pointer over it.
 const DRAWER_PEEK_MS = 1200;
-const WELCOME_DISPLAY_MS = 3500;
-const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
+const WELCOME_DISPLAY_MS = 5500;
+const WELCOME_CAMPAIGN_ID = 'trade-welcome-2026-08';
+const WELCOME_SEEN_KEY_PREFIX = 'proto_welcome_seen';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
 const CART_STORAGE_KEY = 'proto_cart';
@@ -84,9 +84,14 @@ function hashHasCategoryPath() {
   return segments.length > 0;
 }
 
-function readInitialShowWelcome() {
+function welcomeSeenKey(accountId) {
+  return `${WELCOME_SEEN_KEY_PREFIX}:${WELCOME_CAMPAIGN_ID}:${accountId || 'anonymous'}`;
+}
+
+function readInitialShowWelcome(accountId) {
+  if (!accountId) return false;
   try {
-    if (sessionStorage.getItem(WELCOME_DISMISSED_KEY)) return false;
+    if (localStorage.getItem(welcomeSeenKey(accountId))) return false;
   } catch { /* ignore */ }
   return !hashHasCategoryPath();
 }
@@ -186,6 +191,7 @@ export default function App({
   requestedReorder = null,
   onRequestedReorderHandled,
 }) {
+  const customerId = customer?.id;
   const { path, refinements, navigate: hashNavigate, setRefinement } = useHashNav();
   const catalogueRefinements = useMemo(() => {
     const next = { ...refinements };
@@ -204,17 +210,24 @@ export default function App({
   // re-renders this component (and the whole product grid) per keystroke — that
   // was the "typing is extremely slow" cause.
   const [searchQuery, setSearchQuery] = useState('');
-  const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
+  const [showWelcome, setShowWelcome] = useState(() => readInitialShowWelcome(customerId));
+  const welcomeAccountIdRef = useRef(customerId);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome((prev) => {
       if (!prev) return prev;
-      try { sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1'); } catch { /* ignore */ }
+      try { localStorage.setItem(welcomeSeenKey(customerId), new Date().toISOString()); } catch { /* ignore */ }
       return false;
     });
-  }, []);
+  }, [customerId]);
+
+  useEffect(() => {
+    if (welcomeAccountIdRef.current === customerId) return;
+    welcomeAccountIdRef.current = customerId;
+    setShowWelcome(readInitialShowWelcome(customerId));
+  }, [customerId]);
 
   useEffect(() => {
     if (!showWelcome) return undefined;
@@ -228,10 +241,11 @@ export default function App({
   }, [dismissWelcome, showWelcome]);
 
   const handleSortChange = useCallback((next) => {
+    dismissWelcome();
     const normalized = normalizeCatalogSort(next);
     setSort(normalized);
     try { sessionStorage.setItem(CATALOG_SORT_KEY, normalized); } catch { /* ignore */ }
-  }, []);
+  }, [dismissWelcome]);
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
@@ -356,12 +370,14 @@ export default function App({
   }, [restoreCartTriggerFocus]);
 
   const handleCartOpen = useCallback((event) => {
+    dismissWelcome();
     cartTriggerRef.current = event?.currentTarget || document.activeElement;
     if (window.innerWidth > 1200) setCartDrawerOpen(true);
     else setMobileCartOpen(true);
-  }, []);
+  }, [dismissWelcome]);
 
   const goHome = useCallback(() => {
+    dismissWelcome();
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
     setSearchQuery('');
@@ -370,7 +386,7 @@ export default function App({
     setInStockOnly(false);
     hashNavigate([], {}, { scroll: false });
     scrollToTopSmooth();
-  }, [hashNavigate]);
+  }, [dismissWelcome, hashNavigate]);
 
   useEffect(() => {
     if (searchQuery.trim()) dismissWelcome();
@@ -1585,7 +1601,7 @@ export default function App({
       />
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
-        <aside className="sidebar-rail" onMouseEnter={dismissWelcome}>
+        <aside className="sidebar-rail">
           <Sidebar
             categories={categories}
             path={path}
@@ -1598,11 +1614,6 @@ export default function App({
         </aside>
 
         <main className="content-area" onScroll={dismissWelcome}>
-          <CustomerWelcome
-            customer={customer}
-            hasLastOrder={Boolean(lastOrder)}
-            onViewOrders={onViewProfile}
-          />
           <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
