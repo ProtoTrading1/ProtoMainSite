@@ -168,6 +168,15 @@ async function signIn(page) {
   await dialog.locator('input[type="password"]').fill(TEST_PASSWORD);
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Cloud Sync Marker', { exact: true }).first()).toBeVisible();
+  // This suite exercises account-cart convergence, not the restored-basket
+  // reminder. Dismiss the real post-login prompt so it cannot obscure or
+  // shift the product action that follows on either viewport.
+  const basketReminder = page.locator('.customer-journey-prompt--basket');
+  await expect(basketReminder).toBeVisible();
+  await basketReminder.getByRole('button', {
+    name: 'Close basket reminder and continue shopping',
+  }).click();
+  await expect(basketReminder).toBeHidden();
 }
 
 async function storedCart(page) {
