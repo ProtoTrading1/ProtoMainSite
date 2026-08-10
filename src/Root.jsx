@@ -31,6 +31,7 @@ export default function Root() {
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerLoadError, setCustomerLoadError] = useState(null);
   const [view, setView] = useState('landing');
   const [route, setRoute] = useState(window.location.hash);
   const [pathname, setPathname] = useState(() => window.location.pathname);
@@ -159,13 +160,13 @@ export default function Root() {
   const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {
     const nonce = ++loadNonce.current;
     setCustomerLoading(true);
+    setCustomerLoadError(null);
     try {
       const { getCustomerProfile } = await import('./lib/auth');
       const profile = await getCustomerProfile(userId, sessionOrToken);
       if (nonce !== loadNonce.current) return;
       setCustomer(profile);
       setMonitoringUser(profile);
-      if (!profile) return;
 
       if (adminHost) {
         if (profile.role === 'admin') setSurface('admin');
@@ -184,6 +185,14 @@ export default function Root() {
         return;
       }
       setView('pending');
+    } catch (error) {
+      if (nonce !== loadNonce.current) return;
+      setCustomer(null);
+      setMonitoringUser(null);
+      setCustomerLoadError({
+        code: error?.code || 'CUSTOMER_PROFILE_LOOKUP_FAILED',
+        message: error?.message || 'Your trade account could not be loaded.',
+      });
     } finally {
       if (nonce === loadNonce.current) {
         setCustomerLoading(false);
@@ -207,6 +216,7 @@ export default function Root() {
       } else {
         setCustomerLoading(false);
         setCustomer(null);
+        setCustomerLoadError(null);
       }
     };
 
@@ -263,6 +273,7 @@ export default function Root() {
           } else {
             setCustomerLoading(false);
             setCustomer(null);
+            setCustomerLoadError(null);
           }
         });
 
@@ -300,6 +311,7 @@ export default function Root() {
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);
+    setCustomerLoadError(null);
     setMonitoringUser(null);
     setRequestedReorder(null);
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
@@ -316,6 +328,28 @@ export default function Root() {
       </div>
     </div>
   );
+
+  const customerRecovery = session && customerLoadError && !customer ? (
+    <div role="alert" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '460px', textAlign: 'center', border: '1px solid #27272a', borderRadius: '16px', background: '#111111', padding: '32px 24px' }}>
+        <div style={{ color: '#f4c451', fontSize: '14px', fontWeight: '800', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>We couldn’t open your dashboard</div>
+        <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', margin: '0 0 10px' }}>You are signed in</h1>
+        <p style={{ color: '#a1a1aa', fontSize: '14px', lineHeight: 1.6, margin: '0 0 24px' }}>
+          {customerLoadError.code === 'CUSTOMER_PROFILE_NOT_FOUND'
+            ? 'No trade profile is linked to this login yet. Please contact Proto Trading so we can connect your approved account.'
+            : 'We could not load your trade account. This is usually temporary—please try again.'}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+          <button type="button" onClick={() => loadCustomer(session.user.id, session)} style={{ padding: '11px 22px', background: '#f4c451', color: '#111111', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer' }}>
+            Try again
+          </button>
+          <button type="button" onClick={handleLogout} style={{ padding: '11px 22px', background: 'transparent', color: '#d4d4d8', border: '1px solid #3f3f46', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
+            Log out
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const registrationLanding = (
     <>
@@ -347,6 +381,8 @@ export default function Root() {
 
   if (preRegisterHost) {
     if (session === undefined) return authSurfaceFallback;
+
+    if (customerRecovery) return customerRecovery;
 
     if (session && customerLoading && !customer) {
       return (
@@ -440,6 +476,8 @@ export default function Root() {
       </div>
     );
   }
+
+  if (customerRecovery) return customerRecovery;
 
   if (session && customerLoading && !customer) {
     return (

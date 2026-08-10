@@ -37,20 +37,31 @@ export async function getSession() {
 }
 
 export async function getCustomerProfile(userId, sessionOrToken = null) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const { authHeaders } = await import('./authHeaders');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`/api/customer-profile?userId=${encodeURIComponent(userId)}`, {
       headers: await authHeaders(sessionOrToken),
       signal: controller.signal,
     });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.profile) {
+      const error = new Error(json.error || 'Your trade account could not be loaded.');
+      error.status = res.status;
+      error.code = json.code || 'CUSTOMER_PROFILE_LOOKUP_FAILED';
+      throw error;
+    }
+    return json.profile;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('Your trade account is taking too long to load.');
+      timeoutError.code = 'CUSTOMER_PROFILE_TIMEOUT';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
     clearTimeout(timeout);
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.profile ?? null;
-  } catch {
-    return null;
   }
 }
 

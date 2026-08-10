@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './_auth.js';
 
-function getAdminClient() {
+function getAuthenticatedClient(req) {
   return createClient(
     process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    process.env.VITE_SUPABASE_ANON_KEY,
+    {
+      global: { headers: { Authorization: req.headers.authorization } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
   );
 }
 
@@ -21,7 +24,7 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     const { markPortalWelcomeSeen, acceptWhatsapp, whatsappPhone } = req.body || {};
     if (markPortalWelcomeSeen === true) {
-      const supabase = getAdminClient();
+      const supabase = getAuthenticatedClient(req);
       const markedAt = new Date().toISOString();
       const markResult = await supabase
         .from('customers')
@@ -80,7 +83,7 @@ export default async function handler(req, res) {
     if (typeof whatsappPhone === 'string' && whatsappPhone.trim()) {
       patch.phone = whatsappPhone.trim();
     }
-    const supabase = getAdminClient();
+    const supabase = getAuthenticatedClient(req);
     let { data, error } = await supabase
       .from('customers')
       .update(patch)
@@ -113,8 +116,8 @@ export default async function handler(req, res) {
   if (!userId) return res.status(400).json({ error: 'userId required' });
 
   // Users may only fetch their own profile unless they are admin
+  const supabase = getAuthenticatedClient(req);
   if (user.id !== userId) {
-    const supabase = getAdminClient();
     const { data: caller } = await supabase
       .from('customers')
       .select('role')
@@ -126,16 +129,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('customers')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error) return res.status(200).json({ profile: null });
+    if (error) {
+      console.error('customer profile lookup error:', error.code || 'unknown');
+      return res.status(503).json({
+        error: 'Your trade account could not be loaded. Please try again.',
+        code: 'CUSTOMER_PROFILE_LOOKUP_FAILED',
+      });
+    }
+    if (!data) {
+      return res.status(404).json({
+        error: 'No trade profile is linked to this account.',
+        code: 'CUSTOMER_PROFILE_NOT_FOUND',
+      });
+    }
     return res.status(200).json({ profile: data });
-  } catch {
-    return res.status(200).json({ profile: null });
+  } catch (error) {
+    console.error('customer profile lookup exception:', error?.name || 'unknown');
+    return res.status(503).json({
+      error: 'Your trade account could not be loaded. Please try again.',
+      code: 'CUSTOMER_PROFILE_LOOKUP_FAILED',
+    });
   }
 }
