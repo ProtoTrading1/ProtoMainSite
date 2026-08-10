@@ -41,7 +41,7 @@ const formatRand = (value) => {
 };
 
 const basketMessage = (itemCount, basketTotalInclVat) => {
-  const itemLabel = `${itemCount} ${itemCount === 1 ? 'item' : 'items'} saved`;
+  const itemLabel = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
   const formattedTotal = formatRand(basketTotalInclVat);
 
   return formattedTotal
@@ -57,6 +57,7 @@ export const selectCustomerDashboardState = ({
   firstName,
   firstLogin = false,
   onlineOrderCount = 0,
+  basketRestoredAtLogin = false,
   basketItemCount = 0,
   basketTotalInclVat,
 } = {}) => {
@@ -66,15 +67,15 @@ export const selectCustomerDashboardState = ({
   const hasPreviousOrder = orders > 0;
   const isFirstLogin = firstLogin === true;
 
-  if (basketItems > 0) {
+  if (basketRestoredAtLogin === true && basketItems > 0) {
     return Object.freeze({
       key: BASKET_ACTIVE,
       presentation: 'basket',
-      eyebrow: 'SAVED BASKET',
+      eyebrow: 'YOUR BASKET',
       title: `Your basket is waiting, ${name}`,
       message: basketMessage(basketItems, basketTotalInclVat),
       primaryLabel: 'Review basket',
-      secondaryLabel: 'Continue shopping',
+      secondaryLabel: null,
       dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.BASKET_ACTIVE,
       buyAgain: hasPreviousOrder,
       popularCategories: !hasPreviousOrder,

@@ -9,7 +9,7 @@ const DEFAULT_COPY = {
     primaryLabel: 'Browse catalogue',
   },
   basket: {
-    eyebrow: 'SAVED BASKET',
+    eyebrow: 'YOUR BASKET',
     title: 'Your basket is waiting',
     message: 'Pick up where you left off.',
     primaryLabel: 'Review basket',
@@ -38,7 +38,9 @@ export default function CustomerJourneyPrompt({
   const eyebrow = state.eyebrow || fallback.eyebrow;
   const primaryLabel = state.primaryLabel || fallback.primaryLabel;
   const showDismiss = state.dismissible !== false && typeof onDismiss === 'function';
-  const showSecondary = Boolean(state.secondaryLabel) && typeof onSecondary === 'function';
+  const showSecondary = presentation !== 'basket'
+    && Boolean(state.secondaryLabel)
+    && typeof onSecondary === 'function';
   const titleId = `customer-journey-${presentation}-title`;
   const messageId = `customer-journey-${presentation}-message`;
   const Icon = presentation === 'basket' ? ShoppingBag : Sparkles;
@@ -52,6 +54,11 @@ export default function CustomerJourneyPrompt({
       aria-describedby={messageId}
       data-presentation={presentation}
       data-timed={isTimed ? 'true' : 'false'}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !showDismiss) return;
+        event.preventDefault();
+        onDismiss(event);
+      }}
       style={isTimed ? { '--customer-journey-duration': `${state.dismissAfterMs}ms` } : undefined}
     >
       <div className="customer-journey-prompt__accent" aria-hidden="true" />
@@ -72,7 +79,7 @@ export default function CustomerJourneyPrompt({
           <p id={messageId} className="customer-journey-prompt__message">{message}</p>
 
           {presentation === 'basket' && (state.itemCountLabel || state.totalLabel) ? (
-            <div className="customer-journey-prompt__basket-summary" aria-label="Saved basket summary">
+            <div className="customer-journey-prompt__basket-summary" aria-label="Basket summary">
               {state.itemCountLabel ? <span>{state.itemCountLabel}</span> : null}
               {state.itemCountLabel && state.totalLabel ? <span aria-hidden="true">•</span> : null}
               {state.totalLabel ? <strong>{state.totalLabel}</strong> : null}
@@ -107,7 +114,7 @@ export default function CustomerJourneyPrompt({
           className="customer-journey-prompt__close"
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss customer message"
+          aria-label={presentation === 'basket' ? 'Close basket reminder and continue shopping' : 'Dismiss customer message'}
         >
           <X size={19} strokeWidth={2} aria-hidden="true" />
         </button>

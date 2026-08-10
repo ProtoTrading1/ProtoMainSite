@@ -991,6 +991,7 @@ export default function Header({
         {/* Brand */}
         <div className="brand-block">
           <button
+            data-cart-trigger="desktop"
             type="button"
             className="header-home-btn desktop-only"
             onClick={onHome}
@@ -1183,7 +1184,7 @@ export default function Header({
           <Menu size={20} />
           <span>Categories</span>
         </button>
-        <button type="button" className="mobile-tab-bar-btn mobile-tab-bar-btn--cart" onClick={onCartClick}>
+        <button data-cart-trigger="mobile" type="button" className="mobile-tab-bar-btn mobile-tab-bar-btn--cart" onClick={onCartClick}>
           <ShoppingCart size={20} />
           <span>Cart</span>
           {cartItemCount > 0 && <em className="mobile-tab-bar-badge">{cartItemCount}</em>}

@@ -14,6 +14,7 @@ const promptSourceUrl = new URL('../src/components/CustomerJourneyPrompt.jsx', i
 const appSourceUrl = new URL('../src/App.jsx', import.meta.url);
 
 const selectState = (overrides = {}) => selectCustomerDashboardState({
+  basketRestoredAtLogin: false,
   basketItemCount: 0,
   firstLogin: false,
   onlineOrderCount: 0,
@@ -23,11 +24,13 @@ const selectState = (overrides = {}) => selectCustomerDashboardState({
 
 test('an active basket wins over every other customer signal and remains actionable', () => {
   const newCustomerWithBasket = selectState({
+    basketRestoredAtLogin: true,
     basketItemCount: 3,
     firstLogin: true,
     onlineOrderCount: 0,
   });
   const orderedCustomerWithBasket = selectState({
+    basketRestoredAtLogin: true,
     basketItemCount: 2,
     basketTotalInclVat: 1245,
     firstLogin: false,
@@ -36,11 +39,39 @@ test('an active basket wins over every other customer signal and remains actiona
 
   for (const state of [newCustomerWithBasket, orderedCustomerWithBasket]) {
     assert.equal(state.key, BASKET_ACTIVE);
+    assert.equal(state.eyebrow, 'YOUR BASKET');
     assert.match(state.title, /^Your basket is waiting, George$/);
     assert.equal(state.primaryLabel, 'Review basket');
+    assert.equal(state.secondaryLabel, null);
     assert.equal(state.dismissAfterMs, null);
+    assert.doesNotMatch(`${state.eyebrow} ${state.message}`, /saved/i);
   }
-  assert.match(orderedCustomerWithBasket.message, /R 1,245\.00 incl\. VAT/);
+  assert.equal(newCustomerWithBasket.message, '3 items');
+  assert.equal(orderedCustomerWithBasket.message, '2 items · R 1,245.00 incl. VAT');
+});
+
+test('an active basket uses singular item copy without introducing a second action', () => {
+  const state = selectState({
+    basketRestoredAtLogin: true,
+    basketItemCount: 1,
+    basketTotalInclVat: 239,
+  });
+
+  assert.equal(state.message, '1 item · R 239.00 incl. VAT');
+  assert.equal(state.primaryLabel, 'Review basket');
+  assert.equal(state.secondaryLabel, null);
+});
+
+test('items added during the current visit never masquerade as a restored basket', () => {
+  const state = selectState({
+    basketRestoredAtLogin: false,
+    basketItemCount: 3,
+    basketTotalInclVat: 450,
+    onlineOrderCount: 2,
+  });
+
+  assert.equal(state.key, RETURNING_BUYER);
+  assert.notEqual(state.presentation, 'basket');
 });
 
 test('an explicit first login receives first-name-only onboarding and no reorder content', () => {
@@ -123,9 +154,13 @@ test('the journey prompt keeps first-name copy and excludes retired approval/ban
   assert.match(prompt, /state\.title/);
   assert.doesNotMatch(prompt, /fullName|lastName|account approved/i);
   assert.match(prompt, /Review basket/);
+  assert.match(prompt, /presentation !== 'basket'/);
+  assert.match(prompt, /role="status"/);
+  assert.match(prompt, /aria-live="polite"/);
+  assert.match(prompt, /aria-atomic="true"/);
   assert.match(prompt, /type="button"[\s\S]{0,120}onClick=\{onPrimary\}/);
   assert.doesNotMatch(prompt, /main-site-banner\.jpg|site-hero-banner/);
   assert.match(app, /addEventListener\('pointerdown', dismissAfterOutsideInteraction/);
-  assert.match(app, /customerJourney\.presentation === 'basket'/);
+  assert.doesNotMatch(app, /customerJourney\.presentation === 'basket'\) return undefined/);
   assert.equal(fs.existsSync(new URL('../public/main-site-banner.jpg', import.meta.url)), false);
 });

@@ -30,10 +30,7 @@ import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { productDetailId } from './lib/productDetailUrl';
-import {
-  FIRST_LOGIN,
-  selectCustomerDashboardState,
-} from './lib/customerDashboardState';
+import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
 import './index.css';
 
@@ -317,6 +314,7 @@ export default function App({
   const [lastOrder, setLastOrder] = useState(null);
   const [orderHistoryResolved, setOrderHistoryResolved] = useState(false);
   const [customerJourney, setCustomerJourney] = useState(null);
+  const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
   const [bannerConfig, setBannerConfig] = useState(null);
@@ -327,6 +325,7 @@ export default function App({
   useEffect(() => {
     journeyAccountRef.current = null;
     setCustomerJourney(null);
+    setLoginBasketSnapshot(null);
   }, [customer?.id]);
 
   useEffect(() => {
@@ -369,7 +368,16 @@ export default function App({
   }, [restoreCartTriggerFocus]);
 
   const handleCartOpen = useCallback((event) => {
-    cartTriggerRef.current = event?.currentTarget || document.activeElement;
+    const eventTrigger = event?.currentTarget;
+    const persistentTrigger = eventTrigger?.closest?.('.customer-journey-prompt')
+      ? document.querySelector(
+        window.innerWidth <= 900
+          ? '[data-cart-trigger="mobile"]'
+          : '[data-cart-trigger="desktop"]',
+      )
+      : eventTrigger;
+    cartTriggerRef.current = persistentTrigger || document.activeElement;
+    setCustomerJourney(null);
     if (window.innerWidth > 1200) setCartDrawerOpen(true);
     else setMobileCartOpen(true);
   }, []);
@@ -526,6 +534,7 @@ export default function App({
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
     setCartHydrated(false);
+    setLoginBasketSnapshot(null);
     setCartSyncStatus('loading');
     pendingCartSyncRef.current = null;
     cartSyncRetryCountRef.current = 0;
@@ -564,6 +573,20 @@ export default function App({
         if (cancelled || cartAccountRef.current !== uid) return;
         cartRevisionRef.current = Number(accountCart.revision || 0);
         lastSavedCartRef.current = cartFingerprint(hydratedItems);
+        setLoginBasketSnapshot({
+          accountId: uid,
+          fingerprint: cartFingerprint(hydratedItems),
+          itemCount: hydratedItems.reduce(
+            (count, item) => count + Math.max(0, Number(item.qty) || 0),
+            0,
+          ),
+          totalInclVat: hydratedItems.reduce(
+            (total, item) => total + (
+              (Number(item.product.price) || 0) * Math.max(0, Number(item.qty) || 0)
+            ),
+            0,
+          ),
+        });
         setCartItems(hydratedItems);
         setCartLastActivityAt(accountCart.activityAt || null);
         currentCartRef.current = { items: hydratedItems, activityAt: accountCart.activityAt || null };
@@ -1253,17 +1276,22 @@ export default function App({
       return;
     }
 
+    const firstPortalLogin = isExplicitFirstPortalLogin(customer);
+    const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
+      && loginBasketSnapshot.itemCount > 0
+      && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
     const nextJourney = selectCustomerDashboardState({
       firstName: customerFirstName(customer),
-      firstLogin: isExplicitFirstPortalLogin(customer),
+      firstLogin: firstPortalLogin,
       onlineOrderCount: lastOrder ? 1 : 0,
-      basketItemCount: totalItemCount,
-      basketTotalInclVat: cartTotal,
+      basketRestoredAtLogin: restoredBasketIsUntouched,
+      basketItemCount: restoredBasketIsUntouched ? loginBasketSnapshot.itemCount : 0,
+      basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
     });
 
     setCustomerJourney(nextJourney);
     rememberJourneyThisLogin(customer.id, loginSessionKey);
-    if (nextJourney.key === FIRST_LOGIN) {
+    if (firstPortalLogin) {
       void markPortalWelcomeSeen().catch(() => {
         // Keep the server value null so the customer gets one more chance on
         // their next authenticated login instead of silently losing welcome.
@@ -1271,17 +1299,30 @@ export default function App({
     }
   }, [
     cartHydrated,
-    cartTotal,
     customer,
+    cartItems,
     lastOrder,
+    loginBasketSnapshot,
     loginSessionKey,
     orderHistoryResolved,
-    totalItemCount,
   ]);
 
-  const dismissCustomerJourney = useCallback(() => {
+  const dismissCustomerJourney = useCallback((event) => {
+    const restoreCartFocus = customerJourney?.presentation === 'basket' && (
+      event?.key === 'Escape'
+      || event?.currentTarget?.classList?.contains('customer-journey-prompt__close')
+    );
     setCustomerJourney(null);
-  }, []);
+    if (restoreCartFocus) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(
+          window.innerWidth <= 900
+            ? '[data-cart-trigger="mobile"]'
+            : '[data-cart-trigger="desktop"]',
+        )?.focus();
+      });
+    }
+  }, [customerJourney?.presentation]);
 
   useEffect(() => {
     if (!customerJourney || !Number.isFinite(customerJourney.dismissAfterMs)) return undefined;
@@ -1290,7 +1331,7 @@ export default function App({
   }, [customerJourney, dismissCustomerJourney]);
 
   useEffect(() => {
-    if (!customerJourney || customerJourney.presentation === 'basket') return undefined;
+    if (!customerJourney) return undefined;
     const dismissAfterOutsideInteraction = (event) => {
       if (event.target?.closest?.('.customer-journey-prompt')) return;
       dismissCustomerJourney();

@@ -43,7 +43,7 @@ test('FIRST_LOGIN is selected only from an explicit null server column', () => {
   assert.match(app, /isExplicitFirstPortalLogin[\s\S]{0,500}portal_welcome_seen_at === null/);
   assert.match(
     app,
-    /firstLogin:\s*isExplicitFirstPortalLogin\(customer\)/,
+    /const firstPortalLogin = isExplicitFirstPortalLogin\(customer\)[\s\S]{0,500}firstLogin:\s*firstPortalLogin/,
   );
   assert.doesNotMatch(dashboardState, /portal_welcome_seen_at|welcome_seen_at|invoice_count/);
 });
@@ -52,7 +52,7 @@ test('the first welcome is recorded server-side and in-session as soon as it is 
   assert.match(app, /markPortalWelcomeSeen/);
   assert.match(
     app,
-    /selectCustomerDashboardState[\s\S]{0,700}rememberJourneyThisLogin\(customer\.id, loginSessionKey\)[\s\S]{0,300}nextJourney\.key === FIRST_LOGIN[\s\S]{0,200}markPortalWelcomeSeen/,
+    /const firstPortalLogin = isExplicitFirstPortalLogin\(customer\)[\s\S]{0,900}rememberJourneyThisLogin\(customer\.id, loginSessionKey\)[\s\S]{0,300}if \(firstPortalLogin\)[\s\S]{0,200}markPortalWelcomeSeen/,
   );
   assert.match(
     app,
@@ -64,6 +64,12 @@ test('the first welcome is recorded server-side and in-session as soon as it is 
   );
 });
 
+test('a restored basket cannot defer the one-time first-login marker to a later visit', () => {
+  assert.match(app, /firstLogin:\s*firstPortalLogin/);
+  assert.match(app, /if \(firstPortalLogin\)[\s\S]{0,200}markPortalWelcomeSeen/);
+  assert.doesNotMatch(app, /nextJourney\.key === FIRST_LOGIN/);
+});
+
 test('online buyer status comes only from fetched web order history', () => {
   assert.doesNotMatch(app, /customer\?\.invoice_count|customer\.invoice_count/);
   assert.match(app, /onlineOrderCount:\s*lastOrder\s*\?\s*1\s*:\s*0/);
@@ -71,10 +77,18 @@ test('online buyer status comes only from fetched web order history', () => {
   assert.match(app, /orderHistoryResolved/);
 });
 
-test('an active hydrated basket wins and legacy welcome surfaces remain retired', () => {
+test('only an untouched basket restored during login wins over welcome states', () => {
   assert.match(app, /if \(!customer\?\.id \|\| !cartHydrated \|\| !orderHistoryResolved\) return/);
-  assert.match(app, /basketItemCount:\s*totalItemCount/);
-  assert.match(dashboardState, /if \(basketItems > 0\)[\s\S]{0,180}key:\s*BASKET_ACTIVE/);
+  assert.match(app, /setLoginBasketSnapshot\(\{[\s\S]{0,500}fingerprint:[\s\S]{0,250}itemCount:[\s\S]{0,250}totalInclVat:/);
+  assert.match(app, /restoredBasketIsUntouched[\s\S]{0,500}loginBasketSnapshot\.fingerprint === cartFingerprint\(cartItems\)/);
+  assert.match(app, /basketRestoredAtLogin:\s*restoredBasketIsUntouched/);
+  assert.match(dashboardState, /basketRestoredAtLogin === true && basketItems > 0[\s\S]{0,180}key:\s*BASKET_ACTIVE/);
   assert.doesNotMatch(app, /main-site-banner\.jpg|site-hero-banner|CustomerWelcome/);
   assert.equal(fs.existsSync(new URL('../public/main-site-banner.jpg', import.meta.url)), false);
+});
+
+test('normal shopping interaction collapses the basket reminder back to persistent cart controls', () => {
+  assert.match(app, /if \(!customerJourney\) return undefined;[\s\S]{0,350}dismissAfterOutsideInteraction/);
+  assert.doesNotMatch(app, /customerJourney\.presentation === 'basket'\) return undefined/);
+  assert.match(app, /event\.target\?\.closest\?\.\('\.customer-journey-prompt'\)/);
 });
