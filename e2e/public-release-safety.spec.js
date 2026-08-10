@@ -67,7 +67,7 @@ test('registration requires structured business details', async ({ page }) => {
 
   await page.getByPlaceholder('name@business.co.za').fill('safe-e2e@protoe2e.co.za');
   await page.getByPlaceholder('+27').fill('0821234567');
-  await page.getByRole('button', { name: 'No', exact: true }).click();
+  await page.getByRole('button', { name: 'No WhatsApp updates', exact: true }).click();
   await page.getByPlaceholder('At least 8 characters').fill('SafeTest123!');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 

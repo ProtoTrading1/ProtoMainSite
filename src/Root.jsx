@@ -15,6 +15,7 @@ import {
 } from './lib/intercom';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 import { rememberAuthSession } from './lib/authHeaders';
+import { createProfileRequestCache } from './lib/profileRequestCache';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -31,6 +32,7 @@ export default function Root() {
   const [session, setSession] = useState(undefined);
   const [customer, setCustomer] = useState(null);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerLoadError, setCustomerLoadError] = useState(null);
   const [view, setView] = useState('landing');
   const [route, setRoute] = useState(window.location.hash);
   const [pathname, setPathname] = useState(() => window.location.pathname);
@@ -39,6 +41,7 @@ export default function Root() {
   const [loginOptions, setLoginOptions] = useState({ initialEmail: '', initialMode: 'login' });
   const authBootstrapped = useRef(false);
   const loadNonce = useRef(0);
+  const customerLoadRequest = useRef(createProfileRequestCache());
 
   useEffect(() => {
     setRequestedReorder(null);
@@ -156,39 +159,59 @@ export default function Root() {
     if (publicSite && session === null) ensurePublicIntercom();
   }, [adminHost, preRegisterHost, route, session, view]);
 
-  const loadCustomer = useCallback(async (userId, sessionOrToken = null) => {
-    const nonce = ++loadNonce.current;
-    setCustomerLoading(true);
-    try {
-      const { getCustomerProfile } = await import('./lib/auth');
-      const profile = await getCustomerProfile(userId, sessionOrToken);
-      if (nonce !== loadNonce.current) return;
-      setCustomer(profile);
-      setMonitoringUser(profile);
-      if (!profile) return;
+  const loadCustomer = useCallback((userId, sessionOrToken = null) => {
+    const accessToken = typeof sessionOrToken === 'string'
+      ? sessionOrToken
+      : sessionOrToken?.access_token ?? null;
 
-      if (adminHost) {
-        if (profile.role === 'admin') setSurface('admin');
-        else setView('admin-denied');
-        return;
-      }
+    return customerLoadRequest.current.load({
+      userId,
+      accessToken,
+      request: async () => {
+        const nonce = ++loadNonce.current;
+        setCustomerLoading(true);
+        setCustomerLoadError(null);
+        try {
+          const { getCustomerProfile } = await import('./lib/auth');
+          const profile = await getCustomerProfile(userId, sessionOrToken);
+          if (nonce !== loadNonce.current) return null;
+          setCustomer(profile);
+          setMonitoringUser(profile);
 
-      if (preRegisterHost) {
-        if (!profile.is_approved && profile.role !== 'admin') setView('pending');
-        return;
-      }
+          if (adminHost) {
+            if (profile.role === 'admin') setSurface('admin');
+            else setView('admin-denied');
+            return profile;
+          }
 
-      if (profile.is_approved || profile.role === 'admin') {
-        void import('./lib/products').then((m) => m.prefetchCatalog());
-        setSurface('portal');
-        return;
-      }
-      setView('pending');
-    } finally {
-      if (nonce === loadNonce.current) {
-        setCustomerLoading(false);
-      }
-    }
+          if (preRegisterHost) {
+            if (!profile.is_approved && profile.role !== 'admin') setView('pending');
+            return profile;
+          }
+
+          if (profile.is_approved || profile.role === 'admin') {
+            void import('./lib/products').then((m) => m.prefetchCatalog());
+            setSurface('portal');
+            return profile;
+          }
+          setView('pending');
+          return profile;
+        } catch (error) {
+          if (nonce !== loadNonce.current) return null;
+          setCustomer(null);
+          setMonitoringUser(null);
+          setCustomerLoadError({
+            code: error?.code || 'CUSTOMER_PROFILE_LOOKUP_FAILED',
+            message: error?.message || 'Your trade account could not be loaded.',
+          });
+          return null;
+        } finally {
+          if (nonce === loadNonce.current) {
+            setCustomerLoading(false);
+          }
+        }
+      },
+    });
   }, [adminHost, preRegisterHost, setSurface]);
 
   useEffect(() => {
@@ -207,6 +230,7 @@ export default function Root() {
       } else {
         setCustomerLoading(false);
         setCustomer(null);
+        setCustomerLoadError(null);
       }
     };
 
@@ -263,6 +287,7 @@ export default function Root() {
           } else {
             setCustomerLoading(false);
             setCustomer(null);
+            setCustomerLoadError(null);
           }
         });
 
@@ -283,7 +308,6 @@ export default function Root() {
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
     rememberAuthSession(sess);
     setSession(sess);
-    try { sessionStorage.removeItem('proto_welcome_dismissed'); } catch { /* ignore */ }
     void import('./lib/products').then((m) => m.prefetchCatalog());
     void identifyIntercom(sess);
     await loadCustomer(sess.user.id, sess);
@@ -298,9 +322,12 @@ export default function Root() {
     // inherits the signed-out customer's identity — and their trade prices.
     resetIntercom();
     rememberAuthSession(null);
+    loadNonce.current += 1;
+    customerLoadRequest.current.clear();
     setSession(null);
     setCustomer(null);
     setCustomerLoading(false);
+    setCustomerLoadError(null);
     setMonitoringUser(null);
     setRequestedReorder(null);
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
@@ -317,6 +344,28 @@ export default function Root() {
       </div>
     </div>
   );
+
+  const customerRecovery = session && customerLoadError && !customer ? (
+    <div role="alert" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '460px', textAlign: 'center', border: '1px solid #27272a', borderRadius: '16px', background: '#111111', padding: '32px 24px' }}>
+        <div style={{ color: '#f4c451', fontSize: '14px', fontWeight: '800', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>We couldn’t open your dashboard</div>
+        <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', margin: '0 0 10px' }}>You are signed in</h1>
+        <p style={{ color: '#a1a1aa', fontSize: '14px', lineHeight: 1.6, margin: '0 0 24px' }}>
+          {customerLoadError.code === 'CUSTOMER_PROFILE_NOT_FOUND'
+            ? 'No trade profile is linked to this login yet. Please contact Proto Trading so we can connect your approved account.'
+            : 'We could not load your trade account. This is usually temporary—please try again.'}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+          <button type="button" onClick={() => loadCustomer(session.user.id, session)} style={{ padding: '11px 22px', background: '#f4c451', color: '#111111', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer' }}>
+            Try again
+          </button>
+          <button type="button" onClick={handleLogout} style={{ padding: '11px 22px', background: 'transparent', color: '#d4d4d8', border: '1px solid #3f3f46', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
+            Log out
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const registrationLanding = (
     <>
@@ -348,6 +397,8 @@ export default function Root() {
 
   if (preRegisterHost) {
     if (session === undefined) return authSurfaceFallback;
+
+    if (customerRecovery) return customerRecovery;
 
     if (session && customerLoading && !customer) {
       return (
@@ -442,6 +493,8 @@ export default function Root() {
     );
   }
 
+  if (customerRecovery) return customerRecovery;
+
   if (session && customerLoading && !customer) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
@@ -532,6 +585,7 @@ export default function Root() {
         <Suspense fallback={authSurfaceFallback}>
           <App
             customer={customer}
+            loginSessionKey={session?.user?.last_sign_in_at || String(session?.expires_at || '')}
             onLogout={handleLogout}
             onViewProfile={() => setSurface('profile')}
             onViewAdmin={null}

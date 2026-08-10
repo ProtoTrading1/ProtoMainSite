@@ -7,7 +7,7 @@ import MobileNav from './components/MobileNav';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
-import CustomerWelcome from './components/CustomerWelcome';
+import CustomerJourneyPrompt from './components/CustomerJourneyPrompt';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -30,6 +30,8 @@ import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { productDetailId } from './lib/productDetailUrl';
+import { selectCustomerDashboardState } from './lib/customerDashboardState';
+import { markPortalWelcomeSeen } from './lib/auth';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -42,8 +44,6 @@ const MAX_CART_LINES = 250;
 // preview visible for about one second: quick enough not to interrupt ordering,
 // but long enough to notice it and move the pointer over it.
 const DRAWER_PEEK_MS = 1200;
-const WELCOME_DISPLAY_MS = 3500;
-const WELCOME_DISMISSED_KEY = 'proto_welcome_dismissed';
 const IN_STOCK_ONLY_KEY = 'proto_in_stock_only';
 const CATALOG_SORT_KEY = 'proto_catalog_sort';
 const CART_STORAGE_KEY = 'proto_cart';
@@ -53,6 +53,44 @@ const CART_INACTIVITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const CART_EXPIRY_WARN_MS = 72 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
 const CART_QTY_UNLIMITED = 9999;
+const CUSTOMER_JOURNEY_SESSION_KEY_PREFIX = 'proto_customer_journey_session_v1';
+
+function customerFirstName(customer) {
+  const candidate = customer?.first_name
+    || customer?.contact_name
+    || customer?.name
+    || String(customer?.email || '').split('@')[0];
+  return String(candidate || '').trim().split(/\s+/)[0] || 'there';
+}
+
+function customerJourneySessionKey(customerId, loginSessionKey) {
+  if (!customerId || !loginSessionKey) return null;
+  return `${CUSTOMER_JOURNEY_SESSION_KEY_PREFIX}:${customerId}:${loginSessionKey}`;
+}
+
+function hasShownJourneyThisLogin(customerId, loginSessionKey) {
+  const key = customerJourneySessionKey(customerId, loginSessionKey);
+  if (!key) return false;
+  try {
+    return sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberJourneyThisLogin(customerId, loginSessionKey) {
+  const key = customerJourneySessionKey(customerId, loginSessionKey);
+  if (!key) return;
+  try {
+    sessionStorage.setItem(key, '1');
+  } catch { /* the in-memory guard still prevents repeats during this mount */ }
+}
+
+function isExplicitFirstPortalLogin(customer) {
+  return Boolean(customer)
+    && Object.prototype.hasOwnProperty.call(customer, 'portal_welcome_seen_at')
+    && customer.portal_welcome_seen_at === null;
+}
 
 function readCartActivityAt() {
   try {
@@ -73,22 +111,6 @@ function readInStockOnly() {
 function readInitialSort() {
   // Featured should be the consistent default on every visit/reload.
   return DEFAULT_SORT;
-}
-
-function hashHasCategoryPath() {
-  if (typeof window === 'undefined') return false;
-  const raw = window.location.hash.replace(/^#\/?/, '');
-  const pathStr = (raw.split('?')[0] || '').trim();
-  if (!pathStr) return false;
-  const segments = pathStr.split('/').filter(Boolean);
-  return segments.length > 0;
-}
-
-function readInitialShowWelcome() {
-  try {
-    if (sessionStorage.getItem(WELCOME_DISMISSED_KEY)) return false;
-  } catch { /* ignore */ }
-  return !hashHasCategoryPath();
 }
 
 function productStockQtyForCart(product) {
@@ -180,6 +202,7 @@ function collectionLabel(collection) {
 
 export default function App({
   customer,
+  loginSessionKey = '',
   onLogout,
   onViewProfile,
   onViewAdmin,
@@ -204,28 +227,8 @@ export default function App({
   // re-renders this component (and the whole product grid) per keystroke — that
   // was the "typing is extremely slow" cause.
   const [searchQuery, setSearchQuery] = useState('');
-  const [showWelcome, setShowWelcome] = useState(readInitialShowWelcome);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
-
-  const dismissWelcome = useCallback(() => {
-    setShowWelcome((prev) => {
-      if (!prev) return prev;
-      try { sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1'); } catch { /* ignore */ }
-      return false;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!showWelcome) return undefined;
-    const dismissTimer = window.setTimeout(dismissWelcome, WELCOME_DISPLAY_MS);
-    const dismissOnScroll = () => dismissWelcome();
-    window.addEventListener('scroll', dismissOnScroll, { passive: true, once: true });
-    return () => {
-      window.clearTimeout(dismissTimer);
-      window.removeEventListener('scroll', dismissOnScroll);
-    };
-  }, [dismissWelcome, showWelcome]);
 
   const handleSortChange = useCallback((next) => {
     const normalized = normalizeCatalogSort(next);
@@ -239,9 +242,8 @@ export default function App({
   }, [hashNavigate]);
 
   const goAllProducts = useCallback(() => {
-    dismissWelcome();
     navigate([]);
-  }, [dismissWelcome, navigate]);
+  }, [navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     hashNavigate(newPath, newRefinements, { scroll: true });
@@ -310,11 +312,22 @@ export default function App({
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
+  const [orderHistoryResolved, setOrderHistoryResolved] = useState(false);
+  const [orderHistoryAvailable, setOrderHistoryAvailable] = useState(false);
+  const [customerJourney, setCustomerJourney] = useState(null);
+  const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
   const [bannerConfig, setBannerConfig] = useState(null);
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
+  const journeyAccountRef = useRef(null);
+
+  useEffect(() => {
+    journeyAccountRef.current = null;
+    setCustomerJourney(null);
+    setLoginBasketSnapshot(null);
+  }, [customer?.id]);
 
   useEffect(() => {
     currentCartRef.current = { items: cartItems, activityAt: cartLastActivityAt };
@@ -356,7 +369,16 @@ export default function App({
   }, [restoreCartTriggerFocus]);
 
   const handleCartOpen = useCallback((event) => {
-    cartTriggerRef.current = event?.currentTarget || document.activeElement;
+    const eventTrigger = event?.currentTarget;
+    const persistentTrigger = eventTrigger?.closest?.('.customer-journey-prompt')
+      ? document.querySelector(
+        window.innerWidth <= 900
+          ? '[data-cart-trigger="mobile"]'
+          : '[data-cart-trigger="desktop"]',
+      )
+      : eventTrigger;
+    cartTriggerRef.current = persistentTrigger || document.activeElement;
+    setCustomerJourney(null);
     if (window.innerWidth > 1200) setCartDrawerOpen(true);
     else setMobileCartOpen(true);
   }, []);
@@ -371,22 +393,6 @@ export default function App({
     hashNavigate([], {}, { scroll: false });
     scrollToTopSmooth();
   }, [hashNavigate]);
-
-  useEffect(() => {
-    if (searchQuery.trim()) dismissWelcome();
-  }, [searchQuery, dismissWelcome]);
-
-  useEffect(() => {
-    if (path.length > 0) dismissWelcome();
-  }, [pathKey, path.length, dismissWelcome]);
-
-  useEffect(() => {
-    if (activeCollection !== 'all') dismissWelcome();
-  }, [activeCollection, dismissWelcome]);
-
-  useEffect(() => {
-    if (Object.keys(refinements).length > 0) dismissWelcome();
-  }, [refinements, dismissWelcome]);
 
   useEffect(() => {
     try {
@@ -529,6 +535,7 @@ export default function App({
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
     setCartHydrated(false);
+    setLoginBasketSnapshot(null);
     setCartSyncStatus('loading');
     pendingCartSyncRef.current = null;
     cartSyncRetryCountRef.current = 0;
@@ -567,6 +574,20 @@ export default function App({
         if (cancelled || cartAccountRef.current !== uid) return;
         cartRevisionRef.current = Number(accountCart.revision || 0);
         lastSavedCartRef.current = cartFingerprint(hydratedItems);
+        setLoginBasketSnapshot({
+          accountId: uid,
+          fingerprint: cartFingerprint(hydratedItems),
+          itemCount: hydratedItems.reduce(
+            (count, item) => count + Math.max(0, Number(item.qty) || 0),
+            0,
+          ),
+          totalInclVat: hydratedItems.reduce(
+            (total, item) => total + (
+              (Number(item.product.price) || 0) * Math.max(0, Number(item.qty) || 0)
+            ),
+            0,
+          ),
+        });
         setCartItems(hydratedItems);
         setCartLastActivityAt(accountCart.activityAt || null);
         currentCartRef.current = { items: hydratedItems, activityAt: accountCart.activityAt || null };
@@ -802,8 +823,28 @@ export default function App({
   }, [path, pathKey, categories, customer?.id]);
 
   useEffect(() => {
-    if (!customer?.id) return;
-    fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
+    if (!customer?.id) {
+      setLastOrder(null);
+      setOrderHistoryAvailable(true);
+      setOrderHistoryResolved(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLastOrder(null);
+    setOrderHistoryAvailable(false);
+    setOrderHistoryResolved(false);
+    fetchLastOrder(customer.id)
+      .then((order) => {
+        if (cancelled) return;
+        setLastOrder(order);
+        setOrderHistoryAvailable(true);
+      })
+      .catch(() => {
+        if (!cancelled) setOrderHistoryAvailable(false);
+      })
+      .finally(() => { if (!cancelled) setOrderHistoryResolved(true); });
+    return () => { cancelled = true; };
   }, [customer?.id]);
 
   useEffect(() => {
@@ -1131,7 +1172,6 @@ export default function App({
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
 
-    dismissWelcome();
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
@@ -1157,7 +1197,7 @@ export default function App({
       setDrawerPeek(false);
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
-  }, [dismissWelcome, markCartActivity, searchQuery]);
+  }, [markCartActivity, searchQuery]);
 
   const handleCartRevealHandled = useCallback((token) => {
     setCartRevealRequest((current) => (current?.token === token ? null : current));
@@ -1233,6 +1273,89 @@ export default function App({
 
   const cartTotal = cartItems.reduce((acc, i) => acc + i.product.price * i.qty, 0);
   const totalItemCount = cartItems.reduce((acc, i) => acc + i.qty, 0);
+
+  useEffect(() => {
+    if (!customer?.id || !cartHydrated || !orderHistoryResolved) return;
+    const journeyKey = `${customer.id}:${loginSessionKey}`;
+    if (journeyAccountRef.current === journeyKey) return;
+    journeyAccountRef.current = journeyKey;
+
+    if (hasShownJourneyThisLogin(customer.id, loginSessionKey)) {
+      setCustomerJourney(null);
+      return;
+    }
+
+    const firstPortalLogin = isExplicitFirstPortalLogin(customer);
+    const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
+      && loginBasketSnapshot.itemCount > 0
+      && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
+    const nextJourney = selectCustomerDashboardState({
+      firstName: customerFirstName(customer),
+      firstLogin: firstPortalLogin,
+      onlineOrderCount: lastOrder ? 1 : 0,
+      orderHistoryAvailable,
+      basketRestoredAtLogin: restoredBasketIsUntouched,
+      basketItemCount: restoredBasketIsUntouched ? loginBasketSnapshot.itemCount : 0,
+      basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
+    });
+
+    setCustomerJourney(nextJourney);
+    rememberJourneyThisLogin(customer.id, loginSessionKey);
+    if (firstPortalLogin) {
+      void markPortalWelcomeSeen().catch(() => {
+        // Keep the server value null so the customer gets one more chance on
+        // their next authenticated login instead of silently losing welcome.
+      });
+    }
+  }, [
+    cartHydrated,
+    customer,
+    cartItems,
+    lastOrder,
+    loginBasketSnapshot,
+    loginSessionKey,
+    orderHistoryAvailable,
+    orderHistoryResolved,
+  ]);
+
+  const dismissCustomerJourney = useCallback((event) => {
+    const restoreCartFocus = customerJourney?.presentation === 'basket' && (
+      event?.key === 'Escape'
+      || event?.currentTarget?.classList?.contains('customer-journey-prompt__close')
+    );
+    setCustomerJourney(null);
+    if (restoreCartFocus) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(
+          window.innerWidth <= 900
+            ? '[data-cart-trigger="mobile"]'
+            : '[data-cart-trigger="desktop"]',
+        )?.focus();
+      });
+    }
+  }, [customerJourney?.presentation]);
+
+  useEffect(() => {
+    if (!customerJourney || !Number.isFinite(customerJourney.dismissAfterMs)) return undefined;
+    const timer = window.setTimeout(dismissCustomerJourney, customerJourney.dismissAfterMs);
+    return () => window.clearTimeout(timer);
+  }, [customerJourney, dismissCustomerJourney]);
+
+  useEffect(() => {
+    if (!customerJourney) return undefined;
+    const dismissAfterOutsideInteraction = (event) => {
+      if (event.target?.closest?.('.customer-journey-prompt')) return;
+      dismissCustomerJourney();
+    };
+    window.addEventListener('pointerdown', dismissAfterOutsideInteraction, { passive: true });
+    return () => window.removeEventListener('pointerdown', dismissAfterOutsideInteraction);
+  }, [customerJourney, dismissCustomerJourney]);
+
+  const handleCustomerJourneyPrimary = useCallback((event) => {
+    if (customerJourney?.presentation === 'basket') handleCartOpen(event);
+    else goHome();
+    dismissCustomerJourney();
+  }, [customerJourney, dismissCustomerJourney, goHome, handleCartOpen]);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -1502,12 +1625,11 @@ export default function App({
   const previewProductKey = productDetailId(previewProduct);
 
   const handleProductPreview = useCallback((product, { focusOptions = false } = {}) => {
-    dismissWelcome();
     setPreviewOptionsFirst(Boolean(focusOptions));
     setPreviewProduct(product);
     const id = productDetailId(product);
     if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
-  }, [dismissWelcome, hashNavigate, path, refinements]);
+  }, [hashNavigate, path, refinements]);
 
   const closeProductPreview = useCallback(() => {
     setPreviewProduct(null);
@@ -1560,6 +1682,14 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
+  const customerJourneyPrompt = customerJourney ? (
+    <CustomerJourneyPrompt
+      state={customerJourney}
+      onPrimary={handleCustomerJourneyPrimary}
+      onSecondary={dismissCustomerJourney}
+      onDismiss={dismissCustomerJourney}
+    />
+  ) : null;
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -1570,7 +1700,7 @@ export default function App({
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         navigateForSearch={navigateForSearch}
-        onMenuClick={() => { dismissWelcome(); setMobileMenuOpen(true); }}
+        onMenuClick={() => setMobileMenuOpen(true)}
         onHome={goHome}
         customer={customer}
         onViewProfile={onViewProfile}
@@ -1584,8 +1714,10 @@ export default function App({
         onCartClick={handleCartOpen}
       />
 
+      {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
+
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
-        <aside className="sidebar-rail" onMouseEnter={dismissWelcome}>
+        <aside className="sidebar-rail">
           <Sidebar
             categories={categories}
             path={path}
@@ -1597,12 +1729,7 @@ export default function App({
           />
         </aside>
 
-        <main className="content-area" onScroll={dismissWelcome}>
-          <CustomerWelcome
-            customer={customer}
-            hasLastOrder={Boolean(lastOrder)}
-            onViewOrders={onViewProfile}
-          />
+        <main className="content-area">
           <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
@@ -1632,12 +1759,12 @@ export default function App({
             categoryNode={categoryNode}
             categories={categories}
             onProductPreview={handleProductPreview}
-            showWelcome={showWelcome}
             inStockOnly={inStockOnly}
             searchActive={Boolean(searchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
+            journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
           />
         </main>
 

@@ -50,10 +50,10 @@ export default function MainContent({
   onProductPreview = null,
   searchActive = false,
   onSearchProductClick = null,
-  showWelcome = false,
   inStockOnly = false,
   onResetFilters = () => {},
   refinements = {},
+  journeyPrompt = null,
 }) {
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
@@ -74,7 +74,6 @@ export default function MainContent({
 
   // Show the discovery landing when on a dept/category that has subcategories and no active search
   const showLanding = isCategoryPage && !searchQuery && categoryNode?.children?.length > 0 && activeCollection === 'all';
-  const showWelcomeHome = showWelcome && isAllProductsPage && !searchQuery && !isCategoryPage;
   const pathKey = path.join('/');
   const searchKey = searchQuery.trim().toLowerCase();
   const refinementsKey = useMemo(
@@ -258,19 +257,6 @@ export default function MainContent({
 
   return (
     <div className="catalog-page">
-      {showWelcomeHome && (
-        <div className="site-hero-banner" role="status" aria-live="polite">
-          <img
-            src="/main-site-banner.jpg"
-            alt="Thank you for registering — Welcome to Proto Trading Online"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-          />
-        </div>
-      )}
-
-
       {/* Category browse pills */}
       {showCategoryGrid && (
         <section className="cat-browse">
@@ -347,7 +333,12 @@ export default function MainContent({
         </div>
       )}
 
-      {resultsControl}
+      {journeyPrompt ? (
+        <div className="catalog-utility-row">
+          {journeyPrompt}
+          {resultsControl}
+        </div>
+      ) : resultsControl}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
 
       {shouldShowSkeleton ? (

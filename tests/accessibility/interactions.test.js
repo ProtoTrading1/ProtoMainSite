@@ -46,18 +46,10 @@ describe('catalogue interaction accessibility', () => {
     assert.match(styles, /transition: transform 0\.16s/);
   });
 
-  it('dismisses the welcome banner quickly and does not restore it during the session', async () => {
+  it('does not couple catalogue interactions to a retired welcome banner', async () => {
     const app = await readSource('src/App.jsx');
     const styles = await readSource('src/index.css');
-    assert.match(app, /const WELCOME_DISPLAY_MS = 3500/);
-    assert.match(app, /window\.setTimeout\(dismissWelcome, WELCOME_DISPLAY_MS\)/);
-    assert.match(app, /onMouseEnter=\{dismissWelcome\}/);
-    assert.match(app, /onScroll=\{dismissWelcome\}/);
-    assert.doesNotMatch(app, /sessionStorage\.removeItem\(WELCOME_DISMISSED_KEY\)/);
-    assert.doesNotMatch(app, /setShowWelcome\(true\)/);
-    assert.match(styles, /animation: welcome-banner-brief 3\.5s ease forwards/);
-    assert.match(styles, /85\.7%/);
-    assert.match(styles, /max-height: 560px/);
-    assert.match(styles, /pointer-events: none/);
+    assert.doesNotMatch(app, /showWelcome|dismissWelcome|welcomeSeenKey/);
+    assert.doesNotMatch(styles, /site-hero-banner|welcome-banner-brief/);
   });
 });
