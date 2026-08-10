@@ -106,3 +106,20 @@ test('normal shopping interaction collapses the basket reminder back to persiste
   assert.doesNotMatch(app, /customerJourney\.presentation === 'basket'\) return undefined/);
   assert.match(app, /event\.target\?\.closest\?\.\('\.customer-journey-prompt'\)/);
 });
+
+test('meaningful scrolling or changing the restored basket dismisses its reminder', () => {
+  assert.match(app, /BASKET_REMINDER_SCROLL_DISMISS_PX = 96/);
+  assert.match(
+    app,
+    /customerJourney\?\.presentation !== 'basket'[\s\S]{0,1200}addEventListener\('scroll', dismissAfterMeaningfulScroll/,
+  );
+  assert.match(
+    app,
+    /Math\.abs\(currentPosition - \(initialPositions\.get\(target\) \|\| 0\)\) < BASKET_REMINDER_SCROLL_DISMISS_PX/,
+  );
+  assert.match(
+    app,
+    /cartFingerprint\(cartItems\) === loginBasketSnapshot\.fingerprint[\s\S]{0,150}dismissCustomerJourney\(null, \{ animate: true \}\)/,
+  );
+  assert.match(app, /CUSTOMER_JOURNEY_EXIT_MS = 180/);
+});

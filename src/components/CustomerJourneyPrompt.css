@@ -41,6 +41,11 @@
   box-shadow: 0 28px 80px rgb(0 0 0 / 42%), 0 0 0 1px rgb(200 154 60 / 8%);
 }
 
+.customer-journey-prompt--dismissing {
+  pointer-events: none;
+  animation: customer-journey-exit 180ms ease-in both;
+}
+
 @media (min-width: 901px) {
   .customer-journey-prompt--basket {
     position: relative;
@@ -232,6 +237,18 @@
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes customer-journey-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.99);
   }
 }
 

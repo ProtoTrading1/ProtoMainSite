@@ -160,7 +160,7 @@ async function seedLegacyBrowserBasket(page, items) {
   }, { seededItems: items });
 }
 
-async function signIn(page) {
+async function signIn(page, { dismissReminder = true } = {}) {
   await page.goto('/');
   await page.getByRole('button', { name: /sign in/i }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Welcome back.' });
@@ -173,10 +173,12 @@ async function signIn(page) {
   // shift the product action that follows on either viewport.
   const basketReminder = page.locator('.customer-journey-prompt--basket');
   await expect(basketReminder).toBeVisible();
+  if (!dismissReminder) return basketReminder;
   await basketReminder.getByRole('button', {
     name: 'Close basket reminder and continue shopping',
   }).click();
   await expect(basketReminder).toBeHidden();
+  return basketReminder;
 }
 
 async function storedCart(page) {
@@ -191,6 +193,34 @@ async function expectStoredSkus(page, expected) {
 async function refreshFromAccount(page) {
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
 }
+
+test('mobile restored-basket reminder yields to scrolling while the cart stays available', async ({ browser }) => {
+  const accountCart = {
+    created: true,
+    items: [line(legacyProduct, 2)],
+    activityAt: Date.now() - 60_000,
+    revision: 1,
+  };
+  const safety = { authRequests: 0, destructiveRequests: [] };
+  const context = await browser.newContext({ viewport: { width: 412, height: 640 }, isMobile: true, hasTouch: true });
+  await installSyntheticServices(context, accountCart, safety);
+  const page = await context.newPage();
+  await seedLegacyBrowserBasket(page, accountCart.items);
+
+  try {
+    const basketReminder = await signIn(page, { dismissReminder: false });
+    await page.evaluate(() => window.scrollTo(0, 160));
+    await expect(basketReminder).toBeHidden();
+
+    const cartButton = page.getByRole('button', { name: /^Cart\b/ });
+    await expect(cartButton).toBeVisible();
+    await cartButton.click();
+    await expect(page.getByLabel('Your Order').getByRole('heading', { name: 'Legacy Basket Item' })).toBeVisible();
+    expect(safety.destructiveRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
 
 test('desktop and mobile converge on the latest account basket without checkout', async ({ browser }) => {
   const accountCart = { created: false, items: [], activityAt: null, revision: 0 };

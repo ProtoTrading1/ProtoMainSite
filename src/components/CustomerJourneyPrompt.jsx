@@ -48,7 +48,7 @@ export default function CustomerJourneyPrompt({
 
   return (
     <aside
-      className={`customer-journey-prompt customer-journey-prompt--${presentation}`}
+      className={`customer-journey-prompt customer-journey-prompt--${presentation}${state.dismissing ? ' customer-journey-prompt--dismissing' : ''}`}
       role="region"
       aria-labelledby={titleId}
       aria-describedby={messageId}
