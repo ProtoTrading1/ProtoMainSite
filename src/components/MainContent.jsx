@@ -53,6 +53,7 @@ export default function MainContent({
   inStockOnly = false,
   onResetFilters = () => {},
   refinements = {},
+  journeyPrompt = null,
 }) {
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
@@ -332,7 +333,12 @@ export default function MainContent({
         </div>
       )}
 
-      {resultsControl}
+      {journeyPrompt ? (
+        <div className="catalog-utility-row">
+          {journeyPrompt}
+          {resultsControl}
+        </div>
+      ) : resultsControl}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
 
       {shouldShowSkeleton ? (

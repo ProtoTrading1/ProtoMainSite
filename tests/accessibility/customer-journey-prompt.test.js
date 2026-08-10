@@ -43,6 +43,21 @@ describe('customer journey prompt accessibility', () => {
     assert.match(styles, /max-height:\s*calc\([\s\S]*?100dvh[\s\S]*?safe-area-inset-top[\s\S]*?safe-area-inset-bottom/);
   });
 
+  it('uses the catalogue toolbar on desktop without covering ordering controls', async () => {
+    const [styles, catalogue, app] = await Promise.all([
+      readSource('src/components/CustomerJourneyPrompt.css'),
+      readSource('src/components/MainContent.jsx'),
+      readSource('src/App.jsx'),
+    ]);
+
+    assert.match(
+      styles,
+      /@media \(min-width: 901px\)[\s\S]*?\.customer-journey-prompt--basket\s*\{[\s\S]*?position:\s*relative;[\s\S]*?inset:\s*auto;/,
+    );
+    assert.match(catalogue, /className="catalog-utility-row"[\s\S]*?\{journeyPrompt\}[\s\S]*?\{resultsControl\}/);
+    assert.match(app, /journeyPrompt=\{customerJourney\?\.presentation === 'basket'/);
+  });
+
   it('sits below interactive drawers and restores focus through persistent basket controls', async () => {
     const [prompt, styles, app, header] = await Promise.all([
       readSource('src/components/CustomerJourneyPrompt.jsx'),
@@ -54,7 +69,8 @@ describe('customer journey prompt accessibility', () => {
     assert.match(styles, /z-index:\s*550;/);
     assert.match(prompt, /Close basket reminder and continue shopping/);
     assert.match(prompt, /event\.key !== 'Escape'/);
-    assert.match(header, /data-cart-trigger="desktop"/);
+    assert.match(header, /data-cart-trigger="desktop"[\s\S]{0,160}className=\{`cart-summary/);
+    assert.doesNotMatch(header, /data-cart-trigger="desktop"[\s\S]{0,160}className="header-home-btn/);
     assert.match(header, /data-cart-trigger="mobile"/);
     assert.match(app, /closest\?\.\('\.customer-journey-prompt'\)/);
     assert.match(app, /data-cart-trigger="mobile"/);

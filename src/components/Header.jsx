@@ -991,7 +991,6 @@ export default function Header({
         {/* Brand */}
         <div className="brand-block">
           <button
-            data-cart-trigger="desktop"
             type="button"
             className="header-home-btn desktop-only"
             onClick={onHome}
@@ -1152,6 +1151,7 @@ export default function Header({
           )}
 
           <button
+            data-cart-trigger="desktop"
             type="button"
             className={`cart-summary${orderTargetMet ? ' cart-summary--ready' : ''}`}
             onClick={onCartClick}

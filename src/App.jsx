@@ -1671,6 +1671,14 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
+  const customerJourneyPrompt = customerJourney ? (
+    <CustomerJourneyPrompt
+      state={customerJourney}
+      onPrimary={handleCustomerJourneyPrimary}
+      onSecondary={dismissCustomerJourney}
+      onDismiss={dismissCustomerJourney}
+    />
+  ) : null;
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -1695,12 +1703,7 @@ export default function App({
         onCartClick={handleCartOpen}
       />
 
-      <CustomerJourneyPrompt
-        state={customerJourney}
-        onPrimary={handleCustomerJourneyPrimary}
-        onSecondary={dismissCustomerJourney}
-        onDismiss={dismissCustomerJourney}
-      />
+      {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
         <aside className="sidebar-rail">
@@ -1750,6 +1753,7 @@ export default function App({
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
+            journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
           />
         </main>
 
