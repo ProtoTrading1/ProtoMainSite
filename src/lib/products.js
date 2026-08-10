@@ -255,6 +255,7 @@ function getAllCached() {
 export function invalidateProductCache() {
   _cache = null;
   _featuredResolved = null;
+  _featuredLoad = null;
   _loadPromise = null;
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
@@ -385,6 +386,7 @@ export async function fetchProductsBySkus(skus) {
 // in the background once it is older than a minute.
 let _featuredResolved = null; // { key, products, at }
 let _featuredRefreshing = false;
+let _featuredLoad = null; // { key, promise }
 const FEATURED_RESOLVED_REFRESH_MS = 60_000;
 
 async function fetchFeaturedCatalogProducts() {
@@ -402,7 +404,14 @@ async function fetchFeaturedCatalogProducts() {
     }
     return _featuredResolved.products;
   }
-  return resolveFeaturedCatalogProducts(featuredSkus, key);
+  if (_featuredLoad?.key === key) return _featuredLoad.promise;
+
+  const promise = resolveFeaturedCatalogProducts(featuredSkus, key)
+    .finally(() => {
+      if (_featuredLoad?.promise === promise) _featuredLoad = null;
+    });
+  _featuredLoad = { key, promise };
+  return promise;
 }
 
 async function resolveFeaturedCatalogProducts(featuredSkus, key) {
@@ -412,7 +421,7 @@ async function resolveFeaturedCatalogProducts(featuredSkus, key) {
       batches.map((batch) => fetchJsonWithTimeout(
         `/api/products?skus=${encodeURIComponent(batch.join(','))}`,
         10000,
-        { cache: 'no-store' },
+        { cache: 'no-store', authenticated: true },
       )),
     );
 
