@@ -77,6 +77,20 @@ test('online buyer status comes only from fetched web order history', () => {
   assert.match(app, /orderHistoryResolved/);
 });
 
+test('an order-history failure falls back to neutral returning copy', () => {
+  assert.match(app, /const \[orderHistoryAvailable, setOrderHistoryAvailable\]/);
+  assert.match(
+    app,
+    /fetchLastOrder\(customer\.id\)[\s\S]{0,500}setOrderHistoryAvailable\(true\)[\s\S]{0,300}\.catch\([\s\S]{0,180}setOrderHistoryAvailable\(false\)/,
+  );
+  assert.match(app, /orderHistoryAvailable,\s*\n\s*basketRestoredAtLogin/);
+  assert.match(dashboardState, /if \(orderHistoryAvailable !== true\)[\s\S]{0,500}Good to see you again\./);
+  assert.doesNotMatch(
+    dashboardState.slice(dashboardState.indexOf('if (orderHistoryAvailable !== true)')),
+    /Ready to place your first order\?[\s\S]{0,200}orderHistoryAvailable/,
+  );
+});
+
 test('only an untouched basket restored during login wins over welcome states', () => {
   assert.match(app, /if \(!customer\?\.id \|\| !cartHydrated \|\| !orderHistoryResolved\) return/);
   assert.match(app, /setLoginBasketSnapshot\(\{[\s\S]{0,500}fingerprint:[\s\S]{0,250}itemCount:[\s\S]{0,250}totalInclVat:/);

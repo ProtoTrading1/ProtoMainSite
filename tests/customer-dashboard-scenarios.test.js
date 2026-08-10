@@ -105,6 +105,18 @@ test('a returning customer with no orders and an empty basket receives discovery
   assert.equal(state.popularCategories, true);
 });
 
+test('an unavailable order history never makes a returning customer look like a first-time buyer', () => {
+  const state = selectState({ orderHistoryAvailable: false });
+
+  assert.equal(state.key, RETURNING_NO_ORDER);
+  assert.equal(state.title, 'Welcome back, George');
+  assert.equal(state.message, 'Good to see you again.');
+  assert.equal(state.primaryLabel, 'Continue shopping');
+  assert.equal(state.buyAgain, false);
+  assert.equal(state.recentOrderEmpty, false);
+  assert.doesNotMatch(`${state.title} ${state.message}`, /first order/i);
+});
+
 test('an existing online buyer never becomes a first login when firstLogin is false', () => {
   const state = selectState({
     firstLogin: false,

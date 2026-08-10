@@ -57,6 +57,7 @@ export const selectCustomerDashboardState = ({
   firstName,
   firstLogin = false,
   onlineOrderCount = 0,
+  orderHistoryAvailable = true,
   basketRestoredAtLogin = false,
   basketItemCount = 0,
   basketTotalInclVat,
@@ -96,6 +97,25 @@ export const selectCustomerDashboardState = ({
       buyAgain: false,
       popularCategories: true,
       recentOrderEmpty: true,
+    });
+  }
+
+  // A temporary order-history failure must never tell an established customer
+  // that they have not ordered. Keep the experience useful and neutral until
+  // the next login can resolve their history correctly.
+  if (orderHistoryAvailable !== true) {
+    return Object.freeze({
+      key: RETURNING_NO_ORDER,
+      presentation: 'toast',
+      eyebrow: 'WELCOME BACK',
+      title: `Welcome back, ${name}`,
+      message: 'Good to see you again.',
+      primaryLabel: 'Continue shopping',
+      secondaryLabel: null,
+      dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.RETURNING_BUYER,
+      buyAgain: false,
+      popularCategories: false,
+      recentOrderEmpty: false,
     });
   }
 

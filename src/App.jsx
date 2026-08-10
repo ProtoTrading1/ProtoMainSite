@@ -313,6 +313,7 @@ export default function App({
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [orderHistoryResolved, setOrderHistoryResolved] = useState(false);
+  const [orderHistoryAvailable, setOrderHistoryAvailable] = useState(false);
   const [customerJourney, setCustomerJourney] = useState(null);
   const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
@@ -824,16 +825,24 @@ export default function App({
   useEffect(() => {
     if (!customer?.id) {
       setLastOrder(null);
+      setOrderHistoryAvailable(true);
       setOrderHistoryResolved(true);
       return undefined;
     }
 
     let cancelled = false;
     setLastOrder(null);
+    setOrderHistoryAvailable(false);
     setOrderHistoryResolved(false);
     fetchLastOrder(customer.id)
-      .then((order) => { if (!cancelled) setLastOrder(order); })
-      .catch(() => {})
+      .then((order) => {
+        if (cancelled) return;
+        setLastOrder(order);
+        setOrderHistoryAvailable(true);
+      })
+      .catch(() => {
+        if (!cancelled) setOrderHistoryAvailable(false);
+      })
       .finally(() => { if (!cancelled) setOrderHistoryResolved(true); });
     return () => { cancelled = true; };
   }, [customer?.id]);
@@ -1284,6 +1293,7 @@ export default function App({
       firstName: customerFirstName(customer),
       firstLogin: firstPortalLogin,
       onlineOrderCount: lastOrder ? 1 : 0,
+      orderHistoryAvailable,
       basketRestoredAtLogin: restoredBasketIsUntouched,
       basketItemCount: restoredBasketIsUntouched ? loginBasketSnapshot.itemCount : 0,
       basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
@@ -1304,6 +1314,7 @@ export default function App({
     lastOrder,
     loginBasketSnapshot,
     loginSessionKey,
+    orderHistoryAvailable,
     orderHistoryResolved,
   ]);
 

@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const migration = read('migrations/064_customer_portal_welcome_seen.sql');
+const migrationLedger = read('migrations/README.md');
 const api = read('api/customer-profile.js');
 const authClient = read('src/lib/auth.js');
 
@@ -24,6 +25,15 @@ test('migration backfills only matching customers who have already signed in', (
   assert.match(migration, /customer\.portal_welcome_seen_at is null/i);
   assert.match(migration, /auth_user\.last_sign_in_at is not null/i);
   assert.doesNotMatch(migration, /set portal_welcome_seen_at = (?:now\(\)|current_timestamp)/i);
+});
+
+test('release documentation requires the welcome marker before the four-state journey', () => {
+  assert.match(migrationLedger, /064_customer_portal_welcome_seen\.sql/);
+  assert.match(
+    migrationLedger,
+    /064_customer_portal_welcome_seen\.sql[^\n]*Apply before releasing the four-state customer journey/i,
+  );
+  assert.match(migrationLedger, /064_customer_portal_welcome_seen\.sql[^\n]*sends nothing/i);
 });
 
 test('authenticated marker action is self-scoped, one-way and idempotent', () => {
