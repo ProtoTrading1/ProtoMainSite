@@ -30,11 +30,10 @@ import './QuickOrder.css';
 const STARTING_ROWS = [{ id: 'manual-1', code: '', qty: 1 }];
 
 function money(value) {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
+  return `R${(Number(value) || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
-  }).format(Number(value) || 0).replace('ZAR', 'R').replace(/\s/g, '');
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function csvCell(value) {
@@ -60,11 +59,19 @@ function QuickOrderImage({ line }) {
   );
 }
 
-function statusCopy(line) {
-  if (line.status === 'not_found') return 'Item code not found';
-  if (line.status === 'unavailable') return line.availability?.label || 'Currently unavailable';
-  if (line.status === 'below_minimum') return `Minimum quantity is ${line.minimum}`;
-  return line.availability?.guidance || line.availability?.label || 'Available now';
+function availabilityCopy(line) {
+  if (line.status === 'not_found') return { label: 'Item code not found', guidance: '' };
+  if (line.status === 'below_minimum') {
+    return {
+      label: line.availability?.label || 'Available',
+      guidance: `Minimum quantity is ${line.minimum}`,
+    };
+  }
+  const label = line.availability?.label || (line.status === 'unavailable' ? 'Currently unavailable' : 'Available now');
+  const guidance = line.availability?.guidance && line.availability.guidance !== label
+    ? line.availability.guidance
+    : '';
+  return { label, guidance };
 }
 
 export default function QuickOrder({ onAddItems, onSearchProduct, onClose, cartReady = true }) {
@@ -265,47 +272,51 @@ export default function QuickOrder({ onAddItems, onSearchProduct, onClose, cartR
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line) => (
-                  <tr key={line.id} className={line.valid ? '' : 'qo-row--attention'}>
-                    <td data-label="Status">
-                      <span className={`qo-status qo-status--${line.status}`}>
-                        {line.valid ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
-                        {line.valid ? 'Matched' : 'Needs attention'}
-                      </span>
-                    </td>
-                    <td data-label="Item code"><strong>{line.code}</strong></td>
-                    <td data-label="Product">
-                      {line.product ? (
-                        <div className="qo-product-cell">
-                          <QuickOrderImage line={line} />
-                          <div>
-                            <strong>{line.product.name || line.product.title}</strong>
-                            {!line.image && <span className="qo-code-only-note">Code-only item · Image does not block ordering</span>}
+                {lines.map((line) => {
+                  const availability = availabilityCopy(line);
+                  return (
+                    <tr key={line.id} className={line.valid ? '' : 'qo-row--attention'}>
+                      <td data-label="Status">
+                        <span className={`qo-status qo-status--${line.status}`}>
+                          {line.valid ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+                          {line.valid ? 'Matched' : 'Needs attention'}
+                        </span>
+                      </td>
+                      <td data-label="Item code"><strong>{line.code}</strong></td>
+                      <td data-label="Product">
+                        {line.product ? (
+                          <div className="qo-product-cell">
+                            <QuickOrderImage line={line} />
+                            <div>
+                              <strong>{line.product.name || line.product.title}</strong>
+                              {!line.image && <span className="qo-code-only-note">Code-only item · Image does not block ordering</span>}
+                            </div>
                           </div>
+                        ) : <span className="qo-problem-copy">Item not found</span>}
+                      </td>
+                      <td data-label="MOQ">{line.product ? line.minimum : '—'}</td>
+                      <td data-label="Available">
+                        <span className={`qo-availability${line.valid ? '' : ' qo-availability--warning'}`}>
+                          <strong>{availability.label}</strong>
+                          {availability.guidance && <small>{availability.guidance}</small>}
+                        </span>
+                      </td>
+                      <td data-label="Qty">
+                        <div className="qo-qty-control">
+                          <button type="button" aria-label={`Decrease ${line.code} quantity`} onClick={() => changeQty(line.id, line.qty - 1)} disabled={line.qty <= 1}><Minus size={15} /></button>
+                          <input aria-label={`${line.code} quantity`} type="number" min="1" max="9999" value={line.qty} onChange={(event) => changeQty(line.id, event.target.value)} />
+                          <button type="button" aria-label={`Increase ${line.code} quantity`} onClick={() => changeQty(line.id, line.qty + 1)}><Plus size={15} /></button>
                         </div>
-                      ) : <span className="qo-problem-copy">Item not found</span>}
-                    </td>
-                    <td data-label="MOQ">{line.product ? line.minimum : '—'}</td>
-                    <td data-label="Available">
-                      <span className={`qo-availability${line.valid ? '' : ' qo-availability--warning'}`}>
-                        {statusCopy(line)}
-                      </span>
-                    </td>
-                    <td data-label="Qty">
-                      <div className="qo-qty-control">
-                        <button type="button" aria-label={`Decrease ${line.code} quantity`} onClick={() => changeQty(line.id, line.qty - 1)} disabled={line.qty <= 1}><Minus size={15} /></button>
-                        <input aria-label={`${line.code} quantity`} type="number" min="1" max="9999" value={line.qty} onChange={(event) => changeQty(line.id, event.target.value)} />
-                        <button type="button" aria-label={`Increase ${line.code} quantity`} onClick={() => changeQty(line.id, line.qty + 1)}><Plus size={15} /></button>
-                      </div>
-                    </td>
-                    <td data-label="Unit price incl. VAT">{line.product ? money(line.price) : '—'}</td>
-                    <td data-label="Total"><strong>{line.product ? money(line.lineTotal) : '—'}</strong></td>
-                    <td className="qo-row-actions">
-                      {!line.product && <button type="button" onClick={() => onSearchProduct?.(line.code)}><Search size={15} /><span>Search</span></button>}
-                      <button type="button" aria-label={`Remove ${line.code}`} onClick={() => removeLine(line.id)}><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td data-label="Unit price incl. VAT">{line.product ? money(line.price) : '—'}</td>
+                      <td data-label="Total"><strong>{line.product ? money(line.lineTotal) : '—'}</strong></td>
+                      <td className="qo-row-actions">
+                        {!line.product && <button type="button" onClick={() => onSearchProduct?.(line.code)}><Search size={15} /><span>Search</span></button>}
+                        <button type="button" aria-label={`Remove ${line.code}`} onClick={() => removeLine(line.id)}><Trash2 size={16} /></button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -330,4 +341,3 @@ export default function QuickOrder({ onAddItems, onSearchProduct, onClose, cartR
     </section>
   );
 }
-

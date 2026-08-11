@@ -216,7 +216,10 @@
 .qo-code-only-note { color: #64748b; font-size: 10px; }
 .qo-problem-copy { color: #dc2626; font-weight: 700; }
 .qo-availability { display: block; max-width: 160px; color: #15803d; line-height: 1.35; }
+.qo-availability strong { display: block; font-weight: 700; }
+.qo-availability small { display: block; margin-top: 1px; color: #64748b; font-size: 11px; }
 .qo-availability--warning { color: #c2410c; }
+.qo-availability--warning small { color: #9a3412; }
 
 .qo-qty-control { display: inline-grid; grid-template-columns: 34px 46px 34px; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 7px; }
 .qo-qty-control button { display: grid; min-height: 38px; place-items: center; color: #334155; }
@@ -280,7 +283,7 @@
   .qo-product-cell { min-width: 0; }
   .qo-row-actions { display: flex !important; justify-content: flex-end; }
   .qo-row-actions::before { display: none; }
-  .qo-basket-bar { grid-template-columns: 1fr; gap: 12px; margin-inline: -14px; margin-bottom: -150px; padding: 14px; }
+  .qo-basket-bar { position: static; grid-template-columns: 1fr; gap: 12px; margin: 18px -14px -150px; padding: 14px; }
   .qo-basket-total { justify-items: start; }
   .qo-add-basket { grid-column: auto; min-height: 52px; }
 }
