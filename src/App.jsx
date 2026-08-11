@@ -14,6 +14,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 // Lazy-loaded: only fetched when the user actually triggers these interactions.
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
+const QuickOrder = lazyWithRetry(() => import('./components/QuickOrder'), 'app-quick-order');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
@@ -224,6 +225,7 @@ export default function App({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   // `searchQuery` is the COMMITTED search term. The Header keeps the live input
   // value locally and only pushes here after a short debounce, so typing never
   // re-renders this component (and the whole product grid) per keystroke — that
@@ -239,6 +241,7 @@ export default function App({
   }, []);
 
   const navigate = useCallback((newPath, newRefinements) => {
+    setQuickOrderOpen(false);
     setSearchQuery('');
     hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
@@ -248,6 +251,7 @@ export default function App({
   }, [navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
+    setQuickOrderOpen(false);
     hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
   const [loading, setLoading] = useState(true);
@@ -389,6 +393,7 @@ export default function App({
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
     setSearchQuery('');
+    setQuickOrderOpen(false);
     setActiveCollection('all');
     setSort(DEFAULT_SORT);
     setInStockOnly(false);
@@ -1666,6 +1671,57 @@ export default function App({
     return { added, missing, overflow };
   };
 
+  const handleQuickOrderAdd = useCallback((items) => {
+    if (!cartHydratedRef.current) {
+      return { added: 0, overflow: 0, unavailable: 0, reason: 'Your basket is still loading. Please try again in a moment.' };
+    }
+
+    const nextCart = cartItems.map((entry) => ({ ...entry }));
+    let added = 0;
+    let overflow = 0;
+    let unavailable = 0;
+
+    for (const item of Array.isArray(items) ? items : []) {
+      const product = item?.product;
+      const maxQty = cartQtyCapForProduct(product);
+      if (!product?.id || maxQty <= 0) {
+        unavailable += 1;
+        continue;
+      }
+      const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product.minQty) || 1)));
+      const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(item.qty));
+      const existing = nextCart.find((entry) => entry.product.id === product.id);
+      if (existing) {
+        existing.qty = Math.min(maxQty, existing.qty + requestedQty);
+        added += 1;
+        continue;
+      }
+      if (nextCart.length >= MAX_CART_LINES) {
+        overflow += 1;
+        continue;
+      }
+      nextCart.push({ product, qty: Math.min(maxQty, requestedQty) });
+      added += 1;
+    }
+
+    if (added) {
+      setCartItems(nextCart);
+      markCartActivity();
+      setCartAnnouncement(`${added} Quick Order item line${added === 1 ? '' : 's'} added to your basket.`);
+      if (window.matchMedia?.('(max-width: 1200px)').matches) setMobileCartOpen(true);
+      else setCartDrawerOpen(true);
+    }
+
+    return { added, overflow, unavailable };
+  }, [cartItems, markCartActivity]);
+
+  const searchFromQuickOrder = useCallback((code) => {
+    setQuickOrderOpen(false);
+    setSearchQuery(String(code || '').trim());
+    setActiveCollection('all');
+    hashNavigate([], {}, { scroll: true });
+  }, [hashNavigate]);
+
   useEffect(() => {
     if (!requestedReorder) return;
     setLastOrder(requestedReorder);
@@ -1759,32 +1815,52 @@ export default function App({
         customer={customer}
         onViewProfile={onViewProfile}
         onViewAdmin={onViewAdmin}
-        onReorder={() => setReorderModal(true)}
+        onReorder={() => { setQuickOrderOpen(false); setReorderModal(true); }}
         hasLastOrder={!!lastOrder}
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
-        onSpecials={() => handleShortcut('specials')}
+        onSpecials={() => { setQuickOrderOpen(false); handleShortcut('specials'); }}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
+        quickOrderActive={quickOrderOpen}
+        onQuickOrder={() => {
+          setQuickOrderOpen(true);
+          setMobileMenuOpen(false);
+          closeDesktopCart({ restoreFocus: false });
+          scrollToTop();
+        }}
       />
 
       {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
 
-      <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
-        <aside className="sidebar-rail">
-          <Sidebar
-            categories={categories}
-            path={path}
-            navigate={navigate}
-            onAllProducts={goAllProducts}
-            setRefinement={setRefinement}
-            counts={counts}
-            customer={customer}
-          />
-        </aside>
+      <div className={`main-layout${quickOrderOpen ? ' quick-order-layout' : ''}`} style={{ flex: 1, minHeight: 0 }}>
+        {quickOrderOpen ? (
+          <main className="content-area quick-order-content">
+            <Suspense fallback={<div className="quick-order-loading" role="status">Opening Quick Order…</div>}>
+              <QuickOrder
+                cartReady={cartHydrated}
+                onAddItems={handleQuickOrderAdd}
+                onSearchProduct={searchFromQuickOrder}
+                onClose={goHome}
+              />
+            </Suspense>
+          </main>
+        ) : (
+          <>
+            <aside className="sidebar-rail">
+              <Sidebar
+                categories={categories}
+                path={path}
+                navigate={navigate}
+                onAllProducts={goAllProducts}
+                setRefinement={setRefinement}
+                counts={counts}
+                customer={customer}
+              />
+            </aside>
 
-        <main className="content-area">
-          <MainContent
+            <main className="content-area">
+              <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
             addToCart={addToCart}
@@ -1819,8 +1895,10 @@ export default function App({
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
-          />
-        </main>
+              />
+            </main>
+          </>
+        )}
 
         <aside
           ref={desktopCartRef}

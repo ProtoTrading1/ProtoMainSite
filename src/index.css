@@ -295,7 +295,7 @@ textarea:focus-visible,
   right: 0;
   bottom: 0;
   z-index: 480;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   background: #fff;

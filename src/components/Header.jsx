@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useId, useMemo } from 'react';
 import {
-  Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
+  ClipboardList, Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
   MessageCircle, Plus, ScanBarcode, Search, ShoppingCart, Star, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
@@ -542,6 +542,7 @@ export default function Header({
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
+  onQuickOrder, quickOrderActive = false,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSearchOpenInternal, setMobileSearchOpenInternal] = useState(false);
@@ -1089,6 +1090,11 @@ export default function Header({
 
         <div className="header-utilities">
           <nav className="header-nav desktop-only">
+            <button className={`header-nav-btn${quickOrderActive ? ' header-nav-btn--active' : ''}`} type="button" onClick={onQuickOrder} aria-current={quickOrderActive ? 'page' : undefined}>
+              <ClipboardList size={14} />
+              Quick Order
+            </button>
+
             {hasLastOrder && (
               <button className="header-nav-btn" type="button" onClick={onReorder}>
                 <RotateCcw size={14} />
@@ -1183,6 +1189,10 @@ export default function Header({
         <button type="button" className="mobile-tab-bar-btn" onClick={onMenuClick}>
           <Menu size={20} />
           <span>Categories</span>
+        </button>
+        <button type="button" className={`mobile-tab-bar-btn${quickOrderActive ? ' active' : ''}`} onClick={onQuickOrder} aria-current={quickOrderActive ? 'page' : undefined}>
+          <ClipboardList size={20} />
+          <span>Quick Order</span>
         </button>
         <button data-cart-trigger="mobile" type="button" className="mobile-tab-bar-btn mobile-tab-bar-btn--cart" onClick={onCartClick}>
           <ShoppingCart size={20} />
