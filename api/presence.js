@@ -75,5 +75,26 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Presence could not be recorded' });
   }
 
+  // Second write: the visit log (migration 066). Presence holds one
+  // overwritten row per customer, so it can say who is here now but not how
+  // many browsed on Tuesday or how long they stayed. A visit row is opened on
+  // this session's first beat and extended by later ones.
+  //
+  // Needs a session id — without one, every beat would open a fresh visit and
+  // the durations would be nonsense. Failures are logged and swallowed: a
+  // missing analytics row must never fail the heartbeat the live count needs.
+  const session = normalizeSessionId(req.body?.sessionId);
+  if (session) {
+    const { error: visitError } = await supabase
+      .from('customer_visits')
+      .upsert(
+        { customer_id: customerId, session_id: session, last_seen_at: new Date().toISOString() },
+        // started_at is absent on purpose — PostgREST only writes the payload's
+        // columns, so it takes its default on the first beat and stays put.
+        { onConflict: 'customer_id,session_id', ignoreDuplicates: false },
+      );
+    if (visitError) console.error('visit log failed:', visitError.message);
+  }
+
   return res.status(200).json({ ok: true });
 }
