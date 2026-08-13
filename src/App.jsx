@@ -29,6 +29,7 @@ import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
+import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
@@ -525,6 +526,14 @@ export default function App({
   useEffect(() => {
     cartSyncDrainRef.current = drainCartSyncQueue;
   }, [drainCartSyncQueue]);
+
+  // Tell the admin dashboard this customer is browsing. Keyed on the account
+  // id so signing out (or switching account) clears the previous row rather
+  // than leaving a ghost in the live count until the window lapses.
+  useEffect(() => {
+    if (!customer?.id) return undefined;
+    return startPresenceHeartbeat();
+  }, [customer?.id]);
 
   // Merge this browser's basket into the account before allowing mutations.
   // Failed hydration is retried while the local basket remains safely visible.
