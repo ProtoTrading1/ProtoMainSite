@@ -1196,6 +1196,15 @@ export default function App({
     cartRevealSequenceRef.current += 1;
     setCartRevealRequest({ productId: product.id, token: cartRevealSequenceRef.current });
 
+    // Engagement capture for the admin dashboard. Privacy-safe by design: the
+    // quantity is a number and nothing identifies the product, matching the
+    // rest of the journey log. Fire-and-forget — analytics must never delay
+    // adding to a basket.
+    trackJourneyEvent('cart_item_added', {
+      journey: 'basket',
+      metadata: { qty: Math.min(maxQty, requestedQty) },
+    });
+
     if (searchTrackRef.current.rowId && searchQuery.trim()) {
       void logSearchCartAdd(searchTrackRef.current.rowId);
     }
