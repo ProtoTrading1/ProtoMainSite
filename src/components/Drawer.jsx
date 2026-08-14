@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   Check,
+  CircleDollarSign,
   Loader2,
   Package,
   PackageCheck,
@@ -23,7 +24,7 @@ const MIN_ORDER = 1000;
 
 function formatCartExpiry(remainingMs) {
   if (remainingMs === null || remainingMs === undefined) return '';
-  if (remainingMs <= 0) return '7d+ old';
+  if (remainingMs <= 0) return '14d+ old';
 
   const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
   const days = Math.floor(totalMinutes / (24 * 60));
@@ -99,6 +100,8 @@ export default function Drawer({
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
+  priceChanges = [],
+  onDismissPriceChanges,
   onRetryCartSync,
   cartReady = true,
   onClose,
@@ -127,6 +130,8 @@ export default function Drawer({
   const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
   const basketLoading = !cartReady;
   const syncFailed = Boolean(customer?.id) && cartSyncStatus === 'error';
+  const increasedPriceCount = priceChanges.filter((change) => change.direction === 'increased').length;
+  const decreasedPriceCount = priceChanges.length - increasedPriceCount;
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -343,7 +348,7 @@ export default function Drawer({
         <div
           className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`}
           role="progressbar"
-          aria-label="Basket age within the seven-day reminder period"
+          aria-label="Basket age within the fourteen-day reminder period"
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={Math.round(Math.max(0, Math.min(100, autoCloseProgress)))}
@@ -360,6 +365,22 @@ export default function Drawer({
             <span>We cannot confirm this basket on your account. Retry before switching devices.</span>
           </div>
           <button type="button" onClick={onRetryCartSync}>Retry sync</button>
+        </div>
+      )}
+
+      {priceChanges.length > 0 && (
+        <div className="cart-price-alert" role="status">
+          <CircleDollarSign size={18} aria-hidden="true" />
+          <div>
+            <strong>Basket prices updated</strong>
+            <span>
+              {priceChanges.length} {priceChanges.length === 1 ? 'product has' : 'products have'} a new price
+              {increasedPriceCount > 0 ? ` · ${increasedPriceCount} increased` : ''}
+              {decreasedPriceCount > 0 ? ` · ${decreasedPriceCount} decreased` : ''}.
+              {' Current prices are shown below.'}
+            </span>
+          </div>
+          <button type="button" onClick={onDismissPriceChanges} aria-label="Dismiss basket price update">×</button>
         </div>
       )}
 
@@ -427,7 +448,7 @@ export default function Drawer({
             <span>Basket reminder</span>
             <strong>
               {cartExpiryTone === 'danger'
-                ? 'Older than seven days — kept until you clear or submit it'
+                ? 'Older than fourteen days — kept until you clear or submit it'
                 : `Update an item to refresh this reminder (${expiryLabel})`}
             </strong>
           </div>
