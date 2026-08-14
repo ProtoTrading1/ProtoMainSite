@@ -1,12 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
+import { nextBasketLifecycle } from '../lib/basket-expiry.mjs';
 
 const MAX_LINES = 250;
 const MAX_QTY = 9999;
 const MAX_IDENTIFIER_LENGTH = 160;
 const MIN_ACTIVITY_AT = Date.UTC(2000, 0, 1);
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
-const CART_COLUMNS = 'items, activity_at, revision';
+// `*` keeps the endpoint compatible before and after migration 067. The API
+// still returns only the curated fields in cartPayload; no row is exposed.
+const CART_COLUMNS = '*';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -175,6 +178,11 @@ export function cartPayload(row) {
     revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
       ? Number(row.revision)
       : 0,
+    startedAt: row?.started_at || null,
+    expiresAt: row?.expires_at || null,
+    extensionUsed: row?.extension_used === true,
+    archivedAt: row?.archived_at || null,
+    hasArchivedBasket: Array.isArray(row?.archived_items) && row.archived_items.length > 0,
   };
 }
 
@@ -235,6 +243,9 @@ async function writeSnapshot({
     revision: nextRevision,
     updated_at: new Date().toISOString(),
   };
+  if (process.env.BASKET_EXPIRY_ENABLED === 'true') {
+    Object.assign(values, nextBasketLifecycle(currentRow, items));
+  }
 
   if (!currentRow) {
     const { data, error } = await supabase.from('customer_account_carts').insert({

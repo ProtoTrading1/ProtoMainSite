@@ -33,14 +33,15 @@ test('checkout failure can retry the retained options with one idempotency key',
   assert.match(drawerSource, /disabled=\{submitting\}/);
 });
 
-test('basket clearing is undoable and inactivity no longer destroys the basket', () => {
+test('basket clearing is undoable and scheduled expiry is clearly explained', () => {
   assert.match(appSource, /setClearedCartSnapshot\(/);
   assert.match(appSource, /const undoClearCart = useCallback/);
   assert.match(appSource, /intent: 'submitted_clear'/);
   assert.match(appSource, /submittedClearConflict/);
   assert.match(drawerSource, /undoButtonRef\.current\?\.focus/);
   assert.doesNotMatch(appSource, /cartClock - cartLastActivityAt[\s\S]{0,120}clearCart\(\)/);
-  assert.match(drawerSource, /Older than seven days — kept until you clear or submit it/);
+  assert.match(drawerSource, /Complete your order before this basket is archived/);
+  assert.match(drawerSource, /One three-day extension is available/);
   assert.match(drawerSource, /role="progressbar"/);
 });
 

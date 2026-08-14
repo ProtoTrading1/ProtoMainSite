@@ -1,8 +1,8 @@
 import { authHeaders } from './authHeaders';
 
-async function requestAccountCart(method, body) {
+async function requestAccountCart(method, body, path = '/api/account-cart') {
   const headers = await authHeaders();
-  const response = await fetch('/api/account-cart', {
+  const response = await fetch(path, {
     method,
     headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -38,4 +38,8 @@ export function saveAccountCart(items, activityAt, revision) {
 
 export function clearAccountCart(revision, activityAt) {
   return requestAccountCart('DELETE', { revision, activityAt });
+}
+
+export function restoreArchivedAccountCart() {
+  return requestAccountCart('POST', undefined, '/api/account-cart-restore');
 }

@@ -91,6 +91,15 @@
     "api/send-order.js": {
       "includeFiles": "node_modules/pdfkit/js/data/*.afm",
       "maxDuration": 60
+    },
+    "api/basket-expiry-sweep.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/basket-expiry-sweep",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

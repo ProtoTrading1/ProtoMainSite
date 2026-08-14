@@ -27,7 +27,7 @@ import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
-import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, restoreArchivedAccountCart, saveAccountCart } from './lib/accountCart';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
@@ -269,6 +269,10 @@ export default function App({
   const [cartRevealRequest, setCartRevealRequest] = useState(null);
   const [cartScrollTop, setCartScrollTop] = useState(0);
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
+  const [cartExpiresAt, setCartExpiresAt] = useState(null);
+  const [cartExtensionUsed, setCartExtensionUsed] = useState(false);
+  const [hasArchivedBasket, setHasArchivedBasket] = useState(false);
+  const [restoringArchivedBasket, setRestoringArchivedBasket] = useState(false);
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartHydrated, setCartHydrated] = useState(false);
@@ -440,6 +444,9 @@ export default function App({
       if (cartAccountRef.current !== accountId) return;
       cartRevisionRef.current = Number(saved.revision || 0);
       lastSavedCartRef.current = cartFingerprint(saved.items);
+      setCartExpiresAt(saved.expiresAt ? Date.parse(saved.expiresAt) : null);
+      setCartExtensionUsed(saved.extensionUsed === true);
+      setHasArchivedBasket(saved.hasArchivedBasket === true);
       if (operation.type === 'clear') {
         cartClearActivityAtRef.current = null;
         cartClearIntentRef.current = 'normal';
@@ -463,6 +470,9 @@ export default function App({
         cartClearIntentRef.current = 'normal';
         setCartItems(remoteItems);
         setCartLastActivityAt(remoteActivityAt);
+        setCartExpiresAt(error.data.expiresAt ? Date.parse(error.data.expiresAt) : null);
+        setCartExtensionUsed(error.data.extensionUsed === true);
+        setHasArchivedBasket(error.data.hasArchivedBasket === true);
         currentCartRef.current = { items: remoteItems, activityAt: remoteActivityAt };
         setClearedCartSnapshot(null);
         setCartAnnouncement(submittedClearConflict
@@ -575,6 +585,9 @@ export default function App({
     if (previousUid && previousUid !== uid) {
       setCartItems([]);
       setCartLastActivityAt(null);
+      setCartExpiresAt(null);
+      setCartExtensionUsed(false);
+      setHasArchivedBasket(false);
       currentCartRef.current = { items: [], activityAt: null };
     }
 
@@ -601,6 +614,9 @@ export default function App({
         });
         setCartItems(hydratedItems);
         setCartLastActivityAt(accountCart.activityAt || null);
+        setCartExpiresAt(accountCart.expiresAt ? Date.parse(accountCart.expiresAt) : null);
+        setCartExtensionUsed(accountCart.extensionUsed === true);
+        setHasArchivedBasket(accountCart.hasArchivedBasket === true);
         currentCartRef.current = { items: hydratedItems, activityAt: accountCart.activityAt || null };
         setCartClock(Date.now());
         cartHydratedRef.current = true;
@@ -673,6 +689,9 @@ export default function App({
       lastSavedCartRef.current = cartFingerprint(hydratedItems);
       setCartItems(hydratedItems);
       setCartLastActivityAt(remote.activityAt || null);
+      setCartExpiresAt(remote.expiresAt ? Date.parse(remote.expiresAt) : null);
+      setCartExtensionUsed(remote.extensionUsed === true);
+      setHasArchivedBasket(remote.hasArchivedBasket === true);
       currentCartRef.current = { items: hydratedItems, activityAt: remote.activityAt || null };
       setCartClock(Date.now());
       setCartSyncStatus('saved');
@@ -698,6 +717,33 @@ export default function App({
     if (pendingCartSyncRef.current) scheduleCartSync(0);
     else void refreshAccountCart();
   }, [customer?.id, refreshAccountCart, scheduleCartSync]);
+
+  const restoreExpiredBasket = useCallback(async () => {
+    if (!customer?.id || restoringArchivedBasket) return;
+    setRestoringArchivedBasket(true);
+    try {
+      const restored = await restoreArchivedAccountCart();
+      const hydratedItems = await hydrateAccountCartItems(restored.items);
+      cartRevisionRef.current = Number(restored.revision || 0);
+      lastSavedCartRef.current = cartFingerprint(hydratedItems);
+      setCartItems(hydratedItems);
+      setCartLastActivityAt(restored.activityAt || null);
+      setCartExpiresAt(restored.expiresAt ? Date.parse(restored.expiresAt) : null);
+      setCartExtensionUsed(true);
+      setHasArchivedBasket(false);
+      currentCartRef.current = { items: hydratedItems, activityAt: restored.activityAt || null };
+      setCartClock(Date.now());
+      setCartAnnouncement(`Basket restored for three days. ${hydratedItems.length} product line${hydratedItems.length === 1 ? '' : 's'}.`);
+      trackJourneyEvent('basket_restored', {
+        journey: 'basket', step: 'expired_restore', outcome: 'success',
+        metadata: { line_count: hydratedItems.length },
+      });
+    } catch (error) {
+      setCartAnnouncement(error?.message || 'The archived basket could not be restored.');
+    } finally {
+      setRestoringArchivedBasket(false);
+    }
+  }, [customer?.id, restoringArchivedBasket]);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
@@ -1428,8 +1474,10 @@ export default function App({
     else goHome();
     dismissCustomerJourney();
   }, [customerJourney, dismissCustomerJourney, goHome, handleCartOpen]);
-  const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
-    ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
+  const effectiveCartExpiryAt = cartExpiresAt
+    || (cartLastActivityAt ? cartLastActivityAt + CART_INACTIVITY_WINDOW_MS : null);
+  const cartExpiryRemainingMs = cartItems.length && effectiveCartExpiryAt
+    ? Math.max(0, effectiveCartExpiryAt - cartClock)
     : null;
   const cartExpiryProgress = cartExpiryRemainingMs === null
     ? 0
@@ -1861,6 +1909,10 @@ export default function App({
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
+            cartExtensionUsed={cartExtensionUsed}
+            hasArchivedBasket={hasArchivedBasket}
+            restoringArchivedBasket={restoringArchivedBasket}
+            onRestoreArchivedBasket={restoreExpiredBasket}
             cartSyncStatus={cartSyncStatus}
             onRetryCartSync={retryCartSync}
             cartReady={cartHydrated}
@@ -1965,6 +2017,10 @@ export default function App({
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
+                cartExtensionUsed={cartExtensionUsed}
+                hasArchivedBasket={hasArchivedBasket}
+                restoringArchivedBasket={restoringArchivedBasket}
+                onRestoreArchivedBasket={restoreExpiredBasket}
                 cartSyncStatus={cartSyncStatus}
                 onRetryCartSync={retryCartSync}
                 cartReady={cartHydrated}

@@ -23,7 +23,7 @@ const MIN_ORDER = 1000;
 
 function formatCartExpiry(remainingMs) {
   if (remainingMs === null || remainingMs === undefined) return '';
-  if (remainingMs <= 0) return '7d+ old';
+  if (remainingMs <= 0) return 'Expired';
 
   const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
   const days = Math.floor(totalMinutes / (24 * 60));
@@ -98,6 +98,10 @@ export default function Drawer({
   showAutoCloseBar = false,
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
+  cartExtensionUsed = false,
+  hasArchivedBasket = false,
+  restoringArchivedBasket = false,
+  onRestoreArchivedBasket,
   cartSyncStatus = 'local',
   onRetryCartSync,
   cartReady = true,
@@ -343,7 +347,7 @@ export default function Drawer({
         <div
           className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`}
           role="progressbar"
-          aria-label="Basket age within the seven-day reminder period"
+          aria-label="Time remaining before this saved basket is archived"
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={Math.round(Math.max(0, Math.min(100, autoCloseProgress)))}
@@ -368,7 +372,20 @@ export default function Drawer({
           <div className="drawer-empty">
             <div className="drawer-empty-icon"><ShoppingCart size={22} /></div>
             <strong>Your basket is empty</strong>
-            <span>Browse the catalogue and add wholesale lines to build your order request.</span>
+            <span>{hasArchivedBasket
+              ? 'Your previous basket expired and is safely archived.'
+              : 'Browse the catalogue and add wholesale lines to build your order request.'}</span>
+            {hasArchivedBasket && (
+              <button
+                type="button"
+                className="primary-order-button"
+                onClick={onRestoreArchivedBasket}
+                disabled={restoringArchivedBasket}
+              >
+                {restoringArchivedBasket ? <Loader2 size={17} className="spin" /> : <ShoppingCart size={17} />}
+                {restoringArchivedBasket ? 'Restoring basket…' : 'Restore basket for 3 days'}
+              </button>
+            )}
           </div>
         )}
         {cartItems.map((item) => (
@@ -427,8 +444,10 @@ export default function Drawer({
             <span>Basket reminder</span>
             <strong>
               {cartExpiryTone === 'danger'
-                ? 'Older than seven days — kept until you clear or submit it'
-                : `Update an item to refresh this reminder (${expiryLabel})`}
+                ? `Complete your order before this basket is archived (${expiryLabel})`
+                : cartExtensionUsed
+                  ? `Final extension active (${expiryLabel})`
+                  : `One three-day extension is available when you update the basket (${expiryLabel})`}
             </strong>
           </div>
         )}
