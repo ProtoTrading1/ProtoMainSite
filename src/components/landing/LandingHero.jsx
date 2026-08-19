@@ -28,7 +28,15 @@ const APPROVAL_NOTE = 'Online approval is for purchasing on Proto Trading Online
 
 export default function LandingHero({ onApply }) {
   return (
-    <section className="vhero-section vhero-section--static vhero-section--choices">
+    <section className="vhero-section vhero-section--static vhero-section--banner vhero-section--choices">
+      <img
+        src="/proto-banner.jpg"
+        alt="Proto Trading Online wholesale showroom"
+        className="vhero-banner-img"
+        fetchPriority="high"
+        decoding="async"
+      />
+      <div className="vhero-banner-scrim" />
       <div className="vhero-copy">
         <h1 className="vhero-headline" aria-label="Welcome to Proto Trading Online">
           <span className="vhero-headline-line">WELCOME TO</span>
