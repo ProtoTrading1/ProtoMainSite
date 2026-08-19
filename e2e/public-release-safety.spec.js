@@ -23,8 +23,10 @@ test('public home exposes trade registration and sign-in', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle(/Proto/i);
-  await expect(page.getByRole('heading', { name: 'Welcome to our new online store' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /apply for a trade account/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome to Proto Trading Online' })).toBeVisible();
+  // Both registration journeys have to be reachable from the hero.
+  await expect(page.getByRole('button', { name: /register again/i }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /apply for online access/i }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible();
 });
 
@@ -107,5 +109,5 @@ test('policy route renders and returns to the public home', async ({ page }) => 
   await page.getByRole('navigation', { name: 'Policies navigation' })
     .getByRole('link', { name: 'Back to home' })
     .click();
-  await expect(page.getByRole('heading', { name: 'Welcome to our new online store' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome to Proto Trading Online' })).toBeVisible();
 });
