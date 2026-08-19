@@ -328,62 +328,14 @@
   background: #000;
 }
 
-/* ── Branded banner hero (Proto Trading Online showroom image) ── */
-.vhero-banner-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Keep the logo + shelves in frame; the empty dark left holds the copy. */
-  object-position: 72% center;
-  z-index: 0;
-  /* Keep the headline zone controlled, but let the showroom read clearly. */
-  filter: brightness(0.83) saturate(0.68) contrast(1.03);
-  transform: scale(1.02);
-  animation: vhero-bg-in 820ms ease-out forwards;
-}
-
-/* Darken the left so the headline + CTAs stay legible over the image. */
-.vhero-banner-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
-    linear-gradient(
-      90deg,
-      rgba(0, 0, 0, 0.92) 0%,
-      rgba(0, 0, 0, 0.76) 24%,
-      rgba(0, 0, 0, 0.50) 48%,
-      rgba(0, 0, 0, 0.18) 72%,
-      rgba(0, 0, 0, 0.08) 100%
-    );
-  opacity: 1;
-  animation: vhero-scrim-in 820ms ease-out forwards;
-}
-
-@media (max-width: 700px) {
-  /* On small screens the copy sits over a fuller, evenly darkened image. */
-  .vhero-banner-img { object-position: 64% center; }
-  .vhero-banner-scrim {
-    background:
-      linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)),
-      linear-gradient(
-        180deg,
-        rgba(0, 0, 0, 0.88) 0%,
-        rgba(0, 0, 0, 0.62) 45%,
-        rgba(0, 0, 0, 0.82) 100%
-      );
-  }
-}
-
 .vhero-copy {
   position: relative;
   z-index: 2;
   padding: 0 clamp(28px, 7vw, 100px);
   padding-top: 80px;
-  max-width: 780px;
+  /* Wide enough that "PROTO TRADING" stays on one headline line at the 84px
+     cap — at 860px it wrapped by a little over a pixel. */
+  max-width: 940px;
   display: grid;
   gap: 46px;
   align-content: center;
@@ -416,48 +368,93 @@
   .vhero-headline { font-size: 40px; }
 }
 
-.vhero-support-wrap {
+.vhero-choices {
   display: grid;
-  gap: 12px;
-  max-width: 660px;
+  gap: 16px;
+  max-width: 720px;
   opacity: 0;
   animation: vhero-fade-in 220ms ease-out 470ms forwards;
 }
 
-/* Set like the campaign banner: uppercase, bold, white, with the action the
-   customer has to take picked out in the same red as the headline accent. */
-.vhero-support-message {
+.vhero-choices-title {
+  margin: 0 0 6px;
+  color: #FFFFFF;
+  font-family: Outfit, sans-serif;
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.6px;
+}
+
+/* Heading and action sit on one row so the choice reads as a single unit:
+   the question on the left, the way out of it on the right. */
+.vhero-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* The previous-customer card carries the message people most often miss, so
+   it gets the accent border while the new-customer card stays neutral. */
+.vhero-choice--emphasis {
+  border-color: rgba(224, 32, 32, 0.62);
+  background: rgba(224, 32, 32, 0.05);
+}
+
+.vhero-choice-copy {
+  min-width: 0;
+}
+
+.vhero-choice-heading {
   margin: 0;
-  color: #f4f4f5;
-  font-family: 'Outfit', sans-serif;
-  font-size: clamp(15px, 1.5vw, 21px);
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  text-wrap: balance;
+  color: #FFFFFF;
+  font-family: Outfit, sans-serif;
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+  max-width: 14ch;
 }
 
-.vhero-support-message strong {
-  color: #E02020;
-  font-weight: 700;
-}
-
-/* Qualifies the two lines above, so it is deliberately quieter than them:
-   smaller, grey, normal weight — read after, not instead of. */
-.vhero-support-note {
-  margin: 2px 0 0;
-  max-width: 46ch;
+.vhero-choice-detail {
+  margin: 12px 0 0;
   color: #a1a1aa;
-  font-size: clamp(11px, 0.85vw, 13px);
+  font-size: clamp(13px, 1vw, 15px);
   font-weight: 500;
   line-height: 1.45;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
 }
 
-.vhero-support-line {
+.vhero-choice-line {
   display: block;
+}
+
+.vhero-choice-action {
+  flex-shrink: 0;
+  min-height: 60px;
+  padding: 0 28px;
+  font-size: clamp(15px, 1.15vw, 17px);
+  border-radius: 10px;
+}
+
+/* Qualifies both choices, so it is deliberately quieter than the cards:
+   read after them, not instead of them. */
+.vhero-approval-note {
+  margin: 4px 0 0;
+  padding: 16px 20px;
+  border: 1px solid rgba(224, 32, 32, 0.55);
+  border-radius: 12px;
+  background: rgba(224, 32, 32, 0.06);
+  color: #f4f4f5;
+  font-size: clamp(11px, 0.85vw, 13px);
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 @keyframes vhero-copy-in {
@@ -481,33 +478,17 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes vhero-bg-in {
-  from {
-    filter: brightness(0.62) saturate(0.54) contrast(0.96);
-  }
-  to {
-    filter: brightness(0.83) saturate(0.68) contrast(1.03);
-  }
-}
-
-@keyframes vhero-scrim-in {
-  from { opacity: 1; }
-  to { opacity: 0.97; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .access-brand .proto-logo,
-  .vhero-banner-img,
-  .vhero-banner-scrim,
   .vhero-headline,
-  .vhero-support-wrap,
+  .vhero-choices,
   .access-hero-buttons,
   .vhero-trust-strip {
     animation: none;
     opacity: 1;
     transform: none;
   }
-  .vhero-support-message { transition: none; }
+  .vhero-choice { transition: none; }
 }
 
 .premium-product-wall {
@@ -3464,16 +3445,22 @@
     color: rgba(255,255,255,0.7);
   }
 
-  /* The fixed height here reserved space for the rotating tagline so it could
-     not shift the layout as lines changed. The message is static now, so the
-     wrap sizes to its content instead of clipping the second line. */
-  .vhero-support-wrap {
-    gap: 9px;
+  /* On a phone the heading and its action stop competing for one row and
+     stack, with the action full-width so it stays the obvious next step. */
+  .vhero-choice {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    padding: 20px;
   }
 
-  .vhero-support-message {
-    font-size: 15px;
-    line-height: 1.3;
+  .vhero-choice-heading {
+    max-width: none;
+  }
+
+  .vhero-choice-action {
+    width: 100%;
+    min-height: 52px;
   }
 
   /* Scroll hint */
