@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
@@ -30,6 +31,11 @@ import {
 // Brevo rejects a message over ~10 MB, and base64 inflates the PDF by ~33%.
 // Stay well under so the HTML body and headers always fit.
 export const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+export const MAX_PDF_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024;
+// 250 unique images at this ceiling consume at most 4 MB before PDF overhead,
+// leaving roughly 2 MB of safety beneath the Brevo attachment threshold.
+export const MAX_PDF_THUMBNAIL_BYTES = 16 * 1024;
+export const PDF_IMAGE_CONCURRENCY = 6;
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -48,6 +54,66 @@ const ALLOWED_IMAGE_HOSTS = [
   process.env.VITE_STOCK_SUPABASE_URL ? new URL(process.env.VITE_STOCK_SUPABASE_URL).host : null,
 ].filter(Boolean);
 
+async function readResponseWithLimit(response, maxBytes) {
+  const declaredBytes = Number(response.headers.get('content-length') || 0);
+  if (declaredBytes > maxBytes) return null;
+
+  const chunks = [];
+  let totalBytes = 0;
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, totalBytes);
+}
+
+export async function compressImageForPdf(sourceBuffer) {
+  if (!Buffer.isBuffer(sourceBuffer) || sourceBuffer.length === 0) return null;
+
+  try {
+    // The PDF displays these at only 58×58 points. Embedding the original
+    // catalogue photograph wastes megabytes on pixels nobody can see.
+    const thumbnail = await sharp(sourceBuffer, { failOn: 'warning' })
+      .rotate()
+      .resize(116, 116, {
+        fit: 'contain',
+        background: '#ffffff',
+        withoutEnlargement: true,
+      })
+      .flatten({ background: '#ffffff' })
+      .jpeg({ quality: 55, chromaSubsampling: '4:2:0' })
+      .toBuffer();
+
+    if (thumbnail.length <= MAX_PDF_THUMBNAIL_BYTES) return thumbnail;
+
+    // Highly detailed/noisy source images can still be unexpectedly large.
+    // A smaller second pass keeps every embedded image in the low-kilobyte
+    // range; if it cannot, omit that one thumbnail rather than lose the order.
+    const compact = await sharp(sourceBuffer, { failOn: 'warning' })
+      .rotate()
+      .resize(80, 80, {
+        fit: 'contain',
+        background: '#ffffff',
+        withoutEnlargement: true,
+      })
+      .flatten({ background: '#ffffff' })
+      .jpeg({ quality: 38, chromaSubsampling: '4:2:0' })
+      .toBuffer();
+    return compact.length <= MAX_PDF_THUMBNAIL_BYTES ? compact : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchImageBuffer(url) {
   if (!url || !isPdfKitImage(url)) return null;
   try {
@@ -58,25 +124,44 @@ async function fetchImageBuffer(url) {
     // open. Without the image the PDF simply renders that line without a thumb.
     const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!response.ok) return null;
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const sourceBuffer = await readResponseWithLimit(response, MAX_PDF_IMAGE_SOURCE_BYTES);
+    return sourceBuffer ? await compressImageForPdf(sourceBuffer) : null;
   } catch {
     return null;
   }
 }
 
 async function prepareItems(items) {
-  return Promise.all(items.map(async (item) => {
-    const product = item.product || {};
-    const imageUrl = product.remoteImage || product.image || '';
-    return {
-      ...item,
-      product: {
-        ...product,
-        imageBuffer: await fetchImageBuffer(imageUrl),
-      },
-    };
-  }));
+  const prepared = new Array(items.length);
+  const imagePromises = new Map();
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const item = items[index];
+      const product = item.product || {};
+      const imageUrl = product.remoteImage || product.image || '';
+
+      // The same product can appear more than once. Reuse the compressed
+      // thumbnail instead of downloading and processing it repeatedly.
+      if (!imagePromises.has(imageUrl)) {
+        imagePromises.set(imageUrl, fetchImageBuffer(imageUrl));
+      }
+      const imageBuffer = await imagePromises.get(imageUrl);
+      prepared[index] = {
+        ...item,
+        product: { ...product, imageBuffer },
+      };
+    }
+  };
+
+  await Promise.all(Array.from(
+    { length: Math.min(PDF_IMAGE_CONCURRENCY, items.length) },
+    () => worker(),
+  ));
+  return prepared;
 }
 
 function computeSubtotal(items) {
