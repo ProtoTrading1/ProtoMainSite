@@ -69,9 +69,9 @@ export function existingEmailResponse() {
 }
 
 // New-signup notifications go to the Proto team. The old default pointed at
-// orders@prototrading.co.za — a different domain from the one Proto is
-// migrating to — so trade applications could land in a mailbox nobody reads.
-// danieljoffeinfo@gmail.com was removed by request — Daniel keeps the ORDER
+// orders@prototrading.co.za â€” a different domain from the one Proto is
+// migrating to â€” so trade applications could land in a mailbox nobody reads.
+// danieljoffeinfo@gmail.com was removed by request â€” Daniel keeps the ORDER
 // alerts (a separate list, api/_order-alert-recipients.js in the admin) but no
 // longer wants a mail for every trade signup.
 const ADMIN_SIGNUP_RECIPIENTS = (process.env.SIGNUP_NOTIFY_EMAILS
@@ -141,7 +141,7 @@ function buildAdminSignupHtml({
 
   return `
     <div style="font-family:Arial,sans-serif;color:#111827;">
-      <h2>New trade registration — delivery details</h2>
+      <h2>New trade registration â€” delivery details</h2>
       <p>A customer signed up on the trade portal. Delivery details below are stored in CAPS for the admin dashboard.</p>
       <table style="border-collapse:collapse;width:100%;font-size:14px;">${body}</table>
     </div>
@@ -163,7 +163,7 @@ async function sendAdminSignupEmail(payload) {
       body: JSON.stringify({
         sender: BREVO_SENDER,
         to: ADMIN_SIGNUP_RECIPIENTS.map((email) => ({ email })),
-        subject: `New trade signup — ${caps(payload.businessName || payload.contactName || 'CUSTOMER')}`,
+        subject: `New trade signup â€” ${caps(payload.businessName || payload.contactName || 'CUSTOMER')}`,
         htmlContent: buildAdminSignupHtml(payload),
       }),
     });
@@ -192,7 +192,7 @@ export function validateEmail(rawEmail) {
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please enter a valid email address (e.g. name@company.co.za).' };
   const [local, domain] = email.split('@');
   if (BLOCKED_EMAIL_DOMAINS.has(domain)) {
-    return { ok: false, error: 'Please use your real business email address — temporary or test addresses are not accepted.' };
+    return { ok: false, error: 'Please use your real business email address â€” temporary or test addresses are not accepted.' };
   }
   if (BLOCKED_LOCAL_PARTS.has(local) && (domain === 'test.com' || BLOCKED_EMAIL_DOMAINS.has(domain))) {
     return { ok: false, error: 'Please use your real business email address.' };
@@ -219,7 +219,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
   <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review and approve your request within 24 hours.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm — from that moment you can log in and access our full wholesale catalogue, live stock availability, and trade pricing.</p>
+  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm â€” from that moment you can log in and access our full wholesale catalogue, live stock availability, and trade pricing.</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
     <tr><td style="padding:22px 24px;">
       <p style="margin:0 0 14px;color:#111111;font-size:15px;font-weight:800;">What you get as a trade account holder:</p>
@@ -245,7 +245,7 @@ const WELCOME_HTML = (name) => `<!DOCTYPE html>
     <span style="font-size:25px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
     <span style="font-size:17px;font-weight:800;color:#222222;"> TRADING</span>
   </div>
-  <p style="margin:0 0 22px;color:#ffffff;font-size:14px;font-weight:800;line-height:1.5;">🌲 Before printing, please think about the Environment</p>
+  <p style="margin:0 0 22px;color:#ffffff;font-size:14px;font-weight:800;line-height:1.5;">ðŸŒ² Before printing, please think about the Environment</p>
   <p style="margin:0;color:#ffffff;font-size:12.5px;line-height:1.8;">Please note that Internet communications are not secure and therefore Proto Trading does not accept legal responsibility for the contents of this message.</p>
 </td></tr>
 </table>
@@ -267,11 +267,11 @@ const APPROVED_HTML = (name) => `<!DOCTYPE html>
 </td></tr>
 <tr><td style="padding:42px 38px 34px;background:#ffffff;">
   <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news — your Proto Trading Online trade account has been approved. You can log in now to browse the full wholesale catalogue, live stock and trade pricing, and place orders online.</p>
+  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news â€” your Proto Trading Online trade account has been approved. You can log in now to browse the full wholesale catalogue, live stock and trade pricing, and place orders online.</p>
   <p style="margin:0 0 24px;">
     <a href="${PUBLIC_SITE_URL}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px;">Log in to the trade portal</a>
   </p>
-  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> · <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
+  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> Â· <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
 </td></tr>
 </table>
 </td></tr>
@@ -311,7 +311,7 @@ export default async function handler(req, res) {
     unitNumber,
   } = req.body || {};
 
-  // Honeypot — bots that fill hidden fields get a fake success response.
+  // Honeypot â€” bots that fill hidden fields get a fake success response.
   if (company_fax) {
     return res.status(200).json({ ok: true, instantAccess: true, customerCode: 'XXXXXX' });
   }
@@ -343,7 +343,7 @@ export default async function handler(req, res) {
   }
 
   // Throttling: registration creates an auth account and sends emails, so it
-  // must not be scriptable into mass abuse — but South African mobile carriers
+  // must not be scriptable into mass abuse â€” but South African mobile carriers
   // put THOUSANDS of customers behind one CGNAT IP, so a tight per-IP cap
   // rejects real signups on a busy day. Per-IP stays generous; the per-EMAIL
   // bucket below is what stops someone hammering a single address.
@@ -407,7 +407,7 @@ export default async function handler(req, res) {
   const isProtoActive = isVerifiedProtoActiveMatch(protoActiveMatch);
 
   // No email-confirmation step: accounts are created with the address already
-  // marked confirmed. Access is gated by ADMIN APPROVAL instead — an applicant
+  // marked confirmed. Access is gated by ADMIN APPROVAL instead â€” an applicant
   // lands in trade requests and cannot reach the catalogue until an admin
   // approves them, so the mailbox round-trip adds nothing here.
   const { data, error } = await supabase.auth.admin.createUser({
@@ -454,7 +454,7 @@ export default async function handler(req, res) {
   const shouldApprove = isProtoActive;
 
   if (userId) {
-    // Customer codes are NEVER auto-generated — they are allocated manually in
+    // Customer codes are NEVER auto-generated â€” they are allocated manually in
     // the admin dashboard, whenever the admin is ready. Approval does not
     // require a code. (Was: allocateCustomerCode for approved/10000-club
     // signups, which contradicted that rule.)
@@ -595,14 +595,14 @@ export default async function handler(req, res) {
       .eq('id', userId)
       .single();
     if (!savedProfile) {
-      console.error('customer profile verification failed — row missing after upsert | userId:', userId);
+      console.error('customer profile verification failed â€” row missing after upsert | userId:', userId);
     }
     profileVerification = savedProfile || null;
     if (savedProfile?.customer_code) {
       allocatedCustomerCode = savedProfile.customer_code;
     }
 
-    // (No verification email — see the createUser call above. Access is gated by
+    // (No verification email â€” see the createUser call above. Access is gated by
     // admin approval, not by an email round-trip.)
 
     await sendAdminSignupEmail({
@@ -632,6 +632,7 @@ export default async function handler(req, res) {
     });
   }
 
+  let customerNotificationSent = false;
   if (process.env.BREVO_API_KEY) {
     try {
       const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -647,10 +648,10 @@ export default async function handler(req, res) {
           sender: BREVO_SENDER,
           to: [{ email: normalizedEmail }],
           subject: shouldApprove
-            // No "verify your email" — email confirmation was removed; the
+            // No "verify your email" â€” email confirmation was removed; the
             // account is usable the moment it is approved.
-            ? 'Your trade account is approved — Proto Trading'
-            : 'We have received your request — you will hear from us within 24 hours',
+            ? 'Your trade account is approved â€” Proto Trading'
+            : 'We have received your request â€” you will hear from us within 24 hours',
           htmlContent: shouldApprove
             ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
             : WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
@@ -659,6 +660,8 @@ export default async function handler(req, res) {
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
         console.error('Welcome email Brevo error:', resp.status, JSON.stringify(body));
+      } else {
+        customerNotificationSent = true;
       }
     } catch (emailErr) {
       console.error('Welcome email error:', emailErr.message);
@@ -668,7 +671,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     instantAccess: shouldApprove,
-    emailVerificationRequired: true,
+    emailVerificationRequired: false,
+    notificationSent: customerNotificationSent,
     customerCode: allocatedCustomerCode || null,
     profile: profileVerification
       ? {
@@ -679,3 +683,4 @@ export default async function handler(req, res) {
       : null,
   });
 }
+
