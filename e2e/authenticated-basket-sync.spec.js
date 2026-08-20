@@ -145,7 +145,6 @@ function installSyntheticServices(context, accountCart, safety) {
     if (pathname === '/api/popup-special') return json(route, null);
     if (pathname === '/api/sort-orders') return json(route, {});
     if (pathname.includes('/orders/last')) return json(route, { order: null });
-    if (pathname === '/api/intercom/jwt') return json(route, { token: 'synthetic' });
 
     return json(route, {});
   });

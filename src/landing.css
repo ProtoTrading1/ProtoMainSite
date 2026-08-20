@@ -474,9 +474,9 @@
 
 .vhero-choice-detail {
   margin: 12px 0 0;
-  color: #a1a1aa;
+  color: #FFFFFF;
   font-size: clamp(13px, 1vw, 15px);
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.45;
 }
 

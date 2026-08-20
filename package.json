@@ -12,7 +12,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@intercom/messenger-js-sdk": "^0.0.19",
     "@sentry/react": "^10.63.0",
     "@supabase/supabase-js": "^2.105.4",
     "d3-geo": "^2.0.2",

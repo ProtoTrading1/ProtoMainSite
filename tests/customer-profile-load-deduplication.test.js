@@ -69,7 +69,5 @@ test('existing profile-load side effects remain in the shared request', () => {
   assert.match(loadCustomer, /if \(adminHost\)/);
   assert.match(loadCustomer, /if \(preRegisterHost\)/);
   assert.match(loadCustomer, /setCustomerLoadError\(/);
-  assert.match(root, /refreshIntercomIdentity\(sess\)/);
-  assert.match(root, /identifyIntercom\(sess\)/);
   assert.match(root, /loadNonce\.current \+= 1;\s*customerLoadRequest\.current\.clear\(\);\s*setSession\(null\)/);
 });

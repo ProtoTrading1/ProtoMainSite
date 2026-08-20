@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, MessageCircle, PackageSearch, Search, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, PackageSearch, Search, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { filterNavChildrenWhenCountsReady, lookupProductCount } from '../lib/taxonomy';
-import { openIntercom } from '../lib/intercom';
 import { authHeaders } from '../lib/authHeaders';
 
 function MobileProductRequest({ onClose: closeAll }) {
@@ -340,15 +339,6 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, color: '#374151', cursor: 'pointer' }}
             >
               <PackageSearch size={15} style={{ color: '#8B1A1A' }} /> Can't find it?
-            </button>
-            <button
-              onClick={() => { onClose(); openIntercom(); }}
-              aria-label="Ask Proto — online"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 10px', border: '1px solid rgba(212,173,86,0.6)', borderRadius: 10, background: '#101010', boxShadow: '0 5px 14px rgba(0,0,0,0.14)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#fff', cursor: 'pointer' }}
-            >
-              <MessageCircle size={15} style={{ color: '#D4AD56' }} />
-              Ask Proto
-              <span aria-hidden="true" style={{ width: 6, height: 6, marginLeft: 2, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 3px rgba(34,197,94,0.14)' }} />
             </button>
           </div>
         )}

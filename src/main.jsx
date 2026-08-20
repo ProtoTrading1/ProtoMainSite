@@ -33,8 +33,3 @@ createRoot(document.getElementById('root')).render(
     <Root />
   </StrictMode>,
 )
-
-// Intercom is NOT booted here any more. The Messenger is for signed-in
-// customers only, so it loads on first successful identify (Root.jsx ->
-// identifyIntercom). Booting anonymously fetched Intercom's script for every
-// visitor and created a lead contact for people who never signed in.

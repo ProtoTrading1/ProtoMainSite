@@ -6,13 +6,6 @@ import { isAdminHost } from './lib/isAdminHost';
 import { getPortalUrl, isPreRegisterHost } from './lib/isPreRegisterHost';
 import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
-import {
-  ensurePublicIntercom,
-  identifyIntercom,
-  refreshIntercomIdentity,
-  resetIntercom,
-  setIntercomLauncherVisibility,
-} from './lib/intercom';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 import { rememberAuthSession } from './lib/authHeaders';
 import { createProfileRequestCache } from './lib/profileRequestCache';
@@ -140,25 +133,6 @@ export default function Root() {
     scrollToTop();
   }, [view]);
 
-  useEffect(() => {
-    // Everyone on the customer-facing site gets a chat button — a visitor on
-    // the landing page can ask about trading hours and how to open an account,
-    // a signed-in customer can ask about stock. What differs is who Intercom
-    // thinks they are, which is set at boot (see lib/intercom.js) and is what
-    // Fin and the catalogue connector gate on.
-    //
-    // The trade sign-up host counts as public: someone filling in the
-    // application is exactly the prospect this chat is for. Only the admin
-    // deployment stays out of it.
-    const publicSite = !adminHost;
-    setIntercomLauncherVisibility(publicSite);
-
-    // Wait for auth to resolve (session is undefined until then), or a
-    // returning customer is booted as a lead for a moment and then re-booted
-    // as themselves.
-    if (publicSite && session === null) ensurePublicIntercom();
-  }, [adminHost, preRegisterHost, route, session, view]);
-
   const loadCustomer = useCallback((userId, sessionOrToken = null) => {
     const accessToken = typeof sessionOrToken === 'string'
       ? sessionOrToken
@@ -224,9 +198,6 @@ export default function Root() {
       if (sess?.user) {
         void import('./lib/products').then((m) => m.prefetchCatalog());
         void loadCustomer(sess.user.id, sess);
-        // Hand Intercom a signed identity so Fin's catalogue connector can
-        // trust the email it receives. No-ops if the account isn't approved.
-        void identifyIntercom(sess);
       } else {
         setCustomerLoading(false);
         setCustomer(null);
@@ -276,13 +247,6 @@ export default function Root() {
           rememberAuthSession(sess);
           setSession(sess);
           if (sess?.user) {
-            if (event === 'TOKEN_REFRESHED') {
-              // Keep the signed Intercom identity alive on long-lived tabs
-              // without tearing down an open conversation.
-              void refreshIntercomIdentity(sess);
-            } else {
-              void identifyIntercom(sess);
-            }
             await loadCustomer(sess.user.id, sess);
           } else {
             setCustomerLoading(false);
@@ -309,7 +273,6 @@ export default function Root() {
     rememberAuthSession(sess);
     setSession(sess);
     void import('./lib/products').then((m) => m.prefetchCatalog());
-    void identifyIntercom(sess);
     await loadCustomer(sess.user.id, sess);
   };
 
@@ -318,9 +281,6 @@ export default function Root() {
     await signOut();
     const { invalidateProductCache } = await import('./lib/products');
     invalidateProductCache();
-    // Drop the Intercom contact too, or the next person on this browser
-    // inherits the signed-out customer's identity — and their trade prices.
-    resetIntercom();
     rememberAuthSession(null);
     loadNonce.current += 1;
     customerLoadRequest.current.clear();
