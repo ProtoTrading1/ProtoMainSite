@@ -101,6 +101,21 @@ test('all catalogue product previews use the stable detail URL and offer sharing
   assert.match(card, /Share product/);
 });
 
+test('product previews preserve browse position and keep option tags above images', async () => {
+  const [card, siteCss] = await Promise.all([
+    readSource('src/components/ProductCard.jsx'),
+    readSource('src/index.css'),
+  ]);
+
+  assert.match(card, /const savedScroll = \{/);
+  assert.match(card, /contentTop: contentArea\?\.scrollTop/);
+  assert.match(card, /lastFocusedElementRef\.current\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(card, /restoreBrowsePosition\(\);[\s\S]*requestAnimationFrame\(restoreBrowsePosition\)/,
+    'scroll is restored immediately and again after Safari finishes body unlock');
+  assert.match(siteCss, /\.tag-row\s*\{[\s\S]*?z-index: 3;/);
+  assert.match(siteCss, /\.pz-tags\s*\{[\s\S]*?z-index: 3;/);
+});
+
 test('exact product links authenticate their focused lookup', async () => {
   const products = await readSource('src/lib/products.js');
   assert.match(products, /skus=\$\{encodeURIComponent\(batch\.join\(','\)\)\}[\s\S]{0,180}authenticated: true/);

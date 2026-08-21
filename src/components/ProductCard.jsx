@@ -418,6 +418,28 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   useEffect(() => {
     if (!zoomOpen) return;
     lastFocusedElementRef.current = document.activeElement;
+    const contentArea = document.querySelector('.content-area');
+    const savedScroll = {
+      windowX: window.scrollX || 0,
+      windowY: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+      contentLeft: contentArea?.scrollLeft || 0,
+      contentTop: contentArea?.scrollTop || 0,
+    };
+    const previousBodyOverflow = document.body.style.overflow;
+    const restoreBrowsePosition = () => {
+      if (contentArea) {
+        contentArea.scrollTo({
+          top: savedScroll.contentTop,
+          left: savedScroll.contentLeft,
+          behavior: 'auto',
+        });
+      }
+      window.scrollTo({
+        top: savedScroll.windowY,
+        left: savedScroll.windowX,
+        behavior: 'auto',
+      });
+    };
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -450,10 +472,14 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousBodyOverflow;
       if (lastFocusedElementRef.current instanceof HTMLElement) {
-        lastFocusedElementRef.current.focus();
+        lastFocusedElementRef.current.focus({ preventScroll: true });
       }
+      restoreBrowsePosition();
+      // Safari can apply its body-unlock layout one frame late. Reassert the
+      // saved catalogue position after that layout without a visible animation.
+      window.requestAnimationFrame(restoreBrowsePosition);
     };
   }, [closePreview, zoomOpen]);
 

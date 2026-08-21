@@ -2617,9 +2617,11 @@ textarea:focus-visible,
   position: absolute;
   top: 10px;
   left: 10px;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  pointer-events: none;
 }
 .tag-row span {
   padding: 4px 7px;
@@ -6195,6 +6197,7 @@ textarea:focus-visible,
   position: absolute;
   top: 16px;
   left: 16px;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
