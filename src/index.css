@@ -3432,6 +3432,28 @@ textarea:focus-visible,
 }
 .cart-sync-alert button:hover { background: #fee2e2; }
 .cart-sync-alert button:focus-visible { outline: 3px solid rgba(153, 27, 27, 0.24); outline-offset: 2px; }
+.cart-price-alert {
+  margin: 8px 12px 4px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+.cart-price-alert div { display: grid; gap: 2px; }
+.cart-price-alert strong { font-size: 12px; }
+.cart-price-alert span { font-size: 11px; line-height: 1.35; }
+.cart-price-alert button {
+  width: 32px; height: 32px; border: 0; border-radius: 8px;
+  background: transparent; color: #1e3a8a; font-size: 22px;
+  line-height: 1; cursor: pointer;
+}
+.cart-price-alert button:hover { background: #dbeafe; }
+.cart-price-alert button:focus-visible { outline: 3px solid rgba(30, 58, 138, 0.22); outline-offset: 2px; }
 .drawer-items {
   flex: 1;
   overflow: auto;

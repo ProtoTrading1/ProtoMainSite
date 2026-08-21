@@ -28,6 +28,7 @@ import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './l
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
@@ -50,8 +51,8 @@ const CATALOG_SORT_KEY = 'proto_catalog_sort';
 const CART_STORAGE_KEY = 'proto_cart';
 const CART_OWNER_KEY = 'proto_cart_owner';
 const CART_LAST_ACTIVITY_KEY = 'proto_cart_last_activity_at';
-const CART_INACTIVITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const CART_EXPIRY_WARN_MS = 72 * 60 * 60 * 1000;
+const CART_INACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const CART_EXPIRY_WARN_MS = 7 * 24 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
 const CART_QTY_UNLIMITED = 9999;
 const CUSTOMER_JOURNEY_SESSION_KEY_PREFIX = 'proto_customer_journey_session_v1';
@@ -266,6 +267,7 @@ export default function App({
     } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
+  const [cartPriceChanges, setCartPriceChanges] = useState([]);
   const [cartRevealRequest, setCartRevealRequest] = useState(null);
   const [cartScrollTop, setCartScrollTop] = useState(0);
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
@@ -574,6 +576,7 @@ export default function App({
 
     if (previousUid && previousUid !== uid) {
       setCartItems([]);
+      setCartPriceChanges([]);
       setCartLastActivityAt(null);
       currentCartRef.current = { items: [], activityAt: null };
     }
@@ -600,6 +603,7 @@ export default function App({
           ),
         });
         setCartItems(hydratedItems);
+        setCartPriceChanges(detectCartPriceChanges(accountCart.items, hydratedItems));
         setCartLastActivityAt(accountCart.activityAt || null);
         currentCartRef.current = { items: hydratedItems, activityAt: accountCart.activityAt || null };
         setCartClock(Date.now());
@@ -672,6 +676,7 @@ export default function App({
       cartRevisionRef.current = Number(remote.revision || 0);
       lastSavedCartRef.current = cartFingerprint(hydratedItems);
       setCartItems(hydratedItems);
+      setCartPriceChanges(detectCartPriceChanges(remote.items, hydratedItems));
       setCartLastActivityAt(remote.activityAt || null);
       currentCartRef.current = { items: hydratedItems, activityAt: remote.activityAt || null };
       setCartClock(Date.now());
@@ -1862,6 +1867,8 @@ export default function App({
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
+            priceChanges={cartPriceChanges}
+            onDismissPriceChanges={() => setCartPriceChanges([])}
             onRetryCartSync={retryCartSync}
             cartReady={cartHydrated}
             onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
@@ -1966,6 +1973,8 @@ export default function App({
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
+                priceChanges={cartPriceChanges}
+                onDismissPriceChanges={() => setCartPriceChanges([])}
                 onRetryCartSync={retryCartSync}
                 cartReady={cartHydrated}
                 onContinueShopping={() => setMobileCartOpen(false)}
