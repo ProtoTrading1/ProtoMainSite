@@ -45,7 +45,7 @@ function tokenFor(user) {
   return `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: user.id, email: user.email, exp: now + 3600 })}.e2e`;
 }
 
-function installSyntheticServices(context, accountCart, safety) {
+function installSyntheticServices(context, accountCart, safety, products = catalogue) {
   return context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -134,9 +134,9 @@ function installSyntheticServices(context, accountCart, safety) {
       });
     }
 
-    if (pathname === '/api/products') return json(route, catalogue);
+    if (pathname === '/api/products') return json(route, products);
     if (pathname === '/api/featured-products') {
-      return json(route, { items: catalogue.map(({ sku }) => ({ sku })) });
+      return json(route, { items: products.map(({ sku }) => ({ sku })) });
     }
     if (pathname === '/api/taxonomy') return json(route, { categories: [] });
     if (pathname === '/api/stock') return json(route, { qty: 100, to_order: false });
@@ -149,6 +149,47 @@ function installSyntheticServices(context, accountCart, safety) {
     return json(route, {});
   });
 }
+
+test('closing a product preview preserves the catalogue scroll position', async ({ browser }) => {
+  const longCatalogue = [
+    ...catalogue,
+    ...Array.from({ length: 40 }, (_, index) => product(
+      `E2E-SCROLL-${String(index + 1).padStart(2, '0')}`,
+      `Scroll Position Product ${index + 1}`,
+      20 + index,
+    )),
+  ];
+  const accountCart = {
+    created: true,
+    items: [line(legacyProduct, 1)],
+    activityAt: Date.now() - 60_000,
+    revision: 1,
+  };
+  const safety = { authRequests: 0, destructiveRequests: [] };
+  const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+  await installSyntheticServices(context, accountCart, safety, longCatalogue);
+  const page = await context.newPage();
+  await seedLegacyBrowserBasket(page, accountCart.items);
+
+  try {
+    await signIn(page);
+    const content = page.locator('.content-area');
+    const card = page.getByText('Scroll Position Product 25', { exact: true }).locator('xpath=ancestor::article');
+    await card.scrollIntoViewIfNeeded();
+    const before = await content.evaluate((element) => element.scrollTop);
+    expect(before).toBeGreaterThan(1000);
+
+    await card.getByRole('button', { name: 'View Scroll Position Product 25' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect.poll(() => content.evaluate((element) => element.scrollTop)).toBe(before);
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    await expect.poll(() => content.evaluate((element) => element.scrollTop)).toBe(before);
+  } finally {
+    await context.close();
+  }
+});
 
 async function seedLegacyBrowserBasket(page, items) {
   await page.addInitScript(({ seededItems }) => {
