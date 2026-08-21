@@ -24,7 +24,7 @@ const MIN_ORDER = 1000;
 
 function formatCartExpiry(remainingMs) {
   if (remainingMs === null || remainingMs === undefined) return '';
-  if (remainingMs <= 0) return '14d+ old';
+  if (remainingMs <= 0) return 'saved';
 
   const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
   const days = Math.floor(totalMinutes / (24 * 60));
@@ -127,6 +127,8 @@ export default function Drawer({
       : cartSyncStatus === 'saved'
         ? 'Saved to account'
         : 'Saved on this device';
+  // Keep the normal basket quiet. Customers only need the countdown during
+  // the final seven days of the 30-day retention window.
   const showExpiryNote = hasExpiry && cartExpiryTone !== 'ok';
   const basketLoading = !cartReady;
   const syncFailed = Boolean(customer?.id) && cartSyncStatus === 'error';
@@ -348,7 +350,7 @@ export default function Drawer({
         <div
           className={`drawer-auto-close drawer-auto-close--${cartExpiryTone}`}
           role="progressbar"
-          aria-label="Basket age within the fourteen-day reminder period"
+          aria-label="Basket age within the thirty-day retention period"
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={Math.round(Math.max(0, Math.min(100, autoCloseProgress)))}
@@ -447,9 +449,11 @@ export default function Drawer({
           <div className={`cart-expiry-note cart-expiry-note--${cartExpiryTone}`}>
             <span>Basket reminder</span>
             <strong>
-              {cartExpiryTone === 'danger'
-                ? 'Older than fourteen days — kept until you clear or submit it'
-                : `Update an item to refresh this reminder (${expiryLabel})`}
+              {cartExpiryRemainingMs <= 0
+                ? 'Saved until you clear it or submit your order'
+                : cartExpiryTone === 'danger'
+                  ? `Final day to refresh this basket (${expiryLabel} remaining)`
+                  : `Refresh an item to keep this basket (${expiryLabel} remaining)`}
             </strong>
           </div>
         )}

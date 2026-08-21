@@ -40,8 +40,10 @@ test('basket clearing is undoable and inactivity no longer destroys the basket',
   assert.match(appSource, /submittedClearConflict/);
   assert.match(drawerSource, /undoButtonRef\.current\?\.focus/);
   assert.doesNotMatch(appSource, /cartClock - cartLastActivityAt[\s\S]{0,120}clearCart\(\)/);
-  assert.match(appSource, /CART_INACTIVITY_WINDOW_MS = 14 \* 24 \* 60 \* 60 \* 1000/);
-  assert.match(drawerSource, /Older than fourteen days — kept until you clear or submit it/);
+  assert.match(appSource, /CART_INACTIVITY_WINDOW_MS = 30 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(appSource, /CART_EXPIRY_WARN_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(drawerSource, /final seven days of the 30-day retention window/);
+  assert.match(drawerSource, /Saved until you clear it or submit your order/);
   assert.match(drawerSource, /role="progressbar"/);
 });
 
