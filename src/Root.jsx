@@ -93,7 +93,9 @@ export default function Root() {
     };
     const onPopState = () => {
       setPathname(window.location.pathname);
-      scrollToTop();
+      if (shouldRootScrollOnHash(window.location.hash)) {
+        scrollToTop();
+      }
     };
     window.addEventListener('hashchange', onHashChange);
     window.addEventListener('popstate', onPopState);

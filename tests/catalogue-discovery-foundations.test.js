@@ -102,8 +102,9 @@ test('all catalogue product previews use the stable detail URL and offer sharing
 });
 
 test('product previews preserve browse position and keep option tags above images', async () => {
-  const [card, siteCss] = await Promise.all([
+  const [card, root, siteCss] = await Promise.all([
     readSource('src/components/ProductCard.jsx'),
+    readSource('src/Root.jsx'),
     readSource('src/index.css'),
   ]);
 
@@ -112,6 +113,8 @@ test('product previews preserve browse position and keep option tags above image
   assert.match(card, /lastFocusedElementRef\.current\.focus\(\{ preventScroll: true \}\)/);
   assert.match(card, /restoreBrowsePosition\(\);[\s\S]*requestAnimationFrame\(restoreBrowsePosition\)/,
     'scroll is restored immediately and again after Safari finishes body unlock');
+  assert.match(root, /const onPopState = \(\) => \{[\s\S]*shouldRootScrollOnHash\(window\.location\.hash\)[\s\S]*scrollToTop\(\)/,
+    'product URL state must not trigger the root-level route scroll reset');
   assert.match(siteCss, /\.tag-row\s*\{[\s\S]*?z-index: 3;/);
   assert.match(siteCss, /\.pz-tags\s*\{[\s\S]*?z-index: 3;/);
 });
