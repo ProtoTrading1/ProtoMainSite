@@ -31,6 +31,8 @@ const VALID_PROVINCES = new Set([
   'Mpumalanga', 'Northern Cape', 'North West', 'Western Cape',
 ]);
 
+const VALID_SCHOOL_TYPES = new Set(['Public school', 'Private school']);
+
 const VALID_SUPPLY_NEEDS = new Set([
   'Everyday stationery',
   'Art & creative supplies',
@@ -54,9 +56,10 @@ function caps(value) {
   return String(value || '').trim().toUpperCase();
 }
 
-function buildAdminEmailHtml({ schoolName, province, schoolAddress, contactName, schoolRole, email, phone, supplyNeeds }) {
+function buildAdminEmailHtml({ schoolName, schoolType, province, schoolAddress, contactName, schoolRole, email, phone, supplyNeeds }) {
   const rows = [
     ['School', caps(schoolName)],
+    ['Type', caps(schoolType)],
     ['Province', caps(province)],
     ['Address', caps(schoolAddress)],
     ['Contact', caps(contactName)],
@@ -112,6 +115,7 @@ export default async function handler(req, res) {
 
   const {
     schoolName,
+    schoolType,
     streetAddress,
     suburb,
     city,
@@ -137,6 +141,7 @@ export default async function handler(req, res) {
   const normalizedRole = String(schoolRole || '').trim().slice(0, 80);
   const normalizedPhone = String(phone || '').trim().slice(0, 40);
   const normalizedProvince = String(province || '').trim();
+  const normalizedSchoolType = String(schoolType || '').trim();
   const normalizedStreet = String(streetAddress || '').trim().slice(0, 160);
   const normalizedSuburb = String(suburb || '').trim().slice(0, 120);
   const normalizedCity = String(city || '').trim().slice(0, 120);
@@ -146,6 +151,9 @@ export default async function handler(req, res) {
     : [];
 
   if (!normalizedSchoolName) return res.status(400).json({ error: 'Please enter the name of your school.' });
+  if (!VALID_SCHOOL_TYPES.has(normalizedSchoolType)) {
+    return res.status(400).json({ error: 'Please tell us whether the school is public or private.' });
+  }
   if (!normalizedStreet) return res.status(400).json({ error: 'Please enter the school street address.' });
   if (!normalizedSuburb) return res.status(400).json({ error: 'Please enter the suburb.' });
   if (!normalizedCity) return res.status(400).json({ error: 'Please enter the city or town.' });
@@ -218,6 +226,7 @@ export default async function handler(req, res) {
       business_name: normalizedSchoolName,
       province: normalizedProvince,
       is_school: true,
+      school_type: normalizedSchoolType,
       school_role: normalizedRole,
       company_address: schoolAddress,
       delivery_address: schoolAddress,
@@ -246,7 +255,7 @@ export default async function handler(req, res) {
   // Composed so the admin dashboard's existing "in their own words" panel is
   // useful for a school without needing a school-specific field there.
   const descriptionParts = [
-    `School in ${normalizedProvince}.`,
+    `${normalizedSchoolType} in ${normalizedProvince}.`,
     `Registered by ${normalizedContactName} (${normalizedRole}).`,
   ];
   if (normalizedSupplyNeeds.length) {
@@ -269,7 +278,10 @@ export default async function handler(req, res) {
     postal_code: normalizedPostalCode,
     country: 'South Africa',
     province: normalizedProvince,
-    business_type: 'School',
+    // 'Public school' / 'Private school' so the admin dashboard's existing
+    // business_type column and filter distinguish them with no extra work.
+    business_type: normalizedSchoolType,
+    school_type: normalizedSchoolType,
     sales_channels: [SCHOOL_SALES_CHANNEL],
     business_description: descriptionParts.join(' ').slice(0, 400),
     is_school: true,
@@ -291,10 +303,11 @@ export default async function handler(req, res) {
 
   const attempts = [
     fullPayload,
-    withoutColumns('supply_needs'),
-    withoutColumns('supply_needs', 'school_role'),
-    withoutColumns('supply_needs', 'school_role', 'is_school'),
-    withoutColumns('supply_needs', 'school_role', 'is_school', 'sales_channels', 'business_description'),
+    withoutColumns('school_type'),
+    withoutColumns('school_type', 'supply_needs'),
+    withoutColumns('school_type', 'supply_needs', 'school_role'),
+    withoutColumns('school_type', 'supply_needs', 'school_role', 'is_school'),
+    withoutColumns('school_type', 'supply_needs', 'school_role', 'is_school', 'sales_channels', 'business_description'),
   ];
 
   let upsertError = null;
@@ -318,6 +331,7 @@ export default async function handler(req, res) {
 
   await sendAdminEmail({
     schoolName: normalizedSchoolName,
+    schoolType: normalizedSchoolType,
     province: normalizedProvince,
     schoolAddress,
     contactName: normalizedContactName,

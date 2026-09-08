@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import {
   PROVINCES,
   ROLE_SUGGESTIONS,
+  SCHOOL_TYPES,
   SUPPLY_NEEDS,
   MIN_PASSWORD_LENGTH,
   emailError,
@@ -27,6 +28,7 @@ const BENEFITS = [
 /** Field id -> human label, used by the error summary at the top of the form. */
 const FIELD_LABELS = {
   schoolName: 'School name',
+  schoolType: 'Public or private school',
   streetAddress: 'Street address',
   suburb: 'Suburb',
   city: 'City or town',
@@ -43,6 +45,7 @@ const FIELD_LABELS = {
 
 export default function App() {
   const [schoolName, setSchoolName] = useState('');
+  const [schoolType, setSchoolType] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [suburb, setSuburb] = useState('');
   const [city, setCity] = useState('');
@@ -70,6 +73,7 @@ export default function App() {
   const errors = useMemo(() => {
     const next = {};
     if (!schoolName.trim()) next.schoolName = 'Enter the name of your school.';
+    if (!schoolType) next.schoolType = 'Tell us whether the school is public or private.';
     if (!streetAddress.trim()) next.streetAddress = 'Enter the school street address.';
     if (!suburb.trim()) next.suburb = 'Enter the suburb.';
     if (!city.trim()) next.city = 'Enter the city or town.';
@@ -87,7 +91,7 @@ export default function App() {
     else if (confirmPassword !== password) next.confirmPassword = 'The two passwords do not match.';
     if (!authorised) next.authorised = 'Please confirm you are authorised to register this school.';
     return next;
-  }, [schoolName, streetAddress, suburb, city, postalCode, province, contactName, schoolRole, email, phone, password, confirmPassword, authorised]);
+  }, [schoolName, schoolType, streetAddress, suburb, city, postalCode, province, contactName, schoolRole, email, phone, password, confirmPassword, authorised]);
 
   const errorKeys = Object.keys(errors);
   /* Errors surface once a field has been left, or once the form has been sent. */
@@ -114,6 +118,7 @@ export default function App() {
     try {
       await submitSchoolRegistration({
         schoolName: schoolName.trim(),
+        schoolType,
         streetAddress: streetAddress.trim(),
         suburb: suburb.trim(),
         city: city.trim(),
@@ -257,6 +262,30 @@ export default function App() {
                       aria-invalid={showError('schoolName')}
                     />
                   </Field>
+                  <div className={`field field--wide${showError('schoolType') ? ' field--error' : ''}`}>
+                    <span className="field-legend" id="school-type-label">
+                      Is it a public or private school?
+                      <span className="field-required" aria-hidden="true"> *</span>
+                    </span>
+                    <div className="chips" role="radiogroup" aria-labelledby="school-type-label">
+                      {SCHOOL_TYPES.map((type) => {
+                        const selected = schoolType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            className={`chip${selected ? ' chip--selected' : ''}`}
+                            onClick={() => { setSchoolType(type); markTouched('schoolType'); }}
+                          >
+                            {type}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {showError('schoolType') && <p className="field-error">{errors.schoolType}</p>}
+                  </div>
                 </div>
               </fieldset>
 

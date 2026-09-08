@@ -16,6 +16,7 @@ describe('school registration site', () => {
 
   it('collects the fields the school form promises', () => {
     const app = read('schools/src/App.jsx');
+    assert.match(app, /SCHOOL_TYPES\.map/);
     for (const id of ['school-name', 'street-address', 'suburb', 'city', 'postal-code', 'province', 'contact-name', 'school-role', 'email', 'phone', 'password', 'confirm-password']) {
       assert.match(app, new RegExp(`id="${id}"`), `missing field ${id}`);
     }
@@ -25,6 +26,7 @@ describe('school registration site', () => {
   it('validates every required answer on the server, not just in the browser', () => {
     const api = read('schools/api/register-school.js');
     assert.match(api, /VALID_PROVINCES\.has\(normalizedProvince\)/);
+    assert.match(api, /VALID_SCHOOL_TYPES\.has\(normalizedSchoolType\)/);
     assert.match(api, /!normalizedStreet/);
     assert.match(api, /!normalizedSuburb/);
     assert.match(api, /!normalizedCity/);
@@ -41,6 +43,17 @@ describe('school registration site', () => {
     assert.match(api, /is_approved: true/);
     assert.match(api, /customer_code: null/);
     assert.doesNotMatch(api, /allocateCustomerCode/);
+  });
+
+  it('records whether the school is public or private', () => {
+    const fields = read('schools/src/lib/schoolFields.js');
+    const api = read('schools/api/register-school.js');
+    const migration = read('migrations/068_school_type.sql');
+    assert.match(fields, /SCHOOL_TYPES = \['Public school', 'Private school'\]/);
+    assert.match(api, /school_type: normalizedSchoolType/);
+    // business_type mirrors it so the admin's existing filter works unchanged.
+    assert.match(api, /business_type: normalizedSchoolType/);
+    assert.match(migration, /add column if not exists school_type text/i);
   });
 
   it('stores the school address for delivery', () => {
@@ -66,8 +79,8 @@ describe('school registration site', () => {
   it('keeps signing up possible before the migration is applied', () => {
     const api = read('schools/api/register-school.js');
     // Progressive fallbacks drop the new columns rather than failing the signup.
-    assert.match(api, /withoutColumns\('supply_needs'\)/);
-    assert.match(api, /withoutColumns\('supply_needs', 'school_role', 'is_school'\)/);
+    assert.match(api, /withoutColumns\('school_type'\)/);
+    assert.match(api, /withoutColumns\('school_type', 'supply_needs', 'school_role', 'is_school'\)/);
     assert.match(api, /auth\.admin\.deleteUser\(userId\)/);
   });
 

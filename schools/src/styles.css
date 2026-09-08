@@ -413,3 +413,6 @@ h1, h2, .form-title, .benefits-title, .success-title {
 }
 
 .success-cta:hover { background: var(--proto-red-dark); }
+
+/* Group label for a radiogroup — matches the <label> styling of a text field. */
+.field-legend { color: var(--ink); font-size: 12.5px; font-weight: 700; }

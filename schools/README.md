@@ -55,8 +55,8 @@ simply not stored, and the admin badge will not appear.
 
 ## What it collects
 
-School name, the school's physical address (street, suburb, city, postal code,
-province), contact name and role, work email, phone, password, and optional
+School name, whether it is a public or private school, the school's physical
+address (street, suburb, city, postal code, province), contact name and role, work email, phone, password, and optional
 supply-need chips, plus an explicit authorisation confirmation.
 
 The one address is stored as both `company_address` and `delivery_address` — a

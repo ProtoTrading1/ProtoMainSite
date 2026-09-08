@@ -18,6 +18,9 @@ export const PROVINCES = [
   'Western Cape',
 ];
 
+/** Public (state / government) vs independent. Required at registration. */
+export const SCHOOL_TYPES = ['Public school', 'Private school'];
+
 /** Chips under "Supply needs" — what the school wants to buy from Proto. */
 export const SUPPLY_NEEDS = [
   'Everyday stationery',
