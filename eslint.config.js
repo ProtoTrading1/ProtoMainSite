@@ -5,7 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // '**/dist' covers the standalone schools/ app's build output as well as ours.
+  globalIgnores(['dist', '**/dist']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -22,7 +23,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['api/**/*.js'],
+    files: ['api/**/*.js', 'schools/api/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,
