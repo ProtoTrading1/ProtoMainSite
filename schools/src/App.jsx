@@ -27,6 +27,10 @@ const BENEFITS = [
 /** Field id -> human label, used by the error summary at the top of the form. */
 const FIELD_LABELS = {
   schoolName: 'School name',
+  streetAddress: 'Street address',
+  suburb: 'Suburb',
+  city: 'City or town',
+  postalCode: 'Postal code',
   province: 'Province',
   contactName: 'Contact name',
   schoolRole: 'Role at the school',
@@ -39,6 +43,10 @@ const FIELD_LABELS = {
 
 export default function App() {
   const [schoolName, setSchoolName] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [suburb, setSuburb] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [province, setProvince] = useState('');
   const [contactName, setContactName] = useState('');
   const [schoolRole, setSchoolRole] = useState('');
@@ -62,6 +70,10 @@ export default function App() {
   const errors = useMemo(() => {
     const next = {};
     if (!schoolName.trim()) next.schoolName = 'Enter the name of your school.';
+    if (!streetAddress.trim()) next.streetAddress = 'Enter the school street address.';
+    if (!suburb.trim()) next.suburb = 'Enter the suburb.';
+    if (!city.trim()) next.city = 'Enter the city or town.';
+    if (!/^\d{4}$/.test(postalCode.trim())) next.postalCode = 'Enter a 4-digit postal code.';
     if (!province) next.province = 'Select the province your school is in.';
     if (!contactName.trim()) next.contactName = 'Enter your full name.';
     if (!schoolRole.trim()) next.schoolRole = 'Tell us your role at the school.';
@@ -75,7 +87,7 @@ export default function App() {
     else if (confirmPassword !== password) next.confirmPassword = 'The two passwords do not match.';
     if (!authorised) next.authorised = 'Please confirm you are authorised to register this school.';
     return next;
-  }, [schoolName, province, contactName, schoolRole, email, phone, password, confirmPassword, authorised]);
+  }, [schoolName, streetAddress, suburb, city, postalCode, province, contactName, schoolRole, email, phone, password, confirmPassword, authorised]);
 
   const errorKeys = Object.keys(errors);
   /* Errors surface once a field has been left, or once the form has been sent. */
@@ -102,6 +114,10 @@ export default function App() {
     try {
       await submitSchoolRegistration({
         schoolName: schoolName.trim(),
+        streetAddress: streetAddress.trim(),
+        suburb: suburb.trim(),
+        city: city.trim(),
+        postalCode: postalCode.trim(),
         province,
         contactName: contactName.trim(),
         schoolRole: schoolRole.trim(),
@@ -152,15 +168,19 @@ export default function App() {
           {done ? (
             <div className="success" role="status">
               <CheckCircleIcon className="success-icon" />
-              <h2 className="success-title">Registration received</h2>
+              <h2 className="success-title">Your school is ready</h2>
               <p className="success-body">
-                Thank you, {contactName.trim().split(/\s+/)[0] || 'there'}. We have created an account for{' '}
-                <strong>{schoolName.trim()}</strong> and the Proto team is reviewing it now.
+                Thank you, {contactName.trim().split(/\s+/)[0] || 'there'}. The account for{' '}
+                <strong>{schoolName.trim()}</strong> is active — no waiting for approval.
               </p>
               <p className="success-body">
-                We will email <strong>{email.trim()}</strong> as soon as your school is approved. You will then sign in
-                with that address and the password you just chose.
+                Sign in at Proto Trading Online with <strong>{email.trim()}</strong> and the password you just chose to
+                browse the full range and place your first order.
               </p>
+              <a className="success-cta" href="https://proto.co.za">
+                Go to Proto Trading Online
+                <ArrowRightIcon className="submit-icon" />
+              </a>
               <p className="success-meta">Questions? Email online@proto.co.za or call +27 21 461 5883.</p>
             </div>
           ) : (
@@ -223,6 +243,7 @@ export default function App() {
                     id="school-name"
                     label="School name"
                     required
+                    wide
                     error={showError('schoolName') ? errors.schoolName : ''}
                   >
                     <input
@@ -234,6 +255,80 @@ export default function App() {
                       onBlur={() => markTouched('schoolName')}
                       placeholder="e.g. Riverside Primary School"
                       aria-invalid={showError('schoolName')}
+                    />
+                  </Field>
+                </div>
+              </fieldset>
+
+              <fieldset className="section">
+                <legend className="section-title">School address</legend>
+                <p className="section-hint">Where we deliver your order.</p>
+                <div className="grid">
+                  <Field
+                    id="street-address"
+                    label="Street address"
+                    required
+                    wide
+                    error={showError('streetAddress') ? errors.streetAddress : ''}
+                  >
+                    <input
+                      id="street-address"
+                      autoComplete="street-address"
+                      value={streetAddress}
+                      onChange={(e) => setStreetAddress(e.target.value)}
+                      onBlur={() => markTouched('streetAddress')}
+                      placeholder="e.g. 24 School Road"
+                      aria-invalid={showError('streetAddress')}
+                    />
+                  </Field>
+                  <Field
+                    id="suburb"
+                    label="Suburb"
+                    required
+                    error={showError('suburb') ? errors.suburb : ''}
+                  >
+                    <input
+                      id="suburb"
+                      autoComplete="address-level3"
+                      value={suburb}
+                      onChange={(e) => setSuburb(e.target.value)}
+                      onBlur={() => markTouched('suburb')}
+                      placeholder="e.g. Rondebosch"
+                      aria-invalid={showError('suburb')}
+                    />
+                  </Field>
+                  <Field
+                    id="city"
+                    label="City or town"
+                    required
+                    error={showError('city') ? errors.city : ''}
+                  >
+                    <input
+                      id="city"
+                      autoComplete="address-level2"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      onBlur={() => markTouched('city')}
+                      placeholder="e.g. Cape Town"
+                      aria-invalid={showError('city')}
+                    />
+                  </Field>
+                  <Field
+                    id="postal-code"
+                    label="Postal code"
+                    required
+                    error={showError('postalCode') ? errors.postalCode : ''}
+                  >
+                    <input
+                      id="postal-code"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      maxLength={4}
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onBlur={() => markTouched('postalCode')}
+                      placeholder="e.g. 7700"
+                      aria-invalid={showError('postalCode')}
                     />
                   </Field>
                   <Field
@@ -474,9 +569,9 @@ export default function App() {
   );
 }
 
-function Field({ id, label, required, error, children }) {
+function Field({ id, label, required, error, wide = false, children }) {
   return (
-    <div className={`field${error ? ' field--error' : ''}`}>
+    <div className={`field${wide ? ' field--wide' : ''}${error ? ' field--error' : ''}`}>
       <label htmlFor={id}>
         {label}
         {required && <span className="field-required" aria-hidden="true"> *</span>}

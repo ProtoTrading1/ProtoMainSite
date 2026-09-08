@@ -394,3 +394,22 @@ h1, h2, .form-title, .benefits-title, .success-title {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Full-width field inside the two-column grid (school name, street address). */
+.field--wide { grid-column: 1 / -1; }
+
+.success-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 6px 0 4px;
+  padding: 13px 24px;
+  border-radius: 12px;
+  background: var(--proto-red);
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 140ms ease;
+}
+
+.success-cta:hover { background: var(--proto-red-dark); }

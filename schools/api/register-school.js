@@ -7,8 +7,12 @@ import { escapeHtml } from './_escape-html.js';
  *
  * Writes into the SAME `customers` table the main trade portal uses, flagged
  * `is_school` so the admin dashboard can badge and filter these accounts.
- * Schools are never auto-approved and never get an auto-generated customer
- * code — both stay manual admin steps, exactly as for a trade application.
+ *
+ * Schools get INSTANT ACCESS (`is_approved: true`) — unlike a trade
+ * application, which waits for an admin. That is a deliberate business
+ * decision: a school buying classroom supplies is not a competing reseller, so
+ * the approval queue was judged not worth the friction. Customer codes are
+ * still never auto-generated; an admin allocates one later.
  */
 
 const BREVO_SENDER = {
@@ -50,10 +54,11 @@ function caps(value) {
   return String(value || '').trim().toUpperCase();
 }
 
-function buildAdminEmailHtml({ schoolName, province, contactName, schoolRole, email, phone, supplyNeeds }) {
+function buildAdminEmailHtml({ schoolName, province, schoolAddress, contactName, schoolRole, email, phone, supplyNeeds }) {
   const rows = [
     ['School', caps(schoolName)],
     ['Province', caps(province)],
+    ['Address', caps(schoolAddress)],
     ['Contact', caps(contactName)],
     ['Role at school', caps(schoolRole)],
     ['Email', caps(email)],
@@ -68,7 +73,7 @@ function buildAdminEmailHtml({ schoolName, province, contactName, schoolRole, em
   return `
     <div style="font-family:Arial,sans-serif;color:#111827;">
       <h2>New SCHOOL registration</h2>
-      <p>A school signed up on the school-supply site. The account is pending approval in the admin dashboard.</p>
+      <p>A school signed up on the school-supply site and was granted <strong>instant access</strong> — it can already sign in and order. Allocate a customer code in the admin dashboard when ready.</p>
       <table style="border-collapse:collapse;width:100%;font-size:14px;">${rows}</table>
     </div>
   `;
@@ -107,6 +112,10 @@ export default async function handler(req, res) {
 
   const {
     schoolName,
+    streetAddress,
+    suburb,
+    city,
+    postalCode,
     province,
     contactName,
     schoolRole,
@@ -128,11 +137,21 @@ export default async function handler(req, res) {
   const normalizedRole = String(schoolRole || '').trim().slice(0, 80);
   const normalizedPhone = String(phone || '').trim().slice(0, 40);
   const normalizedProvince = String(province || '').trim();
+  const normalizedStreet = String(streetAddress || '').trim().slice(0, 160);
+  const normalizedSuburb = String(suburb || '').trim().slice(0, 120);
+  const normalizedCity = String(city || '').trim().slice(0, 120);
+  const normalizedPostalCode = String(postalCode || '').trim().slice(0, 10);
   const normalizedSupplyNeeds = Array.isArray(supplyNeeds)
     ? [...new Set(supplyNeeds.map((item) => String(item || '').trim()).filter((item) => VALID_SUPPLY_NEEDS.has(item)))]
     : [];
 
   if (!normalizedSchoolName) return res.status(400).json({ error: 'Please enter the name of your school.' });
+  if (!normalizedStreet) return res.status(400).json({ error: 'Please enter the school street address.' });
+  if (!normalizedSuburb) return res.status(400).json({ error: 'Please enter the suburb.' });
+  if (!normalizedCity) return res.status(400).json({ error: 'Please enter the city or town.' });
+  if (!/^\d{4}$/.test(normalizedPostalCode)) {
+    return res.status(400).json({ error: 'Please enter a 4-digit postal code.' });
+  }
   if (!VALID_PROVINCES.has(normalizedProvince)) {
     return res.status(400).json({ error: 'Please select the province your school is in.' });
   }
@@ -160,6 +179,16 @@ export default async function handler(req, res) {
     console.error('register-school: Supabase env vars missing');
     return res.status(500).json({ error: 'Registration is temporarily unavailable. Please try again shortly.' });
   }
+
+  // One physical address: a school is delivered to where it is.
+  const schoolAddress = [
+    normalizedStreet,
+    normalizedSuburb,
+    normalizedCity,
+    normalizedProvince,
+    normalizedPostalCode,
+    'South Africa',
+  ].filter(Boolean).join(', ');
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -190,6 +219,8 @@ export default async function handler(req, res) {
       province: normalizedProvince,
       is_school: true,
       school_role: normalizedRole,
+      company_address: schoolAddress,
+      delivery_address: schoolAddress,
     },
   });
 
@@ -230,6 +261,12 @@ export default async function handler(req, res) {
     first_name: normalizedContactName.split(/\s+/)[0] || null,
     phone: normalizedPhone,
     business_name: normalizedSchoolName,
+    company_address: schoolAddress,
+    delivery_address: schoolAddress,
+    street_name: normalizedStreet,
+    suburb: normalizedSuburb,
+    city: normalizedCity,
+    postal_code: normalizedPostalCode,
     country: 'South Africa',
     province: normalizedProvince,
     business_type: 'School',
@@ -238,8 +275,9 @@ export default async function handler(req, res) {
     is_school: true,
     school_role: normalizedRole,
     supply_needs: normalizedSupplyNeeds,
-    // Never auto-approved, never auto-coded — both are manual admin steps.
-    is_approved: false,
+    // Instant access: a school reaches the catalogue immediately (see the note
+    // at the top of this file). A customer code is still never auto-generated.
+    is_approved: true,
     customer_code: null,
     tier: 'regular',
   };
@@ -281,6 +319,7 @@ export default async function handler(req, res) {
   await sendAdminEmail({
     schoolName: normalizedSchoolName,
     province: normalizedProvince,
+    schoolAddress,
     contactName: normalizedContactName,
     schoolRole: normalizedRole,
     email: normalizedEmail,
@@ -288,5 +327,5 @@ export default async function handler(req, res) {
     supplyNeeds: normalizedSupplyNeeds,
   });
 
-  return res.status(200).json({ ok: true, pendingApproval: true });
+  return res.status(200).json({ ok: true, instantAccess: true });
 }

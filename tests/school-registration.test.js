@@ -16,7 +16,7 @@ describe('school registration site', () => {
 
   it('collects the fields the school form promises', () => {
     const app = read('schools/src/App.jsx');
-    for (const id of ['school-name', 'province', 'contact-name', 'school-role', 'email', 'phone', 'password', 'confirm-password']) {
+    for (const id of ['school-name', 'street-address', 'suburb', 'city', 'postal-code', 'province', 'contact-name', 'school-role', 'email', 'phone', 'password', 'confirm-password']) {
       assert.match(app, new RegExp(`id="${id}"`), `missing field ${id}`);
     }
     assert.match(app, /authorised/);
@@ -25,17 +25,31 @@ describe('school registration site', () => {
   it('validates every required answer on the server, not just in the browser', () => {
     const api = read('schools/api/register-school.js');
     assert.match(api, /VALID_PROVINCES\.has\(normalizedProvince\)/);
+    assert.match(api, /!normalizedStreet/);
+    assert.match(api, /!normalizedSuburb/);
+    assert.match(api, /!normalizedCity/);
+    assert.match(api, /test\(normalizedPostalCode\)/);
     assert.match(api, /VALID_SUPPLY_NEEDS\.has\(item\)/);
     assert.match(api, /authorised !== true/);
     assert.match(api, /password !== confirmPassword/);
     assert.match(api, /MIN_PASSWORD_LENGTH/);
   });
 
-  it('never auto-approves a school and never mints a customer code', () => {
+  it('grants a school instant access but still never mints a customer code', () => {
     const api = read('schools/api/register-school.js');
-    assert.match(api, /is_approved: false/);
+    // Deliberate: a school is not a competing reseller, so it skips the queue.
+    assert.match(api, /is_approved: true/);
     assert.match(api, /customer_code: null/);
     assert.doesNotMatch(api, /allocateCustomerCode/);
+  });
+
+  it('stores the school address for delivery', () => {
+    const api = read('schools/api/register-school.js');
+    assert.match(api, /const schoolAddress = \[/);
+    assert.match(api, /company_address: schoolAddress/);
+    assert.match(api, /delivery_address: schoolAddress/);
+    assert.match(api, /street_name: normalizedStreet/);
+    assert.match(api, /postal_code: normalizedPostalCode/);
   });
 
   it('flags the row so the admin dashboard can badge it', () => {

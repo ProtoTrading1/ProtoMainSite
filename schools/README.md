@@ -5,8 +5,9 @@ project**: nothing in this folder is bundled into the main trade portal, and the
 main portal's build never reads it.
 
 Schools register here, land in the same Supabase `customers` table as trade
-applicants flagged `is_school = true`, and are then reviewed in the admin
-dashboard (they show a **SCHOOL** badge in Customer Management).
+applicants flagged `is_school = true`, and get **instant access** — they can
+sign in at https://proto.co.za and order straight away, with no approval queue.
+They show a **SCHOOL** badge in the admin dashboard's Customer Management.
 
 ## Local development
 
@@ -54,16 +55,20 @@ simply not stored, and the admin badge will not appear.
 
 ## What it collects
 
-School name, province, contact name and role, work email, phone, password, and
-optional supply-need chips, plus an explicit authorisation confirmation.
+School name, the school's physical address (street, suburb, city, postal code,
+province), contact name and role, work email, phone, password, and optional
+supply-need chips, plus an explicit authorisation confirmation.
 
-Deliberately **not** collected here: billing and delivery addresses. Those are
-captured by the admin when the school is approved, so the form stays short.
+The one address is stored as both `company_address` and `delivery_address` — a
+school is delivered to where it is.
 
 ## Rules this site follows
 
-- Schools are **never auto-approved** — an admin approves them, same as a trade
-  application.
-- Customer codes are **never auto-generated** — always null until an admin
+- Schools get **instant access** (`is_approved: true`). This is deliberate and
+  differs from a trade application, which waits for an admin: a school buying
+  classroom supplies is not a competing reseller, so the approval queue was
+  judged not worth the friction. Note the trade-off — anyone who completes this
+  form reaches the wholesale catalogue and trade pricing without vetting.
+- Customer codes are still **never auto-generated** — always null until an admin
   allocates one.
 - No WhatsApp messaging to customers.
