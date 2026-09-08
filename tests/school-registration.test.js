@@ -56,6 +56,29 @@ describe('school registration site', () => {
     assert.match(migration, /add column if not exists school_type text/i);
   });
 
+  it('signs the school straight into the portal', () => {
+    const api = read('schools/api/register-school.js');
+    const app = read('schools/src/App.jsx');
+    // Server mints a real session with the public anon key…
+    assert.match(api, /signInWithPassword/);
+    assert.match(api, /VITE_SUPABASE_ANON_KEY \|\| process\.env\.SUPABASE_ANON_KEY/);
+    // …and the browser hands it to proto.co.za in the URL fragment.
+    assert.match(app, /access_token: accessToken/);
+    assert.match(app, /refresh_token: refreshToken/);
+    assert.match(app, /window\.location\.replace/);
+    // 'type=recovery' would open the portal's password-reset screen instead.
+    assert.doesNotMatch(app, /type: 'recovery'/);
+  });
+
+  it('never strands a school if the auto sign-in fails', () => {
+    const api = read('schools/api/register-school.js');
+    const app = read('schools/src/App.jsx');
+    // The account is already created and approved — the hand-off is best effort.
+    assert.match(api, /auto sign-in failed/);
+    assert.match(app, /if \(accessToken && refreshToken\)/);
+    assert.match(app, /setDone\(true\)/);
+  });
+
   it('stores the school address for delivery', () => {
     const api = read('schools/api/register-school.js');
     assert.match(api, /const schoolAddress = \[/);

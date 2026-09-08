@@ -45,6 +45,9 @@ const SCHOOL_SALES_CHANNEL = 'School, church or institution';
 
 const MIN_PASSWORD_LENGTH = 8;
 
+/** Where a freshly registered school is sent, already signed in. */
+const PORTAL_URL = (process.env.PORTAL_URL || 'https://proto.co.za').replace(/\/$/, '');
+
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
 const BLOCKED_DOMAINS = new Set([
@@ -341,5 +344,43 @@ export default async function handler(req, res) {
     supplyNeeds: normalizedSupplyNeeds,
   });
 
-  return res.status(200).json({ ok: true, instantAccess: true });
+  // Mint a real session so the browser can land INSIDE the portal already
+  // signed in, rather than at a login form. The anon key is public by design
+  // (it is already shipped in the portal's own bundle) and the session it
+  // returns is scoped to this one just-created account.
+  let session = null;
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  if (anonKey) {
+    try {
+      const publicClient = createClient(supabaseUrl, anonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: signIn, error: signInError } = await publicClient.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (signInError) throw signInError;
+      session = signIn?.session || null;
+    } catch (signInErr) {
+      // The account exists and is approved either way — never fail a completed
+      // registration over the convenience hand-off. The browser falls back to
+      // the manual sign-in link.
+      console.warn('register-school auto sign-in failed:', signInErr?.message || signInErr);
+    }
+  } else {
+    console.warn('register-school: no anon key configured — auto sign-in skipped');
+  }
+
+  return res.status(200).json({
+    ok: true,
+    instantAccess: true,
+    portalUrl: PORTAL_URL,
+    session: session
+      ? {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        expiresIn: session.expires_in,
+      }
+      : null,
+  });
 }

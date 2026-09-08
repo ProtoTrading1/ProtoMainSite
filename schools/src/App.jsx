@@ -67,6 +67,7 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const summaryRef = useRef(null);
 
@@ -116,7 +117,7 @@ export default function App() {
 
     setSubmitting(true);
     try {
-      await submitSchoolRegistration({
+      const result = await submitSchoolRegistration({
         schoolName: schoolName.trim(),
         schoolType,
         streetAddress: streetAddress.trim(),
@@ -134,6 +135,28 @@ export default function App() {
         authorised,
         company_fax: companyFax,
       });
+
+      // Straight into the portal, already signed in: hand the session to
+      // proto.co.za in the URL fragment, which its Supabase client reads on
+      // load (detectSessionInUrl) and then strips from the address bar. This
+      // is the same mechanism Supabase's own magic links use.
+      const portalUrl = result?.portalUrl || 'https://proto.co.za';
+      const { accessToken, refreshToken, expiresIn } = result?.session || {};
+      if (accessToken && refreshToken) {
+        const fragment = new URLSearchParams({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_in: String(expiresIn ?? 3600),
+          token_type: 'bearer',
+        });
+        setRedirecting(true);
+        // replace(), not assign(), so Back does not return to a submitted form.
+        window.location.replace(`${portalUrl}/#${fragment.toString()}`);
+        return;
+      }
+
+      // No session came back (anon key not configured, or sign-in hiccuped).
+      // The account is live regardless — fall back to the manual link.
       setDone(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
@@ -558,9 +581,11 @@ export default function App() {
                 <p className="field-error" id="authorised-error">{errors.authorised}</p>
               )}
 
-              <button type="submit" className="submit" disabled={submitting}>
-                {submitting ? 'Registering your school…' : 'Register our school'}
-                {!submitting && <ArrowRightIcon className="submit-icon" />}
+              <button type="submit" className="submit" disabled={submitting || redirecting}>
+                {redirecting
+                  ? 'Taking you to Proto Trading Online…'
+                  : submitting ? 'Registering your school…' : 'Register our school'}
+                {!submitting && !redirecting && <ArrowRightIcon className="submit-icon" />}
               </button>
               <p className="submit-note">Your details are saved securely with Proto.</p>
             </form>

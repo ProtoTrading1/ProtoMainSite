@@ -5,8 +5,15 @@ project**: nothing in this folder is bundled into the main trade portal, and the
 main portal's build never reads it.
 
 Schools register here, land in the same Supabase `customers` table as trade
-applicants flagged `is_school = true`, and get **instant access** — they can
-sign in at https://proto.co.za and order straight away, with no approval queue.
+applicants flagged `is_school = true`, and get **instant access** — on submit
+they are redirected straight into https://proto.co.za **already signed in**,
+with no approval queue and no login step.
+
+The hand-off works the way Supabase's own magic links do: the server signs the
+new account in and returns a session, and the browser passes it to the portal in
+the URL fragment, which the portal's Supabase client reads on load
+(`detectSessionInUrl`) and then strips from the address bar. If it fails for any
+reason the account is still live and the school gets a manual sign-in link.
 They show a **SCHOOL** badge in the admin dashboard's Customer Management.
 
 ## Local development
@@ -41,6 +48,8 @@ Set these on the new Vercel project — it does **not** inherit the main portal'
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | yes | Supabase project URL (`SUPABASE_URL` also accepted) |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-side account creation. Never expose to the browser |
+| `VITE_SUPABASE_ANON_KEY` | yes | Mints the session that signs a school straight into the portal. Public by design — it is already in the portal's own bundle. Without it registration still succeeds, but the school lands on the success screen and has to sign in by hand |
+| `PORTAL_URL` | no | Where a registered school is sent. Defaults to `https://proto.co.za` |
 | `BREVO_API_KEY` | no | Sends the "new school signup" alert. Registration still succeeds without it |
 | `SIGNUP_NOTIFY_EMAILS` | no | Comma-separated alert recipients. Defaults to `online@proto.co.za,george@proto.co.za` |
 | `BREVO_SENDER_NAME` / `BREVO_SENDER_EMAIL` | no | Sender identity, defaults to Proto Trading Online / online@proto.co.za |
