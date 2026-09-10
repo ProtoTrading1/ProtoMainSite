@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
+import { itemPreferenceFields } from '../lib/item-preference.mjs';
 
 const MAX_LINES = 250;
 const MAX_QTY = 9999;
@@ -110,7 +111,7 @@ function validateItems(value) {
     if (!Number.isSafeInteger(raw.qty) || raw.qty < 1 || raw.qty > MAX_QTY) {
       throw inputError(`Basket quantity must be a whole number from 1 to ${MAX_QTY}`);
     }
-    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty };
+    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty, ...itemPreferenceFields(raw) };
   });
 }
 

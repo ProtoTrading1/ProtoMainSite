@@ -297,11 +297,11 @@ function SpecialRibbon({ special }) {
   );
 }
 
-function ProductQtyInput({ qty, setQty, minQty }) {
+function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   const [draft, setDraft] = useState(String(qty));
   useEffect(() => { setDraft(String(qty)); }, [qty]);
   const commit = () => {
-    const next = Math.max(minQty || 1, Math.min(9999, Number(draft) || minQty || 1));
+    const next = Math.max(minQty || 1, Math.min(maxQty, Number(draft) || minQty || 1));
     setDraft(String(next));
     setQty(next);
   };
@@ -310,7 +310,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
       aria-label="Quantity"
       inputMode="numeric"
       min={minQty || 1}
-      max="9999"
+      max={maxQty}
       type="number"
       value={draft}
       onBlur={commit}
@@ -578,12 +578,12 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   >
                     <Minus size={14} />
                   </button>
-                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999} />
                   <button
-                    onClick={() => setQty((current) => Math.min(9999, current + 1))}
+                    onClick={() => setQty((current) => Math.min(product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999, current + 1))}
                     type="button"
                     aria-label={`Increase quantity from ${qty}`}
-                    disabled={qty >= 9999}
+                    disabled={qty >= (product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999)}
                   >
                     <Plus size={14} />
                   </button>
@@ -785,8 +785,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                         <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease" disabled={qty <= (activeProduct.minQty || 1)}>
                           <Minus size={14} />
                         </button>
-                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
-                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} maxQty={activeProduct.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0)) : 9999} />
+                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase" disabled={activeProduct.isExtendedRange && qty >= Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0))}>
                           <Plus size={14} />
                         </button>
                       </div>
