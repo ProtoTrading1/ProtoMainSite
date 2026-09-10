@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareInstoreSearch, discoveryGroup, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 
 test('uses Positill department and description for the soft-toy browse tile', () => {
   const product = {
@@ -24,4 +24,13 @@ test('ranks direct description matches ahead of related browse matches', () => {
   const direct = { title: 'BRACELET WOODEN BEADS', category: 'FASHION JEWELLERY' };
   const related = { title: 'MEMORY WIRE BANGLE', category: 'PENDNTS BRACLTS RNGS' };
   assert.ok(compareInstoreSearch(direct, related, 'bracelet') < 0);
+});
+
+test('starts browse discovery with beads and jewellery making', () => {
+  const tiles = discoveryTiles([
+    { title: 'SOFT TOY BEAR', category: 'SOFT TOYS' },
+    { title: 'WOODEN BEADS', category: 'WOODEN BEADS' },
+    { title: 'BRACELET', category: 'FASHION JEWELLERY' },
+  ]);
+  assert.equal(tiles[0].label, 'Beads & jewellery making');
 });

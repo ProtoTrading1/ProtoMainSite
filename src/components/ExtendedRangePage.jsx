@@ -4,6 +4,7 @@ import ProductCard from './ProductCard';
 import { fetchExtendedRange } from '../lib/extendedRange';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../../lib/instore-discovery.mjs';
 import './InstoreProducts.css';
+import './InstoreDisclaimer.css';
 
 function localPage(catalogue, query, category, page) {
  const products = catalogue.filter((product) => matchesInstoreSearch(product, query)
@@ -21,7 +22,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: 60 });
   const [tiles, setTiles] = useState([]);
   const [catalogue, setCatalogue] = useState(null);
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('Beads & jewellery making');
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
