@@ -1812,6 +1812,7 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
