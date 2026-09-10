@@ -32,15 +32,6 @@ test('barcode grouping output is byte-identical to the legacy shape (no groupId)
   assert.ok(out.some((p) => p.id === 'SOLO' && !p.isVariantGroup));
 });
 
-test('variant cards retain the primary member’s complete product description', () => {
-  const out = groupProductsByBarcode([
-    row('KEY1', 'KEYS', { name: '21ST BIRTHDAY KEY | VINTAGE KEY: GOLD | ±17×8×1cm' }),
-    row('KEY2', 'KEYS', { name: '21ST BIRTHDAY KEY | VINTAGE KEY: SILVER | ±17×8×1cm' }),
-  ]);
-
-  assert.equal(out.find((product) => product.barcode === 'KEYS').name, '21ST BIRTHDAY KEY | VINTAGE KEY: GOLD | ±17×8×1cm');
-});
-
 test('admin group: distinct barcodes collapse, title from group, identity from primary', () => {
   const g = { groupId: 'GID', groupPrimarySku: 'SKU2', groupTitle: 'Deluxe Widget' };
   const out = groupProductsByBarcode([

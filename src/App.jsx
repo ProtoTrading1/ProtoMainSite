@@ -4,7 +4,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
-import ExtendedRangePage from './components/ExtendedRangePage';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -29,7 +28,6 @@ import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './l
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
-import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
@@ -138,9 +136,6 @@ function productCanOrderWhenOos(product) {
 
 function cartQtyCapForProduct(product) {
   if (!product) return 0;
-  // Instore stock is a buy-now ceiling, not a backorder request. Its fresh
-  // server-side checkout resolver repeats this cap immediately before order.
-  if (product.isExtendedRange === true) return Math.max(0, Math.floor(productStockQtyForCart(product) || 0));
   if (productCanOrderWhenOos(product)) return CART_QTY_UNLIMITED;
 
   const qty = productStockQtyForCart(product);
@@ -806,7 +801,7 @@ export default function App({
   // if the first path segment isn't a known department, resolve to the
   // catalogue root instead of showing an empty/broken page.
   useEffect(() => {
-    if (path.length && !['instore-products', 'extended-range'].includes(path[0]) && !categories.some((c) => c.id === path[0])) {
+    if (path.length && !categories.some((c) => c.id === path[0])) {
       hashNavigate([]);
     }
   }, [path, hashNavigate, categories]);
@@ -1183,7 +1178,7 @@ export default function App({
     return () => window.clearTimeout(timeout);
   }, [clearedCartSnapshot]);
 
-  const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
+  const addToCart = useCallback((product, qty, buttonPos = null) => {
     if (!cartHydratedRef.current) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
       return;
@@ -1192,21 +1187,15 @@ export default function App({
     if (maxQty <= 0) return;
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
-    const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
-    const existingLine = currentCartRef.current?.items?.find((item) => item.product.id === product.id);
-    if (requestedPreference && existingLine?.preference && requestedPreference !== existingLine.preference) {
-      setCartAnnouncement('This item already has a different colour/design preference. Review its basket note before adding more.');
-      return;
-    }
 
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
         const nextQty = Math.min(maxQty, existing.qty + requestedQty);
-        if (nextQty === existing.qty && (requestedPreference === undefined || requestedPreference === (existing.preference || ''))) return prev;
-        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty, ...(requestedPreference !== undefined ? { preference: requestedPreference } : {}) } : i));
+        if (nextQty === existing.qty) return prev;
+        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty } : i));
       }
-      return [...prev, { product, qty: Math.min(maxQty, requestedQty), ...itemPreferenceFields({ preference: requestedPreference }) }];
+      return [...prev, { product, qty: Math.min(maxQty, requestedQty) }];
     });
     markCartActivity();
     cartRevealSequenceRef.current += 1;
@@ -1266,12 +1255,6 @@ export default function App({
   const cartQtyMap = useMemo(() => {
     const map = {};
     for (const item of cartItems) map[item.product.id] = item.qty;
-    return map;
-  }, [cartItems]);
-
-  const cartPreferenceMap = useMemo(() => {
-    const map = {};
-    for (const item of cartItems) map[item.product.id] = item.preference || '';
     return map;
   }, [cartItems]);
 
@@ -1562,7 +1545,6 @@ export default function App({
         customerNotes,
         items: submittedItems.map((item) => ({
           qty: item.qty,
-          ...itemPreferenceFields(item),
           product: {
             id: item.product.id,
             sku: item.product.sku,
@@ -1673,7 +1655,7 @@ export default function App({
       const product = bySku.get(String(item.productId || '').toUpperCase())
         || bySku.get(String(item.code || '').toUpperCase())
         || catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
-      if (product) resolved.push({ product, qty: item.qty, ...itemPreferenceFields(item) });
+      if (product) resolved.push({ product, qty: item.qty });
       else missing.push(item);
     }
 
@@ -1686,13 +1668,7 @@ export default function App({
     let overflow = 0;
     for (const item of resolved) {
       const existing = nextCart.find((entry) => entry.product.id === item.product.id);
-      if (existing) {
-        if (existing.preference && item.preference && existing.preference !== item.preference) { missing.push({ ...item, productId: item.product.id, reason: 'preference_conflict' }); continue; }
-        existing.qty += item.qty;
-        if (item.preference) existing.preference = item.preference;
-        added += 1;
-        continue;
-      }
+      if (existing) { existing.qty += item.qty; added += 1; continue; }
       // The server rejects an order over MAX_CART_LINES lines. Stopping here
       // beats letting the cart grow past the limit and failing at checkout,
       // after the customer has already spent the effort.
@@ -1783,7 +1759,6 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
-  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -1812,7 +1787,6 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
-        onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
@@ -1826,7 +1800,6 @@ export default function App({
             path={path}
             navigate={navigate}
             onAllProducts={goAllProducts}
-            onInstoreProducts={() => navigate(['instore-products'])}
             setRefinement={setRefinement}
             counts={counts}
             customer={customer}
@@ -1834,12 +1807,7 @@ export default function App({
         </aside>
 
         <main className="content-area">
-          {viewingInstoreProducts ? <ExtendedRangePage
-            addToCart={addToCart}
-            cartQtyMap={cartQtyMap}
-            cartPreferenceMap={cartPreferenceMap}
-            specialsMap={specialsMap}
-          /> : <MainContent
+          <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
             addToCart={addToCart}
@@ -1874,7 +1842,7 @@ export default function App({
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
-          />}
+          />
         </main>
 
         <aside
@@ -1962,7 +1930,6 @@ export default function App({
         onHome={() => { goHome(); setMobileMenuOpen(false); }}
         onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
         onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
-        onInstoreProducts={() => { navigate(['instore-products']); setMobileMenuOpen(false); }}
       />
 
       {/* Mobile cart — opened from bottom tab bar */}

@@ -19,7 +19,6 @@ function CheckoutLine({ item, toOrder = false }) {
           {toOrder && <em className="checkout-to-order-badge">To order</em>}
         </div>
         <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
-        {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
         {Number(item.product.minQty) > 1
           ? <span>Minimum order: {item.product.minQty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
           : null}

@@ -405,7 +405,6 @@ export default function Drawer({
             </div>
             <div className="drawer-line-body">
               <h3>{item.product.name}</h3>
-              {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
               <span>{item.product.code}</span>
               <span>Sold as: {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
               {Number(item.product.minQty) > 1 && (

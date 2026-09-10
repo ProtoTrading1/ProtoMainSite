@@ -1,8 +1,7 @@
 import PDFDocument from 'pdfkit';
-import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
-import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
+import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -22,8 +21,6 @@ import {
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
-import { stockClient } from './extended-range.js';
-import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
   assertOrderCaptureSchemaReady,
   enqueueFailedOrderDeliveries,
@@ -252,82 +249,7 @@ async function sendTeamEmailWithRetry(payload, orderNumber) {
   };
 }
 
-function orderError(message, status = 400) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-}
-
-function textId(value) {
-  return typeof value === 'string' ? value.trim().toUpperCase() : '';
-}
-
-function availableFromBridge(row) {
-  if (row?.ONHAND === null || row?.ONHAND === undefined || row?.ONHAND === ''
-    || row?.BOOKED === null || row?.BOOKED === undefined || row?.BOOKED === '') return null;
-  const onHand = Number(row.ONHAND);
-  const booked = Number(row.BOOKED);
-  return Number.isFinite(onHand) && Number.isFinite(booked) && booked >= 0 ? Math.floor(onHand - booked) : null;
-}
-
-// Pure server boundary used by the checkout tests. Browser titles, prices and
-// quantities are not trusted: the reviewed index and fresh bridge response win.
-export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [] } = {}) {
-  const sku = textId(item?.product?.sku || item?.product?.id);
-  if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
-  if (indexRow?.image_source !== 'nutstore' || indexRow?.is_active !== true || indexRow?.image_review_status !== 'verified' || indexRow?.visibility_status !== 'search_only' || !String(indexRow?.image_url || '').startsWith('https://')) throw orderError('Instore product is no longer approved.', 409);
-  if (textId(bridgeRow?.CODE) !== sku) throw orderError('Current Instore stock could not be verified.', 503);
-  const qty = Number(item?.qty);
-  const available = availableFromBridge(bridgeRow);
-  const price = websitePriceFromExVat(Number(bridgeRow?.PRICE_A));
-  if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-  if (!Number.isFinite(price) || price <= 0 || available === null || available < 1 || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
-}
-
-async function resolveInstorePrices(items) {
-  if (!items.length) return [];
-  const skus = [...new Set(items.map((item) => textId(item?.product?.sku || item?.product?.id)).filter(Boolean))];
-  if (skus.length !== items.length && new Set(items.map((item) => textId(item?.product?.sku || item?.product?.id))).size !== skus.length) throw orderError('Duplicate Instore order lines are not allowed.');
-  const index = stockClient();
-  let indexRows; let normalRows;
-  try {
-    const [indexResult, normalSkuResult, normalBarcodeResult] = await Promise.all([
-      index.from('extended_range_items').select('sku, image_source, barcode, title, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
-      index.from('website_stock').select('sku, barcode').in('sku', skus),
-      index.from('website_stock').select('sku, barcode').in('barcode', skus),
-    ]);
-    if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error;
-    indexRows = indexResult.data || [];
-    normalRows = [...(normalSkuResult.data || []), ...(normalBarcodeResult.data || [])];
-  } catch (error) {
-    console.error('send-order: Instore index lookup failed:', error?.message || error);
-    throw orderError('Current Instore product details could not be verified. Please try again.', 503);
-  }
-  const duplicates = new Map();
-  for (const item of items) {
-    const sku = textId(item?.product?.sku || item?.product?.id);
-    const outcome = evaluateInstoreDuplicate({ sku }, { status: 'success', complete: true, variantsIncluded: true, checkedIdentifiers: [sku], rows: normalRows });
-    duplicates.set(sku, outcome);
-  }
-  const bridgeUrl = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
-  const bridgeKey = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
-  if (!bridgeUrl.startsWith('https://') || !bridgeKey) throw orderError('Instore bridge is not configured.', 503);
-  const bridgeRows = await Promise.all(skus.map(async (sku) => {
-    const response = await fetch(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw orderError('Current Instore stock could not be verified.', 503);
-    return [sku, (await response.json())?.row];
-  })).catch((error) => { if (error?.status) throw error; throw orderError('Current Instore stock could not be verified.', 503); });
-  const bridgeBySku = new Map(bridgeRows);
-  return items.map((item) => {
-    const sku = textId(item?.product?.sku || item?.product?.id);
-    const matching = indexRows.filter((row) => textId(row.sku) === sku);
-    if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku) });
-  });
-}
-
-async function resolveStandardPrices(items) {
+async function resolveAuthoritativePrices(items) {
   if (items.length > MAX_ORDER_LINES) {
     const error = new Error(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
     error.status = 400;
@@ -411,7 +333,6 @@ async function resolveStandardPrices(items) {
     const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
     return {
       qty,
-      ...itemPreferenceFields(item),
       product: {
         id: authoritativeSku,
         sku: authoritativeSku,
@@ -432,15 +353,6 @@ async function resolveStandardPrices(items) {
   });
 
   return authItems;
-}
-
-export async function resolveAuthoritativePrices(items) {
-  if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
-  const instoreItems = items.filter((item) => item?.product?.isExtendedRange === true);
-  const standardItems = items.filter((item) => item?.product?.isExtendedRange !== true);
-  const [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems)]);
-  let instoreIndex = 0; let standardIndex = 0;
-  return items.map((item) => item?.product?.isExtendedRange === true ? resolvedInstore[instoreIndex++] : resolvedStandard[standardIndex++]);
 }
 
 function estimatedTotal(subtotal, discountAmount) {
@@ -857,8 +769,6 @@ function buildOrderEmailRows(items) {
     const lineTotal = qty * unitPrice;
     const code = escapeHtml(cleanText(product.code, '—'));
     const name = escapeHtml(cleanText(product.name, 'Product'));
-    const preference = normalizeItemPreference(item.preference);
-    const preferenceHtml = preference ? `<br><span style="color:#64748b;font-size:11px;font-weight:600;">Preferred colour/design: ${escapeHtml(preference)} (subject to availability)</span>` : '';
     const unitLabel = escapeHtml(sellingUnitDetails(product.unitsOfIssue).label);
     const img = cleanText(product.image || product.remoteImage || '');
     const imgCell = /^https:\/\//i.test(img)
@@ -869,7 +779,7 @@ function buildOrderEmailRows(items) {
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}<br><span style="color:#64748b;font-size:11px;font-weight:600;">Sold as: ${unitLabel}</span>${preferenceHtml}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}<br><span style="color:#64748b;font-size:11px;font-weight:600;">Sold as: ${unitLabel}</span></td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:800;text-align:center;">${qty}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;text-align:right;white-space:nowrap;">${money(unitPrice)}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:12px;font-weight:800;text-align:right;white-space:nowrap;">${money(lineTotal)}</td>
@@ -1123,7 +1033,6 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
       const unitPrice = Number(product.price || 0);
       return {
         productId: product.id,
-        ...itemPreferenceFields(item),
         code: product.code,
         name: product.name,
         qty,
@@ -1184,13 +1093,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // Preview is a visual/test environment only. Production uses the same
-  // verified checkout path; this guard prevents a preview from sending mail or
-  // creating an order while reviewers exercise the Instore basket.
-  if (process.env.VERCEL_ENV === 'preview') {
-    return res.status(403).json({ error: 'Ordering is disabled in Preview. Your basket has not changed.' });
   }
 
   const access = await requireApprovedCustomer(req, res);

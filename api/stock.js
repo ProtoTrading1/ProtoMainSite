@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
-import { buildExtendedRangeProducts, stockClient } from './extended-range.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
 // Always hits the DB fresh (no-store) so a click never serves a cached number.
@@ -14,26 +13,6 @@ import { buildExtendedRangeProducts, stockClient } from './extended-range.js';
 
 // Accept uppercase letters, digits and dashes (real SKUs/barcodes), sane max length.
 const SKU_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/;
-
-async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
-  const { data, error } = await stockClient().from('extended_range_items')
-    .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
-    .eq('sku', sku).limit(1);
-  if (error) throw error;
-  const product = buildExtendedRangeProducts(data || [], '', { includeStaged })[0];
-  if (!product) return null;
-  const base = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
-  const key = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
-  if (!base.startsWith('https://') || !key) throw new Error('Instore bridge is not configured');
-  const response = await fetch(`${base}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': key }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
-  if (!response.ok) throw new Error(`Instore bridge returned ${response.status}`);
-  const row = (await response.json())?.row;
-  const onHand = Number(row?.ONHAND);
-  const booked = Number(row?.BOOKED);
-  if (!Number.isFinite(onHand) || !Number.isFinite(booked)) throw new Error('Instore bridge returned incomplete stock');
-  const qty = Math.max(0, Math.floor(onHand - booked));
-  return { qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
-}
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -51,8 +30,6 @@ export default async function handler(req, res) {
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    const previewHost = String(req.headers.host || '').split(':')[0];
-    const includeStaged = process.env.VERCEL_ENV === 'preview' && /\.vercel\.app$/i.test(previewHost);
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
@@ -76,9 +53,7 @@ export default async function handler(req, res) {
 
     if (error) throw error;
     if (!data || data.length === 0) {
-      const instore = await readFreshInstoreStock(sku, { includeStaged });
-      if (!instore) return res.status(404).json({ error: 'SKU not found' });
-      return res.status(200).json({ sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
+      return res.status(404).json({ error: 'SKU not found' });
     }
 
     const row = data[0];

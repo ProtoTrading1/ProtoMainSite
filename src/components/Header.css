@@ -522,18 +522,6 @@
   color: #C89A3C;
 }
 
-.app-header--premium .header-nav-instore {
-  color: #E5E5E5;
-}
-
-.app-header--premium .header-nav-instore svg {
-  color: #D4AD56;
-}
-
-.app-header--premium .header-nav-instore:hover {
-  color: #FFFFFF;
-}
-
 .app-header--premium .header-nav-ask-proto {
   color: #E5E5E5;
 }

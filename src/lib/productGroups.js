@@ -77,10 +77,7 @@ export function groupProductsByBarcode(products) {
       ? (variants.find((v) => String(v.sku || v.id || '').trim().toUpperCase() === primarySkuKey) || rep)
       : rep;
     const adminTitle = isAdminGroup ? String(rep.groupTitle || '').trim() : '';
-    // Preserve a complete sellable item's description on a grouped card. The
-    // variant badge communicates alternatives; a shared-prefix label can cut
-    // off useful colour and size details.
-    const groupTitle = adminTitle || primaryMember.name || primaryMember.title || deriveGroupTitle(variants) || entry.key;
+    const groupTitle = adminTitle || deriveGroupTitle(variants) || primaryMember.name || primaryMember.title || entry.key;
     const groupImages = variants.flatMap((v) => v.images || (v.image ? [v.image] : [])).filter(Boolean);
     // Keep barcode-group ids byte-identical to before (`group_<barcode>`); admin
     // groups get a stable, distinct id.
