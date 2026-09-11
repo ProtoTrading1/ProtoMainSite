@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { validateInstoreBridgeStock } from '../../api/stock.js';
+
+test('Instore stock requires its exact product identity and complete numeric balances', () => {
+  const sku = '8618100133';
+  const row = { CODE: sku, ONHAND: '12', BOOKED: '1' };
+  assert.equal(validateInstoreBridgeStock(sku, row).qty, 11);
+  assert.throws(() => validateInstoreBridgeStock(sku, { ...row, CODE: '8618100134' }), /different product/);
+  assert.throws(() => validateInstoreBridgeStock(sku, { ...row, CODE: null }), /different product/);
+  for (const field of ['ONHAND', 'BOOKED']) {
+    for (const value of [null, undefined, '', ' ', 'invalid', NaN, Infinity, false]) {
+      assert.throws(() => validateInstoreBridgeStock(sku, { ...row, [field]: value }), /incomplete stock/);
+    }
+  }
+  assert.throws(() => validateInstoreBridgeStock(sku, { ...row, BOOKED: -1 }), /invalid booked/);
+  assert.equal(validateInstoreBridgeStock(sku, { ...row, ONHAND: 0, BOOKED: 0 }).availability.canOrder, false);
+});
 
 const readSource = (relativePath) => readFile(new URL(`../../${relativePath}`, import.meta.url), 'utf8');
 

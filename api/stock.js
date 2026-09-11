@@ -15,6 +15,19 @@ import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequ
 // Accept uppercase letters, digits and dashes (real SKUs/barcodes), sane max length.
 const SKU_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/;
 
+export function validateInstoreBridgeStock(sku, row) {
+  if (typeof row?.CODE !== 'string' || row.CODE.trim().toUpperCase() !== sku) throw new Error('Instore bridge returned a different product');
+  for (const field of ['ONHAND', 'BOOKED']) {
+    const value = row?.[field];
+    if (!['string', 'number'].includes(typeof value) || String(value).trim() === '' || !Number.isFinite(Number(value))) throw new Error('Instore bridge returned incomplete stock');
+  }
+  const onHand = Number(row.ONHAND);
+  const booked = Number(row.BOOKED);
+  if (booked < 0) throw new Error('Instore bridge returned invalid booked stock');
+  const qty = Math.max(0, Math.floor(onHand - booked));
+  return { qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
+}
+
 async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
   const { data, error } = await stockClient().from('extended_range_items')
     .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
@@ -28,11 +41,7 @@ async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
   const response = await fetch(`${base}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': key }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Instore bridge returned ${response.status}`);
   const row = (await response.json())?.row;
-  const onHand = Number(row?.ONHAND);
-  const booked = Number(row?.BOOKED);
-  if (!Number.isFinite(onHand) || !Number.isFinite(booked)) throw new Error('Instore bridge returned incomplete stock');
-  const qty = Math.max(0, Math.floor(onHand - booked));
-  return { qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
+  return validateInstoreBridgeStock(sku, row);
 }
 
 export default async function handler(req, res) {

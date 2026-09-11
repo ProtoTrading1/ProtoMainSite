@@ -288,7 +288,7 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
 async function resolveInstorePrices(items) {
   if (!items.length) return [];
   const skus = [...new Set(items.map((item) => textId(item?.product?.sku || item?.product?.id)).filter(Boolean))];
-  if (skus.length !== items.length && new Set(items.map((item) => textId(item?.product?.sku || item?.product?.id))).size !== skus.length) throw orderError('Duplicate Instore order lines are not allowed.');
+  if (skus.length !== items.length) throw orderError('Duplicate or invalid Instore order lines are not allowed.');
   const index = stockClient();
   let indexRows; let normalRows;
   try {
