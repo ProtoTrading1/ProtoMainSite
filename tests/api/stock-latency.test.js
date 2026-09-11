@@ -9,8 +9,11 @@ test('live stock keeps authentication first and overlaps approval with the stock
 
   const authIndex = source.indexOf('await requireAuth(req, res)');
   const parallelIndex = source.indexOf('await Promise.all([');
-  const approvalIndex = source.indexOf('getApprovedCustomer(user, res)');
-  const stockIndex = source.indexOf(".from('website_stock')");
+  // The isolated Instore preview has its own approval/read path before the
+  // normal catalogue flow. Assert the normal flow specifically, rather than
+  // treating the first preview reference as the live-stock implementation.
+  const approvalIndex = source.lastIndexOf('getApprovedCustomer(user, res)');
+  const stockIndex = source.lastIndexOf(".from('website_stock')");
 
   assert.ok(authIndex >= 0, 'the caller is authenticated');
   assert.ok(parallelIndex > authIndex, 'parallel reads only start after authentication');
