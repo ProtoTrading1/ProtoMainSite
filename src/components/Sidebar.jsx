@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, PackageSearch, Upload, X } from 'lucide-react';
+import { Loader2, PackageSearch, Store, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import { authHeaders } from '../lib/authHeaders';
 let megaMenuPreloadPromise = null;
@@ -144,7 +144,7 @@ function MegaMenuSkeleton() {
   );
 }
 
-export default function Sidebar({ categories, path, navigate, onAllProducts, counts }) {
+export default function Sidebar({ categories, path, navigate, onAllProducts, onInstoreProducts, counts }) {
   // Keep the active department highlighted without forcing its flyout open on
   // first render. The menu appears only after deliberate pointer or keyboard
   // intent, so a deep-linked category never starts with its products obscured.
@@ -264,6 +264,12 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, cou
 
         {/* CTA buttons — below category list */}
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={onInstoreProducts}
+            aria-current={['instore-products', 'extended-range'].includes(path[0]) ? 'page' : undefined}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, minHeight: 44, padding: '10px 14px', border: '1px solid #e7d7d7', borderRadius: 10, background: ['instore-products', 'extended-range'].includes(path[0]) ? '#fbeaea' : '#fff7f7', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#8b1a1a', cursor: 'pointer' }}
+          ><Store size={17} aria-hidden="true" />Instore Products</button>
           <button
             ref={requestTriggerRef}
             type="button"

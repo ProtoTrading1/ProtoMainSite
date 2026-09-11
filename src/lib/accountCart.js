@@ -21,6 +21,7 @@ export function cartFingerprint(items) {
   return JSON.stringify((Array.isArray(items) ? items : []).map((item) => [
     String(item?.product?.id || item?.product?.sku || item?.product?.code || ''),
     Number(item?.qty || 0),
+    String(item?.preference || ''),
   ]));
 }
 
