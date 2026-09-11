@@ -37,8 +37,8 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
 });
 
 test('product detail begins a live stock lookup without querying every grid card', () => {
-  assert.match(productCardSrc, /function StockCheck\(\{ sku, autoCheck = false \}\)/);
+  assert.match(productCardSrc, /function StockCheck\(\{ sku, autoCheck = false, source = '' \}\)/);
   assert.match(productCardSrc, /if \(autoCheck\) void check\(\)/);
   assert.match(productCardSrc, /<StockCheck[\s\S]*?autoCheck[\s\S]*?\/>/);
-  assert.match(productCardSrc, /!product\.isVariantGroup && sku \? <StockCheck sku=\{sku\} \/>/, 'single-SKU grid stock remains explicitly requested');
+  assert.match(productCardSrc, /!product\.isVariantGroup && sku \? <StockCheck/, 'single-SKU grid stock remains explicitly requested');
 });

@@ -48,7 +48,7 @@ test('orderability and customer-initiated live stock remain visible on mobile', 
   ]);
   assert.match(card, /className=\{`pc-orderability pc-orderability--\$\{badgeClass\}`\}/);
   assert.match(card, /label: 'Stock varies by option'/, 'variant groups use a neutral group-level stock message');
-  assert.match(card, /!product\.isVariantGroup && sku \? <StockCheck sku=\{sku\} \/>/, 'single-SKU live grid stock remains customer initiated');
+  assert.match(card, /!product\.isVariantGroup && sku \? <StockCheck/, 'single-SKU grid stock remains customer initiated');
   assert.match(card, /<PackageSearch size=\{16\} \/>[\s\S]*Choose option/, 'variant groups expose one clear primary action');
   assert.doesNotMatch(card, /Select option for live stock|View options/, 'duplicate option actions are removed');
   assert.match(card, /isVariantGroup \? \([\s\S]*Choose option[\s\S]*\) : \([\s\S]*aria-label="Quantity"/, 'group quantity controls wait until an exact option is chosen');

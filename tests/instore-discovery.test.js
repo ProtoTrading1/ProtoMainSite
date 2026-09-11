@@ -44,3 +44,13 @@ test('uses a recognisable in-stock product as the browse thumbnail', () => {
   assert.equal(beads?.sku, '8618100133');
   assert.equal(beads?.image, 'bracelet.jpg');
 });
+
+test('keeps fancy-dress products out of the party browse thumbnail', () => {
+  const tiles = discoveryTiles([
+    { sku: '8601897013', title: 'WITCHES NOSE CARDED', category: 'PARTY / FANCY DRES', image: 'witch.jpg' },
+    { sku: '8602000001', title: 'PARTY BALLOONS ASSORTED', category: 'PARTY / FANCY DRES', image: 'balloons.jpg' },
+  ]);
+  const party = tiles.find((tile) => tile.label === 'Party items');
+  assert.equal(party?.sku, '8602000001');
+  assert.equal(party?.image, 'balloons.jpg');
+});

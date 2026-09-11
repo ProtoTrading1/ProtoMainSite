@@ -127,14 +127,17 @@ function StockBadge({ product }) {
         <span>{availability.label}</span>
         <small>{availability.guidance}</small>
       </div>
-      {!product.isVariantGroup && sku ? <StockCheck sku={sku} /> : null}
+      {!product.isVariantGroup && sku ? <StockCheck
+        sku={sku}
+        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+      /> : null}
     </div>
   );
 }
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false }) {
+function StockCheck({ sku, autoCheck = false, source = '' }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
 
@@ -145,7 +148,8 @@ function StockCheck({ sku, autoCheck = false }) {
     requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
     try {
-      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}`, {
+      const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
+      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
         timeoutMs: 10000,
@@ -163,7 +167,7 @@ function StockCheck({ sku, autoCheck = false }) {
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
     }
-  }, [sku]);
+  }, [sku, source]);
 
   useEffect(() => () => {
     requestRef.current?.abort();
@@ -209,7 +213,7 @@ function StockCheck({ sku, autoCheck = false }) {
         >
           {state.status === 'loading'
             ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
-            : <><PackageSearch size={14} /> Check live stock</>}
+            : <><PackageSearch size={14} /> {source === 'instore-preview' ? 'Confirm preview stock' : 'Check live stock'}</>}
         </button>
       ) : null}
       <span className="stock-result" role="status" aria-live="polite">{readout}</span>
