@@ -9,7 +9,9 @@ test('live stock keeps authentication first and overlaps approval with the stock
 
   const authIndex = source.indexOf('await requireAuth(req, res)');
   const parallelIndex = source.indexOf('await Promise.all([');
-  const approvalIndex = source.indexOf('getApprovedCustomer(user, res)');
+  // The isolated preview has its own approval check before its early return;
+  // assert against the approval check in the live parallel-read path.
+  const approvalIndex = source.lastIndexOf('getApprovedCustomer(user, res)');
   const stockIndex = source.indexOf(".from('website_stock')");
 
   assert.ok(authIndex >= 0, 'the caller is authenticated');
