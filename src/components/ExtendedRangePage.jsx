@@ -22,7 +22,9 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: 60 });
   const [tiles, setTiles] = useState([]);
   const [catalogue, setCatalogue] = useState(null);
-  const [category, setCategory] = useState('Beads & jewellery making');
+  // Beads stays the first browse tile, but opening the page must show the
+  // complete collection rather than silently applying that tile as a filter.
+  const [category, setCategory] = useState('');
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
