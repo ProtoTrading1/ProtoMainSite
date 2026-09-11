@@ -2,12 +2,14 @@ export const BASKET_ACTIVE = 'BASKET_ACTIVE';
 export const FIRST_LOGIN = 'FIRST_LOGIN';
 export const RETURNING_BUYER = 'RETURNING_BUYER';
 export const RETURNING_NO_ORDER = 'RETURNING_NO_ORDER';
+export const INSTORE_INTRO = 'INSTORE_INTRO';
 
 export const CUSTOMER_DASHBOARD_STATE_KEYS = Object.freeze({
   BASKET_ACTIVE,
   FIRST_LOGIN,
   RETURNING_BUYER,
   RETURNING_NO_ORDER,
+  INSTORE_INTRO,
 });
 
 export const CUSTOMER_DASHBOARD_DISMISS_MS = Object.freeze({
@@ -15,6 +17,7 @@ export const CUSTOMER_DASHBOARD_DISMISS_MS = Object.freeze({
   FIRST_LOGIN: 5_000,
   RETURNING_BUYER: 3_000,
   RETURNING_NO_ORDER: 4_000,
+  INSTORE_INTRO: 8_000,
 });
 
 const safeFirstName = (value) => {
@@ -61,6 +64,7 @@ export const selectCustomerDashboardState = ({
   basketRestoredAtLogin = false,
   basketItemCount = 0,
   basketTotalInclVat,
+  showInstoreIntro = false,
 } = {}) => {
   const name = safeFirstName(firstName);
   const orders = safeCount(onlineOrderCount);
@@ -77,7 +81,25 @@ export const selectCustomerDashboardState = ({
       message: basketMessage(basketItems, basketTotalInclVat),
       primaryLabel: 'Review basket',
       secondaryLabel: null,
+      instoreLabel: 'New: browse Instore Products',
       dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.BASKET_ACTIVE,
+      buyAgain: hasPreviousOrder,
+      popularCategories: !hasPreviousOrder,
+      recentOrderEmpty: !hasPreviousOrder,
+    });
+  }
+
+  if (showInstoreIntro === true) {
+    return Object.freeze({
+      key: INSTORE_INTRO,
+      presentation: 'toast',
+      eyebrow: 'NEW FOR YOU',
+      title: `More products are now available, ${name}`,
+      message: 'Explore our Instore range for more choice, clear pricing and available stock.',
+      primaryLabel: 'Explore Instore Products',
+      secondaryLabel: null,
+      dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.INSTORE_INTRO,
+      action: 'instore',
       buyAgain: hasPreviousOrder,
       popularCategories: !hasPreviousOrder,
       recentOrderEmpty: !hasPreviousOrder,

@@ -27,6 +27,7 @@ export default function CustomerJourneyPrompt({
   state,
   onPrimary,
   onSecondary,
+  onInstore,
   onDismiss,
 }) {
   if (!state) return null;
@@ -41,6 +42,9 @@ export default function CustomerJourneyPrompt({
   const showSecondary = presentation !== 'basket'
     && Boolean(state.secondaryLabel)
     && typeof onSecondary === 'function';
+  const showInstoreLink = presentation === 'basket'
+    && Boolean(state.instoreLabel)
+    && typeof onInstore === 'function';
   const titleId = `customer-journey-${presentation}-title`;
   const messageId = `customer-journey-${presentation}-message`;
   const Icon = presentation === 'basket' ? ShoppingBag : Sparkles;
@@ -67,7 +71,8 @@ export default function CustomerJourneyPrompt({
         <Icon size={presentation === 'basket' ? 24 : 20} strokeWidth={1.8} />
       </div>
 
-      <div className="customer-journey-prompt__content">
+      <div className={`customer-journey-prompt__content${presentation === 'basket' ? ' customer-journey-prompt__content--basket' : ''}`}>
+        <div className="customer-journey-prompt__copy">
         <div
           className="customer-journey-prompt__announcement"
           role="status"
@@ -87,23 +92,38 @@ export default function CustomerJourneyPrompt({
           ) : null}
         </div>
 
-        <div className="customer-journey-prompt__actions">
-          <button
-            className="customer-journey-prompt__button customer-journey-prompt__button--primary"
-            type="button"
-            onClick={onPrimary}
-          >
-            <span>{primaryLabel}</span>
-            <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
-          </button>
+        </div>
 
-          {showSecondary ? (
+        <div className="customer-journey-prompt__action-area">
+          <div className="customer-journey-prompt__actions">
             <button
-              className="customer-journey-prompt__button customer-journey-prompt__button--secondary"
+              className="customer-journey-prompt__button customer-journey-prompt__button--primary"
               type="button"
-              onClick={onSecondary}
+              onClick={onPrimary}
             >
-              {state.secondaryLabel}
+              <span>{primaryLabel}</span>
+              <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
+            </button>
+
+            {showSecondary ? (
+              <button
+                className="customer-journey-prompt__button customer-journey-prompt__button--secondary"
+                type="button"
+                onClick={onSecondary}
+              >
+                {state.secondaryLabel}
+              </button>
+            ) : null}
+          </div>
+
+          {showInstoreLink ? (
+            <button
+              className="customer-journey-prompt__instore-link"
+              type="button"
+              onClick={onInstore}
+            >
+              <span>{state.instoreLabel}</span>
+              <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
             </button>
           ) : null}
         </div>

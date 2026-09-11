@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   BASKET_ACTIVE,
   FIRST_LOGIN,
+  INSTORE_INTRO,
   RETURNING_BUYER,
   RETURNING_NO_ORDER,
   selectCustomerDashboardState,
@@ -60,6 +61,17 @@ test('an active basket uses singular item copy without introducing a second acti
   assert.equal(state.message, '1 item · R 239.00 incl. VAT');
   assert.equal(state.primaryLabel, 'Review basket');
   assert.equal(state.secondaryLabel, null);
+  assert.equal(state.instoreLabel, 'New: browse Instore Products');
+});
+
+test('an empty basket receives a one-time personalised Instore introduction', () => {
+  const state = selectState({ showInstoreIntro: true, onlineOrderCount: 1 });
+
+  assert.equal(state.key, INSTORE_INTRO);
+  assert.equal(state.title, 'More products are now available, George');
+  assert.equal(state.primaryLabel, 'Explore Instore Products');
+  assert.equal(state.action, 'instore');
+  assert.equal(state.dismissAfterMs, 8_000);
 });
 
 test('items added during the current visit never masquerade as a restored basket', () => {
@@ -171,6 +183,9 @@ test('the journey prompt keeps first-name copy and excludes retired approval/ban
   assert.match(prompt, /aria-live="polite"/);
   assert.match(prompt, /aria-atomic="true"/);
   assert.match(prompt, /type="button"[\s\S]{0,120}onClick=\{onPrimary\}/);
+  assert.match(prompt, /state\.instoreLabel/);
+  assert.match(app, /hasSeenInstoreIntro\(customer\.id\)/);
+  assert.match(app, /hashNavigate\(\['instore-products'\]\)/);
   assert.doesNotMatch(prompt, /main-site-banner\.jpg|site-hero-banner/);
   assert.match(app, /addEventListener\('pointerdown', dismissAfterOutsideInteraction/);
   assert.doesNotMatch(app, /customerJourney\.presentation === 'basket'\) return undefined/);

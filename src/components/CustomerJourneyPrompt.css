@@ -95,11 +95,19 @@
   min-width: 0;
 }
 
-.customer-journey-prompt--basket .customer-journey-prompt__content {
+.customer-journey-prompt__content--basket {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
   align-items: center;
+}
+
+.customer-journey-prompt__copy {
+  min-width: 0;
+}
+
+.customer-journey-prompt__action-area {
+  min-width: 0;
 }
 
 .customer-journey-prompt__eyebrow {
@@ -150,6 +158,24 @@
 .customer-journey-prompt__basket-summary strong {
   color: #f3d27c;
   font-weight: 750;
+}
+
+.customer-journey-prompt__instore-link {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 5px 0;
+  color: #efc766;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+.customer-journey-prompt__instore-link:hover {
+  color: #f7d77d;
+  text-decoration: underline;
 }
 
 .customer-journey-prompt__actions {
@@ -206,7 +232,8 @@
 }
 
 .customer-journey-prompt__button:focus-visible,
-.customer-journey-prompt__close:focus-visible {
+.customer-journey-prompt__close:focus-visible,
+.customer-journey-prompt__instore-link:focus-visible {
   outline: 3px solid #f7d77d;
   outline-offset: 3px;
 }
@@ -309,13 +336,19 @@
     width: 100%;
   }
 
-  .customer-journey-prompt--basket .customer-journey-prompt__content {
+  .customer-journey-prompt__content--basket {
     grid-template-columns: minmax(0, 1fr);
     gap: 9px;
   }
 
   .customer-journey-prompt--basket .customer-journey-prompt__actions {
     display: block;
+  }
+
+  .customer-journey-prompt__instore-link {
+    justify-content: center;
+    width: 100%;
+    margin-top: 2px;
   }
 
   .customer-journey-prompt--basket .customer-journey-prompt__button--primary {

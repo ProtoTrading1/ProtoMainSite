@@ -59,6 +59,7 @@ const CART_EXPIRY_WARN_MS = 7 * 24 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
 const CART_QTY_UNLIMITED = 9999;
 const CUSTOMER_JOURNEY_SESSION_KEY_PREFIX = 'proto_customer_journey_session_v1';
+const INSTORE_INTRO_SEEN_KEY_PREFIX = 'proto_instore_intro_seen_v1';
 const BASKET_REMINDER_SCROLL_DISMISS_PX = 96;
 const CUSTOMER_JOURNEY_EXIT_MS = 180;
 
@@ -91,6 +92,28 @@ function rememberJourneyThisLogin(customerId, loginSessionKey) {
   try {
     sessionStorage.setItem(key, '1');
   } catch { /* the in-memory guard still prevents repeats during this mount */ }
+}
+
+function instoreIntroSeenKey(customerId) {
+  return customerId ? `${INSTORE_INTRO_SEEN_KEY_PREFIX}:${customerId}` : null;
+}
+
+function hasSeenInstoreIntro(customerId) {
+  const key = instoreIntroSeenKey(customerId);
+  if (!key) return false;
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberInstoreIntro(customerId) {
+  const key = instoreIntroSeenKey(customerId);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, '1');
+  } catch { /* a future login can show the helpful introduction again */ }
 }
 
 function isExplicitFirstPortalLogin(customer) {
@@ -1366,6 +1389,7 @@ export default function App({
     const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
       && loginBasketSnapshot.itemCount > 0
       && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
+    const showInstoreIntro = !restoredBasketIsUntouched && !hasSeenInstoreIntro(customer.id);
     const nextJourney = selectCustomerDashboardState({
       firstName: customerFirstName(customer),
       firstLogin: firstPortalLogin,
@@ -1374,10 +1398,12 @@ export default function App({
       basketRestoredAtLogin: restoredBasketIsUntouched,
       basketItemCount: restoredBasketIsUntouched ? loginBasketSnapshot.itemCount : 0,
       basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
+      showInstoreIntro,
     });
 
     setCustomerJourney(nextJourney);
     rememberJourneyThisLogin(customer.id, loginSessionKey);
+    if (nextJourney.action === 'instore') rememberInstoreIntro(customer.id);
     if (firstPortalLogin) {
       void markPortalWelcomeSeen().catch(() => {
         // Keep the server value null so the customer gets one more chance on
@@ -1482,9 +1508,15 @@ export default function App({
 
   const handleCustomerJourneyPrimary = useCallback((event) => {
     if (customerJourney?.presentation === 'basket') handleCartOpen(event);
+    else if (customerJourney?.action === 'instore') hashNavigate(['instore-products']);
     else goHome();
     dismissCustomerJourney();
-  }, [customerJourney, dismissCustomerJourney, goHome, handleCartOpen]);
+  }, [customerJourney, dismissCustomerJourney, goHome, handleCartOpen, hashNavigate]);
+
+  const handleCustomerJourneyInstore = useCallback(() => {
+    hashNavigate(['instore-products']);
+    dismissCustomerJourney();
+  }, [dismissCustomerJourney, hashNavigate]);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -1828,6 +1860,7 @@ export default function App({
       state={customerJourney}
       onPrimary={handleCustomerJourneyPrimary}
       onSecondary={dismissCustomerJourney}
+      onInstore={handleCustomerJourneyInstore}
       onDismiss={dismissCustomerJourney}
     />
   ) : null;
