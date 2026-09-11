@@ -6,6 +6,10 @@ import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSea
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
+// Instore is intentionally a high-availability collection. Small residual
+// quantities create disappointing customer journeys, so do not show an item
+// until there are at least ten units available to sell.
+export const MIN_INSTORE_AVAILABLE_STOCK = 10;
 const PREVIEW_IMAGE_BUCKET = 'preview-instore-images';
 const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
 // This only caches the already-verified read model inside a warm function.
@@ -94,7 +98,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || !imageUrl.startsWith('https://')
-      || !Number.isFinite(availableStock) || availableStock < 1
+      || !Number.isFinite(availableStock) || availableStock < MIN_INSTORE_AVAILABLE_STOCK
       || price <= 0) return [];
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),

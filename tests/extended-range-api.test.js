@@ -9,32 +9,33 @@ const valid = {
   image_review_status: 'verified', visibility_status: 'search_only', is_active: true,
 };
 
-test('Instore feed includes only reviewed priced positive-stock records', () => {
+test('Instore feed includes only reviewed priced records with at least ten available units', () => {
   const products = buildExtendedRangeProducts([
-    valid,
+    { ...valid, available_stock: 10 },
     { ...valid, sku: '8618100134', available_stock: 0 },
+    { ...valid, sku: '8618100138', available_stock: 9 },
     { ...valid, sku: '8618100135', available_stock: -1 },
     { ...valid, sku: '8618100136', image_review_status: 'pending' },
     { ...valid, sku: '8618100137', visibility_status: 'hidden' },
   ]);
   assert.deepEqual(products.map((product) => product.sku), ['8618100133']);
   assert.equal(products[0].availability.canOrder, true);
-  assert.equal(products[0].stockQty, 3);
+  assert.equal(products[0].stockQty, 10);
 });
 
 test('plain language discovery search does not loosen eligibility', () => {
-  assert.equal(buildExtendedRangeProducts([valid], 'wood bracelet').length, 1);
+  assert.equal(buildExtendedRangeProducts([{ ...valid, available_stock: 10 }], 'wood bracelet').length, 1);
   assert.equal(buildExtendedRangeProducts([{ ...valid, available_stock: 0 }], 'bracelet').length, 0);
 });
 
 test('legacy verified Instore records do not require a source-label backfill', () => {
-  const legacy = { ...valid };
+  const legacy = { ...valid, available_stock: 10 };
   delete legacy.image_source;
   assert.equal(buildExtendedRangeProducts([legacy], 'bracelet').length, 1);
 });
 
-test('staged hidden products are preview-only and still need positive stock', () => {
-  const staged = { ...valid, visibility_status: 'hidden', is_active: false };
+test('staged hidden products are preview-only and still need ten available units', () => {
+  const staged = { ...valid, available_stock: 10, visibility_status: 'hidden', is_active: false };
   assert.equal(buildExtendedRangeProducts([staged]).length, 0);
   assert.equal(buildExtendedRangeProducts([staged], '', { includeStaged: true }).length, 1);
   assert.equal(buildExtendedRangeProducts([{ ...staged, available_stock: 0 }], '', { includeStaged: true }).length, 0);
@@ -43,13 +44,13 @@ test('staged hidden products are preview-only and still need positive stock', ()
 test('isolated preview mapping uses the VAT-inclusive run price and cannot make stockless rows sellable', () => {
   const previewRow = {
     sku: '8618100133', barcode: '', title: 'BRACELET WOODEN BEADS',
-    price_incl_vat: 13.5, available_stock: 3, department: 'Beads',
+    price_incl_vat: 13.5, available_stock: 10, department: 'Beads',
     image_url: 'https://preview-images.example.test/8618100133.jpg',
   };
   const products = buildPreviewProducts([previewRow], 'wood bracelet');
   assert.equal(products.length, 1);
   assert.equal(products[0].price, 13.5);
-  assert.equal(products[0].stockQty, 3);
+  assert.equal(products[0].stockQty, 10);
   assert.equal(buildPreviewProducts([{ ...previewRow, available_stock: 0 }]).length, 0);
   assert.equal(buildPreviewProducts([{ ...previewRow, image_url: null }]).length, 0);
 });
@@ -57,7 +58,7 @@ test('isolated preview mapping uses the VAT-inclusive run price and cannot make 
 test('isolated preview preserves a VAT-inclusive price that is not on the normal price grid', () => {
   const [product] = buildPreviewProducts([{
     sku: '8601056001', title: 'PARTY LACE GLOVES', price_incl_vat: 69.49,
-    available_stock: 1, department: 'Party', image_url: 'https://preview-images.example.test/8601056001.jpg',
+    available_stock: 10, department: 'Party', image_url: 'https://preview-images.example.test/8601056001.jpg',
   }]);
   assert.equal(product.price, 69.49);
 });

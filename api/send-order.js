@@ -22,7 +22,7 @@ import {
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
-import { stockClient } from './extended-range.js';
+import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
   assertOrderCaptureSchemaReady,
@@ -281,7 +281,7 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   const available = availableFromBridge(bridgeRow);
   const price = websitePriceFromExVat(Number(bridgeRow?.PRICE_A));
   if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-  if (!Number.isFinite(price) || price <= 0 || available === null || available < 1 || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  if (!Number.isFinite(price) || price <= 0 || available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
   return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
