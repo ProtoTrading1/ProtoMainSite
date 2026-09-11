@@ -21,7 +21,6 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [products, setProducts] = useState([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: 60 });
   const [tiles, setTiles] = useState([]);
-  const [catalogue, setCatalogue] = useState(null);
   // Beads stays the first browse tile, but opening the page must show the
   // complete collection rather than silently applying that tile as a filter.
   const [category, setCategory] = useState('');
@@ -32,20 +31,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const searchRef = useRef(null);
 
   useEffect(() => {
-    if (Array.isArray(catalogue)) {
-      const local = localPage(catalogue, submittedQuery, category, page);
-      setProducts(local.products);
-      setTiles(local.tiles);
-      setMeta({ total: local.total, page, pageSize: 60 });
-      setLoading(false); setError(false);
-      return undefined;
-    }
     const controller = new AbortController();
     setLoading(true); setError(false);
-    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category, includeCatalogue: true })
+    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
       .then((data) => {
         if (controller.signal.aborted) return;
-        if (Array.isArray(data?.catalogue)) setCatalogue(data.catalogue);
         setProducts(Array.isArray(data?.products) ? data.products : []);
         setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
         setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || 60) });
@@ -53,7 +43,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       .catch(() => { if (!controller.signal.aborted) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedQuery, page, retry, category, catalogue]);
+  }, [submittedQuery, page, retry, category]);
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
