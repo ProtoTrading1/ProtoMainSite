@@ -6,6 +6,11 @@ import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSea
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
+function hashBrowseCategory() {
+  const [, query = ''] = window.location.hash.split('?');
+  return new URLSearchParams(query).get('browse') || '';
+}
+
 function localPage(catalogue, query, category, page) {
  const products = catalogue.filter((product) => matchesInstoreSearch(product, query)
     && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
@@ -23,7 +28,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [tiles, setTiles] = useState([]);
   // Beads stays the first browse tile, but opening the page must show the
   // complete collection rather than silently applying that tile as a filter.
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(hashBrowseCategory);
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -45,14 +50,21 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     return () => controller.abort();
   }, [submittedQuery, page, retry, category]);
 
+  // Category cards are real links, so browsing still works through native
+  // navigation if a browser blocks or delays a React click event.
+  useEffect(() => {
+    const applyBrowseLink = () => {
+      setCategory(hashBrowseCategory());
+      setPage(1);
+      window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    };
+    window.addEventListener('hashchange', applyBrowseLink);
+    return () => window.removeEventListener('hashchange', applyBrowseLink);
+  }, []);
+
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
-  // Category cards are browse actions. Move the refreshed results into view so
-  // a customer gets an immediate, visible response after tapping a card.
-  const browseCategory = (nextCategory) => {
-    choose('', nextCategory);
-    window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
-  };
+
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
   const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); setPage(1); };
@@ -83,7 +95,8 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     </div>
     {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
       const active = category === tile.label;
-      return <button key={tile.label} type="button" data-active={active} aria-current={active ? 'true' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`} onClick={() => browseCategory(active ? '' : tile.label)}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></button>;
+      const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
+      return <a key={tile.label} href={href} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
     })}</nav>}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
       <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
