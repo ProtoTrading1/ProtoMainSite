@@ -88,6 +88,9 @@
     }
   ],
   "functions": {
+    "api/extended-range.js": {
+      "maxDuration": 60
+    },
     "api/send-order.js": {
       "includeFiles": "node_modules/pdfkit/js/data/*.afm",
       "maxDuration": 60

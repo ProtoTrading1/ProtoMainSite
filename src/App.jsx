@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
+import ExtendedRangePage from './components/ExtendedRangePage';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -28,6 +29,7 @@ import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './l
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
@@ -136,6 +138,9 @@ function productCanOrderWhenOos(product) {
 
 function cartQtyCapForProduct(product) {
   if (!product) return 0;
+  // Instore stock is a buy-now ceiling, not a backorder request. Its fresh
+  // server-side checkout resolver repeats this cap immediately before order.
+  if (product.isExtendedRange === true) return Math.max(0, Math.floor(productStockQtyForCart(product) || 0));
   if (productCanOrderWhenOos(product)) return CART_QTY_UNLIMITED;
 
   const qty = productStockQtyForCart(product);
@@ -274,6 +279,7 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartHydrated, setCartHydrated] = useState(false);
+  const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
@@ -286,6 +292,10 @@ export default function App({
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
   const cartHydratedRef = useRef(false);
+  // Account-cart persistence is intentionally disabled on Vercel Preview so a
+  // reviewer cannot read or alter a real customer's saved basket. When the API
+  // confirms that condition, this ref enables an on-device demo basket only.
+  const cartPreviewModeRef = useRef(false);
   const cartRevisionRef = useRef(0);
   const lastSavedCartRef = useRef('');
   const cartAccountRef = useRef(customer?.id || null);
@@ -427,7 +437,7 @@ export default function App({
   }, []);
 
   const drainCartSyncQueue = useCallback(async () => {
-    if (cartSyncInFlightRef.current || !cartHydratedRef.current) return;
+    if (cartPreviewModeRef.current || cartSyncInFlightRef.current || !cartHydratedRef.current) return;
     const operation = pendingCartSyncRef.current;
     const accountId = cartAccountRef.current;
     if (!operation || !accountId || operation.accountId !== accountId) return;
@@ -547,6 +557,8 @@ export default function App({
     const previousUid = cartAccountRef.current;
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
+    cartPreviewModeRef.current = false;
+    setCartPreviewMode(false);
     setCartHydrated(false);
     setLoginBasketSnapshot(null);
     setCartSyncStatus('loading');
@@ -610,8 +622,26 @@ export default function App({
         cartHydratedRef.current = true;
         setCartHydrated(true);
         setCartSyncStatus('saved');
-      } catch {
+      } catch (error) {
         if (cancelled || cartAccountRef.current !== uid) return;
+        if (error?.status === 403 && error?.data?.error === 'Preview basket persistence is disabled') {
+          // This is the expected preview security boundary, not a failed
+          // customer basket. Permit add/remove/quantity demonstration locally
+          // without retrying or writing to the account service.
+          cartPreviewModeRef.current = true;
+          setCartPreviewMode(true);
+          cartRevisionRef.current = 0;
+          lastSavedCartRef.current = cartFingerprint(localItems);
+          setCartItems(localItems);
+          setCartPriceChanges([]);
+          setCartLastActivityAt(localActivityAt);
+          currentCartRef.current = { items: localItems, activityAt: localActivityAt };
+          setCartClock(Date.now());
+          cartHydratedRef.current = true;
+          setCartHydrated(true);
+          setCartSyncStatus('preview');
+          return;
+        }
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
@@ -640,7 +670,7 @@ export default function App({
   }, [customer?.id]);
 
   useEffect(() => {
-    if (!customer?.id || !cartHydratedRef.current) return undefined;
+    if (!customer?.id || !cartHydratedRef.current || cartPreviewModeRef.current) return undefined;
     const fingerprint = cartFingerprint(cartItems);
     if (fingerprint === lastSavedCartRef.current) return undefined;
     const nextOperation = makeCartSyncOperation(
@@ -659,7 +689,7 @@ export default function App({
 
   const refreshAccountCart = useCallback(async () => {
     const accountId = cartAccountRef.current;
-    if (!accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+    if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
     const beforeFingerprint = cartFingerprint(currentCartRef.current.items);
     if (beforeFingerprint !== lastSavedCartRef.current) return;
     try {
@@ -694,6 +724,10 @@ export default function App({
 
   const retryCartSync = useCallback(() => {
     if (!customer?.id) return;
+    if (cartPreviewModeRef.current) {
+      setCartSyncStatus('preview');
+      return;
+    }
     if (!cartHydratedRef.current) {
       setCartSyncStatus('loading');
       void cartHydrateRetryRef.current?.();
@@ -801,7 +835,7 @@ export default function App({
   // if the first path segment isn't a known department, resolve to the
   // catalogue root instead of showing an empty/broken page.
   useEffect(() => {
-    if (path.length && !categories.some((c) => c.id === path[0])) {
+    if (path.length && !['instore-products', 'extended-range'].includes(path[0]) && !categories.some((c) => c.id === path[0])) {
       hashNavigate([]);
     }
   }, [path, hashNavigate, categories]);
@@ -1178,7 +1212,7 @@ export default function App({
     return () => window.clearTimeout(timeout);
   }, [clearedCartSnapshot]);
 
-  const addToCart = useCallback((product, qty, buttonPos = null) => {
+  const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
     if (!cartHydratedRef.current) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
       return;
@@ -1187,15 +1221,21 @@ export default function App({
     if (maxQty <= 0) return;
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
+    const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
+    const existingLine = currentCartRef.current?.items?.find((item) => item.product.id === product.id);
+    if (requestedPreference && existingLine?.preference && requestedPreference !== existingLine.preference) {
+      setCartAnnouncement('This item already has a different colour/design preference. Review its basket note before adding more.');
+      return;
+    }
 
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
         const nextQty = Math.min(maxQty, existing.qty + requestedQty);
-        if (nextQty === existing.qty) return prev;
-        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty } : i));
+        if (nextQty === existing.qty && (requestedPreference === undefined || requestedPreference === (existing.preference || ''))) return prev;
+        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty, ...(requestedPreference !== undefined ? { preference: requestedPreference } : {}) } : i));
       }
-      return [...prev, { product, qty: Math.min(maxQty, requestedQty) }];
+      return [...prev, { product, qty: Math.min(maxQty, requestedQty), ...itemPreferenceFields({ preference: requestedPreference }) }];
     });
     markCartActivity();
     cartRevealSequenceRef.current += 1;
@@ -1255,6 +1295,12 @@ export default function App({
   const cartQtyMap = useMemo(() => {
     const map = {};
     for (const item of cartItems) map[item.product.id] = item.qty;
+    return map;
+  }, [cartItems]);
+
+  const cartPreferenceMap = useMemo(() => {
+    const map = {};
+    for (const item of cartItems) map[item.product.id] = item.preference || '';
     return map;
   }, [cartItems]);
 
@@ -1468,6 +1514,10 @@ export default function App({
 
   const sendOrderEmail = async (opts = {}) => {
     if (!cartHydratedRef.current || !cartItems.length) return { ok: false };
+    if (cartPreviewModeRef.current) {
+      setCartAnnouncement('Preview basket only — order requests are disabled here.');
+      return { ok: false, preview: true };
+    }
     const courierChoice = opts?.courierChoice || null;
     const customerNotes = String(opts?.customerNotes || '').trim();
     const promo = opts?.promo || null;
@@ -1545,6 +1595,7 @@ export default function App({
         customerNotes,
         items: submittedItems.map((item) => ({
           qty: item.qty,
+          ...itemPreferenceFields(item),
           product: {
             id: item.product.id,
             sku: item.product.sku,
@@ -1655,7 +1706,7 @@ export default function App({
       const product = bySku.get(String(item.productId || '').toUpperCase())
         || bySku.get(String(item.code || '').toUpperCase())
         || catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
-      if (product) resolved.push({ product, qty: item.qty });
+      if (product) resolved.push({ product, qty: item.qty, ...itemPreferenceFields(item) });
       else missing.push(item);
     }
 
@@ -1668,7 +1719,13 @@ export default function App({
     let overflow = 0;
     for (const item of resolved) {
       const existing = nextCart.find((entry) => entry.product.id === item.product.id);
-      if (existing) { existing.qty += item.qty; added += 1; continue; }
+      if (existing) {
+        if (existing.preference && item.preference && existing.preference !== item.preference) { missing.push({ ...item, productId: item.product.id, reason: 'preference_conflict' }); continue; }
+        existing.qty += item.qty;
+        if (item.preference) existing.preference = item.preference;
+        added += 1;
+        continue;
+      }
       // The server rejects an order over MAX_CART_LINES lines. Stopping here
       // beats letting the cart grow past the limit and failing at checkout,
       // after the customer has already spent the effort.
@@ -1759,6 +1816,7 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
+  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -1787,6 +1845,7 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
@@ -1800,6 +1859,7 @@ export default function App({
             path={path}
             navigate={navigate}
             onAllProducts={goAllProducts}
+            onInstoreProducts={() => navigate(['instore-products'])}
             setRefinement={setRefinement}
             counts={counts}
             customer={customer}
@@ -1807,7 +1867,19 @@ export default function App({
         </aside>
 
         <main className="content-area">
-          <MainContent
+          {viewingInstoreProducts ? <ExtendedRangePage
+            addToCart={addToCart}
+            cartQtyMap={cartQtyMap}
+            cartPreferenceMap={cartPreferenceMap}
+            specialsMap={specialsMap}
+            browseCategory={String(refinements.browse || '')}
+            onBrowseCategoryChange={(nextCategory) => {
+              const next = { ...refinements };
+              if (nextCategory) next.browse = nextCategory;
+              else delete next.browse;
+              hashNavigate(path, next, { scroll: false });
+            }}
+          /> : <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
             addToCart={addToCart}
@@ -1842,7 +1914,7 @@ export default function App({
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
-          />
+          />}
         </main>
 
         <aside
@@ -1867,6 +1939,7 @@ export default function App({
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
+            cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
             onRetryCartSync={retryCartSync}
@@ -1930,6 +2003,7 @@ export default function App({
         onHome={() => { goHome(); setMobileMenuOpen(false); }}
         onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
         onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
+        onInstoreProducts={() => { navigate(['instore-products']); setMobileMenuOpen(false); }}
       />
 
       {/* Mobile cart — opened from bottom tab bar */}
@@ -1973,6 +2047,7 @@ export default function App({
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
+                cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}
                 onRetryCartSync={retryCartSync}

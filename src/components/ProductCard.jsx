@@ -127,14 +127,17 @@ function StockBadge({ product }) {
         <span>{availability.label}</span>
         <small>{availability.guidance}</small>
       </div>
-      {!product.isVariantGroup && sku ? <StockCheck sku={sku} /> : null}
+      {!product.isVariantGroup && sku ? <StockCheck
+        sku={sku}
+        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+      /> : null}
     </div>
   );
 }
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false }) {
+function StockCheck({ sku, autoCheck = false, source = '' }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
 
@@ -145,7 +148,8 @@ function StockCheck({ sku, autoCheck = false }) {
     requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
     try {
-      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}`, {
+      const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
+      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
         timeoutMs: 10000,
@@ -163,7 +167,7 @@ function StockCheck({ sku, autoCheck = false }) {
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
     }
-  }, [sku]);
+  }, [sku, source]);
 
   useEffect(() => () => {
     requestRef.current?.abort();
@@ -209,7 +213,7 @@ function StockCheck({ sku, autoCheck = false }) {
         >
           {state.status === 'loading'
             ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
-            : <><PackageSearch size={14} /> Check live stock</>}
+            : <><PackageSearch size={14} /> {source === 'instore-preview' ? 'Confirm preview stock' : 'Check live stock'}</>}
         </button>
       ) : null}
       <span className="stock-result" role="status" aria-live="polite">{readout}</span>
@@ -297,11 +301,11 @@ function SpecialRibbon({ special }) {
   );
 }
 
-function ProductQtyInput({ qty, setQty, minQty }) {
+function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   const [draft, setDraft] = useState(String(qty));
   useEffect(() => { setDraft(String(qty)); }, [qty]);
   const commit = () => {
-    const next = Math.max(minQty || 1, Math.min(9999, Number(draft) || minQty || 1));
+    const next = Math.max(minQty || 1, Math.min(maxQty, Number(draft) || minQty || 1));
     setDraft(String(next));
     setQty(next);
   };
@@ -310,7 +314,7 @@ function ProductQtyInput({ qty, setQty, minQty }) {
       aria-label="Quantity"
       inputMode="numeric"
       min={minQty || 1}
-      max="9999"
+      max={maxQty}
       type="number"
       value={draft}
       onBlur={commit}
@@ -578,12 +582,12 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   >
                     <Minus size={14} />
                   </button>
-                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} />
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999} />
                   <button
-                    onClick={() => setQty((current) => Math.min(9999, current + 1))}
+                    onClick={() => setQty((current) => Math.min(product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999, current + 1))}
                     type="button"
                     aria-label={`Increase quantity from ${qty}`}
-                    disabled={qty >= 9999}
+                    disabled={qty >= (product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999)}
                   >
                     <Plus size={14} />
                   </button>
@@ -785,8 +789,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                         <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease" disabled={qty <= (activeProduct.minQty || 1)}>
                           <Minus size={14} />
                         </button>
-                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} />
-                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase">
+                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} maxQty={activeProduct.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0)) : 9999} />
+                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase" disabled={activeProduct.isExtendedRange && qty >= Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0))}>
                           <Plus size={14} />
                         </button>
                       </div>

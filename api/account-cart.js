@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
+import { itemPreferenceFields } from '../lib/item-preference.mjs';
 
 const MAX_LINES = 250;
 const MAX_QTY = 9999;
@@ -110,7 +111,7 @@ function validateItems(value) {
     if (!Number.isSafeInteger(raw.qty) || raw.qty < 1 || raw.qty > MAX_QTY) {
       throw inputError(`Basket quantity must be a whole number from 1 to ${MAX_QTY}`);
     }
-    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty };
+    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty, ...itemPreferenceFields(raw) };
   });
 }
 
@@ -264,6 +265,12 @@ async function writeSnapshot({
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Authorization');
+
+  const previewHost = String(req.headers.host || '').split(':')[0];
+  if (process.env.VERCEL_ENV === 'preview' && /\.vercel\.app$/i.test(previewHost)) {
+    // A preview must not read or mutate a real customer's saved basket.
+    return res.status(403).json({ error: 'Preview basket persistence is disabled' });
+  }
 
   const approved = await requireApprovedCustomer(req, res);
   if (!approved) return;
