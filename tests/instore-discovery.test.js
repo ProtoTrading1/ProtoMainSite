@@ -64,42 +64,55 @@ test('starts browse discovery with beads and jewellery making', () => {
   assert.equal(tiles[0].label, 'Beads & jewellery making');
 });
 
-test('uses curated website artwork for the beads browse thumbnail', () => {
+test('uses the highest product code and its current image for a browse tile', () => {
   const tiles = discoveryTiles([
-    { sku: '8600000001', title: 'MAGNETIC CLASP', category: 'BEAD METAL PARTS', image: 'clasp.jpg' },
-    { sku: '8618100133', title: 'BRACELET WOODEN BEADS', category: 'WOODEN BEADS', image: 'bracelet.jpg' },
+    { sku: '8618100133', title: 'WOODEN BEADS', category: 'WOODEN BEADS', image: 'older-beads.jpg' },
+    { sku: '8628100133A', title: 'GLASS BEADS', category: 'WOODEN BEADS', image: 'newest-beads.jpg' },
   ]);
   const beads = tiles.find((tile) => tile.label === 'Beads & jewellery making');
-  // Finished bracelets belong in their own customer category; the bead tile
-  // must not borrow that product merely because its description says beads.
-  assert.equal(beads?.sku, '8600000001');
-  assert.equal(beads?.image, '/cat-beads.jpg');
+  assert.equal(beads?.sku, '8628100133A');
+  assert.equal(beads?.image, 'newest-beads.jpg');
 });
 
-test('uses the party artwork while keeping a non-fancy-dress representative', () => {
+test('uses the current 86181 bracelet range for the Jewellery tile', () => {
+  const tiles = discoveryTiles([
+    { sku: '8633680429', title: 'TERRORIST NECKLACE', category: 'FASHION JEWELLERY', image: 'historical-necklace.jpg' },
+    { sku: '8618100319', title: 'BRACELET ASSORTED', category: 'FASHION JEWELLERY', image: 'bracelet-range.jpg' },
+    { sku: '8618100523', title: 'BRACELET S/STEEL', category: 'FASHION JEWELLERY', image: 'newest-bracelet-range.jpg' },
+  ]);
+  const jewellery = tiles.find((tile) => tile.label === 'Jewellery');
+  const bracelets = tiles.find((tile) => tile.label === 'Bracelets');
+  assert.equal(jewellery?.sku, '8618100523');
+  assert.equal(jewellery?.image, 'newest-bracelet-range.jpg');
+  assert.equal(bracelets?.sku, '8618100523');
+  assert.equal(bracelets?.image, 'newest-bracelet-range.jpg');
+});
+
+test('keeps unsuitable fancy-dress products out of the Party tile', () => {
   const tiles = discoveryTiles([
     { sku: '8601897013', title: 'WITCHES NOSE CARDED', category: 'PARTY / FANCY DRES', image: 'witch.jpg' },
     { sku: '8602000001', title: 'PARTY BALLOONS ASSORTED', category: 'PARTY / FANCY DRES', image: 'balloons.jpg' },
+    { sku: '8699999999', title: 'PIRATE COSTUME', category: 'PARTY / FANCY DRES', image: 'costume.jpg' },
   ]);
   const party = tiles.find((tile) => tile.label === 'Party items');
   assert.equal(party?.sku, '8602000001');
-  assert.equal(party?.image, '/cat-events.jpg');
+  assert.equal(party?.image, 'balloons.jpg');
 });
 
-test('uses semantically aligned category visuals for browse tiles', () => {
+test('uses current product images instead of a frozen category artwork', () => {
   const tiles = discoveryTiles([
     { sku: '8600000001', title: 'SOFT TOY BEAR', category: 'SOFT TOYS', image: 'bear.jpg' },
     { sku: '8600000003', title: 'NECKLACE PEACE', category: 'FASHION JEWELLERY', image: 'necklace.jpg' },
     { sku: '8600000004', title: 'MISCELLANEOUS ITEM', category: 'UNSORTED', image: 'misc.jpg' },
     { sku: '8600000002', title: 'LIPSTICK PINK', category: 'COSMETICS SKIN CARE', image: 'lipstick.jpg' },
   ]);
-  assert.equal(tiles.find((tile) => tile.label === 'Jewellery')?.image, '/cat-jewellery.png');
-  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-soft-toys.png');
-  assert.equal(tiles.find((tile) => tile.label === 'More finds')?.image, '/cat-more-finds.png');
-  assert.equal(tiles.find((tile) => tile.label === 'Beauty')?.image, '/cat-beauty.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Jewellery')?.image, 'necklace.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, 'bear.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'More finds')?.image, 'misc.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Beauty')?.image, 'lipstick.jpg');
 });
 
-test('covers every visible browse category with its intended thumbnail', () => {
+test('covers every visible browse category with a current product image', () => {
   const fixtures = [
     ['BEADS', 'WOODEN BEADS'], ['FASHION JEWELLERY', 'NECKLACE GOLD'],
     ['STATIONERY/ART', 'NOTEBOOK'], ['HOUSEHOLD', 'MUG'],
@@ -108,21 +121,21 @@ test('covers every visible browse category with its intended thumbnail', () => {
     ['SOFT TOYS', 'SOFT TOY BEAR'], ['COSMETICS SKIN CARE', 'LIPSTICK'],
     ['HAIR ACCESSORIES', 'HAIR CLIP'], ['FASHION JEWELLERY', 'BRACELET'],
     ['', 'UNIDENTIFIED OBJECT'],
-  ].map(([category, title], index) => ({ sku: String(index), category, title, image: 'fixture.jpg' }));
+  ].map(([category, title], index) => ({ sku: String(index), category, title, image: `fixture-${index}.jpg` }));
   const images = Object.fromEntries(discoveryTiles(fixtures).map((tile) => [tile.label, tile.image]));
   assert.deepEqual(images, {
-    'Beads & jewellery making': '/cat-beads.jpg',
-    Jewellery: '/cat-jewellery.png',
-    'Stationery & art': '/cat-arts.jpg',
-    'Home & kitchen': '/cat-homeware.jpg',
-    'Bags & wallets': '/cat-fashion.jpg',
-    'Party items': '/cat-events.jpg',
-    'Crafts & DIY': '/cat-textiles.jpg',
-    'Toys & games': '/cat-toys.jpg',
-    'Soft toys': '/cat-soft-toys.png',
-    Beauty: '/cat-beauty.jpg',
-    'Hair accessories': '/cat-fashion.jpg',
-    Bracelets: '/cat-beads.jpg',
-    'More finds': '/cat-more-finds.png',
+    'Beads & jewellery making': 'fixture-0.jpg',
+    Jewellery: 'fixture-1.jpg',
+    'Stationery & art': 'fixture-2.jpg',
+    'Home & kitchen': 'fixture-3.jpg',
+    'Bags & wallets': 'fixture-4.jpg',
+    'Party items': 'fixture-5.jpg',
+    'Crafts & DIY': 'fixture-6.jpg',
+    'Toys & games': 'fixture-7.jpg',
+    'Soft toys': 'fixture-8.jpg',
+    Beauty: 'fixture-9.jpg',
+    'Hair accessories': 'fixture-10.jpg',
+    Bracelets: 'fixture-11.jpg',
+    'More finds': 'fixture-12.jpg',
   });
 });
