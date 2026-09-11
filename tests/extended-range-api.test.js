@@ -93,6 +93,17 @@ test('isolated preview reads every database page instead of stopping at 1,000 pr
   assert.equal(rows.length, total);
 });
 
+test('complete catalogue reads support the full Positill-scale code index', async () => {
+  const total = 41174;
+  const rows = await readCompleteRows(() => ({
+    order: () => ({ range: (from, to) => Promise.resolve({
+      data: Array.from({ length: Math.max(0, Math.min(total - from, to - from + 1)) }, (_, index) => ({ sku: String(from + index) })),
+      count: total, error: null,
+    }) }),
+  }));
+  assert.equal(rows.length, total);
+});
+
 test('preview catalogue read tolerates an import count increasing between pages', async () => {
   let request = 0;
   const rows = await readCompleteRows(() => ({

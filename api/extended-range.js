@@ -6,6 +6,10 @@ import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSea
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
+// The Positill index currently contains more than 40,000 sellable codes.
+// Keep a finite guardrail against an accidental unbounded read, but do not
+// mistake a complete catalogue of that size for a partial response.
+const MAX_COMPLETE_CATALOGUE_ROWS = 100_000;
 // Instore is intentionally a high-availability collection. Small residual
 // quantities create disappointing customer journeys, so do not show an item
 // until there are at least ten units available to sell.
@@ -42,7 +46,7 @@ async function getCachedCatalogue(key, loader) {
 export async function readCompleteRows(makeQuery, { allowChangingCount = false } = {}) {
   const page = (offset) => makeQuery().order('sku', { ascending: true }).range(offset, offset + 999);
   const first = await page(0);
-  if (first.error || !Array.isArray(first.data) || !Number.isInteger(first.count) || first.count < 0 || first.count > 20_000) throw new Error('Catalogue lookup incomplete');
+  if (first.error || !Array.isArray(first.data) || !Number.isInteger(first.count) || first.count < 0 || first.count > MAX_COMPLETE_CATALOGUE_ROWS) throw new Error('Catalogue lookup incomplete');
   if (first.count === 0) return [];
 
   // We know the complete page count after the first request. Parallel page
@@ -51,7 +55,7 @@ export async function readCompleteRows(makeQuery, { allowChangingCount = false }
   const pages = Math.ceil(first.count / 1000);
   const remaining = await Promise.all(Array.from({ length: pages - 1 }, (_, index) => page((index + 1) * 1000)));
   const responses = [first, ...remaining];
-  if (responses.some(({ data, error, count }) => error || !Array.isArray(data) || !Number.isInteger(count) || count < 0 || count > 20_000 || (!allowChangingCount && count !== first.count))) throw new Error('Catalogue lookup incomplete');
+  if (responses.some(({ data, error, count }) => error || !Array.isArray(data) || !Number.isInteger(count) || count < 0 || count > MAX_COMPLETE_CATALOGUE_ROWS || (!allowChangingCount && count !== first.count))) throw new Error('Catalogue lookup incomplete');
   const rows = responses.flatMap(({ data }) => data);
   if (!allowChangingCount && rows.length !== first.count) throw new Error('Catalogue lookup truncated');
   return rows;
