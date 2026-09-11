@@ -203,19 +203,36 @@ export default async function handler(req, res) {
         .select('id, status').eq('id', runId).maybeSingle();
       if (runError || run?.status !== 'ready') throw new Error('Isolated Instore preview is not ready');
       const rows = await readCompletePreviewRows(client, runId);
-      const allEligible = buildPreviewProducts(await signPreviewImages(client, runId, rows));
+      // Eligibility and discovery never expose the placeholder; it only lets
+      // the existing product mapper validate image-backed rows before we sign
+      // the small subset that this response actually displays.
+      const allEligible = buildPreviewProducts(rows.map((row) => ({
+        ...row,
+        image_url: `https://preview.invalid/${encodeURIComponent(row.sku)}`,
+      })));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
-      const includeCatalogue = req.query?.catalogue === '1';
       const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
       const from = (page - 1) * PAGE_SIZE;
+      const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
+      const tileFirstSku = new Map();
+      for (const product of allEligible) {
+        const group = discoveryGroup(product);
+        if (!tileFirstSku.has(group)) tileFirstSku.set(group, product.sku);
+      }
+      const [signedTiles, signedProducts] = await Promise.all([
+        signPreviewImages(client, runId, [...tileFirstSku.values()].map((sku) => rowBySku.get(sku)).filter(Boolean)),
+        signPreviewImages(client, runId, filtered.slice(from, from + PAGE_SIZE).map((product) => rowBySku.get(product.sku)).filter(Boolean)),
+      ]);
+      const tileImageBySku = new Map(signedTiles.map((row) => [String(row.sku || '').trim().toUpperCase(), row.image_url]));
+      const tiles = discoveryTiles(allEligible.map((product) => ({ ...product, image: tileImageBySku.get(product.sku) || '' })));
+      const products = buildPreviewProducts(signedProducts);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({
         source: 'isolated Instore preview catalogue',
         count: Math.min(PAGE_SIZE, Math.max(0, filtered.length - from)), page, pageSize: PAGE_SIZE,
-        total: filtered.length, tiles: discoveryTiles(allEligible), products: filtered.slice(from, from + PAGE_SIZE),
-        catalogue: includeCatalogue ? allEligible : undefined,
+        total: filtered.length, tiles, products,
       });
     }
     const includeStaged = false;
