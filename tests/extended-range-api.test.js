@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExtendedRangeProducts, buildPreviewProducts, readCompleteRows } from '../api/extended-range.js';
+import { buildExtendedRangeProducts, buildPreviewProducts, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
 
 const valid = {
   sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS',
@@ -60,6 +60,23 @@ test('isolated preview preserves a VAT-inclusive price that is not on the normal
     available_stock: 1, department: 'Party', image_url: 'https://preview-images.example.test/8601056001.jpg',
   }]);
   assert.equal(product.price, 69.49);
+});
+
+test('isolated preview signs only objects belonging to its configured run', async () => {
+  const signedPaths = [];
+  const client = { storage: { from: (bucket) => ({ createSignedUrls: async (paths, ttl) => {
+    assert.equal(bucket, 'preview-instore-images');
+    assert.equal(ttl, 3600);
+    signedPaths.push(...paths);
+    return { error: null, data: paths.map((path) => ({ path, signedUrl: `https://signed.example.test/${path}` })) };
+  } }) } };
+  const rows = await signPreviewImages(client, 'run-a', [
+    { sku: 'A', image_object_path: 'runs/run-a/A/a.jpg' },
+    { sku: 'B', image_object_path: 'runs/other/B/b.jpg' },
+  ]);
+  assert.deepEqual(signedPaths, ['runs/run-a/A/a.jpg']);
+  assert.match(rows[0].image_url, /^https:\/\/signed\.example\.test\//);
+  assert.equal(rows[1].image_url, '');
 });
 
 test('preview catalogue read tolerates an import count increasing between pages', async () => {
