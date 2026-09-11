@@ -6,6 +6,8 @@ import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSea
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
+const PREVIEW_IMAGE_BUCKET = 'preview-instore-images';
+const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
 // This only caches the already-verified read model inside a warm function.
 // Checkout still verifies availability independently, while repeat browsing
 // avoids re-reading thousands of rows on every search or category click.
@@ -130,6 +132,30 @@ export function previewCatalogueClient() {
   return { runId, client: createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } }) };
 }
 
+// Preview images stay in a private bucket. The browser receives a short-lived
+// signed URL only for objects belonging to the configured isolated run.
+export async function signPreviewImages(client, runId, rows) {
+  const prefix = `runs/${runId}/`;
+  const paths = [...new Set((rows || [])
+    .map((row) => String(row?.image_object_path || '').trim())
+    .filter((objectPath) => objectPath.startsWith(prefix)))];
+  if (!paths.length) return [];
+
+  const signed = new Map();
+  for (let start = 0; start < paths.length; start += 100) {
+    const { data, error } = await client.storage.from(PREVIEW_IMAGE_BUCKET)
+      .createSignedUrls(paths.slice(start, start + 100), PREVIEW_IMAGE_URL_TTL_SECONDS);
+    if (error) throw new Error('Isolated Instore preview images could not be signed');
+    for (const item of data || []) {
+      if (item?.path && item?.signedUrl) signed.set(item.path, item.signedUrl);
+    }
+  }
+  return (rows || []).map((row) => ({
+    ...row,
+    image_url: signed.get(String(row?.image_object_path || '').trim()) || '',
+  }));
+}
+
 export function buildPreviewProducts(rows, rawQuery = '') {
   return buildExtendedRangeProducts((rows || []).map((row) => ({
     sku: row.sku,
@@ -167,12 +193,12 @@ export default async function handler(req, res) {
         .select('id, status').eq('id', runId).maybeSingle();
       if (runError || run?.status !== 'ready') throw new Error('Isolated Instore preview is not ready');
       const { data: rows, error } = await client.from('preview_instore_items')
-        .select('sku, barcode, title, price_incl_vat, available_stock, department, image_url')
+        .select('sku, barcode, title, price_incl_vat, available_stock, department, image_object_path')
         .eq('run_id', runId)
-        .not('image_url', 'is', null)
+        .not('image_object_path', 'is', null)
         .order('sku', { ascending: true });
       if (error || !Array.isArray(rows)) throw new Error('Isolated Instore preview could not be read');
-      const allEligible = buildPreviewProducts(rows);
+      const allEligible = buildPreviewProducts(await signPreviewImages(client, runId, rows));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
       const includeCatalogue = req.query?.catalogue === '1';
