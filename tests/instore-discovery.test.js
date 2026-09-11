@@ -35,22 +35,31 @@ test('starts browse discovery with beads and jewellery making', () => {
   assert.equal(tiles[0].label, 'Beads & jewellery making');
 });
 
-test('uses a recognisable in-stock product as the browse thumbnail', () => {
+test('uses curated website artwork for the beads browse thumbnail', () => {
   const tiles = discoveryTiles([
     { sku: '8600000001', title: 'MAGNETIC CLASP', category: 'BEAD METAL PARTS', image: 'clasp.jpg' },
     { sku: '8618100133', title: 'BRACELET WOODEN BEADS', category: 'WOODEN BEADS', image: 'bracelet.jpg' },
   ]);
   const beads = tiles.find((tile) => tile.label === 'Beads & jewellery making');
   assert.equal(beads?.sku, '8618100133');
-  assert.equal(beads?.image, 'bracelet.jpg');
+  assert.equal(beads?.image, '/cat-beads.jpg');
 });
 
-test('keeps fancy-dress products out of the party browse thumbnail', () => {
+test('uses the party artwork while keeping a non-fancy-dress representative', () => {
   const tiles = discoveryTiles([
     { sku: '8601897013', title: 'WITCHES NOSE CARDED', category: 'PARTY / FANCY DRES', image: 'witch.jpg' },
     { sku: '8602000001', title: 'PARTY BALLOONS ASSORTED', category: 'PARTY / FANCY DRES', image: 'balloons.jpg' },
   ]);
   const party = tiles.find((tile) => tile.label === 'Party items');
   assert.equal(party?.sku, '8602000001');
-  assert.equal(party?.image, 'balloons.jpg');
+  assert.equal(party?.image, '/cat-events.jpg');
+});
+
+test('uses a dedicated website category visual for each browse category', () => {
+  const tiles = discoveryTiles([
+    { sku: '8600000001', title: 'SOFT TOY BEAR', category: 'SOFT TOYS', image: 'bear.jpg' },
+    { sku: '8600000002', title: 'LIPSTICK PINK', category: 'COSMETICS SKIN CARE', image: 'lipstick.jpg' },
+  ]);
+  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-toys.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Beauty')?.image, '/cat-beauty.jpg');
 });
