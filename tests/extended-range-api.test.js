@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExtendedRangeProducts, buildPreviewProducts, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
+import { buildExtendedRangeProducts, buildPreviewProducts, readCompletePreviewRows, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
 
 const valid = {
   sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS',
@@ -77,6 +77,19 @@ test('isolated preview signs only objects belonging to its configured run', asyn
   assert.deepEqual(signedPaths, ['runs/run-a/A/a.jpg']);
   assert.match(rows[0].image_url, /^https:\/\/signed\.example\.test\//);
   assert.equal(rows[1].image_url, '');
+});
+
+test('isolated preview reads every database page instead of stopping at 1,000 products', async () => {
+  const total = 6030;
+  const query = {
+    select: () => query, eq: () => query, not: () => query,
+    order: () => ({ range: (from, to) => Promise.resolve({
+      data: Array.from({ length: Math.max(0, Math.min(total - from, to - from + 1)) }, (_, index) => ({ sku: String(from + index) })),
+      count: total, error: null,
+    }) }),
+  };
+  const rows = await readCompletePreviewRows({ from: () => query }, 'run-a');
+  assert.equal(rows.length, total);
 });
 
 test('preview catalogue read tolerates an import count increasing between pages', async () => {
