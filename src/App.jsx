@@ -1839,6 +1839,13 @@ export default function App({
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}
             specialsMap={specialsMap}
+            browseCategory={String(refinements.browse || '')}
+            onBrowseCategoryChange={(nextCategory) => {
+              const next = { ...refinements };
+              if (nextCategory) next.browse = nextCategory;
+              else delete next.browse;
+              hashNavigate(path, next, { scroll: false });
+            }}
           /> : <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}

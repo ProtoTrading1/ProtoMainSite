@@ -6,11 +6,6 @@ import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSea
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
-function hashBrowseCategory() {
-  const [, query = ''] = window.location.hash.split('?');
-  return new URLSearchParams(query).get('browse') || '';
-}
-
 function localPage(catalogue, query, category, page) {
  const products = catalogue.filter((product) => matchesInstoreSearch(product, query)
     && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
@@ -18,7 +13,7 @@ function localPage(catalogue, query, category, page) {
   return { products: products.slice(from, from + 60), total: products.length, tiles: discoveryTiles(catalogue) };
 }
 
-export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {} }) {
+export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange }) {
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -28,7 +23,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [tiles, setTiles] = useState([]);
   // Beads stays the first browse tile, but opening the page must show the
   // complete collection rather than silently applying that tile as a filter.
-  const [category, setCategory] = useState(hashBrowseCategory);
+  const [category, setCategory] = useState(browseCategory);
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -50,25 +45,21 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     return () => controller.abort();
   }, [submittedQuery, page, retry, category]);
 
-  // Category cards are real links, so browsing still works through native
-  // navigation if a browser blocks or delays a React click event.
+  // The app router owns the hash. Mirroring its parsed browse value here
+  // prevents a native category link from leaving this page on stale results.
   useEffect(() => {
-    const applyBrowseLink = () => {
-      setCategory(hashBrowseCategory());
-      setPage(1);
-      window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
-    };
-    window.addEventListener('hashchange', applyBrowseLink);
-    return () => window.removeEventListener('hashchange', applyBrowseLink);
-  }, []);
+    setCategory(browseCategory);
+    setPage(1);
+    if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }, [browseCategory]);
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
 
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
-  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); setPage(1); };
-  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); setPage(1); searchRef.current?.focus(); };
+  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };
+  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); searchRef.current?.focus(); };
   const pages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);

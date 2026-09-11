@@ -20,6 +20,10 @@ test('uses Positill department wording to keep party items distinct from toys', 
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');
 });
 
+test('does not classify socks as soft toys', () => {
+  assert.notEqual(discoveryGroup({ title: 'COTTON SOCKS ASSORTED', category: 'SOCKS' }), 'Soft toys');
+});
+
 test('ranks direct description matches ahead of related browse matches', () => {
   const direct = { title: 'BRACELET WOODEN BEADS', category: 'FASHION JEWELLERY' };
   const related = { title: 'MEMORY WIRE BANGLE', category: 'PENDNTS BRACLTS RNGS' };
