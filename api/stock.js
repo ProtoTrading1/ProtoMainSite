@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
-import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, stockClient } from './extended-range.js';
+import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
 // Always hits the DB fresh (no-store) so a click never serves a cached number.
@@ -62,10 +62,10 @@ export default async function handler(req, res) {
         .select('id, status').eq('id', runId).maybeSingle();
       if (runError || run?.status !== 'ready') throw new Error('Isolated Instore preview is not ready');
       const { data, error } = await client.from('preview_instore_items')
-        .select('sku, barcode, title, price_incl_vat, available_stock, department, image_url')
+        .select('sku, barcode, title, price_incl_vat, available_stock, department, image_object_path')
         .eq('run_id', runId).eq('sku', sku).limit(1);
       if (error) throw error;
-      const product = buildPreviewProducts(data || [])[0];
+      const product = buildPreviewProducts(await signPreviewImages(client, runId, data || []))[0];
       if (!product) return res.status(404).json({ error: 'SKU not found' });
       return res.status(200).json({
         sku, qty: product.stockQty, keep_live_when_oos: false, to_order: false,
