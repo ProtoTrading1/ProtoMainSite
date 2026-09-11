@@ -29,6 +29,8 @@ test('does not classify socks as soft toys', () => {
 test('keeps jewellery-making components out of finished jewellery', () => {
   assert.equal(discoveryGroup({ title: 'JUMP RING 0.7*5MM PKT,50', category: 'FASHION JEWELLERY' }), 'More finds');
   assert.equal(discoveryGroup({ title: 'METAL BEAD RAINBOW', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
+  assert.notEqual(discoveryGroup({ title: 'CHAIN S/STEEL', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.notEqual(discoveryGroup({ title: 'JEWELLERY DISPLAY BOX 7*7CM', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.equal(discoveryGroup({ title: 'NECKLACE CRYSTAL HEART', category: 'FASHION JEWELLERY' }), 'Jewellery');
 });
 
