@@ -215,17 +215,15 @@ export default async function handler(req, res) {
       const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
       const from = (page - 1) * PAGE_SIZE;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
-      const tileFirstSku = new Map();
-      for (const product of allEligible) {
-        const group = discoveryGroup(product);
-        if (!tileFirstSku.has(group)) tileFirstSku.set(group, product.sku);
-      }
+      // Tile representatives are selected from the same positive-stock,
+      // priced catalogue as the product grid. Sign only those few images.
+      const tileCandidates = discoveryTiles(allEligible);
       const [signedTiles, signedProducts] = await Promise.all([
-        signPreviewImages(client, runId, [...tileFirstSku.values()].map((sku) => rowBySku.get(sku)).filter(Boolean)),
+        signPreviewImages(client, runId, tileCandidates.map((tile) => rowBySku.get(tile.sku)).filter(Boolean)),
         signPreviewImages(client, runId, filtered.slice(from, from + PAGE_SIZE).map((product) => rowBySku.get(product.sku)).filter(Boolean)),
       ]);
       const tileImageBySku = new Map(signedTiles.map((row) => [String(row.sku || '').trim().toUpperCase(), row.image_url]));
-      const tiles = discoveryTiles(allEligible.map((product) => ({ ...product, image: tileImageBySku.get(product.sku) || '' })));
+      const tiles = tileCandidates.map(({ sku, ...tile }) => ({ ...tile, image: tileImageBySku.get(sku) || '' }));
       const products = buildPreviewProducts(signedProducts);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
