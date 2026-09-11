@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 21496)
+Total output lines: 2080
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Header from './components/Header';
@@ -279,6 +282,7 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartHydrated, setCartHydrated] = useState(false);
+  const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
   const [drawerPeek, setDrawerPeek] = useState(false);
   const drawerTimerRef = useRef(null);
@@ -291,6 +295,10 @@ export default function App({
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
   const cartHydratedRef = useRef(false);
+  // Account-cart persistence is intentionally disabled on Vercel Preview so a
+  // reviewer cannot read or alter a real customer's saved basket. When the API
+  // confirms that condition, this ref enables an on-device demo basket only.
+  const cartPreviewModeRef = useRef(false);
   const cartRevisionRef = useRef(0);
   const lastSavedCartRef = useRef('');
   const cartAccountRef = useRef(customer?.id || null);
@@ -432,7 +440,7 @@ export default function App({
   }, []);
 
   const drainCartSyncQueue = useCallback(async () => {
-    if (cartSyncInFlightRef.current || !cartHydratedRef.current) return;
+    if (cartPreviewModeRef.current || cartSyncInFlightRef.current || !cartHydratedRef.current) return;
     const operation = pendingCartSyncRef.current;
     const accountId = cartAccountRef.current;
     if (!operation || !accountId || operation.accountId !== accountId) return;
@@ -552,6 +560,8 @@ export default function App({
     const previousUid = cartAccountRef.current;
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
+    cartPreviewModeRef.current = false;
+    setCartPreviewMode(false);
     setCartHydrated(false);
     setLoginBasketSnapshot(null);
     setCartSyncStatus('loading');
@@ -615,8 +625,26 @@ export default function App({
         cartHydratedRef.current = true;
         setCartHydrated(true);
         setCartSyncStatus('saved');
-      } catch {
+      } catch (error) {
         if (cancelled || cartAccountRef.current !== uid) return;
+        if (error?.status === 403 && error?.data?.error === 'Preview basket persistence is disabled') {
+          // This is the expected preview security boundary, not a failed
+          // customer basket. Permit add/remove/quantity demonstration locally
+          // without retrying or writing to the account service.
+          cartPreviewModeRef.current = true;
+          setCartPreviewMode(true);
+          cartRevisionRef.current = 0;
+          lastSavedCartRef.current = cartFingerprint(localItems);
+          setCartItems(localItems);
+          setCartPriceChanges([]);
+          setCartLastActivityAt(localActivityAt);
+          currentCartRef.current = { items: localItems, activityAt: localActivityAt };
+          setCartClock(Date.now());
+          cartHydratedRef.current = true;
+          setCartHydrated(true);
+          setCartSyncStatus('preview');
+          return;
+        }
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
@@ -645,7 +673,7 @@ export default function App({
   }, [customer?.id]);
 
   useEffect(() => {
-    if (!customer?.id || !cartHydratedRef.current) return undefined;
+    if (!customer?.id || !cartHydratedRef.current || cartPreviewModeRef.current) return undefined;
     const fingerprint = cartFingerprint(cartItems);
     if (fingerprint === lastSavedCartRef.current) return undefined;
     const nextOperation = makeCartSyncOperation(
@@ -664,7 +692,7 @@ export default function App({
 
   const refreshAccountCart = useCallback(async () => {
     const accountId = cartAccountRef.current;
-    if (!accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+    if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
     const beforeFingerprint = cartFingerprint(currentCartRef.current.items);
     if (beforeFingerprint !== lastSavedCartRef.current) return;
     try {
@@ -699,6 +727,10 @@ export default function App({
 
   const retryCartSync = useCallback(() => {
     if (!customer?.id) return;
+    if (cartPreviewModeRef.current) {
+      setCartSyncStatus('preview');
+      return;
+    }
     if (!cartHydratedRef.current) {
       setCartSyncStatus('loading');
       void cartHydrateRetryRef.current?.();
@@ -907,169 +939,7 @@ export default function App({
 
   useEffect(() => {
     const refreshCatalogue = () => {
-      void refreshProductCache().catch(() => {
-        // Keep the last known-good catalogue visible during a transient outage.
-      });
-    };
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') refreshCatalogue();
-    };
-    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
-
-    window.addEventListener('focus', refreshCatalogue);
-    window.addEventListener('online', refreshCatalogue);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refreshCatalogue);
-      window.removeEventListener('online', refreshCatalogue);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, []);
-
-  // Category counts describe the catalogue scope, not the current browse
-  // position. Keeping them in the page-loading effect made every department,
-  // category, page, search and sort change repeat the full taxonomy count pass.
-  // Refresh only when an input that can actually change a count changes.
-  useEffect(() => {
-    let cancelled = false;
-    void fetchCategoryCounts({ collection: activeCollection, inStockOnly })
-      .then((nextCounts) => {
-        if (!cancelled) setCounts(nextCounts);
-      })
-      .catch(() => {
-        // Counts are supporting navigation data. A transient count failure must
-        // not clear otherwise valid counts or block the product page.
-      });
-    return () => { cancelled = true; };
-  }, [activeCollection, categories, inStockOnly, catalogRefreshKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let cancelDeferredImageWarm = null;
-
-    const warmPageImages = (products) => {
-      const imageUrls = products
-        .map((product) => product.image || product.localImage)
-        .filter(Boolean);
-      if (!imageUrls.length) return;
-
-      // Prioritize the first visible rows, then warm the rest off the critical path.
-      const immediateLimit = page === 1 ? 12 : 20;
-      preloadProductImages(imageUrls, { limit: immediateLimit });
-
-      const deferredUrls = imageUrls.slice(immediateLimit);
-      if (!deferredUrls.length || typeof window === 'undefined') return;
-
-      const runDeferredWarm = () => {
-        if (cancelled) return;
-        preloadProductImages(deferredUrls, { limit: deferredUrls.length });
-      };
-
-      if (typeof window.requestIdleCallback === 'function') {
-        const idleId = window.requestIdleCallback(runDeferredWarm, { timeout: 1200 });
-        cancelDeferredImageWarm = () => {
-          if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
-        };
-        return;
-      }
-
-      const timerId = window.setTimeout(runDeferredWarm, 250);
-      cancelDeferredImageWarm = () => window.clearTimeout(timerId);
-    };
-
-    const load = async () => {
-      setLoading(true);
-      try {
-        const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
-        const pageData = await fetchProductPage({
-          page,
-          pageSize: CATALOG_PAGE_SIZE,
-          searchQuery,
-          categoryPath: path,
-          collection: activeCollection,
-          sort,
-          specialIds,
-          inStockOnly,
-        });
-
-        if (cancelled) return;
-        setUsingFallback(false);
-
-        if (pageData.total > 0 && pageData.products.length === 0 && page > 1) {
-          const maxPage = Math.max(1, Math.ceil(pageData.total / CATALOG_PAGE_SIZE));
-          if (maxPage !== page) {
-            setPage(maxPage);
-            return;
-          }
-        }
-
-        // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
-        // fall back to showing the top-level department so the page isn't empty.
-        if (pageData.total === 0 && path.length > 1 && !searchQuery && activeCollection === 'all') {
-          const l1Data = await fetchProductPage({
-            page: 1,
-            pageSize: CATALOG_PAGE_SIZE,
-            searchQuery: '',
-            categoryPath: path.slice(0, 1),
-            collection: 'all',
-            sort,
-            inStockOnly,
-          });
-          if (!cancelled && l1Data.total > 0) {
-            setCatalogProducts(l1Data.products);
-            setCatalogTotal(l1Data.total);
-            warmPageImages(l1Data.products);
-            return;
-          }
-        }
-
-        setCatalogProducts(pageData.products);
-        setCatalogTotal(pageData.total);
-        warmPageImages(pageData.products);
-      } catch {
-        // Never fall back to a public catalogue file: trade pricing and stock
-        // are available only through the approved-customer API.
-        if (cancelled) return;
-        setUsingFallback(false);
-        setCatalogTotal(0);
-        setCatalogProducts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-      if (cancelDeferredImageWarm) cancelDeferredImageWarm();
-    };
-  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
-      lastSearchLogKeyRef.current = '';
-      return;
-    }
-    if (loading) return;
-
-    const term = searchQuery.trim();
-    if (term.length < 3) return;
-
-    const logKey = `${term}|${pathKey}|${activeCollection}`;
-    if (lastSearchLogKeyRef.current === logKey) return;
-
-    let cancelled = false;
-    const searchedAt = new Date();
-    const filtersApplied = [];
-    if (activeCollection !== 'all') filtersApplied.push(collectionLabel(activeCollection));
-    if (path.length) filtersApplied.push(...path);
-
-    const timer = setTimeout(() => {
-      void logSearch({
-        searchTerm: term,
-        resultsFound: catalogTotal,
+      void refreshProductCache().catch(() …1496 tokens truncated…ultsFound: catalogTotal,
         customerId: customer?.id ?? null,
         customerEmail: customer?.email ?? null,
         filtersApplied,
@@ -1485,6 +1355,10 @@ export default function App({
 
   const sendOrderEmail = async (opts = {}) => {
     if (!cartHydratedRef.current || !cartItems.length) return { ok: false };
+    if (cartPreviewModeRef.current) {
+      setCartAnnouncement('Preview basket only — order requests are disabled here.');
+      return { ok: false, preview: true };
+    }
     const courierChoice = opts?.courierChoice || null;
     const customerNotes = String(opts?.customerNotes || '').trim();
     const promo = opts?.promo || null;
@@ -1906,6 +1780,7 @@ export default function App({
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
+            cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
             onRetryCartSync={retryCartSync}
@@ -2013,6 +1888,7 @@ export default function App({
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
+                cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}
                 onRetryCartSync={retryCartSync}
@@ -2042,3 +1918,4 @@ export default function App({
     </div>
   );
 }
+

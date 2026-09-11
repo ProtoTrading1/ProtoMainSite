@@ -100,6 +100,7 @@ export default function Drawer({
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
+  cartPreviewMode = false,
   priceChanges = [],
   onDismissPriceChanges,
   onRetryCartSync,
@@ -120,7 +121,9 @@ export default function Drawer({
   const isReady = cartTotal >= MIN_ORDER;
   const hasExpiry = cartItems.length > 0 && cartExpiryRemainingMs !== null;
   const expiryLabel = formatCartExpiry(cartExpiryRemainingMs);
-  const syncLabel = cartSyncStatus === 'saving'
+  const syncLabel = cartPreviewMode || cartSyncStatus === 'preview'
+    ? 'Preview basket — saved only on this device'
+    : cartSyncStatus === 'saving'
     ? 'Saving…'
     : cartSyncStatus === 'loading'
       ? 'Loading account basket…'
@@ -472,6 +475,11 @@ export default function Drawer({
             <Loader2 size={17} className="spin" />
             Loading account basket…
           </button>
+        ) : cartPreviewMode ? (
+          <button className="primary-order-button" type="button" disabled aria-label="Preview basket only — ordering disabled">
+            <ShoppingCart size={17} />
+            Preview basket — ordering disabled
+          </button>
         ) : isReady ? (
           <button className="primary-order-button" onClick={handleSubmitClick} type="button">
             <ShoppingCart size={17} />
@@ -601,3 +609,4 @@ export default function Drawer({
     </div>
   );
 }
+
