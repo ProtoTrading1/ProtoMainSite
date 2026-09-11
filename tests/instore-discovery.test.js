@@ -99,6 +99,16 @@ test('keeps unsuitable fancy-dress products out of the Party tile', () => {
   assert.equal(party?.image, 'balloons.jpg');
 });
 
+test('uses a genuine toy or game image ahead of a newer source-department magnet', () => {
+  const tiles = discoveryTiles([
+    { sku: '8610000001', title: 'TOY CAR', category: 'TOYS + GAMES', image: 'toy-car.jpg' },
+    { sku: '8690000001', title: 'MAGNET SET', category: 'TOYS + GAMES', image: 'magnet.jpg' },
+  ]);
+  const toys = tiles.find((tile) => tile.label === 'Toys & games');
+  assert.equal(toys?.sku, '8610000001');
+  assert.equal(toys?.image, 'toy-car.jpg');
+});
+
 test('uses current product images instead of a frozen category artwork', () => {
   const tiles = discoveryTiles([
     { sku: '8600000001', title: 'SOFT TOY BEAR', category: 'SOFT TOYS', image: 'bear.jpg' },
