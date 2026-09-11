@@ -31,13 +31,16 @@ test('keeps jewellery-making components out of finished jewellery', () => {
   assert.equal(discoveryGroup({ title: 'METAL BEAD RAINBOW', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
   assert.equal(discoveryGroup({ title: 'METAL LOCKET', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
   assert.equal(discoveryGroup({ title: 'NECKLACE LOCKET HEART', category: 'FASHION JEWELLERY' }), 'Jewellery');
-  assert.equal(discoveryGroup({ title: 'NECKLACE RASTA SEEDBEADS', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
-  assert.equal(discoveryGroup({ title: 'NECKLACE MIYUKI BEADED', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
+  // These are complete necklaces, not loose beads: the object noun wins.
+  assert.equal(discoveryGroup({ title: 'NECKLACE RASTA SEEDBEADS', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.equal(discoveryGroup({ title: 'NECKLACE MIYUKI BEADED', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.equal(discoveryGroup({ title: 'EARRING PARTS 6MM', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
   assert.equal(discoveryGroup({ title: 'METAL EARRING HOOKS', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
   assert.notEqual(discoveryGroup({ title: 'CHAIN S/STEEL', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.notEqual(discoveryGroup({ title: 'JEWELLERY DISPLAY BOX 7*7CM', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.equal(discoveryGroup({ title: 'NECKLACE CRYSTAL HEART', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.equal(discoveryGroup({ sku: '8605790101', title: 'CHAIN W/PENDANT PEACE', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.equal(discoveryGroup({ title: 'CHAIN WITH PENDANT PEACE', category: 'FASHION JEWELLERY' }), 'Jewellery');
 });
 
 test('ranks direct description matches ahead of related browse matches', () => {
@@ -61,7 +64,9 @@ test('uses curated website artwork for the beads browse thumbnail', () => {
     { sku: '8618100133', title: 'BRACELET WOODEN BEADS', category: 'WOODEN BEADS', image: 'bracelet.jpg' },
   ]);
   const beads = tiles.find((tile) => tile.label === 'Beads & jewellery making');
-  assert.equal(beads?.sku, '8618100133');
+  // Finished bracelets belong in their own customer category; the bead tile
+  // must not borrow that product merely because its description says beads.
+  assert.equal(beads?.sku, '8600000001');
   assert.equal(beads?.image, '/cat-beads.jpg');
 });
 
