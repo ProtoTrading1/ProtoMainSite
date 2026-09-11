@@ -156,6 +156,16 @@ export async function signPreviewImages(client, runId, rows) {
   }));
 }
 
+// PostgREST returns at most 1,000 rows unless we explicitly page through the
+// result. An Instore preview must not quietly look complete when only its first
+// database page was read.
+export async function readCompletePreviewRows(client, runId) {
+  return readCompleteRows(() => client.from('preview_instore_items')
+    .select('sku, barcode, title, price_incl_vat, available_stock, department, image_object_path', { count: 'exact' })
+    .eq('run_id', runId)
+    .not('image_object_path', 'is', null));
+}
+
 export function buildPreviewProducts(rows, rawQuery = '') {
   return buildExtendedRangeProducts((rows || []).map((row) => ({
     sku: row.sku,
@@ -192,12 +202,7 @@ export default async function handler(req, res) {
       const { data: run, error: runError } = await client.from('preview_instore_runs')
         .select('id, status').eq('id', runId).maybeSingle();
       if (runError || run?.status !== 'ready') throw new Error('Isolated Instore preview is not ready');
-      const { data: rows, error } = await client.from('preview_instore_items')
-        .select('sku, barcode, title, price_incl_vat, available_stock, department, image_object_path')
-        .eq('run_id', runId)
-        .not('image_object_path', 'is', null)
-        .order('sku', { ascending: true });
-      if (error || !Array.isArray(rows)) throw new Error('Isolated Instore preview could not be read');
+      const rows = await readCompletePreviewRows(client, runId);
       const allEligible = buildPreviewProducts(await signPreviewImages(client, runId, rows));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
