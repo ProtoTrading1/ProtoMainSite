@@ -1223,20 +1223,25 @@ export default function App({
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
     const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
-    const existingLine = currentCartRef.current?.items?.find((item) => item.product.id === product.id);
-    if (requestedPreference && existingLine?.preference && requestedPreference !== existingLine.preference) {
-      setCartAnnouncement('This item already has a different colour/design preference. Review its basket note before adding more.');
-      return;
-    }
-
     setCartItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      const sameProduct = prev.filter((i) => i.product.id === product.id);
+      // An Instore code can represent assorted colours/designs. Keep each
+      // customer preference as a separate basket line, but cap the combined
+      // quantity at the single live-stock balance for that code.
+      const existing = product.isExtendedRange === true
+        ? sameProduct.find((i) => (i.preference || '') === (requestedPreference || ''))
+        : sameProduct[0];
+      const alreadyRequested = product.isExtendedRange === true
+        ? sameProduct.reduce((total, i) => total + Number(i.qty || 0), 0)
+        : Number(existing?.qty || 0);
+      const availableToAdd = Math.max(0, maxQty - alreadyRequested);
       if (existing) {
-        const nextQty = Math.min(maxQty, existing.qty + requestedQty);
+        const nextQty = existing.qty + Math.min(availableToAdd, requestedQty);
         if (nextQty === existing.qty && (requestedPreference === undefined || requestedPreference === (existing.preference || ''))) return prev;
-        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: nextQty, ...(requestedPreference !== undefined ? { preference: requestedPreference } : {}) } : i));
+        return prev.map((i) => (i === existing ? { ...i, qty: nextQty, ...(requestedPreference !== undefined ? { preference: requestedPreference } : {}) } : i));
       }
-      return [...prev, { product, qty: Math.min(maxQty, requestedQty), ...itemPreferenceFields({ preference: requestedPreference }) }];
+      if (availableToAdd <= 0) return prev;
+      return [...prev, { product, qty: Math.min(availableToAdd, requestedQty), ...itemPreferenceFields({ preference: requestedPreference }) }];
     });
     markCartActivity();
     cartRevealSequenceRef.current += 1;

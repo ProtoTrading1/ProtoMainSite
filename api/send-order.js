@@ -287,8 +287,9 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
 
 async function resolveInstorePrices(items) {
   if (!items.length) return [];
-  const skus = [...new Set(items.map((item) => textId(item?.product?.sku || item?.product?.id)).filter(Boolean))];
-  if (skus.length !== items.length) throw orderError('Duplicate or invalid Instore order lines are not allowed.');
+  const itemSkus = items.map((item) => textId(item?.product?.sku || item?.product?.id));
+  if (itemSkus.some((sku) => !sku)) throw orderError('Each Instore order line needs a product code.');
+  const skus = [...new Set(itemSkus)];
   const index = stockClient();
   let indexRows; let normalRows;
   try {
@@ -319,6 +320,17 @@ async function resolveInstorePrices(items) {
     return [sku, (await response.json())?.row];
   })).catch((error) => { if (error?.status) throw error; throw orderError('Current Instore stock could not be verified.', 503); });
   const bridgeBySku = new Map(bridgeRows);
+  const requestedBySku = new Map();
+  for (const item of items) {
+    const sku = textId(item?.product?.sku || item?.product?.id);
+    const qty = Number(item?.qty);
+    if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
+    requestedBySku.set(sku, (requestedBySku.get(sku) || 0) + qty);
+  }
+  for (const [sku, requested] of requestedBySku) {
+    const available = availableFromBridge(bridgeBySku.get(sku));
+    if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || requested > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  }
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
