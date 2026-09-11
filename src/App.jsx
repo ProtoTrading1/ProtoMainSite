@@ -1389,7 +1389,7 @@ export default function App({
     const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
       && loginBasketSnapshot.itemCount > 0
       && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
-    const showInstoreIntro = !restoredBasketIsUntouched && !hasSeenInstoreIntro(customer.id);
+    const showInstoreIntro = !hasSeenInstoreIntro(customer.id);
     const nextJourney = selectCustomerDashboardState({
       firstName: customerFirstName(customer),
       firstLogin: firstPortalLogin,
@@ -1517,6 +1517,11 @@ export default function App({
     hashNavigate(['instore-products']);
     dismissCustomerJourney();
   }, [dismissCustomerJourney, hashNavigate]);
+
+  const handleCustomerJourneySecondary = useCallback((event) => {
+    if (customerJourney?.secondaryAction === 'basket') handleCartOpen(event);
+    dismissCustomerJourney();
+  }, [customerJourney?.secondaryAction, dismissCustomerJourney, handleCartOpen]);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -1859,7 +1864,7 @@ export default function App({
     <CustomerJourneyPrompt
       state={customerJourney}
       onPrimary={handleCustomerJourneyPrimary}
-      onSecondary={dismissCustomerJourney}
+      onSecondary={handleCustomerJourneySecondary}
       onInstore={handleCustomerJourneyInstore}
       onDismiss={dismissCustomerJourney}
     />

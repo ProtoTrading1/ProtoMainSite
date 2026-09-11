@@ -64,7 +64,7 @@ test('an active basket uses singular item copy without introducing a second acti
   assert.equal(state.instoreLabel, 'New: browse Instore Products');
 });
 
-test('an empty basket receives a one-time personalised Instore introduction', () => {
+test('every customer receives the one-time personalised Instore introduction', () => {
   const state = selectState({ showInstoreIntro: true, onlineOrderCount: 1 });
 
   assert.equal(state.key, INSTORE_INTRO);
@@ -72,6 +72,19 @@ test('an empty basket receives a one-time personalised Instore introduction', ()
   assert.equal(state.primaryLabel, 'Explore Instore Products');
   assert.equal(state.action, 'instore');
   assert.equal(state.dismissAfterMs, 8_000);
+});
+
+test('the Instore introduction keeps a restored basket available as a secondary action', () => {
+  const state = selectState({
+    showInstoreIntro: true,
+    basketRestoredAtLogin: true,
+    basketItemCount: 3,
+  });
+
+  assert.equal(state.key, INSTORE_INTRO);
+  assert.equal(state.primaryLabel, 'Explore Instore Products');
+  assert.equal(state.secondaryLabel, 'Review basket');
+  assert.equal(state.secondaryAction, 'basket');
 });
 
 test('items added during the current visit never masquerade as a restored basket', () => {

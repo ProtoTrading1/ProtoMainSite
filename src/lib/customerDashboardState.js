@@ -72,6 +72,24 @@ export const selectCustomerDashboardState = ({
   const hasPreviousOrder = orders > 0;
   const isFirstLogin = firstLogin === true;
 
+  if (showInstoreIntro === true) {
+    return Object.freeze({
+      key: INSTORE_INTRO,
+      presentation: 'toast',
+      eyebrow: 'NEW FOR YOU',
+      title: `More products are now available, ${name}`,
+      message: 'Explore our Instore range for more choice, clear pricing and available stock.',
+      primaryLabel: 'Explore Instore Products',
+      secondaryLabel: basketRestoredAtLogin === true && basketItems > 0 ? 'Review basket' : null,
+      dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.INSTORE_INTRO,
+      action: 'instore',
+      secondaryAction: basketRestoredAtLogin === true && basketItems > 0 ? 'basket' : null,
+      buyAgain: hasPreviousOrder,
+      popularCategories: !hasPreviousOrder,
+      recentOrderEmpty: !hasPreviousOrder,
+    });
+  }
+
   if (basketRestoredAtLogin === true && basketItems > 0) {
     return Object.freeze({
       key: BASKET_ACTIVE,
@@ -83,23 +101,6 @@ export const selectCustomerDashboardState = ({
       secondaryLabel: null,
       instoreLabel: 'New: browse Instore Products',
       dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.BASKET_ACTIVE,
-      buyAgain: hasPreviousOrder,
-      popularCategories: !hasPreviousOrder,
-      recentOrderEmpty: !hasPreviousOrder,
-    });
-  }
-
-  if (showInstoreIntro === true) {
-    return Object.freeze({
-      key: INSTORE_INTRO,
-      presentation: 'toast',
-      eyebrow: 'NEW FOR YOU',
-      title: `More products are now available, ${name}`,
-      message: 'Explore our Instore range for more choice, clear pricing and available stock.',
-      primaryLabel: 'Explore Instore Products',
-      secondaryLabel: null,
-      dismissAfterMs: CUSTOMER_DASHBOARD_DISMISS_MS.INSTORE_INTRO,
-      action: 'instore',
       buyAgain: hasPreviousOrder,
       popularCategories: !hasPreviousOrder,
       recentOrderEmpty: !hasPreviousOrder,
