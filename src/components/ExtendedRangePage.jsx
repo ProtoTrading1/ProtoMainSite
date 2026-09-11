@@ -87,7 +87,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
       const active = category === tile.label;
       const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
-      return <a key={tile.label} href={href} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
+      return <a key={tile.label} href={href} data-category={tile.label} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
     })}</nav>}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
       <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>

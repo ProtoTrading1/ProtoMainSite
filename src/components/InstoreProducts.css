@@ -19,6 +19,9 @@
 }
 .instore-tiles span { font-size: 17px; line-height: 1.2; }
 .instore-tiles small { font-size: 14px; }
+.instore-tiles a[data-category="Jewellery"] img { object-position: 82% 54%; }
+.instore-tiles a[data-category="Bracelets"] img { object-position: 18% 83%; }
+.instore-tiles a[data-category="Hair accessories"] img { object-position: 96% 88%; }
 @media (max-width: 760px) {
   .instore-tiles { grid-template-columns: 1fr; gap: 10px; }
   .instore-tiles a { min-height: 100px; }

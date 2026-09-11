@@ -22,6 +22,8 @@ test('uses Positill department wording to keep party items distinct from toys', 
 
 test('does not classify socks as soft toys', () => {
   assert.notEqual(discoveryGroup({ title: 'COTTON SOCKS ASSORTED', category: 'SOCKS' }), 'Soft toys');
+  assert.notEqual(discoveryGroup({ title: 'ANKLE SOCKS', category: 'SOFT TOYS' }), 'Soft toys');
+  assert.equal(discoveryGroup({ title: 'SOFT TOY TEDDY BEAR', category: 'SOFT TOYS' }), 'Soft toys');
 });
 
 test('ranks direct description matches ahead of related browse matches', () => {
@@ -64,6 +66,6 @@ test('uses a dedicated website category visual for each browse category', () => 
     { sku: '8600000001', title: 'SOFT TOY BEAR', category: 'SOFT TOYS', image: 'bear.jpg' },
     { sku: '8600000002', title: 'LIPSTICK PINK', category: 'COSMETICS SKIN CARE', image: 'lipstick.jpg' },
   ]);
-  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-toys.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-card-2.jpg');
   assert.equal(tiles.find((tile) => tile.label === 'Beauty')?.image, '/cat-beauty.jpg');
 });
