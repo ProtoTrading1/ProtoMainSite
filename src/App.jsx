@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 21496)
-Total output lines: 2080
-
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Header from './components/Header';
@@ -939,7 +936,169 @@ export default function App({
 
   useEffect(() => {
     const refreshCatalogue = () => {
-      void refreshProductCache().catch(() …1496 tokens truncated…ultsFound: catalogTotal,
+      void refreshProductCache().catch(() => {
+        // Keep the last known-good catalogue visible during a transient outage.
+      });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshCatalogue();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+
+    window.addEventListener('focus', refreshCatalogue);
+    window.addEventListener('online', refreshCatalogue);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshCatalogue);
+      window.removeEventListener('online', refreshCatalogue);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, []);
+
+  // Category counts describe the catalogue scope, not the current browse
+  // position. Keeping them in the page-loading effect made every department,
+  // category, page, search and sort change repeat the full taxonomy count pass.
+  // Refresh only when an input that can actually change a count changes.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCategoryCounts({ collection: activeCollection, inStockOnly })
+      .then((nextCounts) => {
+        if (!cancelled) setCounts(nextCounts);
+      })
+      .catch(() => {
+        // Counts are supporting navigation data. A transient count failure must
+        // not clear otherwise valid counts or block the product page.
+      });
+    return () => { cancelled = true; };
+  }, [activeCollection, categories, inStockOnly, catalogRefreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let cancelDeferredImageWarm = null;
+
+    const warmPageImages = (products) => {
+      const imageUrls = products
+        .map((product) => product.image || product.localImage)
+        .filter(Boolean);
+      if (!imageUrls.length) return;
+
+      // Prioritize the first visible rows, then warm the rest off the critical path.
+      const immediateLimit = page === 1 ? 12 : 20;
+      preloadProductImages(imageUrls, { limit: immediateLimit });
+
+      const deferredUrls = imageUrls.slice(immediateLimit);
+      if (!deferredUrls.length || typeof window === 'undefined') return;
+
+      const runDeferredWarm = () => {
+        if (cancelled) return;
+        preloadProductImages(deferredUrls, { limit: deferredUrls.length });
+      };
+
+      if (typeof window.requestIdleCallback === 'function') {
+        const idleId = window.requestIdleCallback(runDeferredWarm, { timeout: 1200 });
+        cancelDeferredImageWarm = () => {
+          if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+        };
+        return;
+      }
+
+      const timerId = window.setTimeout(runDeferredWarm, 250);
+      cancelDeferredImageWarm = () => window.clearTimeout(timerId);
+    };
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
+        const pageData = await fetchProductPage({
+          page,
+          pageSize: CATALOG_PAGE_SIZE,
+          searchQuery,
+          categoryPath: path,
+          collection: activeCollection,
+          sort,
+          specialIds,
+          inStockOnly,
+        });
+
+        if (cancelled) return;
+        setUsingFallback(false);
+
+        if (pageData.total > 0 && pageData.products.length === 0 && page > 1) {
+          const maxPage = Math.max(1, Math.ceil(pageData.total / CATALOG_PAGE_SIZE));
+          if (maxPage !== page) {
+            setPage(maxPage);
+            return;
+          }
+        }
+
+        // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
+        // fall back to showing the top-level department so the page isn't empty.
+        if (pageData.total === 0 && path.length > 1 && !searchQuery && activeCollection === 'all') {
+          const l1Data = await fetchProductPage({
+            page: 1,
+            pageSize: CATALOG_PAGE_SIZE,
+            searchQuery: '',
+            categoryPath: path.slice(0, 1),
+            collection: 'all',
+            sort,
+            inStockOnly,
+          });
+          if (!cancelled && l1Data.total > 0) {
+            setCatalogProducts(l1Data.products);
+            setCatalogTotal(l1Data.total);
+            warmPageImages(l1Data.products);
+            return;
+          }
+        }
+
+        setCatalogProducts(pageData.products);
+        setCatalogTotal(pageData.total);
+        warmPageImages(pageData.products);
+      } catch {
+        // Never fall back to a public catalogue file: trade pricing and stock
+        // are available only through the approved-customer API.
+        if (cancelled) return;
+        setUsingFallback(false);
+        setCatalogTotal(0);
+        setCatalogProducts([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (cancelDeferredImageWarm) cancelDeferredImageWarm();
+    };
+  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
+      lastSearchLogKeyRef.current = '';
+      return;
+    }
+    if (loading) return;
+
+    const term = searchQuery.trim();
+    if (term.length < 3) return;
+
+    const logKey = `${term}|${pathKey}|${activeCollection}`;
+    if (lastSearchLogKeyRef.current === logKey) return;
+
+    let cancelled = false;
+    const searchedAt = new Date();
+    const filtersApplied = [];
+    if (activeCollection !== 'all') filtersApplied.push(collectionLabel(activeCollection));
+    if (path.length) filtersApplied.push(...path);
+
+    const timer = setTimeout(() => {
+      void logSearch({
+        searchTerm: term,
+        resultsFound: catalogTotal,
         customerId: customer?.id ?? null,
         customerEmail: customer?.email ?? null,
         filtersApplied,
@@ -1918,4 +2077,3 @@ export default function App({
     </div>
   );
 }
-
