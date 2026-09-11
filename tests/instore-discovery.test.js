@@ -41,6 +41,12 @@ test('keeps jewellery-making components out of finished jewellery', () => {
   assert.equal(discoveryGroup({ title: 'NECKLACE CRYSTAL HEART', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.equal(discoveryGroup({ sku: '8605790101', title: 'CHAIN W/PENDANT PEACE', category: 'FASHION JEWELLERY' }), 'Jewellery');
   assert.equal(discoveryGroup({ title: 'CHAIN WITH PENDANT PEACE', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.equal(discoveryGroup({ sku: '8613010026', title: 'S/PRECIOUS CHIPS CROAL', category: 'STATIONERY/ART' }), 'Beads & jewellery making');
+  assert.equal(discoveryGroup({ title: 'S/PRECIOUS STONE 6MM TIGER EYE', category: 'STATIONERY/ART' }), 'Beads & jewellery making');
+  assert.equal(discoveryGroup({ title: 'SEMIPRECIOUS STONES ASSORTED', category: 'STATIONERY/ART' }), 'Beads & jewellery making');
+  assert.equal(discoveryGroup({ title: 'GEMSTONES ASSORTED', category: 'STATIONERY/ART' }), 'Beads & jewellery making');
+  assert.equal(discoveryGroup({ title: 'NECKLACE SEMI PRECIOUS AMETHYST', category: 'FASHION JEWELLERY' }), 'Jewellery');
+  assert.equal(discoveryGroup({ title: 'EARRINGS SEMI PRECIOUS QUARTZ', category: 'FASHION JEWELLERY' }), 'Jewellery');
 });
 
 test('ranks direct description matches ahead of related browse matches', () => {
@@ -80,11 +86,43 @@ test('uses the party artwork while keeping a non-fancy-dress representative', ()
   assert.equal(party?.image, '/cat-events.jpg');
 });
 
-test('uses a dedicated website category visual for each browse category', () => {
+test('uses semantically aligned category visuals for browse tiles', () => {
   const tiles = discoveryTiles([
     { sku: '8600000001', title: 'SOFT TOY BEAR', category: 'SOFT TOYS', image: 'bear.jpg' },
+    { sku: '8600000003', title: 'NECKLACE PEACE', category: 'FASHION JEWELLERY', image: 'necklace.jpg' },
+    { sku: '8600000004', title: 'MISCELLANEOUS ITEM', category: 'UNSORTED', image: 'misc.jpg' },
     { sku: '8600000002', title: 'LIPSTICK PINK', category: 'COSMETICS SKIN CARE', image: 'lipstick.jpg' },
   ]);
-  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-card-2.jpg');
+  assert.equal(tiles.find((tile) => tile.label === 'Jewellery')?.image, '/cat-jewellery.png');
+  assert.equal(tiles.find((tile) => tile.label === 'Soft toys')?.image, '/cat-soft-toys.png');
+  assert.equal(tiles.find((tile) => tile.label === 'More finds')?.image, '/cat-more-finds.png');
   assert.equal(tiles.find((tile) => tile.label === 'Beauty')?.image, '/cat-beauty.jpg');
+});
+
+test('covers every visible browse category with its intended thumbnail', () => {
+  const fixtures = [
+    ['BEADS', 'WOODEN BEADS'], ['FASHION JEWELLERY', 'NECKLACE GOLD'],
+    ['STATIONERY/ART', 'NOTEBOOK'], ['HOUSEHOLD', 'MUG'],
+    ['BAGS & WALLETS', 'PURSE'], ['PARTY / FANCY DRES', 'PARTY BALLOONS'],
+    ['CRAFTS AND ALLIED', 'RIBBON'], ['TOYS + GAMES', 'TOY CAR'],
+    ['SOFT TOYS', 'SOFT TOY BEAR'], ['COSMETICS SKIN CARE', 'LIPSTICK'],
+    ['HAIR ACCESSORIES', 'HAIR CLIP'], ['FASHION JEWELLERY', 'BRACELET'],
+    ['', 'UNIDENTIFIED OBJECT'],
+  ].map(([category, title], index) => ({ sku: String(index), category, title, image: 'fixture.jpg' }));
+  const images = Object.fromEntries(discoveryTiles(fixtures).map((tile) => [tile.label, tile.image]));
+  assert.deepEqual(images, {
+    'Beads & jewellery making': '/cat-beads.jpg',
+    Jewellery: '/cat-jewellery.png',
+    'Stationery & art': '/cat-arts.jpg',
+    'Home & kitchen': '/cat-homeware.jpg',
+    'Bags & wallets': '/cat-fashion.jpg',
+    'Party items': '/cat-events.jpg',
+    'Crafts & DIY': '/cat-textiles.jpg',
+    'Toys & games': '/cat-toys.jpg',
+    'Soft toys': '/cat-soft-toys.png',
+    Beauty: '/cat-beauty.jpg',
+    'Hair accessories': '/cat-fashion.jpg',
+    Bracelets: '/cat-beads.jpg',
+    'More finds': '/cat-more-finds.png',
+  });
 });
