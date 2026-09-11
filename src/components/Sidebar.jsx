@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { instoreAvailable } from '../lib/instoreAvailability';
 import { Loader2, PackageSearch, Store, Upload, X } from 'lucide-react';
 import CategoryNav from './CategoryNav';
 import { authHeaders } from '../lib/authHeaders';
@@ -264,12 +265,12 @@ export default function Sidebar({ categories, path, navigate, onAllProducts, onI
 
         {/* CTA buttons — below category list */}
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
-          <button
+          {instoreAvailable && <button
             type="button"
             onClick={onInstoreProducts}
             aria-current={['instore-products', 'extended-range'].includes(path[0]) ? 'page' : undefined}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, minHeight: 44, padding: '10px 14px', border: '1px solid #e7d7d7', borderRadius: 10, background: ['instore-products', 'extended-range'].includes(path[0]) ? '#fbeaea' : '#fff7f7', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: '#8b1a1a', cursor: 'pointer' }}
-          ><Store size={17} aria-hidden="true" />Instore Products</button>
+          ><Store size={17} aria-hidden="true" />Instore Products</button>}
           <button
             ref={requestTriggerRef}
             type="button"

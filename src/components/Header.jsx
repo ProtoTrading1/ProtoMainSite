@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useId, useMemo } from 'react';
+import { instoreAvailable } from '../lib/instoreAvailability';
 import {
   Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
   Plus, ScanBarcode, Search, ShoppingCart, Star, Store, Upload, User, X,
@@ -1100,10 +1101,10 @@ export default function Header({
               About Us
             </button>
 
-            <button className="header-nav-btn header-nav-instore" type="button" onClick={onInstoreProducts}>
+            {instoreAvailable && <button className="header-nav-btn header-nav-instore" type="button" onClick={onInstoreProducts}>
               <Store size={14} />
               Instore Products
-            </button>
+            </button>}
 
             <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
               <Star size={14} className="spinning-star" />

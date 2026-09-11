@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
+import { instoreAvailable } from './lib/instoreAvailability';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -1867,7 +1868,7 @@ export default function App({
         </aside>
 
         <main className="content-area">
-          {viewingInstoreProducts ? <ExtendedRangePage
+          {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}

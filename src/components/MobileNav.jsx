@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { instoreAvailable } from '../lib/instoreAvailability';
 import { X, ChevronLeft, ChevronRight, LayoutGrid, Loader2, PackageSearch, Search, Upload, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import { filterNavChildrenWhenCountsReady, lookupProductCount } from '../lib/taxonomy';
@@ -238,12 +239,12 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <button
+            {instoreAvailable && <button
               type="button"
               onClick={() => { onInstoreProducts?.(); onClose(); }}
               aria-current={['instore-products', 'extended-range'].includes(path[0]) ? 'page' : undefined}
               style={{ width: '100%', minHeight: 52, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, border: 0, background: '#fff7f7', borderBottom: '1px solid #f3f4f6', color: '#7f1d1d', font: 'inherit', fontWeight: 800, textAlign: 'left', cursor: 'pointer' }}
-            ><Search size={17} aria-hidden="true" /> Instore Products</button>
+            ><Search size={17} aria-hidden="true" /> Instore Products</button>}
             <button
               onClick={() => {
                 navigate([]);
