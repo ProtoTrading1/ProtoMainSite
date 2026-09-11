@@ -74,6 +74,12 @@ test('uses the highest product code and its current image for a browse tile', ()
   assert.equal(beads?.image, 'newest-beads.jpg');
 });
 
+test('opens the unfiltered catalogue with beads before party items', () => {
+  const beads = { sku: '8610000001', title: 'GLASS BEADS', category: 'STRING BEADS' };
+  const party = { sku: '8600000001', title: 'GLOVES PARTY', category: 'PARTY / FANCY DRES' };
+  assert.ok(compareInstoreSearch(beads, party, '') < 0);
+});
+
 test('uses the current 86181 bracelet range for the Jewellery tile', () => {
   const tiles = discoveryTiles([
     { sku: '8633680429', title: 'TERRORIST NECKLACE', category: 'FASHION JEWELLERY', image: 'historical-necklace.jpg' },
