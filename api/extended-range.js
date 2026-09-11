@@ -216,8 +216,8 @@ export default async function handler(req, res) {
       const from = (page - 1) * PAGE_SIZE;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
       // Tile representatives come from the same positive-stock, priced
-      // catalogue as the product grid. Website category art is already public
-      // and must not be sent through the signed product-image path.
+      // catalogue as the grid. Each is a current stock image, so it must pass
+      // through the same short-lived signed-image path as a product card.
       const tileCandidates = discoveryTiles(allEligible);
       const tileRowsToSign = tileCandidates
         .filter((tile) => !String(tile.image || '').startsWith('/'))
@@ -229,7 +229,7 @@ export default async function handler(req, res) {
       const tileImageBySku = new Map(signedTiles.map((row) => [String(row.sku || '').trim().toUpperCase(), row.image_url]));
       const tiles = tileCandidates.map(({ sku, image, ...tile }) => ({
         ...tile,
-        image: image || tileImageBySku.get(sku) || '',
+        image: tileImageBySku.get(sku) || image || '',
       }));
       const products = buildPreviewProducts(signedProducts);
       res.setHeader('Cache-Control', 'private, no-store');
