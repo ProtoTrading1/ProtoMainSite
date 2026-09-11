@@ -34,3 +34,13 @@ test('starts browse discovery with beads and jewellery making', () => {
   ]);
   assert.equal(tiles[0].label, 'Beads & jewellery making');
 });
+
+test('uses a recognisable in-stock product as the browse thumbnail', () => {
+  const tiles = discoveryTiles([
+    { sku: '8600000001', title: 'MAGNETIC CLASP', category: 'BEAD METAL PARTS', image: 'clasp.jpg' },
+    { sku: '8618100133', title: 'BRACELET WOODEN BEADS', category: 'WOODEN BEADS', image: 'bracelet.jpg' },
+  ]);
+  const beads = tiles.find((tile) => tile.label === 'Beads & jewellery making');
+  assert.equal(beads?.sku, '8618100133');
+  assert.equal(beads?.image, 'bracelet.jpg');
+});
