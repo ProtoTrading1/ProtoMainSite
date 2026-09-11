@@ -26,6 +26,12 @@ test('does not classify socks as soft toys', () => {
   assert.equal(discoveryGroup({ title: 'SOFT TOY TEDDY BEAR', category: 'SOFT TOYS' }), 'Soft toys');
 });
 
+test('keeps jewellery-making components out of finished jewellery', () => {
+  assert.equal(discoveryGroup({ title: 'JUMP RING 0.7*5MM PKT,50', category: 'FASHION JEWELLERY' }), 'More finds');
+  assert.equal(discoveryGroup({ title: 'METAL BEAD RAINBOW', category: 'FASHION JEWELLERY' }), 'Beads & jewellery making');
+  assert.equal(discoveryGroup({ title: 'NECKLACE CRYSTAL HEART', category: 'FASHION JEWELLERY' }), 'Jewellery');
+});
+
 test('ranks direct description matches ahead of related browse matches', () => {
   const direct = { title: 'BRACELET WOODEN BEADS', category: 'FASHION JEWELLERY' };
   const related = { title: 'MEMORY WIRE BANGLE', category: 'PENDNTS BRACLTS RNGS' };
