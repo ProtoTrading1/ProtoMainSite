@@ -47,6 +47,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
+  // Category cards are browse actions. Move the refreshed results into view so
+  // a customer gets an immediate, visible response after tapping a card.
+  const browseCategory = (nextCategory) => {
+    choose('', nextCategory);
+    window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
   const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); setPage(1); };
@@ -75,7 +81,10 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
-    {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => <button key={tile.label} type="button" aria-pressed={category === tile.label} onClick={() => choose('', category === tile.label ? '' : tile.label)}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></button>)}</nav>}
+    {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
+      const active = category === tile.label;
+      return <button key={tile.label} type="button" data-active={active} aria-current={active ? 'true' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`} onClick={() => browseCategory(active ? '' : tile.label)}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></button>;
+    })}</nav>}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
       <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
       {loading && <div className="instore-loading">Loading products…</div>}
