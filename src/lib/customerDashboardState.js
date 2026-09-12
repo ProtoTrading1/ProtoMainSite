@@ -17,7 +17,7 @@ export const CUSTOMER_DASHBOARD_DISMISS_MS = Object.freeze({
   FIRST_LOGIN: 5_000,
   RETURNING_BUYER: 3_000,
   RETURNING_NO_ORDER: 4_000,
-  INSTORE_INTRO: 8_000,
+  INSTORE_INTRO: 10_000,
 });
 
 const safeFirstName = (value) => {
