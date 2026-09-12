@@ -80,7 +80,7 @@ test('an empty basket receives a one-time personalised Instore introduction', ()
   assert.equal(state.title, 'More products are now available, George');
   assert.equal(state.primaryLabel, 'Explore Instore Products');
   assert.equal(state.action, 'instore');
-  assert.equal(state.dismissAfterMs, 8_000);
+  assert.equal(state.dismissAfterMs, 10_000);
 });
 
 test('items added during the current visit never masquerade as a restored basket', () => {
