@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { discoveryGroup, discoveryTiles, filterInstoreSearch } from '../lib/instore-discovery.mjs';
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
@@ -19,7 +19,7 @@ const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
 // This only caches the already-verified read model inside a warm function.
 // Checkout still verifies availability independently, while repeat browsing
 // avoids re-reading thousands of rows on every search or category click.
-const CATALOGUE_CACHE_TTL_MS = 30_000;
+const CATALOGUE_CACHE_TTL_MS = 60_000;
 const catalogueCache = new Map();
 
 async function getCachedCatalogue(key, loader) {
@@ -92,9 +92,8 @@ function normalizePage(value) {
 // an active, priced item with positive currently-synced available stock.
 // Zero or unknown stock is excluded; it never turns into an "arriving soon" card.
 export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged = false, pricesAreInclusive = false } = {}) {
-  const query = normalizeQuery(rawQuery);
   const seen = new Set();
-  return (rows || []).flatMap((row) => {
+  const products = (rows || []).flatMap((row) => {
     const sku = String(row?.sku || '').trim().toUpperCase();
     // A reviewer can hide a misleading source photo without taking the SKU
     // off sale.  The product keeps its normal availability and checkout
@@ -130,10 +129,10 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
     };
-    if (!matchesInstoreSearch(product, query)) return [];
     seen.add(sku);
     return [product];
   });
+  return rawQuery ? filterInstoreSearch(products, rawQuery) : products;
 }
 
 async function readInstoreImageControls(client) {
@@ -258,7 +257,7 @@ export default async function handler(req, res) {
       })));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
-      const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+      const filtered = filterInstoreSearch(allEligible, query, category);
       const from = (page - 1) * PAGE_SIZE;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
       // Tile representatives come from the same positive-stock, priced
@@ -278,7 +277,7 @@ export default async function handler(req, res) {
         image: tileImageBySku.get(sku) || image || '',
       }));
       const products = buildPreviewProducts(signedProducts);
-      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=30');
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({
         source: 'isolated Instore preview catalogue',
@@ -311,9 +310,11 @@ export default async function handler(req, res) {
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
-    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+    const filtered = filterInstoreSearch(allEligible, query, category);
     const from = (page - 1) * PAGE_SIZE;
-    res.setHeader('Cache-Control', 'private, no-store');
+    // This is authorised customer data. `private` allows only the customer's
+    // browser to reuse a recent result; it must never be shared at the CDN.
+    res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=30');
     res.setHeader('Vary', 'Authorization');
     return res.status(200).json({
       source: 'verified Instore image index with live stock eligibility',

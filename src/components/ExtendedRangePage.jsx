@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
-import { fetchExtendedRange } from '../lib/extendedRange';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../../lib/instore-discovery.mjs';
+import { fetchExtendedRange, getCachedExtendedRangeCatalogue, primeExtendedRangeCatalogue } from '../lib/extendedRange';
+import { discoveryGroup, discoveryTiles, filterInstoreSearch } from '../../lib/instore-discovery.mjs';
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
 function localPage(catalogue, query, category, page) {
- const products = catalogue.filter((product) => matchesInstoreSearch(product, query)
-    && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+ const products = filterInstoreSearch(catalogue, query, category);
   const from = (page - 1) * 60;
   return { products: products.slice(from, from + 60), total: products.length, tiles: discoveryTiles(catalogue) };
 }
@@ -27,23 +26,40 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [catalogueRevision, setCatalogueRevision] = useState(0);
   const resultsRef = useRef(null);
   const searchRef = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(false);
+    const catalogue = getCachedExtendedRangeCatalogue();
+    if (catalogue) {
+      const local = localPage(catalogue, submittedQuery, category, page);
+      setProducts(local.products);
+      setTiles(local.tiles);
+      setMeta({ total: local.total, page, pageSize: 60 });
+      setLoading(false);
+      return () => controller.abort();
+    }
     fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
       .then((data) => {
         if (controller.signal.aborted) return;
         setProducts(Array.isArray(data?.products) ? data.products : []);
         setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
         setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || 60) });
+        // Do not hold up the first visible page for the full browse cache.
+        // It is only used once it is safely available in the background.
+        primeExtendedRangeCatalogue()
+          .then((nextCatalogue) => {
+            if (!controller.signal.aborted && nextCatalogue) setCatalogueRevision((value) => value + 1);
+          })
+          .catch(() => {});
       })
       .catch(() => { if (!controller.signal.aborted) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedQuery, page, retry, category]);
+  }, [submittedQuery, page, retry, category, catalogueRevision]);
 
   // The app router owns the hash. Mirroring its parsed browse value here
   // prevents a native category link from leaving this page on stale results.
@@ -63,6 +79,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const pages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);
+  // The tiles are a landing-page guide. Once a shopper has made a choice,
+  // show the actual product photography directly beneath the search controls.
+  const showDiscoveryTiles = !category && !submittedQuery;
+  const activeTile = category ? tiles.find((tile) => tile.label === category) : null;
+  const clearCategory = () => { setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };
   const changePage = (next) => { setPage(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); };
   const guideActionStyle = { width: '100%', border: 0, padding: 0, background: 'transparent', color: 'inherit', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', font: 'inherit', cursor: 'pointer' };
 
@@ -84,7 +105,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
-    {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
+    {!showDiscoveryTiles && <div className="instore-refinement" aria-live="polite">
+      {activeTile && <img src={activeTile.image} alt="" />}
+      <div><span>{category ? 'Browsing' : 'Search results'}</span><strong>{category || `“${submittedQuery}”`}</strong></div>
+      {category && <button type="button" onClick={clearCategory}>Browse all product types</button>}
+    </div>}
+    {showDiscoveryTiles && tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
       const active = category === tile.label;
       const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
       return <a key={tile.label} href={href} data-category={tile.label} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
