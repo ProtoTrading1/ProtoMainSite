@@ -64,6 +64,15 @@ test('an active basket uses singular item copy without introducing a second acti
   assert.equal(state.instoreLabel, 'New: browse Instore Products');
 });
 
+test('the app keeps the once-only Instore announcement independent from a restored basket', async () => {
+  const app = await readFile(appSourceUrl, 'utf8');
+
+  assert.match(app, /const showInstoreIntro = !hasSeenInstoreIntro\(customer\.id\);/);
+  assert.match(app, /const nextInstoreAnnouncement = restoredBasketIsUntouched && showInstoreIntro/);
+  assert.match(app, /setInstoreAnnouncement\(nextInstoreAnnouncement\)/);
+  assert.match(app, /\{instoreAnnouncementPrompt\}/);
+});
+
 test('an empty basket receives a one-time personalised Instore introduction', () => {
   const state = selectState({ showInstoreIntro: true, onlineOrderCount: 1 });
 
