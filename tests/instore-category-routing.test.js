@@ -11,3 +11,9 @@ test('every Instore category link is driven by the app router browse refinement'
   assert.match(page, /useEffect\(\(\) => \{\s*setCategory\(browseCategory\);[\s\S]*\}, \[browseCategory\]\);/);
   assert.doesNotMatch(page, /hashBrowseCategory|addEventListener\('hashchange'/);
 });
+
+test('a search or category selection brings product cards above the discovery tiles', () => {
+  assert.match(page, /const showDiscoveryTiles = !category && !submittedQuery;/);
+  assert.match(page, /\{showDiscoveryTiles && tiles\.length > 0 && <nav className="instore-tiles"/);
+  assert.match(page, /\{!showDiscoveryTiles && <div className="instore-refinement"/);
+});

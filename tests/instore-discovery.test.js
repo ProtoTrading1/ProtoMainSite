@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, discoveryTiles, filterInstoreSearch, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 
 test('uses Positill department and description for the soft-toy browse tile', () => {
   const product = {
@@ -18,6 +18,17 @@ test('uses Positill department and description for the soft-toy browse tile', ()
 test('uses Positill department wording to keep party items distinct from toys', () => {
   assert.equal(discoveryGroup({ title: 'PARTY TOY CLUB', category: 'PARTY / FANCY DRES' }), 'Party items');
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');
+});
+
+test('uses the main catalogue search rules for Instore codes, descriptions, customer wording and typos', () => {
+  const products = [
+    { sku: '8618100133', barcode: '60010001', name: 'Ladies Wallet', description: 'Compact purse with zip', title: 'Ladies Wallet', category: 'BAGS & WALLETS', stockQty: 12 },
+    { sku: '8618100134', barcode: '60010002', name: 'Stationery Pen Set', description: 'Blue ink pen set', title: 'Stationery Pen Set', category: 'STATIONERY/ART', stockQty: 12 },
+  ];
+  assert.equal(filterInstoreSearch(products, '8618100133')[0]?.sku, '8618100133');
+  assert.equal(filterInstoreSearch(products, 'purse')[0]?.sku, '8618100133');
+  assert.equal(filterInstoreSearch(products, 'stationary')[0]?.sku, '8618100134');
+  assert.equal(filterInstoreSearch(products, 'walelt')[0]?.sku, '8618100133');
 });
 
 test('does not classify socks as soft toys', () => {
