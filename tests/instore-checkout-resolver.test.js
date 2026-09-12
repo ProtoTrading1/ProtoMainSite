@@ -28,6 +28,12 @@ test('Instore checkout ignores browser price and caps the request at fresh avail
   assert.throws(() => resolveInstoreOrderLine({ ...item, qty: 12 }, { indexRow, bridgeRow }), { status: 409 });
 });
 
+test('Instore checkout remains available while an incorrect customer image is hidden', () => {
+  const result = resolveInstoreOrderLine(item, { indexRow: { ...indexRow, image_url: '' }, bridgeRow });
+  assert.equal(result.product.sku, indexRow.sku);
+  assert.equal(result.product.price, 13.5);
+});
+
 test('Instore checkout rejects an item that has fallen below the ten-unit display threshold', () => {
   assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, ONHAND: 10, BOOKED: 1 } }), { status: 409 });
 });

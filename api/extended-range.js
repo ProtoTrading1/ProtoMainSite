@@ -96,7 +96,11 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
   const seen = new Set();
   return (rows || []).flatMap((row) => {
     const sku = String(row?.sku || '').trim().toUpperCase();
-    const imageUrl = String(row?.image_url || '').trim();
+    // A reviewer can hide a misleading source photo without taking the SKU
+    // off sale.  The product keeps its normal availability and checkout
+    // identity; the client renders a clear neutral image state instead.
+    const imageHidden = row?.image_control_status === 'hidden';
+    const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
     const availableStock = Number(row?.available_stock);
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
@@ -108,7 +112,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       || (row?.visibility_status === 'hidden'
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
-      || !imageUrl.startsWith('https://')
+      || (!imageHidden && !imageUrl.startsWith('https://'))
       || !Number.isFinite(availableStock) || availableStock < MIN_INSTORE_AVAILABLE_STOCK
       || price <= 0) return [];
     const product = {
@@ -117,7 +121,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       title: String(row?.title || '').trim() || sku,
       description: String(row?.original_description || '').trim(),
       originalDescription: String(row?.original_description || '').trim(),
-      price, image: imageUrl, images: [imageUrl],
+      price, image: imageUrl, images: imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
       stockQty: Math.floor(availableStock), stockOnHand: Math.floor(availableStock), inStock: true,
       minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
@@ -127,6 +131,21 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     seen.add(sku);
     return [product];
   });
+}
+
+async function readInstoreImageControls(client) {
+  const { data, error } = await client
+    .from('instore_image_controls')
+    .select('sku, status');
+  if (error) throw new Error(`Instore image controls unavailable: ${error.message || 'query failed'}`);
+  return new Map((data || []).map((row) => [String(row?.sku || '').trim().toUpperCase(), String(row?.status || '').trim()]));
+}
+
+export function applyInstoreImageControls(rows, controls) {
+  return (rows || []).map((row) => ({
+    ...row,
+    image_control_status: controls?.get(String(row?.sku || '').trim().toUpperCase()) || 'visible',
+  }));
 }
 
 export function stockClient() {
@@ -261,7 +280,7 @@ export default async function handler(req, res) {
     // large staged preview cannot spend its whole serverless response window
     // waiting for the main-catalogue duplicate index to begin.
     const allEligible = await getCachedCatalogue(includeStaged ? 'preview' : 'production', async () => {
-      const [rangeRows, catalogue] = await Promise.all([
+      const [rangeRows, catalogue, imageControls] = await Promise.all([
         readCompleteRows(() => client.from('extended_range_items')
           .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
           .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
@@ -271,8 +290,9 @@ export default async function handler(req, res) {
           .gte('available_stock', 0)
           .like('image_url', 'https://%'), { allowChangingCount: includeStaged }),
         readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
+        readInstoreImageControls(client),
       ]);
-      const eligible = buildExtendedRangeProducts(rangeRows, '', { includeStaged });
+      const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls), '', { includeStaged });
       return excludeMainCatalogueProducts(eligible, catalogue);
     });
     const query = normalizeQuery(req.query?.q);

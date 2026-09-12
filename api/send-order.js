@@ -275,7 +275,10 @@ function availableFromBridge(row) {
 export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [] } = {}) {
   const sku = textId(item?.product?.sku || item?.product?.id);
   if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
-  if (indexRow?.image_source !== 'nutstore' || indexRow?.is_active !== true || indexRow?.image_review_status !== 'verified' || indexRow?.visibility_status !== 'search_only' || !String(indexRow?.image_url || '').startsWith('https://')) throw orderError('Instore product is no longer approved.', 409);
+  // A removed/misleading product photo must never make a separately approved,
+  // in-stock SKU unorderable. Image visibility is presentation-only; the
+  // normal index, duplicate, price and fresh-stock gates stay authoritative.
+  if (indexRow?.image_source !== 'nutstore' || indexRow?.is_active !== true || indexRow?.image_review_status !== 'verified' || indexRow?.visibility_status !== 'search_only') throw orderError('Instore product is no longer approved.', 409);
   if (textId(bridgeRow?.CODE) !== sku) throw orderError('Current Instore stock could not be verified.', 503);
   const qty = Number(item?.qty);
   const available = availableFromBridge(bridgeRow);

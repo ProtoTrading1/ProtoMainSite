@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExtendedRangeProducts, buildPreviewProducts, readCompletePreviewRows, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
+import { applyInstoreImageControls, buildExtendedRangeProducts, buildPreviewProducts, readCompletePreviewRows, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
 
 const valid = {
   sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS',
@@ -32,6 +32,15 @@ test('legacy verified Instore records do not require a source-label backfill', (
   const legacy = { ...valid, available_stock: 10 };
   delete legacy.image_source;
   assert.equal(buildExtendedRangeProducts([legacy], 'bracelet').length, 1);
+});
+
+test('a hidden incorrect image keeps the reviewed Instore SKU sellable with no source photo', () => {
+  const rows = applyInstoreImageControls([{ ...valid, available_stock: 10 }], new Map([[valid.sku, 'hidden']]));
+  const [product] = buildExtendedRangeProducts(rows);
+  assert.equal(product.sku, valid.sku);
+  assert.equal(product.imageStatus, 'hidden');
+  assert.equal(product.image, '');
+  assert.equal(product.availability.canOrder, true);
 });
 
 test('staged hidden products are preview-only and still need ten available units', () => {

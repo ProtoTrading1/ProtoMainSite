@@ -221,7 +221,7 @@ function StockCheck({ sku, autoCheck = false, source = '' }) {
   );
 }
 
-function ProductImage({ src, alt, priority = false, className = '', variant = 'card' }) {
+function ProductImage({ src, alt, priority = false, className = '', variant = 'card', imageStatus = 'visible' }) {
   const candidates = buildImageCandidates(src, { variant });
   const [imageIdx, setImageIdx] = useState(0);
   const imgRef = useRef(null);
@@ -265,6 +265,15 @@ function ProductImage({ src, alt, priority = false, className = '', variant = 'c
     const img = imgRef.current;
     if (img?.complete && img.naturalWidth) normalizeCardImage(img);
   }, [src, imageIdx, variant]);
+
+  if (imageStatus === 'hidden') {
+    return (
+      <div className="pc-image-unavailable" role="img" aria-label={`${alt}: image being updated`}>
+        <ImageOff size={28} aria-hidden="true" />
+        <span>Image being updated</span>
+      </div>
+    );
+  }
 
   if (!candidates.length || !candidates[imageIdx]) {
   return (
@@ -527,6 +536,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
               src={product.localImage || product.image}
               alt={product.name}
               priority={priority}
+              imageStatus={product.imageStatus}
             />
           </div>
           <SpecialRibbon special={special} />
@@ -645,6 +655,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   variant="modal"
                   src={optimizedImageUrl(galleryImages ? galleryImages[activeImageIdx] : (activeProduct.localImage || activeProduct.image))}
                   alt={activeProduct.name}
+                  imageStatus={activeProduct.imageStatus}
                 />
               </div>
               {galleryImages && (
