@@ -12,7 +12,7 @@ function localPage(catalogue, query, category, page) {
   return { products: products.slice(from, from + 60), total: products.length, tiles: discoveryTiles(catalogue) };
 }
 
-export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange }) {
+export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange, onApolloActivity = () => {}, onProductPreview = null }) {
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -69,6 +69,23 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }, [browseCategory]);
 
+  const lastActivitySearchRef = useRef('');
+  useEffect(() => {
+    if (loading || !submittedQuery) return;
+    const key = `${submittedQuery}|${category}|${meta.total}`;
+    if (lastActivitySearchRef.current === key) return;
+    lastActivitySearchRef.current = key;
+    onApolloActivity('search_completed', { source: 'instore', original: submittedQuery,
+      normalized: submittedQuery.normalize('NFKC').toLocaleLowerCase(), resultsCount: meta.total });
+  }, [category, loading, meta.total, onApolloActivity, submittedQuery]);
+
+  const lastActivityCategoryRef = useRef('');
+  useEffect(() => {
+    if (!category || lastActivityCategoryRef.current === category) return;
+    lastActivityCategoryRef.current = category;
+    onApolloActivity('category_view', { source: 'instore', categoryId: category });
+  }, [category, onApolloActivity]);
+
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
 
@@ -120,7 +137,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       {loading && <div className="instore-loading">Loading products…</div>}
       {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
       {!loading && !error && !products.length && <div className="instore-state"><PackageSearch size={30} /><h3>No products found</h3><p>Try a shorter name or a different word.</p><button type="button" onClick={clear}>Clear search</button></div>}
-      {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} /><label className="instore-preference">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
+      {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} onProductPreview={onProductPreview} /><label className="instore-preference">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
     </div>
   </section>;
 }

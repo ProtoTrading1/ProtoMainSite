@@ -34,6 +34,8 @@ import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-prefe
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
+import { createApolloActivityReporter, startActiveTimeLifecycle } from './lib/apolloActivity';
+import { journeySessionId } from './lib/journeySession';
 import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
@@ -249,6 +251,7 @@ export default function App({
     return next;
   }, [refinements]);
   const pathKey = path.join('/');
+  const apolloActivitySource = ['instore-products', 'extended-range'].includes(path[0]) ? 'instore' : 'main';
   // Live category tree — fetched from /api/taxonomy on mount so admin renames
   // and new subcategories show up without a redeploy of the bundled snapshot.
   const categories = useLiveTaxonomy();
@@ -362,6 +365,28 @@ export default function App({
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const journeyAccountRef = useRef(null);
+  const apolloActivityReporterRef = useRef(null);
+  const apolloActivitySourceRef = useRef(apolloActivitySource);
+  const apolloActivityEnabled = import.meta.env.VITE_APOLLO_ACTIVITY_ENABLED === 'true';
+
+  useEffect(() => { apolloActivitySourceRef.current = apolloActivitySource; }, [apolloActivitySource]);
+  useEffect(() => {
+    const reporter = createApolloActivityReporter({
+      enabled: apolloActivityEnabled && Boolean(customer?.id), sessionId: journeySessionId(),
+      send: async (events) => {
+        const headers = await authHeaders();
+        for (const event of events) {
+          const route = event.source === 'instore' ? '/api/apollo-activity-instore' : '/api/apollo-activity-main';
+          const response = await fetch(route, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify(event) });
+          if (!response.ok) throw new Error('Apollo activity was not accepted');
+        }
+      },
+    });
+    apolloActivityReporterRef.current = reporter;
+    return () => { reporter.dispose(); if (apolloActivityReporterRef.current === reporter) apolloActivityReporterRef.current = null; };
+  }, [apolloActivityEnabled, customer?.id]);
+  useEffect(() => startActiveTimeLifecycle({ enabled: apolloActivityEnabled && Boolean(customer?.id), reporter: apolloActivityReporterRef.current, getSource: () => apolloActivitySourceRef.current }), [apolloActivityEnabled, customer?.id]);
+  const recordApolloActivity = useCallback((eventType, fields) => apolloActivityReporterRef.current?.record(eventType, fields) || false, []);
 
   useEffect(() => {
     journeyAccountRef.current = null;
@@ -896,7 +921,8 @@ export default function App({
       entityLabel: label,
       customerId: customer?.id,
     });
-  }, [path, pathKey, categories, customer?.id]);
+    if (apolloActivitySource === 'main') recordApolloActivity('category_view', { source: 'main', categoryId: path.join('/') });
+  }, [path, pathKey, categories, customer?.id, apolloActivitySource, recordApolloActivity]);
 
   useEffect(() => {
     if (!customer?.id) {
@@ -1122,6 +1148,9 @@ export default function App({
     if (path.length) filtersApplied.push(...path);
 
     const timer = setTimeout(() => {
+      recordApolloActivity('search_completed', {
+        source: apolloActivitySource, original: term, normalized: term.normalize('NFKC').toLocaleLowerCase(), resultsCount: catalogTotal,
+      });
       void logSearch({
         searchTerm: term,
         resultsFound: catalogTotal,
@@ -1140,7 +1169,7 @@ export default function App({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, catalogTotal, loading, activeCollection, path, pathKey, customer?.id, customer?.email]);
+  }, [searchQuery, catalogTotal, loading, activeCollection, path, pathKey, customer?.id, customer?.email, apolloActivitySource, recordApolloActivity]);
 
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
@@ -1831,11 +1860,14 @@ export default function App({
   const previewProductKey = productDetailId(previewProduct);
 
   const handleProductPreview = useCallback((product, { focusOptions = false } = {}) => {
+    recordApolloActivity('product_view', {
+      source: product?.isExtendedRange === true ? 'instore' : 'main', productKind: 'parent', productId: String(product?.id || product?.code || ''),
+    });
     setPreviewOptionsFirst(Boolean(focusOptions));
     setPreviewProduct(product);
     const id = productDetailId(product);
     if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
-  }, [hashNavigate, path, refinements]);
+  }, [hashNavigate, path, recordApolloActivity, refinements]);
 
   const closeProductPreview = useCallback(() => {
     setPreviewProduct(null);
@@ -1888,7 +1920,7 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
-  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
+  const viewingInstoreProducts = apolloActivitySource === 'instore';
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -1954,6 +1986,8 @@ export default function App({
             cartPreferenceMap={cartPreferenceMap}
             specialsMap={specialsMap}
             browseCategory={String(refinements.browse || '')}
+            onApolloActivity={recordApolloActivity}
+            onProductPreview={handleProductPreview}
             onBrowseCategoryChange={(nextCategory) => {
               const next = { ...refinements };
               if (nextCategory) next.browse = nextCategory;
