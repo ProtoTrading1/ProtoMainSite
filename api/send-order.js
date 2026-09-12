@@ -272,13 +272,14 @@ function availableFromBridge(row) {
 
 // Pure server boundary used by the checkout tests. Browser titles, prices and
 // quantities are not trusted: the reviewed index and fresh bridge response win.
-export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [] } = {}) {
+export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible' } = {}) {
   const sku = textId(item?.product?.sku || item?.product?.id);
   if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
   // A removed/misleading product photo must never make a separately approved,
   // in-stock SKU unorderable. Image visibility is presentation-only; the
   // normal index, duplicate, price and fresh-stock gates stay authoritative.
   if (indexRow?.image_source !== 'nutstore' || indexRow?.is_active !== true || indexRow?.image_review_status !== 'verified' || indexRow?.visibility_status !== 'search_only') throw orderError('Instore product is no longer approved.', 409);
+  if (listingStatus === 'hidden') throw orderError('Instore product is no longer available.', 409);
   if (textId(bridgeRow?.CODE) !== sku) throw orderError('Current Instore stock could not be verified.', 503);
   const qty = Number(item?.qty);
   const available = availableFromBridge(bridgeRow);
@@ -294,16 +295,18 @@ async function resolveInstorePrices(items) {
   if (itemSkus.some((sku) => !sku)) throw orderError('Each Instore order line needs a product code.');
   const skus = [...new Set(itemSkus)];
   const index = stockClient();
-  let indexRows; let normalRows;
+  let indexRows; let normalRows; let listingControls;
   try {
-    const [indexResult, normalSkuResult, normalBarcodeResult] = await Promise.all([
+    const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
       index.from('extended_range_items').select('sku, image_source, barcode, title, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('barcode', skus),
+      index.from('instore_listing_controls').select('sku, status').in('sku', skus),
     ]);
-    if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error;
+    if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error;
     indexRows = indexResult.data || [];
     normalRows = [...(normalSkuResult.data || []), ...(normalBarcodeResult.data || [])];
+    listingControls = new Map((listingResult.data || []).map((row) => [textId(row.sku), String(row.status || '').trim().toLowerCase()]));
   } catch (error) {
     console.error('send-order: Instore index lookup failed:', error?.message || error);
     throw orderError('Current Instore product details could not be verified. Please try again.', 503);
@@ -338,7 +341,7 @@ async function resolveInstorePrices(items) {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku) });
+    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible' });
   });
 }
 

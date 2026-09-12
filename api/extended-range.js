@@ -100,13 +100,16 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     // off sale.  The product keeps its normal availability and checkout
     // identity; the client renders a clear neutral image state instead.
     const imageHidden = row?.image_control_status === 'hidden';
+    // Listing controls are an explicit operational removal. Unlike an image
+    // control they remove the SKU from discovery and ordering until restored.
+    const listingHidden = row?.listing_control_status === 'hidden';
     const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
     const availableStock = Number(row?.available_stock);
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
       : customerFacingCataloguePrice(row?.price);
-    if (!sku || seen.has(sku)
+    if (!sku || seen.has(sku) || listingHidden
       || !['search_only', ...(includeStaged ? ['hidden'] : [])].includes(row?.visibility_status)
       || row?.image_review_status !== 'verified'
       || (row?.visibility_status === 'hidden'
@@ -141,10 +144,19 @@ async function readInstoreImageControls(client) {
   return new Map((data || []).map((row) => [String(row?.sku || '').trim().toUpperCase(), String(row?.status || '').trim()]));
 }
 
-export function applyInstoreImageControls(rows, controls) {
+async function readInstoreListingControls(client) {
+  const { data, error } = await client
+    .from('instore_listing_controls')
+    .select('sku, status');
+  if (error) throw new Error(`Instore listing controls unavailable: ${error.message || 'query failed'}`);
+  return new Map((data || []).map((row) => [String(row?.sku || '').trim().toUpperCase(), String(row?.status || '').trim()]));
+}
+
+export function applyInstoreImageControls(rows, controls, listingControls = new Map()) {
   return (rows || []).map((row) => ({
     ...row,
     image_control_status: controls?.get(String(row?.sku || '').trim().toUpperCase()) || 'visible',
+    listing_control_status: listingControls?.get(String(row?.sku || '').trim().toUpperCase()) || 'visible',
   }));
 }
 
@@ -280,7 +292,7 @@ export default async function handler(req, res) {
     // large staged preview cannot spend its whole serverless response window
     // waiting for the main-catalogue duplicate index to begin.
     const allEligible = await getCachedCatalogue(includeStaged ? 'preview' : 'production', async () => {
-      const [rangeRows, catalogue, imageControls] = await Promise.all([
+      const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
         readCompleteRows(() => client.from('extended_range_items')
           .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
           .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
@@ -291,8 +303,9 @@ export default async function handler(req, res) {
           .like('image_url', 'https://%'), { allowChangingCount: includeStaged }),
         readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
         readInstoreImageControls(client),
+        readInstoreListingControls(client),
       ]);
-      const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls), '', { includeStaged });
+      const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls, listingControls), '', { includeStaged });
       return excludeMainCatalogueProducts(eligible, catalogue);
     });
     const query = normalizeQuery(req.query?.q);

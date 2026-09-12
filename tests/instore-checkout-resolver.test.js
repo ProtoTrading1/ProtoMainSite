@@ -34,6 +34,10 @@ test('Instore checkout remains available while an incorrect customer image is hi
   assert.equal(result.product.price, 13.5);
 });
 
+test('Instore checkout rejects a SKU explicitly removed from Instore Products', () => {
+  assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow, listingStatus: 'hidden' }), { status: 409 });
+});
+
 test('Instore checkout rejects an item that has fallen below the ten-unit display threshold', () => {
   assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, ONHAND: 10, BOOKED: 1 } }), { status: 409 });
 });

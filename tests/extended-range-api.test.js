@@ -43,6 +43,15 @@ test('a hidden incorrect image keeps the reviewed Instore SKU sellable with no s
   assert.equal(product.availability.canOrder, true);
 });
 
+test('an explicit Instore listing removal excludes the SKU from the customer feed', () => {
+  const rows = applyInstoreImageControls(
+    [{ ...valid, available_stock: 10 }],
+    new Map(),
+    new Map([[valid.sku, 'hidden']]),
+  );
+  assert.equal(buildExtendedRangeProducts(rows).length, 0);
+});
+
 test('staged hidden products are preview-only and still need ten available units', () => {
   const staged = { ...valid, available_stock: 10, visibility_status: 'hidden', is_active: false };
   assert.equal(buildExtendedRangeProducts([staged]).length, 0);
