@@ -354,6 +354,7 @@ export default function App({
   const [orderHistoryResolved, setOrderHistoryResolved] = useState(false);
   const [orderHistoryAvailable, setOrderHistoryAvailable] = useState(false);
   const [customerJourney, setCustomerJourney] = useState(null);
+  const [instoreAnnouncement, setInstoreAnnouncement] = useState(null);
   const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
@@ -365,6 +366,7 @@ export default function App({
   useEffect(() => {
     journeyAccountRef.current = null;
     setCustomerJourney(null);
+    setInstoreAnnouncement(null);
     setLoginBasketSnapshot(null);
   }, [customer?.id]);
 
@@ -1389,7 +1391,7 @@ export default function App({
     const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
       && loginBasketSnapshot.itemCount > 0
       && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
-    const showInstoreIntro = !restoredBasketIsUntouched && !hasSeenInstoreIntro(customer.id);
+    const showInstoreIntro = !hasSeenInstoreIntro(customer.id);
     const nextJourney = selectCustomerDashboardState({
       firstName: customerFirstName(customer),
       firstLogin: firstPortalLogin,
@@ -1400,10 +1402,19 @@ export default function App({
       basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
       showInstoreIntro,
     });
+    const nextInstoreAnnouncement = restoredBasketIsUntouched && showInstoreIntro
+      ? selectCustomerDashboardState({
+        firstName: customerFirstName(customer),
+        showInstoreIntro: true,
+      })
+      : null;
 
     setCustomerJourney(nextJourney);
+    setInstoreAnnouncement(nextInstoreAnnouncement);
     rememberJourneyThisLogin(customer.id, loginSessionKey);
-    if (nextJourney.action === 'instore') rememberInstoreIntro(customer.id);
+    if (nextJourney.action === 'instore' || nextInstoreAnnouncement?.action === 'instore') {
+      rememberInstoreIntro(customer.id);
+    }
     if (firstPortalLogin) {
       void markPortalWelcomeSeen().catch(() => {
         // Keep the server value null so the customer gets one more chance on
@@ -1422,6 +1433,7 @@ export default function App({
   ]);
 
   const journeyDismissTimerRef = useRef(null);
+  const instoreAnnouncementTimerRef = useRef(null);
 
   const dismissCustomerJourney = useCallback((event, { animate = false } = {}) => {
     const restoreCartFocus = customerJourney?.presentation === 'basket' && (
@@ -1460,11 +1472,28 @@ export default function App({
     if (journeyDismissTimerRef.current) window.clearTimeout(journeyDismissTimerRef.current);
   }, []);
 
+  const dismissInstoreAnnouncement = useCallback(() => {
+    if (instoreAnnouncementTimerRef.current) window.clearTimeout(instoreAnnouncementTimerRef.current);
+    instoreAnnouncementTimerRef.current = null;
+    setInstoreAnnouncement(null);
+  }, []);
+
+  useEffect(() => () => {
+    if (instoreAnnouncementTimerRef.current) window.clearTimeout(instoreAnnouncementTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (!customerJourney || !Number.isFinite(customerJourney.dismissAfterMs)) return undefined;
     const timer = window.setTimeout(dismissCustomerJourney, customerJourney.dismissAfterMs);
     return () => window.clearTimeout(timer);
   }, [customerJourney, dismissCustomerJourney]);
+
+  useEffect(() => {
+    if (!instoreAnnouncement || !Number.isFinite(instoreAnnouncement.dismissAfterMs)) return undefined;
+    const timer = window.setTimeout(dismissInstoreAnnouncement, instoreAnnouncement.dismissAfterMs);
+    instoreAnnouncementTimerRef.current = timer;
+    return () => window.clearTimeout(timer);
+  }, [dismissInstoreAnnouncement, instoreAnnouncement]);
 
   useEffect(() => {
     if (!customerJourney) return undefined;
@@ -1517,6 +1546,11 @@ export default function App({
     hashNavigate(['instore-products']);
     dismissCustomerJourney();
   }, [dismissCustomerJourney, hashNavigate]);
+
+  const handleInstoreAnnouncement = useCallback(() => {
+    hashNavigate(['instore-products']);
+    dismissInstoreAnnouncement();
+  }, [dismissInstoreAnnouncement, hashNavigate]);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -1864,6 +1898,13 @@ export default function App({
       onDismiss={dismissCustomerJourney}
     />
   ) : null;
+  const instoreAnnouncementPrompt = instoreAnnouncement ? (
+    <CustomerJourneyPrompt
+      state={instoreAnnouncement}
+      onPrimary={handleInstoreAnnouncement}
+      onDismiss={dismissInstoreAnnouncement}
+    />
+  ) : null;
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -1889,6 +1930,7 @@ export default function App({
         onCartClick={handleCartOpen}
       />
 
+      {instoreAnnouncementPrompt}
       {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
