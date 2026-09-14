@@ -64,16 +64,16 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);
   const changePage = (next) => { setPage(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); };
-  const guideActionStyle = { width: '100%', border: 0, padding: 0, background: 'transparent', color: 'inherit', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', font: 'inherit', cursor: 'pointer' };
+  const showResultsFirst = Boolean(submittedQuery || category);
+  const categoryTiles = tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
+    const active = category === tile.label;
+    const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
+    return <a key={tile.label} href={href} data-category={tile.label} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
+  })}</nav>;
 
   return <section className="instore" aria-labelledby="instore-title">
-    <header className="instore-hero">
-      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">More products,<br />ready to order<span aria-hidden="true">.</span></h1><p>Search by everyday product names, see available stock, and add a colour or design preference for each item.</p></div>
-      <ol className="instore-guide">
-        <li><button type="button" style={guideActionStyle} onClick={() => searchRef.current?.focus()}><b>01</b><span>Search in plain language</span></button></li>
-        <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>02</b><span>Check live stock</span></button></li>
-        <li><button type="button" style={guideActionStyle} onClick={() => { resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); window.setTimeout(() => resultsRef.current?.querySelector('textarea')?.focus(), 350); }}><b>03</b><span>Add your preference</span></button></li>
-      </ol>
+    <header className="instore-hero instore-hero--compact">
+      <div><h1 id="instore-title"><Store size={22} aria-hidden="true" /> Instore Products</h1><p>Search, check stock and add your colour/design preference.</p></div>
     </header>
     <aside className="instore-disclaimer" aria-label="Product image quality notice"><strong>Product images</strong><span>Some Instore product images are lower resolution and are for reference. Colours and details may differ from the actual product.</span></aside>
     <div className="instore-toolbar">
@@ -84,11 +84,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
-    {tiles.length > 0 && <nav className="instore-tiles" aria-label="Browse by product type">{tiles.map((tile) => {
-      const active = category === tile.label;
-      const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
-      return <a key={tile.label} href={href} data-category={tile.label} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
-    })}</nav>}
+    {!showResultsFirst && categoryTiles}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
       <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
       {loading && <div className="instore-loading">Loading products…</div>}
@@ -96,5 +92,6 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       {!loading && !error && !products.length && <div className="instore-state"><PackageSearch size={30} /><h3>No products found</h3><p>Try a shorter name or a different word.</p><button type="button" onClick={clear}>Clear search</button></div>}
       {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} preferenceSlot={<label className="instore-preference instore-preference--in-card">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label>} /></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
     </div>
+    {showResultsFirst && categoryTiles}
   </section>;
 }

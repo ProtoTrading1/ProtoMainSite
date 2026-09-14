@@ -29,3 +29,10 @@
 }
 /* Keep an item preference visibly attached to its own purchase controls. */
 .instore-preference--in-card{margin-top:12px;padding:12px 0 0;border:0;border-top:1px solid #e6e8ec;border-radius:0}
+
+.instore-hero--compact{padding:16px 20px;border-radius:14px;box-shadow:none}
+.instore-hero--compact h1{display:flex;align-items:center;gap:10px;font-size:24px;line-height:1.2;letter-spacing:-.02em;margin:0}
+.instore-hero--compact p{margin:6px 0 0;font-size:14px;line-height:1.4}
+.instore-results{scroll-margin-top:90px}
+.instore-results + .instore-tiles{margin-top:24px}
+@media(max-width:760px){.instore-hero--compact{padding:14px 16px}.instore-hero--compact h1{font-size:22px}}
