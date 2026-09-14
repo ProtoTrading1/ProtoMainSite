@@ -37,6 +37,7 @@ import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
+import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -151,13 +152,10 @@ function productStockQtyForCart(product) {
 }
 
 function productCanOrderWhenOos(product) {
-  // Only "to order" products are orderable at zero stock — keep_live_when_oos
-  // alone keeps a product visible but shown as out-of-stock (not orderable).
-  return product?.toOrder === true
-    || product?.to_order === true
-    || product?.orderableWhenOutOfStock === true
-    || product?.orderable_when_out_of_stock === true
-    || product?.availability?.canOrder === true;
+  // Keep this narrower than availability.canOrder: a landed or incoming line
+  // may be visible/orderable after confirmation, but it is not an exception to
+  // the on-hand quantity cap. Only an explicit "To order" item is uncapped.
+  return isToOrderProduct(product);
 }
 
 function cartQtyCapForProduct(product) {
@@ -168,14 +166,13 @@ function cartQtyCapForProduct(product) {
   if (productCanOrderWhenOos(product)) return CART_QTY_UNLIMITED;
 
   const qty = productStockQtyForCart(product);
-  if (qty === null) return product.inStock === false ? 0 : CART_QTY_UNLIMITED;
-  // Zero stock (non-"to order") is not orderable. Everything else may be
-  // over-ordered as a backorder request — we no longer silently clamp an
-  // in-stock line to available stock; instead a clear advisory is shown at the
-  // quantity inputs (see src/lib/stockAdvisory.js). Negative SOH lines are
-  // valid backorders and likewise uncapped.
-  if (qty === 0) return 0;
-  return CART_QTY_UNLIMITED;
+  // An unverified stock value is not safe to sell as an ordinary in-stock
+  // product. The customer can refresh the catalogue; the server independently
+  // rejects it until it can verify the live quantity.
+  if (qty === null) return 0;
+  // Regular catalogue lines may never exceed physical stock on hand. This is
+  // duplicated by the authoritative server guard at submission time.
+  return normaliseStockQty(qty) || 0;
 }
 
 function normalizeCartQtyInput(qty) {
@@ -1160,6 +1157,7 @@ export default function App({
   const [modalOpen, setModalOpen] = useState(false);
   const [orderStatus, setOrderStatus] = useState('idle');
   const [orderError, setOrderError] = useState('');
+  const [orderChanges, setOrderChanges] = useState([]);
   const [submittedOrderNumber, setSubmittedOrderNumber] = useState('');
 
   useEffect(() => () => {
@@ -1246,6 +1244,10 @@ export default function App({
     const maxQty = cartQtyCapForProduct(product);
     if (maxQty <= 0) return;
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
+    if (maxQty < minimumQty) {
+      setCartAnnouncement(`Only ${maxQty} available for ${product.name}; its minimum order is ${minimumQty}.`);
+      return;
+    }
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
     const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
     setCartItems((prev) => {
@@ -1650,6 +1652,7 @@ export default function App({
     });
     setOrderStatus('sending');
     setOrderError('');
+    setOrderChanges([]);
     setSubmittedOrderNumber('');
     setModalOpen(true);
 
@@ -1673,6 +1676,7 @@ export default function App({
             sku: item.product.sku,
             code: item.product.code,
             name: item.product.name,
+            checkoutSnapshot: checkoutSnapshotForProduct(item.product),
           },
         })),
       };
@@ -1687,7 +1691,12 @@ export default function App({
         body,
       }).then(async (response) => {
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'Order could not be sent');
+        if (!response.ok) {
+          const error = new Error(result.error || 'Order could not be sent');
+          error.code = result.code || undefined;
+          error.changes = Array.isArray(result.changes) ? result.changes : [];
+          throw error;
+        }
         return result;
       });
 
@@ -1725,6 +1734,36 @@ export default function App({
     } catch (err) {
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');
+      if (err?.code === 'ORDER_REVIEW_REQUIRED') {
+        const changes = Array.isArray(err.changes) ? err.changes : [];
+        setOrderChanges(changes);
+        // Refresh only the price/stock snapshots returned by the authoritative
+        // checkout check. We never auto-reduce a quantity: the customer must
+        // explicitly decide which line to amend before resubmitting.
+        setCartItems((previous) => previous.map((item) => {
+          const change = changes.find((candidate) => {
+            const key = String(candidate?.sku || '').toUpperCase();
+            return key && [item.product.id, item.product.sku, item.product.code]
+              .some((value) => String(value || '').toUpperCase() === key);
+          });
+          if (!change) return item;
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              ...(Number.isFinite(change.currentPrice) ? { price: change.currentPrice } : {}),
+              ...(Number.isFinite(change.currentStockQty)
+                ? { stockOnHand: change.currentStockQty, stockQty: change.currentStockQty }
+                : {}),
+            },
+          };
+        }));
+        // A review result is not a transient delivery error. Make the next
+        // submit a fresh customer action with a fresh idempotency key/snapshot.
+        checkoutRefRef.current = null;
+        lastCheckoutOptionsRef.current = null;
+        lastCheckoutSubmissionRef.current = null;
+      }
       trackJourneyEvent('order_submit_failed', {
         journey: 'checkout',
         step: 'submit',
@@ -2043,8 +2082,16 @@ export default function App({
           onClose={() => setModalOpen(false)}
           orderStatus={orderStatus}
           orderError={orderError}
+          orderChanges={orderChanges}
           orderNumber={submittedOrderNumber}
           onRetry={retryLastOrderSubmission}
+          onReview={() => {
+            setModalOpen(false);
+            setOrderChanges([]);
+            setCartAnnouncement('Your basket was refreshed with the latest price and stock. Review any highlighted changes before submitting again.');
+            if (window.matchMedia?.('(max-width: 768px)').matches) setMobileCartOpen(true);
+            else setCartDrawerOpen(true);
+          }}
           onViewOrder={viewSubmittedOrder}
         />
       </Suspense>
