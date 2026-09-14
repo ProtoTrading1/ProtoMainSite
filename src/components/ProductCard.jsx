@@ -342,7 +342,7 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   );
 }
 
-function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null }) {
+function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const variantCount = product?.variantCount || variants.length;
@@ -579,6 +579,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
           <StockBadge product={product} />
 
+          {preferenceSlot}
           <div className={`buy-row${isVariantGroup ? ' buy-row--options' : ''}`}>
             {isVariantGroup ? (
               <button
