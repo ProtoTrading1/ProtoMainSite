@@ -541,6 +541,7 @@ export default function Header({
   onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
+  onSearchShortcut,
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -847,6 +848,7 @@ export default function Header({
   const [mobileInput, setMobileInput] = useState('');
   const mobileSearchInputRef = useRef(null);
   const openMobileSearch = () => {
+    if (onSearchShortcut) { onSearchShortcut(); return; }
     setMobileSearchOpen(true);
     setMobileInput('');
     // The input is permanently mounted, so autoFocus never re-fires; focus it

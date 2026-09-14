@@ -1965,6 +1965,11 @@ export default function App({
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
         onInstoreProducts={() => navigate(['instore-products'])}
+        onSearchShortcut={viewingInstoreProducts ? () => {
+          const input = document.getElementById('instore-search');
+          input?.scrollIntoView({ block: 'center', behavior: 'auto' });
+          input?.focus({ preventScroll: true });
+        } : undefined}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
