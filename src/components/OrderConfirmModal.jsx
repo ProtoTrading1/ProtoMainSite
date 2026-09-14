@@ -6,8 +6,10 @@ export default function OrderConfirmModal({
   onClose,
   orderStatus = 'idle',
   orderError = '',
+  orderChanges = [],
   orderNumber = '',
   onRetry,
+  onReview,
   onViewOrder,
 }) {
   const dialogRef = useRef(null);
@@ -16,6 +18,7 @@ export default function OrderConfirmModal({
   const isSending = orderStatus === 'sending';
   const isSuccess = orderStatus === 'sent' || orderStatus === 'saved';
   const isError = orderStatus === 'error';
+  const requiresReview = isError && orderChanges.length > 0;
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -98,8 +101,10 @@ export default function OrderConfirmModal({
             )}
             {isError && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">Could not send order</h2>
-                <p className="ocm-subtitle">{orderError || 'Something went wrong. Please try again.'}</p>
+                <h2 id="order-confirm-title" className="ocm-title">{requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
+                <p className="ocm-subtitle">
+                  {orderError || 'Something went wrong. Please try again.'}
+                </p>
               </>
             )}
           </div>
@@ -115,6 +120,28 @@ export default function OrderConfirmModal({
           </div>
         )}
 
+        {requiresReview && (
+          <div className="ocm-change-list" role="alert" aria-live="assertive">
+            {orderChanges.map((change) => (
+              <div className="ocm-change-line" key={change.sku}>
+                <strong>{change.name}</strong>
+                {change.priceChanged && (
+                  <span>
+                    Price: {change.previousPrice === null ? 'not verified' : `R${change.previousPrice.toFixed(2)}`}
+                    {' → '}{change.currentPrice === null ? 'unavailable' : `R${change.currentPrice.toFixed(2)}`}
+                  </span>
+                )}
+                {!change.toOrder && (change.stockChanged || change.quantityExceedsStock || change.stockUnavailable) && (
+                  <span>
+                    Stock: {change.currentStockQty === null ? 'currently unavailable' : `${change.currentStockQty} available`}
+                    {change.quantityExceedsStock ? ` · your quantity is ${change.requestedQty}` : ''}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {(isSuccess || isError) && (
           <div className="ocm-actions ocm-actions--simple">
             {isSuccess && onViewOrder && (
@@ -124,10 +151,10 @@ export default function OrderConfirmModal({
             )}
             <button
               className={`ocm-copy-btn ${isError ? 'ocm-done-btn' : ''}`}
-              onClick={isError ? onRetry : onClose}
+              onClick={isError ? (requiresReview ? onReview : onRetry) : onClose}
               type="button"
             >
-              {isSuccess ? 'Close' : 'Try again'}
+              {isSuccess ? 'Close' : requiresReview ? 'Review basket' : 'Try again'}
             </button>
           </div>
         )}
