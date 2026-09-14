@@ -467,8 +467,7 @@ export function isOrderableWhenOutOfStock(product) {
   return product.toOrder === true
     || product.to_order === true
     || product.orderableWhenOutOfStock === true
-    || product.orderable_when_out_of_stock === true
-    || product.availability?.canOrder === true;
+    || product.orderable_when_out_of_stock === true;
 }
 
 function productStockQty(product) {
@@ -480,8 +479,7 @@ function productStockQty(product) {
 /**
  * Whether a single product row is available to buy (pre-grouping).
  * Positive stock is immediately orderable. Zero and negative stock require an
- * explicit business promise (made/sourced to order, landed stock, or an open
- * pre-order); keep_live_when_oos controls visibility only.
+ * explicit "To order" promise; keep_live_when_oos controls visibility only.
  */
 export function isProductAvailable(product) {
   if (!product) return false;
