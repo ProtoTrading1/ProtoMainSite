@@ -22,6 +22,7 @@ import {
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
+import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
@@ -393,6 +394,7 @@ async function resolveStandardPrices(items) {
     throw unavailable;
   }
 
+  const reviewChanges = [];
   const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
@@ -411,12 +413,27 @@ async function resolveStandardPrices(items) {
       throw error;
     }
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
-    if (!availability.canOrder) {
-      const error = new Error(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`);
-      error.status = 409;
-      throw error;
-    }
     const price = customerFacingCataloguePrice(rawPrice);
+    const toOrder = isToOrderProduct(row);
+    const review = evaluateCheckoutSnapshot({
+      sku: row.sku,
+      name: cleanText(row.title, `Product on line ${index + 1}`),
+      quantity: qty,
+      isToOrder: toOrder,
+      submittedSnapshot: product.checkoutSnapshot || {},
+      currentPrice: price,
+      currentStockQty: normaliseStockQty(availability.stockQty),
+    });
+    if (review) reviewChanges.push(review);
+    if (!availability.canOrder) {
+      // A changed stock snapshot gives the customer the more useful review
+      // alert below. Otherwise preserve the existing unavailable-line error.
+      if (!review) {
+        const error = new Error(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`);
+        error.status = 409;
+        throw error;
+      }
+    }
     const minQty = Math.max(1, Math.min(MAX_QTY_PER_LINE, Math.floor(Number(row.min_order_qty) || 1)));
     if (qty < minQty) {
       const unitLabel = sellingUnitDetails(row.units_of_issue || 'EACH').label.toLowerCase();
@@ -448,6 +465,14 @@ async function resolveStandardPrices(items) {
       },
     };
   });
+
+  if (reviewChanges.length) {
+    const error = new Error('Price or stock changed while you were shopping. Review the affected products before sending your order request.');
+    error.status = 409;
+    error.code = 'ORDER_REVIEW_REQUIRED';
+    error.changes = reviewChanges;
+    throw error;
+  }
 
   return authItems;
 }
@@ -1263,7 +1288,11 @@ export default async function handler(req, res) {
   try {
     orderItems = await resolveAuthoritativePrices(items);
   } catch (err) {
-    return res.status(err?.status || 500).json({ error: err?.message || 'Order items could not be verified.' });
+    return res.status(err?.status || 500).json({
+      error: err?.message || 'Order items could not be verified.',
+      code: err?.code || null,
+      changes: Array.isArray(err?.changes) ? err.changes : undefined,
+    });
   }
   const subtotal = computeSubtotal(orderItems);
   let promo = null;
