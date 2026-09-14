@@ -424,7 +424,7 @@ export default function Drawer({
               {(() => {
                 const adv = stockAdvisoryForQty(item.product, item.qty);
                 return adv.isOverOrder ? (
-                  <p className="drawer-line-stock-note">{adv.availableStock} in stock &middot; {adv.shortfall} to confirm</p>
+                  <p className="drawer-line-stock-note">{adv.availableStock} in stock &middot; reduce by {adv.shortfall}</p>
                 ) : null;
               })()}
             </div>
