@@ -27,3 +27,5 @@
   .instore-tiles a { min-height: 100px; }
   .instore-tiles img { width: 78px; height: 78px; }
 }
+/* Keep an item preference visibly attached to its own purchase controls. */
+.instore-preference--in-card{margin-top:12px;padding:12px 0 0;border:0;border-top:1px solid #e6e8ec;border-radius:0}
