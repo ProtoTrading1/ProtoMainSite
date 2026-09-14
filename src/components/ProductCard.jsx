@@ -62,12 +62,21 @@ function catalogStockQty(product) {
 }
 
 function availabilityForProduct(product) {
-  if (product?.availability?.state) return product.availability;
-  return resolveProductAvailability({
+  const availability = product?.availability?.state
+    ? product.availability
+    : resolveProductAvailability({
     stockQty: catalogStockQty(product),
     toOrder: !!(product?.toOrder || product?.orderableWhenOutOfStock),
     incoming: product,
   });
+  // Stock in transit/being received can still be described to customers, but
+  // only an explicit To order line may bypass the physical on-hand cap.
+  const isToOrder = !!(product?.toOrder || product?.to_order || product?.orderableWhenOutOfStock || product?.orderable_when_out_of_stock);
+  const stockQty = catalogStockQty(product);
+  if (!isToOrder && (stockQty === null || stockQty <= 0)) {
+    return { ...availability, canOrder: false };
+  }
+  return availability;
 }
 
 function groupedAvailability(product) {
@@ -721,7 +730,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 )}
                 {modalAvailability.state === 'landed' && (
                   <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#245aa7', fontWeight: 600 }}>
-                    🚢 This stock has landed and is being received. You can add it now; final quantity and timing will be confirmed on your quotation.
+                    🚢 This stock has landed and is being received. It can be ordered once it has been received into available stock.
                   </p>
                 )}
                 {['incoming', 'incoming_preorder'].includes(modalAvailability.state) && (
@@ -807,7 +816,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                       </div>
                     </div>
                     {modalAdvisory.isOverOrder && (
-                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {modalAdvisory.shortfall} with you.</p>
+                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; reduce the quantity before ordering.</p>
                     )}
                     <button
                       className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}

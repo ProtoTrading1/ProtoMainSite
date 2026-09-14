@@ -27,10 +27,19 @@ test('checkout failure can retry the retained options with one idempotency key',
   assert.match(appSource, /if \(!checkoutRefRef\.current\) checkoutRefRef\.current = makeClientRef\(\)/);
   assert.match(appSource, /sendOrderEmail\(lastCheckoutOptionsRef\.current\)/);
   assert.match(appSource, /sendOrderEmail=\{sendOrderEmail\}/, 'mobile checkout awaits and retains failed form state');
-  assert.match(confirmationSource, /onClick=\{isError \? onRetry : onClose\}/);
+  assert.match(confirmationSource, /onClick=\{isError \? \(requiresReview \? onReview : onRetry\) : onClose\}/);
   assert.match(drawerSource, /if \(result\?\.ok\)/, 'failed submission leaves the delivery form intact');
   assert.match(confirmationSource, /onClick=\{isSending \? undefined : onClose\}/);
   assert.match(drawerSource, /disabled=\{submitting\}/);
+});
+
+test('checkout sends a visible price and stock snapshot and requires review before capture when it changed', () => {
+  assert.match(appSource, /checkoutSnapshot: checkoutSnapshotForProduct\(item\.product\)/);
+  assert.match(appSource, /ORDER_REVIEW_REQUIRED/);
+  assert.match(confirmationSource, /Your basket needs review/);
+  assert.match(confirmationSource, /Review basket/);
+  assert.match(confirmationSource, /Price:/);
+  assert.match(confirmationSource, /Stock:/);
 });
 
 test('basket clearing is undoable and inactivity no longer destroys the basket', () => {
