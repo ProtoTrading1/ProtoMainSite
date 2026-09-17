@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, discoveryTiles, featuredInstoreProducts, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
@@ -258,7 +258,8 @@ export default async function handler(req, res) {
       })));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
-      const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+      const matched = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category));
+      const filtered = !query && !category ? featuredInstoreProducts(matched) : matched.sort((left, right) => compareInstoreSearch(left, right, query));
       const from = (page - 1) * PAGE_SIZE;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
       // Tile representatives come from the same positive-stock, priced
@@ -311,7 +312,8 @@ export default async function handler(req, res) {
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
-    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+    const matched = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category));
+    const filtered = !query && !category ? featuredInstoreProducts(matched) : matched.sort((left, right) => compareInstoreSearch(left, right, query));
     const from = (page - 1) * PAGE_SIZE;
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Vary', 'Authorization');
