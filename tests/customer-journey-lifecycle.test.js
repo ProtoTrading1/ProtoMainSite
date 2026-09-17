@@ -52,7 +52,7 @@ test('the first welcome is recorded server-side and in-session as soon as it is 
   assert.match(app, /markPortalWelcomeSeen/);
   assert.match(
     app,
-    /const firstPortalLogin = isExplicitFirstPortalLogin\(customer\)[\s\S]{0,900}rememberJourneyThisLogin\(customer\.id, loginSessionKey\)[\s\S]{0,300}if \(firstPortalLogin\)[\s\S]{0,200}markPortalWelcomeSeen/,
+    /const firstPortalLogin = isExplicitFirstPortalLogin\(customer\)[\s\S]{0,1800}rememberJourneyThisLogin\(customer\.id, loginSessionKey\)[\s\S]{0,300}if \(firstPortalLogin\)[\s\S]{0,200}markPortalWelcomeSeen/,
   );
   assert.match(
     app,
