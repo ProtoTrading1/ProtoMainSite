@@ -80,6 +80,12 @@ test('opens the unfiltered catalogue with beads before party items', () => {
   assert.ok(compareInstoreSearch(beads, party, '') < 0);
 });
 
+test('shows the highest source-system codes first within every browse category', () => {
+  const older = { sku: '8610400101', title: 'METAL CHARM HEART', category: 'FASHION JEWELLERY' };
+  const newer = { sku: '8610400199', title: 'METAL CHARM STAR', category: 'FASHION JEWELLERY' };
+  assert.ok(compareInstoreSearch(newer, older, '') < 0);
+});
+
 test('uses the current 86181 bracelet range for the Jewellery tile', () => {
   const tiles = discoveryTiles([
     { sku: '8633680429', title: 'TERRORIST NECKLACE', category: 'FASHION JEWELLERY', image: 'historical-necklace.jpg' },

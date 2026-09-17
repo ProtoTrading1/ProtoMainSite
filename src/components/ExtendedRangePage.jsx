@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Gem, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
 import { fetchExtendedRange } from '../lib/extendedRange';
@@ -56,6 +56,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
+  const showMetalCharms = () => {
+    choose('86104', '');
+    onBrowseCategoryChange?.('');
+    window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
 
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
@@ -85,6 +90,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
+    {!submittedQuery && <section className="instore-feature" aria-labelledby="instore-feature-title">
+      <div className="instore-feature-icon"><Gem size={28} aria-hidden="true" /></div>
+      <div><span className="instore-kicker">FEATURED RANGE</span><h2 id="instore-feature-title">Metal Charms</h2><p>Explore the 86104 range, with the newest product codes shown first.</p></div>
+      <button type="button" onClick={showMetalCharms}>Shop Metal Charms <ArrowRight size={16} /></button>
+    </section>}
     {!submittedQuery && tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
       <div className="instore-browse-heading"><strong>Browse by category</strong><span>Filter the collection, or continue with all products below.</span></div>
       <nav className="instore-tiles instore-tiles--rail" aria-label="Browse by product type">{tiles.map((tile) => {
