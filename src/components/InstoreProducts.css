@@ -29,3 +29,10 @@
 }
 /* Keep an item preference visibly attached to its own purchase controls. */
 .instore-preference--in-card{margin-top:12px;padding:12px 0 0;border:0;border-top:1px solid #e6e8ec;border-radius:0}
+
+
+/* Keep browsing visible without delaying product discovery. */
+.instore-browse{margin:0 0 24px;padding:15px 16px;border:1px solid #e4e8ef;border-radius:16px;background:linear-gradient(135deg,#fffaf0,#fff)}
+.instore-browse-heading{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;color:#172033}.instore-browse-heading strong{font-size:16px}.instore-browse-heading span{font-size:13px;color:#667085}
+.instore-tiles--rail{display:flex;grid-template-columns:none;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;margin:12px 0 0;padding:0 1px 4px}.instore-tiles--rail a{flex:0 0 208px;min-height:72px;padding:8px 10px;gap:10px;scroll-snap-align:start}.instore-tiles--rail img{width:54px;height:54px;border-radius:8px}.instore-tiles--rail span{font-size:14px}.instore-tiles--rail small{font-size:12px}
+@media(max-width:760px){.instore-browse{margin-bottom:18px;padding:13px}.instore-browse-heading span{font-size:12px}.instore-tiles--rail{margin-top:10px}.instore-tiles--rail a{flex-basis:178px;min-height:66px}.instore-tiles--rail img{width:48px;height:48px}}
