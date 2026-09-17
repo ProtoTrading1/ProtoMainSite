@@ -85,7 +85,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
-    {tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
+    {!submittedQuery && tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
       <div className="instore-browse-heading"><strong>Browse by category</strong><span>Filter the collection, or continue with all products below.</span></div>
       <nav className="instore-tiles instore-tiles--rail" aria-label="Browse by product type">{tiles.map((tile) => {
       const active = category === tile.label;
