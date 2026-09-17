@@ -74,10 +74,35 @@ test('uses the highest product code and its current image for a browse tile', ()
   assert.equal(beads?.image, 'newest-beads.jpg');
 });
 
+test('retains the approved colourful thumbnail when its current product is eligible', () => {
+  const tiles = discoveryTiles([
+    { sku: '8628100133A', title: 'GLASS BEADS', category: 'WOODEN BEADS', image: 'newest-beads.jpg' },
+    { sku: '8650000017', title: 'SILICON BEADS MIX', category: 'STRING BEADS', image: 'colourful-beads.jpg' },
+  ]);
+  const beads = tiles.find((tile) => tile.label === 'Beads & jewellery making');
+  assert.equal(beads?.sku, '8650000017');
+  assert.equal(beads?.image, 'colourful-beads.jpg');
+});
+
 test('opens the unfiltered catalogue with beads before party items', () => {
   const beads = { sku: '8610000001', title: 'GLASS BEADS', category: 'STRING BEADS' };
   const party = { sku: '8600000001', title: 'GLOVES PARTY', category: 'PARTY / FANCY DRES' };
   assert.ok(compareInstoreSearch(beads, party, '') < 0);
+});
+
+test('leads Beads with only the exact newly added intake SKUs, not older matching-prefix products', () => {
+  const products = [
+    { sku: '8610300999', title: 'OLDER BEADS', category: 'STRING BEADS' },
+    { sku: '8611000001', title: 'CRUCIFIX', category: 'BEAD METAL PARTS' },
+    { sku: '8610460077', title: 'NEW BEADS A', category: 'STRING BEADS' },
+    { sku: '8610800972', title: 'NEW BEADS B', category: 'STRING BEADS' },
+    { sku: '8611010039', title: 'NEW BEADS C', category: 'STRING BEADS' },
+    { sku: '8650000017', title: 'SILICON BEADS', category: 'STRING BEADS' },
+  ];
+  const ordered = [...products].sort((left, right) => compareInstoreSearch(left, right, ''));
+  assert.deepEqual(ordered.map((product) => product.sku), [
+    '8611010039', '8610800972', '8610460077', '8611000001', '8610300999', '8650000017',
+  ]);
 });
 
 test('uses the current 86181 bracelet range for the Jewellery tile', () => {
