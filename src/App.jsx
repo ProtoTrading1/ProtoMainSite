@@ -577,6 +577,7 @@ export default function App({
     if (!uid) return;
     let cancelled = false;
     let hydrationRetryTimer = null;
+    let hydrationFailures = 0;
     const previousUid = cartAccountRef.current;
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
@@ -665,17 +666,27 @@ export default function App({
           setCartSyncStatus('preview');
           return;
         }
+        hydrationFailures += 1;
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
         setCartSyncStatus('error');
-        trackJourneyEvent('basket_sync_failed', {
-          journey: 'basket',
-          step: 'hydrate',
-          outcome: 'error',
-          metadata: { retry: true },
-        });
-        hydrationRetryTimer = window.setTimeout(hydrate, 3000);
+        // Record only a safe failure category and avoid a three-second retry
+        // loop during an outage. Basket contents are never included here.
+        if (hydrationFailures === 1 || hydrationFailures % 5 === 0) {
+          trackJourneyEvent('basket_sync_failed', {
+            journey: 'basket',
+            step: 'hydrate',
+            outcome: 'error',
+            metadata: {
+              retry: true,
+              attempt: hydrationFailures,
+              status: Number.isInteger(error?.status) ? error.status : null,
+            },
+          });
+        }
+        const retryDelay = Math.min(30_000, 3000 * (2 ** Math.min(4, hydrationFailures - 1)));
+        hydrationRetryTimer = window.setTimeout(hydrate, retryDelay);
       }
     };
     cartHydrateRetryRef.current = () => {

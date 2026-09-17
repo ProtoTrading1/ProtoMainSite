@@ -208,6 +208,17 @@ describe('whole-basket conflict semantics', () => {
 });
 
 describe('account basket client orchestration contract', () => {
+  it('refreshes an expired bearer token once for any account basket request', async () => {
+    const client = await readFile(new URL('../src/lib/accountCart.js', import.meta.url), 'utf8');
+    const auth = await readFile(new URL('../src/lib/authHeaders.js', import.meta.url), 'utf8');
+
+    assert.match(client, /response\.status === 401/);
+    assert.match(client, /refreshAuthHeaders\(\)/);
+    assert.match(client, /credentials: 'same-origin'/);
+    assert.match(auth, /export async function refreshAuthHeaders/);
+    assert.match(auth, /readAccessToken\(\{ refresh: true \}\)/);
+  });
+
   it('serialises/coalesces saves and retries conflicts without server-wins replacement', async () => {
     const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
@@ -250,5 +261,14 @@ describe('account basket client orchestration contract', () => {
     assert.match(drawer, /Basket sync needs attention/);
     assert.match(drawer, /We cannot confirm this basket on your account/);
     assert.match(drawer, /onClick=\{onRetryCartSync\}>Retry sync/);
+  });
+
+  it('backs off failed basket hydration and records only safe error diagnostics', async () => {
+    const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+    assert.match(app, /let hydrationFailures = 0/);
+    assert.match(app, /hydrationFailures % 5 === 0/);
+    assert.match(app, /status: Number\.isInteger\(error\?\.status\) \? error\.status : null/);
+    assert.match(app, /Math\.min\(30_000, 3000 \* \(2 \*\* Math\.min\(4, hydrationFailures - 1\)\)\)/);
   });
 });

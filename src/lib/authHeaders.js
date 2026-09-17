@@ -63,6 +63,17 @@ export async function authHeaders(sessionOrToken = null, extraHeaders = {}) {
 }
 
 /**
+ * Recover a customer request that was made just as its cached access token
+ * expired. Callers must use this only after a 401 and retry once; service,
+ * validation and stock errors must remain visible to the customer.
+ */
+export async function refreshAuthHeaders(extraHeaders = {}) {
+  currentAccessToken = null;
+  const token = await readAccessToken({ refresh: true });
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...extraHeaders };
+}
+
+/**
  * Authenticated GET helper for customer reads. It caps both session recovery
  * and the network request, and refreshes a stale access token once on 401.
  */

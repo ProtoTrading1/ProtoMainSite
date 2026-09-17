@@ -1,12 +1,17 @@
-import { authHeaders } from './authHeaders';
+import { authHeaders, refreshAuthHeaders } from './authHeaders';
 
 async function requestAccountCart(method, body) {
-  const headers = await authHeaders();
-  const response = await fetch('/api/account-cart', {
+  const request = (headers) => fetch('/api/account-cart', {
     method,
     headers,
+    credentials: 'same-origin',
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+
+  let response = await request(await authHeaders());
+  if (response.status === 401) {
+    response = await request(await refreshAuthHeaders());
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.error || 'Account basket could not be saved');
