@@ -648,7 +648,15 @@ export default function App({
         setCartSyncStatus('saved');
       } catch (error) {
         if (cancelled || cartAccountRef.current !== uid) return;
-        if (error?.status === 403 && error?.data?.error === 'Preview basket persistence is disabled') {
+        // Preview deployments intentionally return 403 for account-cart so a
+        // reviewer cannot read or alter a real customer's saved basket. Some
+        // Vercel edge responses omit the JSON message, therefore the preview
+        // host and status are the dependable boundary. Keep this strictly off
+        // the live custom domain so a real account permission failure remains
+        // visible rather than being hidden by local mode.
+        const previewBasketBlocked = window.location.hostname.endsWith('.vercel.app')
+          && error?.status === 403;
+        if (previewBasketBlocked) {
           // This is the expected preview security boundary, not a failed
           // customer basket. Permit add/remove/quantity demonstration locally
           // without retrying or writing to the account service.

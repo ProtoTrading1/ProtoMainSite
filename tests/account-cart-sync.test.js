@@ -271,4 +271,12 @@ describe('account basket client orchestration contract', () => {
     assert.match(app, /status: Number\.isInteger\(error\?\.status\) \? error\.status : null/);
     assert.match(app, /Math\.min\(30_000, 3000 \* \(2 \*\* Math\.min\(4, hydrationFailures - 1\)\)\)/);
   });
+
+  it('keeps preview basket isolation local without masking a live account failure', async () => {
+    const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+    assert.match(app, /window\.location\.hostname\.endsWith\('\.vercel\.app'\)/);
+    assert.match(app, /error\?\.status === 403/);
+    assert.match(app, /if \(previewBasketBlocked\)[\s\S]*?setCartSyncStatus\('preview'\)/);
+  });
 });
