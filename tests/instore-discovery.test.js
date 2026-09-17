@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, discoveryTiles, featuredInstoreProducts, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+
+test('features curated shop-window products before safe mixed-category fallbacks', () => {
+  const featured = featuredInstoreProducts([
+    { sku: '8610000001', title: 'ACRYLIC BEADS', category: 'STRING BEADS' },
+    { sku: '8650000017', title: 'SILICON BEADS', category: 'STRING BEADS' },
+    { sku: '8690000001', title: 'METAL PENDANT', category: 'BEAD METAL PARTS' },
+    { sku: '8618100001', title: 'BRACELET', category: 'FASHION JEWELLERY' },
+    { sku: '8618200001', title: 'EARRINGS', category: 'FASHION JEWELLERY' },
+    { sku: '8696170008', title: 'DIY WOODEN OFF ROAD VEHICLE', category: 'CRAFTS AND ALLIED' },
+  ]);
+  assert.deepEqual(featured.slice(0, 2).map((product) => product.sku), ['8650000017', '8696170008']);
+  assert.equal(featured.some((product) => product.sku === '8690000001'), false);
+  assert.equal(featured.filter((product) => product.sku === '8650000017').length, 1);
+});
 
 test('uses Positill department and description for the soft-toy browse tile', () => {
   const product = {
