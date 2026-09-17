@@ -86,6 +86,12 @@ test('shows the highest source-system codes first within every browse category',
   assert.ok(compareInstoreSearch(newer, older, '') < 0);
 });
 
+test('can show the highest product codes first across a mixed latest-items view', () => {
+  const older = { sku: '8610400101', title: 'METAL CHARM HEART', category: 'FASHION JEWELLERY' };
+  const newer = { sku: '8626100117', title: 'SOFT TOY GIRAFFE', category: 'SOFT TOYS' };
+  assert.ok(compareInstoreSearch(newer, older, '', { newestFirst: true }) < 0);
+});
+
 test('uses the current 86181 bracelet range for the Jewellery tile', () => {
   const tiles = discoveryTiles([
     { sku: '8633680429', title: 'TERRORIST NECKLACE', category: 'FASHION JEWELLERY', image: 'historical-necklace.jpg' },

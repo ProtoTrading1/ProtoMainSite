@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Gem, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Sparkles, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
 import { fetchExtendedRange } from '../lib/extendedRange';
@@ -17,6 +17,7 @@ function localPage(catalogue, query, category, page) {
 export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange }) {
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
+  const [newestFirst, setNewestFirst] = useState(false);
   const [page, setPage] = useState(1);
   const [retry, setRetry] = useState(0);
   const [products, setProducts] = useState([]);
@@ -34,7 +35,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(false);
-    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
+    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category, sort: newestFirst ? 'newest' : '' })
       .then((data) => {
         if (controller.signal.aborted) return;
         setProducts(Array.isArray(data?.products) ? data.products : []);
@@ -44,28 +45,29 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       .catch(() => { if (!controller.signal.aborted) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedQuery, page, retry, category]);
+  }, [submittedQuery, page, retry, category, newestFirst]);
 
   // The app router owns the hash. Mirroring its parsed browse value here
   // prevents a native category link from leaving this page on stale results.
   useEffect(() => {
     setCategory(browseCategory);
+    setNewestFirst(false);
     setPage(1);
     if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }, [browseCategory]);
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
-  const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
-  const showMetalCharms = () => {
-    choose('86104', '');
+  const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setNewestFirst(false); setPage(1); };
+  const showLatest = () => {
+    setQuery(''); setSubmittedQuery(''); setCategory(''); setNewestFirst(true); setPage(1);
     onBrowseCategoryChange?.('');
     window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
-  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };
-  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); searchRef.current?.focus(); };
+  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); setNewestFirst(false); onBrowseCategoryChange?.(''); setPage(1); };
+  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); setNewestFirst(false); onBrowseCategoryChange?.(''); setPage(1); searchRef.current?.focus(); };
   const pages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);
@@ -90,12 +92,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>
-    {!submittedQuery && <section className="instore-feature" aria-labelledby="instore-feature-title">
-      <div className="instore-feature-icon"><Gem size={28} aria-hidden="true" /></div>
-      <div><span className="instore-kicker">FEATURED RANGE</span><h2 id="instore-feature-title">Metal Charms</h2><p>Explore the 86104 range, with the newest product codes shown first.</p></div>
-      <button type="button" onClick={showMetalCharms}>Shop Metal Charms <ArrowRight size={16} /></button>
+    {!submittedQuery && !newestFirst && <section className="instore-feature" aria-labelledby="instore-feature-title">
+      <div className="instore-feature-icon"><Sparkles size={28} aria-hidden="true" /></div>
+      <div><span className="instore-kicker">FEATURED NOW</span><h2 id="instore-feature-title">Latest Instore finds</h2><p>A fresh mix from across the collection, with the newest product codes first.</p></div>
+      <button type="button" onClick={showLatest}>Browse newest items <ArrowRight size={16} /></button>
     </section>}
-    {!submittedQuery && tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
+    {!submittedQuery && !newestFirst && tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
       <div className="instore-browse-heading"><strong>Browse by category</strong><span>Filter the collection, or continue with all products below.</span></div>
       <nav className="instore-tiles instore-tiles--rail" aria-label="Browse by product type">{tiles.map((tile) => {
       const active = category === tile.label;
@@ -104,7 +106,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     })}</nav>
     </section>}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
-      <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
+      <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : newestFirst ? ' — newest items first' : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
       {loading && <div className="instore-loading" role="status"><span className="instore-spinner" aria-hidden="true"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
       {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
       {!loading && !error && !products.length && <div className="instore-state"><PackageSearch size={30} /><h3>No products found</h3><p>Try a shorter name or a different word.</p><button type="button" onClick={clear}>Clear search</button></div>}

@@ -3,11 +3,12 @@ import { authenticatedGetJson } from './authHeaders';
 const RESPONSE_CACHE_TTL_MS = 30_000;
 const responseCache = new Map();
 
-export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false } = {}) {
+export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', sort = '', includeCatalogue = false } = {}) {
   const params = new URLSearchParams();
   const normalized = String(query || '').trim();
   if (normalized) params.set('q', normalized);
   if (category) params.set('category', category);
+  if (sort === 'newest') params.set('sort', 'newest');
   if (includeCatalogue) params.set('catalogue', '1');
   params.set('page', String(Math.max(1, Number.parseInt(page, 10) || 1)));
   const cacheKey = params.toString();

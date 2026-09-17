@@ -258,7 +258,8 @@ export default async function handler(req, res) {
       })));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
-      const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+      const newestFirst = req.query?.sort === 'newest';
+      const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query, { newestFirst }));
       const from = (page - 1) * PAGE_SIZE;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
       // Tile representatives come from the same positive-stock, priced
@@ -310,8 +311,9 @@ export default async function handler(req, res) {
     });
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
+    const newestFirst = req.query?.sort === 'newest';
     const includeCatalogue = req.query?.catalogue === '1';
-    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query, { newestFirst }));
     const from = (page - 1) * PAGE_SIZE;
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Vary', 'Authorization');
