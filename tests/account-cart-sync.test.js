@@ -108,6 +108,36 @@ describe('account basket mutation validation', () => {
     assert.equal(merge.mode, 'merge');
     assert.equal(merge.revision, null);
   });
+
+  it('keeps separately requested colour/design variants of one SKU as separate basket lines', () => {
+    const variants = [
+      item('8612200100', 4),
+      { ...item('8612200100', 3), preference: 'Green' },
+      { ...item('8612200100', 3), preference: 'blue' },
+    ];
+
+    const parsed = parseCartMutation({
+      mode: 'save',
+      items: variants,
+      activityAt: NOW - 1_000,
+      revision: 3,
+    }, { now: NOW });
+
+    assert.equal(parsed.items.length, 3);
+    assert.deepEqual(parsed.items.map(({ preference }) => preference || ''), ['', 'Green', 'blue']);
+  });
+
+  it('still rejects a duplicate SKU with the same normalised colour/design preference', () => {
+    assertBadRequest(() => parseCartMutation({
+      mode: 'save',
+      items: [
+        { ...item('8612200100'), preference: ' Dark  blue ' },
+        { ...item('8612200100'), preference: 'dark blue' },
+      ],
+      activityAt: NOW - 1_000,
+      revision: 3,
+    }, { now: NOW }), /duplicate/i);
+  });
 });
 
 describe('whole-basket conflict semantics', () => {

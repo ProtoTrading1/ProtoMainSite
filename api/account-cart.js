@@ -104,14 +104,23 @@ function validateItems(value) {
   const seen = new Set();
   return value.map((raw) => {
     const identifiers = productIdentifiers(raw);
-    const key = identifiers.primary.toUpperCase();
+    // A requested colour/design is part of a basket line, not part of the
+    // catalogue product. The same SKU may therefore legitimately appear once
+    // with no preference and again for distinct preferences (for example,
+    // "green" and "blue"). Keep rejecting true duplicates, including simple
+    // casing/whitespace variations, so a retry cannot silently double a line.
+    const preferenceFields = itemPreferenceFields(raw);
+    const preferenceKey = (preferenceFields.preference || '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+    const key = `${identifiers.primary.toUpperCase()}\u0000${preferenceKey}`;
     if (seen.has(key)) throw inputError(`Duplicate basket product: ${identifiers.primary}`);
     seen.add(key);
 
     if (!Number.isSafeInteger(raw.qty) || raw.qty < 1 || raw.qty > MAX_QTY) {
       throw inputError(`Basket quantity must be a whole number from 1 to ${MAX_QTY}`);
     }
-    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty, ...itemPreferenceFields(raw) };
+    return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty, ...preferenceFields };
   });
 }
 
