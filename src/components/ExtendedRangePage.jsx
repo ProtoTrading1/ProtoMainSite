@@ -84,7 +84,6 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
         <div><Search size={18} aria-hidden="true" /><input ref={searchRef} id="instore-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try bracelets, hair clips, mugs…" maxLength={80} />{(query || submittedQuery) && <button type="button" onClick={clear} aria-label="Clear search"><X size={16} /></button>}</div>
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
-      {loading && <div className="instore-searching" role="status"><span aria-hidden="true"><ProtoLogo variant="icon" size="sm" className="instore-searching-logo" /></span><span>Finding products…</span></div>}
     </div>
     {tiles.length > 0 && <><nav className="instore-tiles" aria-label="Browse product types horizontally. Scroll for more categories.">{tiles.map((tile) => {
       const active = category === tile.label;
