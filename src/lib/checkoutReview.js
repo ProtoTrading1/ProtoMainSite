@@ -47,18 +47,28 @@ export function getDeliveryAddressReview(customer = {}) {
 }
 
 function productKeys(product = {}) {
-  return [product.id, product.sku, product.code]
+  return [product.id, product.sku, product.code, product.barcode]
     .map((value) => String(value || '').trim().toUpperCase())
     .filter(Boolean);
 }
 
-function reviewKey(change = {}) {
-  return String(change.sku || '').trim().toUpperCase();
+function reviewKeys(change = {}) {
+  return [change.sku, ...(Array.isArray(change.matchKeys) ? change.matchKeys : [])]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean);
 }
 
 export function isOutOfStockReviewChange(change = {}) {
-  if (change.toOrder) return false;
+  if (change.toOrder || change.stockOrderable) return false;
   return Number.isFinite(change.currentStockQty) && change.currentStockQty <= 0;
+}
+
+export function checkoutRemovalMessage(removedCount, remainingCount) {
+  if (!Number.isFinite(removedCount) || removedCount <= 0) return '';
+  const reason = 'The following items were removed because they are currently out of stock.';
+  return remainingCount > 0
+    ? `${reason} Your other items are still in your basket. Review the remaining basket before sending your order request again.`
+    : `${reason} Your basket is now empty. Add available items before sending a new order request.`;
 }
 
 export function applyCheckoutReviewChanges(cartItems = [], changes = []) {
@@ -71,8 +81,8 @@ export function applyCheckoutReviewChanges(cartItems = [], changes = []) {
   const items = cartItems.flatMap((item) => {
     const keys = productKeys(item.product);
     const change = reviewChanges.find((candidate) => {
-      const key = reviewKey(candidate);
-      return key && keys.includes(key);
+      const candidateKeys = reviewKeys(candidate);
+      return candidateKeys.some((key) => keys.includes(key));
     });
     if (!change) return [item];
     if (change.removedFromBasket) {

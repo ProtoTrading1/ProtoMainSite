@@ -38,7 +38,11 @@ import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
 import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
-import { applyCheckoutReviewChanges, isOutOfStockReviewChange } from './lib/checkoutReview';
+import {
+  applyCheckoutReviewChanges,
+  checkoutRemovalMessage,
+  isOutOfStockReviewChange,
+} from './lib/checkoutReview';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -1760,15 +1764,20 @@ export default function App({
           ...change,
           removedFromBasket: isOutOfStockReviewChange(change),
         }));
-        const removedCount = reviewedChanges.filter((change) => change.removedFromBasket).length;
-        setOrderChanges(reviewedChanges);
-        if (removedCount > 0) {
-          setOrderError('The following items were removed because they are currently out of stock. Your other items are still in your basket. Review the remaining basket before sending your order request again.');
-        }
+        const reviewedBasket = applyCheckoutReviewChanges(
+          currentCartRef.current.items,
+          reviewedChanges,
+        );
+        setOrderChanges(reviewedBasket.changes);
+        const removalMessage = checkoutRemovalMessage(
+          reviewedBasket.removedCount,
+          reviewedBasket.items.length,
+        );
+        if (removalMessage) setOrderError(removalMessage);
         // Remove only lines with no live stock. Keep every valid line, refresh
         // authoritative price/stock details, and never auto-reduce a positive
         // quantity or remove an explicit "To order" product.
-        setCartItems((previous) => applyCheckoutReviewChanges(previous, reviewedChanges).items);
+        setCartItems(reviewedBasket.items);
         // A review result is not a transient delivery error. Make the next
         // submit a fresh customer action with a fresh idempotency key/snapshot.
         checkoutRefRef.current = null;

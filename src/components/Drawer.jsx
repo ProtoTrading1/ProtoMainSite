@@ -235,6 +235,11 @@ export default function Drawer({
         setCourierChoice(null);
         setCustomerNotes('');
         setAppliedPromo(null);
+      } else {
+        // The order result modal explains reviewable stock/price changes and
+        // retryable delivery failures. Close this sheet so that result is not
+        // hidden behind a second modal backdrop.
+        setShowCourierPicker(false);
       }
     } finally {
       setSubmitting(false);

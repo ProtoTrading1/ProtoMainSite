@@ -45,7 +45,7 @@ function tokenFor(user) {
   return `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: user.id, email: user.email, exp: now + 3600 })}.e2e`;
 }
 
-function installSyntheticServices(context, accountCart, safety, products = catalogue) {
+function installSyntheticServices(context, accountCart, safety, products = catalogue, orderReview = null) {
   return context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -71,6 +71,11 @@ function installSyntheticServices(context, accountCart, safety, products = catal
     }
 
     if (!pathname.startsWith('/api/')) return route.continue();
+
+    if (pathname === '/api/send-order' && orderReview) {
+      safety.orderRequests = (safety.orderRequests || 0) + 1;
+      return json(route, orderReview, 409);
+    }
 
     if (/send-order|order-notify|send-reset-email|register-trade/.test(pathname)) {
       safety.destructiveRequests.push(`${request.method()} ${pathname}`);
@@ -312,5 +317,110 @@ test('desktop and mobile converge on the latest account basket without checkout'
     expect(safety.destructiveRequests).toEqual([]);
   } finally {
     await Promise.allSettled([desktopContext.close(), mobileContext.close()]);
+  }
+});
+
+test('desktop and mobile remove zero-stock lines, explain why, and persist the resulting basket', async ({ browser }) => {
+  const unavailableQueen = product('TK2154-GLD', '21st Birthday Key — Queen Crown', 428);
+  const unavailablePrincess = product('TK2120-GLD', '21st Birthday Key — Princess', 355);
+  const products = [unavailableQueen, unavailablePrincess, markerProduct];
+  const orderReview = {
+    error: 'Price or stock changed while you were shopping. Review the affected products before sending your order request.',
+    code: 'ORDER_REVIEW_REQUIRED',
+    changes: [
+      {
+        sku: unavailableQueen.sku,
+        name: unavailableQueen.name,
+        requestedQty: 1,
+        currentPrice: unavailableQueen.price,
+        currentStockQty: 0,
+        stockChanged: true,
+        quantityExceedsStock: true,
+        stockUnavailable: false,
+        toOrder: false,
+      },
+      {
+        sku: unavailablePrincess.sku,
+        name: unavailablePrincess.name,
+        requestedQty: 2,
+        currentPrice: unavailablePrincess.price,
+        currentStockQty: 0,
+        stockChanged: true,
+        quantityExceedsStock: true,
+        stockUnavailable: false,
+        toOrder: false,
+      },
+    ],
+  };
+
+  for (const scenario of [
+    { mobile: false, contextOptions: { viewport: { width: 1440, height: 900 } } },
+    { mobile: true, contextOptions: { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true } },
+  ]) {
+    for (const basketCase of [
+      { name: 'mixed', keepMarker: true },
+      { name: 'all unavailable', keepMarker: false },
+    ]) {
+    const expectedSkus = basketCase.keepMarker ? ['E2E-MARKER'] : [];
+    const accountCart = {
+      created: true,
+      items: [
+        line(unavailableQueen, 1),
+        line(unavailablePrincess, 2),
+        ...(basketCase.keepMarker ? [line(markerProduct, 3)] : []),
+      ],
+      activityAt: Date.now() - 60_000,
+      revision: 1,
+    };
+    const safety = { authRequests: 0, destructiveRequests: [], orderRequests: 0 };
+    const context = await browser.newContext(scenario.contextOptions);
+    await installSyntheticServices(context, accountCart, safety, products, orderReview);
+    const page = await context.newPage();
+    await seedLegacyBrowserBasket(page, accountCart.items);
+
+    try {
+      await signIn(page);
+      const cartButton = page.getByRole('button', { name: /^(?:Open cart|Cart)\b/ }).first();
+      await cartButton.click();
+      await page.getByRole('button', { name: 'Review order request' }).click();
+      await page.getByRole('button', { name: 'Continue to options' }).click();
+      await page.getByRole('button', { name: 'No WhatsApp updates', exact: true }).click();
+      await page.getByRole('button', { name: 'Continue to delivery' }).click();
+      await page.getByRole('button', { name: /Pick up in store/ }).click();
+      await page.getByRole('button', { name: 'Send order request — no payment now' }).click();
+
+      const result = page.getByRole('dialog', { name: 'Basket updated' });
+      await expect(result).toBeVisible();
+      await expect(result).toContainText('The following items were removed because they are currently out of stock.');
+      if (basketCase.keepMarker) {
+        await expect(result).toContainText('Your other items are still in your basket.');
+      } else {
+        await expect(result).toContainText('Your basket is now empty.');
+        await expect(result).not.toContainText('Your other items are still in your basket.');
+      }
+      await expect(result).toContainText(unavailableQueen.name);
+      await expect(result).toContainText(unavailablePrincess.name);
+      await expect(result.getByText('Removed from basket — out of stock')).toHaveCount(2);
+
+      await expect.poll(() => accountCart.items.map((item) => item.product.id)).toEqual(expectedSkus);
+      await expectStoredSkus(page, expectedSkus);
+      expect(safety.orderRequests).toBe(1);
+      expect(safety.destructiveRequests).toEqual([]);
+
+      await result.getByRole('button', { name: 'Review basket' }).click();
+      const order = scenario.mobile
+        ? page.getByRole('dialog', { name: 'Your Order' })
+        : page.locator('.cart-drawer');
+      if (basketCase.keepMarker) {
+        await expect(order.getByRole('heading', { name: markerProduct.name })).toBeVisible();
+      } else {
+        await expect(order.getByText('Your basket is empty')).toBeVisible();
+      }
+      await expect(order.getByRole('heading', { name: unavailableQueen.name })).toHaveCount(0);
+      await expect(order.getByRole('heading', { name: unavailablePrincess.name })).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+    }
   }
 });

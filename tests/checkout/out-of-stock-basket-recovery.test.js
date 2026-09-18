@@ -3,11 +3,12 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {
   applyCheckoutReviewChanges,
+  checkoutRemovalMessage,
   isOutOfStockReviewChange,
 } from '../../src/lib/checkoutReview.js';
 
-const appSource = fs.readFileSync(new URL('../../src/App.jsx', import.meta.url), 'utf8');
 const confirmationSource = fs.readFileSync(new URL('../../src/components/OrderConfirmModal.jsx', import.meta.url), 'utf8');
+const checkoutReviewSource = fs.readFileSync(new URL('../../src/lib/checkoutReview.js', import.meta.url), 'utf8');
 
 const cart = [
   { qty: 1, product: { id: 'TK2154-GLD', sku: 'TK2154-GLD', price: 428, stockOnHand: 1 } },
@@ -38,11 +39,37 @@ test('checkout keeps positive-stock and To order lines for explicit customer rev
   assert.equal(result.items.find((item) => item.product.sku === 'KEEP-1').product.price, 21);
   assert.equal(isOutOfStockReviewChange({ currentStockQty: 0, toOrder: true }), false);
   assert.equal(isOutOfStockReviewChange({ currentStockQty: null, stockUnavailable: true, toOrder: false }), false);
+  assert.equal(isOutOfStockReviewChange({ currentStockQty: 0, stockOrderable: true, toOrder: false }), false);
+});
+
+test('barcode-resolved zero-stock changes remove the original stale-SKU basket line', () => {
+  const result = applyCheckoutReviewChanges([
+    { qty: 1, product: { id: 'OLD-SKU', sku: 'OLD-SKU', code: '6001002003004', price: 20 } },
+  ], [{
+    sku: 'CURRENT-SKU',
+    matchKeys: ['OLD-SKU', '6001002003004'],
+    currentStockQty: 0,
+    toOrder: false,
+  }]);
+
+  assert.equal(result.removedCount, 1);
+  assert.deepEqual(result.items, []);
 });
 
 test('customer is told why products were removed and sees every affected product name', () => {
-  assert.match(appSource, /The following items were removed because they are currently out of stock/);
-  assert.match(appSource, /Your other items are still in your basket/);
+  assert.match(checkoutReviewSource, /The following items were removed because they are currently out of stock/);
+  assert.match(checkoutReviewSource, /Your other items are still in your basket/);
+  assert.match(checkoutReviewSource, /Your basket is now empty/);
   assert.match(confirmationSource, /<strong>\{change\.name\}<\/strong>/);
   assert.match(confirmationSource, /Removed from basket — out of stock/);
+});
+
+test('checkout wording distinguishes a retained basket from an empty basket', () => {
+  const mixedMessage = checkoutRemovalMessage(2, 1);
+  assert.match(mixedMessage, /Your other items are still in your basket/);
+  assert.doesNotMatch(mixedMessage, /basket is now empty/);
+
+  const emptyMessage = checkoutRemovalMessage(2, 0);
+  assert.match(emptyMessage, /Your basket is now empty/);
+  assert.doesNotMatch(emptyMessage, /other items are still in your basket/);
 });

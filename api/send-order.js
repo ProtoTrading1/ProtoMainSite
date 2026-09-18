@@ -22,7 +22,14 @@ import {
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
-import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import {
+  aggregateRequestedQuantities,
+  evaluateCheckoutSnapshot,
+  isStockOrderableAvailability,
+  isToOrderProduct,
+  mergeCheckoutReviewChanges,
+  normaliseStockQty,
+} from '../lib/order-stock-guard.mjs';
 import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
@@ -394,6 +401,26 @@ async function resolveStandardPrices(items) {
     throw unavailable;
   }
 
+  // One SKU can legitimately occupy multiple basket lines when the customer
+  // records different colour/design preferences. Physical stock belongs to
+  // the SKU, so checkout must compare the combined requested quantity with the
+  // authoritative balance instead of validating each preference line alone.
+  const requestedQtyBySku = aggregateRequestedQuantities(items.map((item) => {
+    const product = item?.product || {};
+    const submittedSku = String(product.sku || product.id || '').trim().toUpperCase();
+    const barcode = String(product.code || product.barcode || '').trim();
+    const row = productBySku.get(submittedSku) || (barcode ? productByBarcode.get(barcode) : null);
+    const availability = row
+      ? availabilityForRow(row, incomingBySku.get(row.sku) || null)
+      : null;
+    return {
+      sku: row?.sku,
+      quantity: Number(item?.qty),
+      isToOrder: row ? isToOrderProduct(row) : false,
+      stockOrderable: isStockOrderableAvailability(availability),
+    };
+  }));
+
   const reviewChanges = [];
   const authItems = items.map((item, index) => {
     const product = item.product || {};
@@ -415,16 +442,27 @@ async function resolveStandardPrices(items) {
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
+    const stockOrderable = isStockOrderableAvailability(availability);
     const review = evaluateCheckoutSnapshot({
       sku: row.sku,
       name: cleanText(row.title, `Product on line ${index + 1}`),
-      quantity: qty,
+      quantity: toOrder
+        ? qty
+        : (requestedQtyBySku.get(String(row.sku || '').trim().toUpperCase()) || qty),
       isToOrder: toOrder,
+      stockOrderable,
       submittedSnapshot: product.checkoutSnapshot || {},
       currentPrice: price,
       currentStockQty: normaliseStockQty(availability.stockQty),
     });
-    if (review) reviewChanges.push(review);
+    if (review) {
+      reviewChanges.push({
+        ...review,
+        matchKeys: [product.id, product.sku, product.code, product.barcode]
+          .map((value) => String(value || '').trim())
+          .filter(Boolean),
+      });
+    }
     if (!availability.canOrder) {
       // A changed stock snapshot gives the customer the more useful review
       // alert below. Otherwise preserve the existing unavailable-line error.
@@ -466,11 +504,12 @@ async function resolveStandardPrices(items) {
     };
   });
 
-  if (reviewChanges.length) {
+  const mergedReviewChanges = mergeCheckoutReviewChanges(reviewChanges);
+  if (mergedReviewChanges.length) {
     const error = new Error('Price or stock changed while you were shopping. Review the affected products before sending your order request.');
     error.status = 409;
     error.code = 'ORDER_REVIEW_REQUIRED';
-    error.changes = reviewChanges;
+    error.changes = mergedReviewChanges;
     throw error;
   }
 
