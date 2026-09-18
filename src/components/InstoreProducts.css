@@ -70,5 +70,17 @@
 .instore-featured-heading span { color: #b88b2e; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
 .instore-featured-heading h2 { margin: 4px 0; font-size: 24px; }
 .instore-featured-heading p { margin: 0; color: #667085; }
+
+/* Keep the Instore introduction compact so products arrive above the fold. */
+.instore-hero { padding: clamp(18px, 2.5vw, 30px); gap: 20px; border-radius: 18px; }
+.instore h1 { font-size: clamp(28px, 3.5vw, 44px); margin: 8px 0; }
+.instore-hero p { font-size: 15px; line-height: 1.45; }
+.instore-guide { min-width: 220px; gap: 8px; }
+.instore-guide li { font-size: 13px; }
+.instore-guide b { width: 26px; height: 26px; }
+@media (max-width: 760px) {
+  .instore-hero { padding: 20px 18px; }
+  .instore-guide { margin-top: 16px; }
+}
 /* Keep an item preference visibly attached to its own purchase controls. */
 .instore-preference--in-card{margin-top:12px;padding:12px 0 0;border:0;border-top:1px solid #e6e8ec;border-radius:0}
