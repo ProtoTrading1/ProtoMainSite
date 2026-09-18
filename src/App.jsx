@@ -38,6 +38,7 @@ import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
 import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import { applyCheckoutReviewChanges, isOutOfStockReviewChange } from './lib/checkoutReview';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -1755,28 +1756,19 @@ export default function App({
       setOrderError(err.message || 'Order could not be sent');
       if (err?.code === 'ORDER_REVIEW_REQUIRED') {
         const changes = Array.isArray(err.changes) ? err.changes : [];
-        setOrderChanges(changes);
-        // Refresh only the price/stock snapshots returned by the authoritative
-        // checkout check. We never auto-reduce a quantity: the customer must
-        // explicitly decide which line to amend before resubmitting.
-        setCartItems((previous) => previous.map((item) => {
-          const change = changes.find((candidate) => {
-            const key = String(candidate?.sku || '').toUpperCase();
-            return key && [item.product.id, item.product.sku, item.product.code]
-              .some((value) => String(value || '').toUpperCase() === key);
-          });
-          if (!change) return item;
-          return {
-            ...item,
-            product: {
-              ...item.product,
-              ...(Number.isFinite(change.currentPrice) ? { price: change.currentPrice } : {}),
-              ...(Number.isFinite(change.currentStockQty)
-                ? { stockOnHand: change.currentStockQty, stockQty: change.currentStockQty }
-                : {}),
-            },
-          };
+        const reviewedChanges = changes.map((change) => ({
+          ...change,
+          removedFromBasket: isOutOfStockReviewChange(change),
         }));
+        const removedCount = reviewedChanges.filter((change) => change.removedFromBasket).length;
+        setOrderChanges(reviewedChanges);
+        if (removedCount > 0) {
+          setOrderError('The following items were removed because they are currently out of stock. Your other items are still in your basket. Review the remaining basket before sending your order request again.');
+        }
+        // Remove only lines with no live stock. Keep every valid line, refresh
+        // authoritative price/stock details, and never auto-reduce a positive
+        // quantity or remove an explicit "To order" product.
+        setCartItems((previous) => applyCheckoutReviewChanges(previous, reviewedChanges).items);
         // A review result is not a transient delivery error. Make the next
         // submit a fresh customer action with a fresh idempotency key/snapshot.
         checkoutRefRef.current = null;

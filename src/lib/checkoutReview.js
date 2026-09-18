@@ -45,3 +45,51 @@ export function getDeliveryAddressReview(customer = {}) {
       : 'This delivery address may be incomplete. Before choosing Proto delivery, add the street address, suburb and postal code in My Profile, or include the full address in your delivery notes.',
   };
 }
+
+function productKeys(product = {}) {
+  return [product.id, product.sku, product.code]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function reviewKey(change = {}) {
+  return String(change.sku || '').trim().toUpperCase();
+}
+
+export function isOutOfStockReviewChange(change = {}) {
+  if (change.toOrder) return false;
+  return Number.isFinite(change.currentStockQty) && change.currentStockQty <= 0;
+}
+
+export function applyCheckoutReviewChanges(cartItems = [], changes = []) {
+  const reviewChanges = changes.map((change) => ({
+    ...change,
+    removedFromBasket: isOutOfStockReviewChange(change),
+  }));
+  let removedCount = 0;
+
+  const items = cartItems.flatMap((item) => {
+    const keys = productKeys(item.product);
+    const change = reviewChanges.find((candidate) => {
+      const key = reviewKey(candidate);
+      return key && keys.includes(key);
+    });
+    if (!change) return [item];
+    if (change.removedFromBasket) {
+      removedCount += 1;
+      return [];
+    }
+    return [{
+      ...item,
+      product: {
+        ...item.product,
+        ...(Number.isFinite(change.currentPrice) ? { price: change.currentPrice } : {}),
+        ...(Number.isFinite(change.currentStockQty)
+          ? { stockOnHand: change.currentStockQty, stockQty: change.currentStockQty }
+          : {}),
+      },
+    }];
+  });
+
+  return { items, changes: reviewChanges, removedCount };
+}

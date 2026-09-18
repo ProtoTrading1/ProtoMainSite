@@ -19,6 +19,7 @@ export default function OrderConfirmModal({
   const isSuccess = orderStatus === 'sent' || orderStatus === 'saved';
   const isError = orderStatus === 'error';
   const requiresReview = isError && orderChanges.length > 0;
+  const removedCount = orderChanges.filter((change) => change.removedFromBasket).length;
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -101,7 +102,7 @@ export default function OrderConfirmModal({
             )}
             {isError && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">{requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
+                <h2 id="order-confirm-title" className="ocm-title">{removedCount > 0 ? 'Basket updated' : requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
                 <p className="ocm-subtitle">
                   {orderError || 'Something went wrong. Please try again.'}
                 </p>
@@ -125,13 +126,16 @@ export default function OrderConfirmModal({
             {orderChanges.map((change) => (
               <div className="ocm-change-line" key={change.sku}>
                 <strong>{change.name}</strong>
+                {change.removedFromBasket && (
+                  <span>Removed from basket — out of stock</span>
+                )}
                 {change.priceChanged && (
                   <span>
                     Price: {change.previousPrice === null ? 'not verified' : `R${change.previousPrice.toFixed(2)}`}
                     {' → '}{change.currentPrice === null ? 'unavailable' : `R${change.currentPrice.toFixed(2)}`}
                   </span>
                 )}
-                {!change.toOrder && (change.stockChanged || change.quantityExceedsStock || change.stockUnavailable) && (
+                {!change.removedFromBasket && !change.toOrder && (change.stockChanged || change.quantityExceedsStock || change.stockUnavailable) && (
                   <span>
                     Stock: {change.currentStockQty === null ? 'currently unavailable' : `${change.currentStockQty} available`}
                     {change.quantityExceedsStock ? ` · your quantity is ${change.requestedQty}` : ''}
