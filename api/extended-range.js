@@ -185,7 +185,10 @@ export async function signPreviewImages(client, runId, rows) {
   const paths = [...new Set((rows || [])
     .map((row) => String(row?.image_object_path || '').trim())
     .filter((objectPath) => objectPath.startsWith(prefix)))];
-  if (!paths.length) return [];
+  // A staged run may deliberately retain an immutable source-run image path.
+  // Never sign outside this run, but keep its stock-backed rows available so
+  // the preview can render neutral no-image cards instead of an empty grid.
+  if (!paths.length) return (rows || []).map((row) => ({ ...row, image_url: '' }));
 
   const signed = new Map();
   for (let start = 0; start < paths.length; start += 100) {

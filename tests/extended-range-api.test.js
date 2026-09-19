@@ -102,6 +102,21 @@ test('isolated preview signs only objects belonging to its configured run', asyn
   assert.equal(rows[1].image_url, '');
 });
 
+test('isolated preview keeps rows from another run as neutral no-image cards', async () => {
+  const sourceRunRows = await signPreviewImages({}, 'run-a', [
+    { sku: 'A', image_object_path: 'runs/source-run/A/a.jpg' },
+  ]);
+  assert.equal(sourceRunRows.length, 1);
+  assert.equal(sourceRunRows[0].image_url, '');
+  const [product] = buildPreviewProducts([{
+    ...sourceRunRows[0], title: 'METAL BEAD', price_incl_vat: 12.5,
+    available_stock: 10, department: 'Beads',
+  }]);
+  assert.equal(product.sku, 'A');
+  assert.equal(product.imageStatus, 'hidden');
+  assert.equal(product.availability.canOrder, true);
+});
+
 test('isolated preview reads every database page instead of stopping at 1,000 products', async () => {
   const total = 6030;
   const query = {
