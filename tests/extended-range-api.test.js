@@ -70,7 +70,11 @@ test('isolated preview mapping uses the VAT-inclusive run price and cannot make 
   assert.equal(products[0].price, 13.5);
   assert.equal(products[0].stockQty, 10);
   assert.equal(buildPreviewProducts([{ ...previewRow, available_stock: 0 }]).length, 0);
-  assert.equal(buildPreviewProducts([{ ...previewRow, image_url: null }]).length, 0);
+  const [unsignedImage] = buildPreviewProducts([{ ...previewRow, image_url: null }]);
+  assert.equal(unsignedImage.sku, previewRow.sku);
+  assert.equal(unsignedImage.imageStatus, 'hidden');
+  assert.equal(unsignedImage.image, '');
+  assert.equal(unsignedImage.availability.canOrder, true);
 });
 
 test('isolated preview preserves a VAT-inclusive price that is not on the normal price grid', () => {

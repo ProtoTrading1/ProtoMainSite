@@ -223,6 +223,12 @@ export function buildPreviewProducts(rows, rawQuery = '') {
     available_stock: row.available_stock,
     category: row.department,
     image_url: row.image_url,
+    // A missing or expired preview-image signature must never make a
+    // stock-backed product disappear. The customer can still review its
+    // description, price and availability using the neutral no-image state.
+    // This is especially important while a staged run is being verified: the
+    // catalogue and its private image objects have separate failure modes.
+    image_control_status: String(row?.image_url || '').trim().startsWith('https://') ? 'visible' : 'hidden',
     image_review_status: 'verified',
     visibility_status: 'search_only',
     is_active: true,
