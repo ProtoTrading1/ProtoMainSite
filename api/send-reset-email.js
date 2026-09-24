@@ -61,7 +61,7 @@ export const RESET_HTML = (link) => `<!DOCTYPE html>
 </td></tr></table>
 </body></html>`;
 
-// Identical response for every input — no account-existence oracle.
+// Identical response for every input â€” no account-existence oracle.
 const GENERIC_OK = { ok: true };
 const GENERIC_RESPONSE_FLOOR_MS = 1400;
 
@@ -120,6 +120,7 @@ export default async function handler(req, res) {
             'content-type': 'application/json',
             'api-key': process.env.BREVO_API_KEY,
           },
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             sender: {
               name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -131,13 +132,13 @@ export default async function handler(req, res) {
           }),
         });
         if (!resp.ok) {
-          const body = await resp.json().catch(() => ({}));
-          console.error('Brevo API error:', resp.status, JSON.stringify(body));
+          const body = await resp.text().catch(() => '');
+          console.error('Password reset Brevo error:', resp.status, body || resp.statusText || 'unknown error');
         }
       }
     }
   } catch (err) {
-    // Log but still return generic success — internal errors must not become an
+    // Log but still return generic success â€” internal errors must not become an
     // account-existence side-channel.
     console.error('send-reset-email:', err.message);
   }
@@ -145,3 +146,4 @@ export default async function handler(req, res) {
   await waitForGenericResponse(startedAt);
   return res.status(200).json(GENERIC_OK);
 }
+

@@ -7,7 +7,7 @@ const EMAIL_RE = /^[^\s@,()]+@[^\s@,()]+\.[^\s@,()]+$/;
 
 /**
  * Signing secret for reset tokens. Requires a dedicated env var and FAILS CLOSED
- * (returns undefined) if none is set — deliberately NO fallback to the Supabase
+ * (returns undefined) if none is set â€” deliberately NO fallback to the Supabase
  * service-role key, so a misconfiguration surfaces as "Server misconfigured"
  * instead of silently signing tokens with the DB master key.
  */
@@ -79,6 +79,21 @@ export async function consumeResetToken(supabase, tokenHash, userId, expiresAt) 
 
 export async function findUserByEmail(supabase, email) {
   const target = String(email || '').trim().toLowerCase();
+
+  // The customer row carries the Auth user id and avoids scanning the Auth
+  // directory page by page. This matters once the user count grows beyond the
+  // bounded fallback window below.
+  const { data: customer, error: customerError } = await supabase
+    .from('customers')
+    .select('id, email')
+    .eq('email', target)
+    .maybeSingle();
+  if (!customerError && customer?.id && customer.email?.trim().toLowerCase() === target) {
+    const { data, error } = await supabase.auth.admin.getUserById(customer.id);
+    if (!error && data?.user?.email?.trim().toLowerCase() === target) return data.user;
+  }
+
+  // Compatibility fallback for older accounts whose customer row is missing.
   let page = 1;
   while (page <= 20) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
@@ -90,3 +105,4 @@ export async function findUserByEmail(supabase, email) {
   }
   return null;
 }
+

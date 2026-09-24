@@ -88,6 +88,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [showAccountRecovery, setShowAccountRecovery] = useState(false);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
+  const [notificationSent, setNotificationSent] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
   const [standaloneStep, setStandaloneStep] = useState(0);
 
@@ -122,16 +123,16 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       issues.push({ key: 'confirmPassword', message: 'Passwords must match', section: 'contact' });
     }
     if (typeof whatsappOptIn !== 'boolean') {
-      issues.push({ key: 'whatsapp', message: 'WhatsApp question — choose Yes or No', section: 'contact' });
+      issues.push({ key: 'whatsapp', message: 'WhatsApp question â€” choose Yes or No', section: 'contact' });
     }
     if (!businessName.trim()) {
       issues.push({ key: 'businessName', message: 'Company / trading name', section: 'business' });
     }
     if (tradingChannels.length === 0) {
-      issues.push({ key: 'tradingChannels', message: 'How you trade — select at least one option', section: 'business' });
+      issues.push({ key: 'tradingChannels', message: 'How you trade â€” select at least one option', section: 'business' });
     }
     if (productCategories.length === 0) {
-      issues.push({ key: 'productCategories', message: 'What you sell — select at least one option', section: 'business' });
+      issues.push({ key: 'productCategories', message: 'What you sell â€” select at least one option', section: 'business' });
     }
     if (productCategories.includes('Other') && !otherProductCategory.trim()) {
       issues.push({ key: 'otherProductCategory', message: 'Name the other product category', section: 'business' });
@@ -218,7 +219,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return true;
     if (emailCheck.checkedEmail === normalized && emailCheck.status === 'existing') return false;
     const sequence = ++emailCheckSequence.current;
-    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
+    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your emailâ€¦' });
     try {
       const result = await checkRegistrationEmail(normalized);
       if (sequence !== emailCheckSequence.current) return false;
@@ -226,7 +227,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
         return false;
       }
-      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
+      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available â€” continue your application.' });
       return true;
     } catch (error) {
       if (sequence !== emailCheckSequence.current) return false;
@@ -342,6 +343,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       });
       setCustomerCode(result?.customerCode || result?.profile?.customerCode || '');
       setInstantAccess(Boolean(result?.instantAccess));
+      setNotificationSent(result?.notificationSent === true);
       setDone(true);
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
@@ -359,9 +361,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
                 <p>
                   {instantAccess
-                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — sign in with {email.trim()} to access the catalogue.</>
+                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} â€” sign in with {email.trim()} to access the catalogue.</>
                     : <>Thank you, {contactName.trim()}. Proto is reviewing your application and we will notify {email.trim()} when you have been approved.</>}
                 </p>
+                {!notificationSent && (
+                  <p className="lp-quiz-error" role="alert">
+                    Your application was saved, but we could not confirm the email notification. Please contact online@proto.co.za if you do not hear from us.
+                  </p>
+                )}
                 {!standalone && (
                   <button type="button" onClick={onLogin}>
                     Go to sign in
@@ -489,7 +496,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                               onClick={() => setWhatsappOptIn(true)}
                               aria-pressed={whatsappOptIn === true}
                             >
-                              {whatsappOptIn === true ? '✓ Yes, send updates' : 'Yes, send updates'}
+                              {whatsappOptIn === true ? 'âœ“ Yes, send updates' : 'Yes, send updates'}
                             </button>
                             <button
                               type="button"
@@ -497,7 +504,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                               onClick={() => setWhatsappOptIn(false)}
                               aria-pressed={whatsappOptIn === false}
                             >
-                              {whatsappOptIn === false ? '✓ No WhatsApp updates' : 'No WhatsApp updates'}
+                              {whatsappOptIn === false ? 'âœ“ No WhatsApp updates' : 'No WhatsApp updates'}
                             </button>
                           </div>
                         </div>
@@ -618,7 +625,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
 
                       <div id="register-trading-channel-label" className="lp-register-subhead">
-                        1. How do you trade? <span className="lp-register-required">(required — select all that apply)</span>
+                        1. How do you trade? <span className="lp-register-required">(required â€” select all that apply)</span>
                       </div>
                       <div className="lp-quiz-types" role="group" aria-labelledby="register-trading-channel-label" aria-required="true">
                         {TRADING_CHANNELS.map((channel) => {
@@ -636,7 +643,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         );})}
                       </div>
                       <div id="register-product-category-label" className="lp-register-subhead">
-                        2. What do you mainly sell? <span className="lp-register-required">(required — select all that apply)</span>
+                        2. What do you mainly sell? <span className="lp-register-required">(required â€” select all that apply)</span>
                       </div>
                       <div className="lp-quiz-types" role="group" aria-labelledby="register-product-category-label" aria-required="true">
                         {PRODUCT_CATEGORIES.map((category) => {
@@ -671,7 +678,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                           required
                           aria-invalid={fieldHasIssue('businessDescription')}
                         />
-                        <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                        <span className="lp-quiz-field-help">Minimum 20 characters Â· {businessDescription.length}/400</span>
                       </div>
                     </>
                   )}
@@ -707,7 +714,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       required
                       aria-invalid={fieldHasIssue('businessDescription')}
                     />
-                    <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+                    <span className="lp-quiz-field-help">Minimum 20 characters Â· {businessDescription.length}/400</span>
                   </div>
                   <MonthlySpendOptional value={monthlySpend} onChange={setMonthlySpend} />
                 </section>
@@ -798,7 +805,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       disabled={submitting || emailCheck.status === 'checking' || emailCheck.status === 'existing' || !canAdvanceStandalone()}
                     >
                       {submitting
-                        ? 'Submitting your application…'
+                        ? 'Submitting your applicationâ€¦'
                         : standaloneStep < STANDALONE_STEPS.length - 1
                           ? 'Continue'
                           : 'Submit trade application'}
@@ -808,7 +815,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                 ) : (
                 <div className="lp-register-actions">
                   <button type="submit" className="lp-register-submit" disabled={submitting}>
-                    {submitting ? 'Submitting your application…' : 'Submit trade application'}
+                    {submitting ? 'Submitting your applicationâ€¦' : 'Submit trade application'}
                   </button>
                   {!standalone && (
                     <p className="lp-register-footnote">
@@ -898,3 +905,4 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     </div>
   );
 }
+
