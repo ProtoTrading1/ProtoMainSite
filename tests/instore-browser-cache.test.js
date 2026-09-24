@@ -76,10 +76,48 @@ test('the page answers locally once it holds the collection, and prefetches out 
   // A previously seen view is painted before the network answers.
   assert.match(page, /const stored = storedExtendedRange\(submittedQuery, \{ page, category \}\)/);
   assert.match(page, /setLoading\(!stored\)/);
-  // The prefetch waits for the first page and never runs on a metered link.
-  assert.match(page, /if \(catalogue \|\| loading \|\| error \|\| !products\.length\) return undefined;/);
-  assert.match(page, /connection\?\.saveData \|\| \['slow-2g', '2g'\]\.includes\(connection\?\.effectiveType\)/);
-  assert.match(page, /requestIdleCallback/);
+  // The page joins the boot load rather than starting a second one.
+  assert.match(page, /prefetchInstoreCatalogue\(\)\.then\(\(collection\) => \{/);
+  assert.doesNotMatch(page, /loadInstoreCatalogue/);
+});
+
+test('the Instore collection is loaded during portal boot, like the main catalogue', async () => {
+  const [products, range] = await Promise.all([
+    readSource('src/lib/products.js'),
+    readSource('src/lib/extendedRange.js'),
+  ]);
+
+  // Started by the same boot routine that starts the main catalogue, so
+  // opening Instore Products is not the moment it gets downloaded.
+  assert.match(products, /export function prefetchCatalog\(\)[\s\S]*module\.prefetchInstoreCatalogue\(\)/);
+  // ...but only once the main catalogue payload is in: the storefront's own
+  // products must never queue behind the extended range.
+  assert.match(products, /void getAllCached\(\)\s*\.catch\(\(\) => null\)\s*\.then\(\(\) => import\('\.\/extendedRange'\)\)/);
+
+  // One entry point, so every caller gets the idle and connection guards.
+  assert.match(range, /export function prefetchInstoreCatalogue\(\)/);
+  assert.match(range, /connection\?\.saveData \|\| \['slow-2g', '2g'\]\.includes\(connection\?\.effectiveType\)/);
+  assert.match(range, /requestIdleCallback\(start, \{ timeout: 5000 \}\)/);
+  // It resolves with the collection so a page can join a running load.
+  assert.match(range, /if \(catalogueRequest\) return catalogueRequest;/);
+});
+
+test('the collection survives a reload without downloading again', async () => {
+  const range = await readSource('src/lib/extendedRange.js');
+
+  // IndexedDB, like the main catalogue, and its own database rather than
+  // sharing the catalogue's.
+  assert.match(range, /const IDB_NAME = 'proto-instore';/);
+  assert.doesNotMatch(range, /'proto-catalogue'/);
+  // A much shorter window than the main catalogue's 24 hours, because these
+  // rows carry live stock figures.
+  assert.match(range, /const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;/);
+  // A stored collection is used at once and refreshed behind the customer.
+  assert.match(range, /catalogueProducts = persisted;\s*\n\s*void fetchCollection\(\)/);
+  // Nothing stale, nothing shaped for older code, and nothing left at sign-out.
+  assert.match(range, /if \(!Array\.isArray\(entry\?\.data\) \|\| !entry\.data\.length\) return null;/);
+  assert.match(range, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
+  assert.match(range, /void clearPersistedCollection\(\)/);
 });
 
 test('the API and the browser share one page definition', async () => {

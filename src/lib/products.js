@@ -94,6 +94,14 @@ export function prefetchCatalog() {
   // The home grid is Featured — resolve it now so the first screen after
   // login paints without a loading pass.
   void fetchFeaturedCatalogProducts().catch(() => {});
+  // Instore Products loads on the same boot, so opening it is not the moment
+  // it gets downloaded. It waits for the main catalogue payload first: the
+  // storefront's own products must never queue behind the extended range.
+  void getAllCached()
+    .catch(() => null)
+    .then(() => import('./extendedRange'))
+    .then((module) => module.prefetchInstoreCatalogue())
+    .catch(() => {});
 }
 
 function saveToLocalCache(data) {

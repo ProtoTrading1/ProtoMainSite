@@ -4,9 +4,74 @@ import {
   STORED_RESPONSE_MAX_BYTES, instoreRequestKey, storedResponseIsUsable,
 } from '../../lib/instore-response-cache.mjs';
 
+// The collection is persisted the way the main catalogue is, so navigating to
+// Instore Products — or reloading on it — does not download it again. Its own
+// database, separate from the main catalogue's, and a much shorter window,
+// because these rows carry live stock figures.
+const IDB_NAME = 'proto-instore';
+const IDB_STORE = 'collection';
+const IDB_VERSION = 1;
+const IDB_KEY = 'approved-customer-v1';
+const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;
+
 const responseCache = new Map();
 let catalogueRequest = null;
 let catalogueProducts = null;
+
+function openCollectionDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      // A version release must not resurrect a collection shaped for older code.
+      else request.transaction.objectStore(IDB_STORE).clear();
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function readPersistedCollection() {
+  const db = await openCollectionDb();
+  if (!db) return null;
+  const entry = await new Promise((resolve) => {
+    const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => resolve(null);
+  });
+  db.close();
+  const age = Date.now() - Number(entry?.ts || 0);
+  if (!Array.isArray(entry?.data) || !entry.data.length) return null;
+  return Number.isFinite(age) && age >= 0 && age < PERSISTED_COLLECTION_MAX_AGE_MS ? entry.data : null;
+}
+
+async function writePersistedCollection(products) {
+  const db = await openCollectionDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).put({ data: products, ts: Date.now() }, IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
+}
+
+async function clearPersistedCollection() {
+  const db = await openCollectionDb();
+  if (!db) return;
+  await new Promise((resolve) => {
+    const transaction = db.transaction(IDB_STORE, 'readwrite');
+    transaction.objectStore(IDB_STORE).delete(IDB_KEY);
+    transaction.oncomplete = resolve;
+    transaction.onerror = resolve;
+    transaction.onabort = resolve;
+  });
+  db.close();
+}
 
 function storage() {
   try {
@@ -24,6 +89,7 @@ export function clearStoredInstoreResponses() {
   responseCache.clear();
   catalogueRequest = null;
   catalogueProducts = null;
+  void clearPersistedCollection().catch(() => {});
   const store = storage();
   if (!store) return;
   try {
@@ -119,14 +185,28 @@ export async function fetchExtendedRange(query = '', { signal, page = 1, categor
  * Returns null when it is not available. Callers must keep working from the
  * paged endpoint in that case.
  */
+async function fetchCollection() {
+  const data = await fetchExtendedRange('', { page: 1, includeCatalogue: true });
+  const products = Array.isArray(data?.catalogue) && data.catalogue.length ? data.catalogue : null;
+  if (products) {
+    catalogueProducts = products;
+    await writePersistedCollection(products).catch(() => {});
+  }
+  return products;
+}
+
 export function loadInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
   if (!catalogueRequest) {
-    catalogueRequest = fetchExtendedRange('', { page: 1, includeCatalogue: true })
-      .then((data) => {
-        const products = Array.isArray(data?.catalogue) ? data.catalogue : null;
-        catalogueProducts = products?.length ? products : null;
-        return catalogueProducts;
+    catalogueRequest = readPersistedCollection()
+      .catch(() => null)
+      .then((persisted) => {
+        if (!persisted) return fetchCollection();
+        // Use the stored collection at once so browsing is immediate, and
+        // refresh it behind the customer so the next view is current.
+        catalogueProducts = persisted;
+        void fetchCollection().catch(() => null);
+        return persisted;
       })
       .catch(() => null)
       .finally(() => { catalogueRequest = null; });
@@ -136,4 +216,28 @@ export function loadInstoreCatalogue() {
 
 export function instoreCatalogue() {
   return catalogueProducts;
+}
+
+/**
+ * Start loading the Instore collection during portal boot, the way
+ * prefetchCatalog() starts the main catalogue, so opening Instore Products is
+ * not the moment it gets downloaded.
+ *
+ * This is the entry point every caller should use: it waits for the browser to
+ * be idle so the download never competes with what is on screen, and it does
+ * nothing on a connection the customer is paying for by the megabyte. It
+ * resolves with the collection, or null when it is unavailable, so a page can
+ * join a load that is already running rather than starting a second one.
+ */
+export function prefetchInstoreCatalogue() {
+  if (catalogueProducts) return Promise.resolve(catalogueProducts);
+  if (catalogueRequest) return catalogueRequest;
+  const connection = typeof navigator === 'undefined' ? null : navigator.connection;
+  if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const start = () => resolve(loadInstoreCatalogue());
+    if (typeof window === 'undefined') start();
+    else if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
+    else window.setTimeout(start, 1500);
+  });
 }

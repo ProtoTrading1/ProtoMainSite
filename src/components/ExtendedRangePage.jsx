@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
-import { fetchExtendedRange, instoreCatalogue, loadInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
+import { fetchExtendedRange, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
 import { discoveryTiles } from '../../lib/instore-discovery.mjs';
 import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
 import './InstoreProducts.css';
@@ -71,27 +71,17 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     return () => controller.abort();
   }, [submittedQuery, page, retry, category, catalogue]);
 
-  // Fetched once per tab, and only after the first page is on screen and the
-  // browser is idle, so this never competes with the products the customer is
-  // waiting for. Skipped on a connection they are paying for by the megabyte.
+  // Portal boot already starts this collection, so usually it is in hand
+  // before this page is opened. Joining the same load covers a customer who
+  // arrives before it has finished, or whose boot prefetch did not run.
   useEffect(() => {
-    if (catalogue || loading || error || !products.length) return undefined;
-    const connection = typeof navigator === 'undefined' ? null : navigator.connection;
-    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return undefined;
+    if (catalogue) return undefined;
     let cancelled = false;
-    let idleHandle = null;
-    let timer = null;
-    const start = () => loadInstoreCatalogue().then((collection) => {
+    prefetchInstoreCatalogue().then((collection) => {
       if (!cancelled && collection) setCatalogue(collection);
     });
-    if (typeof window.requestIdleCallback === 'function') idleHandle = window.requestIdleCallback(start, { timeout: 3000 });
-    else timer = window.setTimeout(start, 1200);
-    return () => {
-      cancelled = true;
-      if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [catalogue, loading, error, products.length]);
+    return () => { cancelled = true; };
+  }, [catalogue, retry]);
 
   // The app router owns the hash. Mirroring its parsed browse value here
   // prevents a native category link from leaving this page on stale results.
