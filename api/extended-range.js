@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { instorePage } from '../lib/instore-page.mjs';
 import { readCompleteRows } from './_complete-rows.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
@@ -207,12 +208,10 @@ export async function serveStoredCatalogue(client, { query, category, page, from
     const [{ products, total }, catalogue] = await Promise.all([
       catalogueSearchPatterns(query).length
         ? readCatalogueSearchCandidates(client, { query, category }).then((candidates) => {
-          // The same matcher and the same ranking the live read applies. The
-          // database has only narrowed the collection to the stored tokens.
-          const filtered = candidates
-            .filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category))
-            .sort((left, right) => compareInstoreSearch(left, right, query));
-          return { products: filtered.slice(from, from + PAGE_SIZE), total: filtered.length };
+          // The same page definition the live read uses. The database has only
+          // narrowed the collection to the stored token matches first.
+          const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
+          return { products: view.products, total: view.total };
         })
         : readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE }),
       includeCatalogue ? readCatalogueProducts(client) : Promise.resolve(undefined),
@@ -328,8 +327,8 @@ export default async function handler(req, res) {
       })));
       const query = normalizeQuery(req.query?.q);
       const category = String(req.query?.category || '').trim();
-      const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
-      const from = (page - 1) * PAGE_SIZE;
+      const filtered = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
+      const from = filtered.from;
       const rowBySku = new Map(rows.map((row) => [String(row.sku || '').trim().toUpperCase(), row]));
       // Tile representatives come from the same positive-stock, priced
       // catalogue as the grid. Each is a current stock image, so it must pass
@@ -340,7 +339,7 @@ export default async function handler(req, res) {
         .map((tile) => rowBySku.get(tile.sku)).filter(Boolean);
       const [signedTiles, signedProducts] = await Promise.all([
         signPreviewImages(client, runId, tileRowsToSign),
-        signPreviewImages(client, runId, filtered.slice(from, from + PAGE_SIZE).map((product) => rowBySku.get(product.sku)).filter(Boolean)),
+        signPreviewImages(client, runId, filtered.products.map((product) => rowBySku.get(product.sku)).filter(Boolean)),
       ]);
       const tileImageBySku = new Map(signedTiles.map((row) => [String(row.sku || '').trim().toUpperCase(), row.image_url]));
       const tiles = tileCandidates.map(({ sku, image, ...tile }) => ({
@@ -352,8 +351,8 @@ export default async function handler(req, res) {
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({
         source: 'isolated Instore preview catalogue',
-        count: Math.min(PAGE_SIZE, Math.max(0, filtered.length - from)), page, pageSize: PAGE_SIZE,
-        total: filtered.length, tiles, products,
+        count: Math.min(PAGE_SIZE, Math.max(0, filtered.total - from)), page, pageSize: PAGE_SIZE,
+        total: filtered.total, tiles, products,
       });
     }
     const includeStaged = false;
@@ -385,15 +384,15 @@ export default async function handler(req, res) {
       })
       : getCachedCatalogue(includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
     const allEligible = live.products;
-    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+    const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
     if (claimed) await storeInstoreCatalogue(client, { ...live, tiles });
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Vary', 'Authorization');
     return res.status(200).json({
       source: SOURCE_LABEL,
-      count: Math.min(PAGE_SIZE, Math.max(0, filtered.length - from)), page, pageSize: PAGE_SIZE,
-      total: filtered.length, tiles, products: filtered.slice(from, from + PAGE_SIZE),
+      count: Math.min(PAGE_SIZE, Math.max(0, view.total - from)), page, pageSize: PAGE_SIZE,
+      total: view.total, tiles, products: view.products,
       // The first authenticated response includes the same already-verified
       // data used by this handler. The browser can then search and browse it
       // instantly without bypassing the stock, price, image, or duplicate gate.

@@ -27,6 +27,10 @@ export async function resetPassword(email) {
 }
 
 export async function signOut() {
+  // Browsing data cached for speed is dropped before the session ends, so
+  // nothing of one customer's session is left behind for the next.
+  const { clearStoredInstoreResponses } = await import('./extendedRange');
+  clearStoredInstoreResponses();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }

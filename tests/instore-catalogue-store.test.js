@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, discoveryTiles, instoreSearchTokens, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import {
   buildCatalogueRows, catalogueSearchPatterns, catalogueSearchTokens, catalogueSnapshotIsFresh,
   catalogueTtlMs, controlsFingerprint, writeCatalogueSnapshot,
 } from '../api/_instore-catalogue.js';
+import { instorePage } from '../lib/instore-page.mjs';
 import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-range.js';
 
 const PAGE_SIZE = 60;
@@ -213,6 +214,49 @@ test('the stored Instore collection answers browsing exactly as the live read do
     assert.equal(catalogue, undefined);
     assert.deepEqual(body, liveResponse(live.products, request), `identical response for ${JSON.stringify(request)}`);
   }
+});
+
+test('a view the browser answers from the cached collection is the served view', async () => {
+  const { client, live } = await seededClient();
+
+  // The browser fetches the whole collection once (?catalogue=1) and then
+  // answers searching, browsing and paging locally. That must be the same view
+  // the server would have returned for the same request.
+  const cached = (await serveStoredCatalogue(client, { query: '', category: '', page: 1, from: 0, includeCatalogue: true })).body.catalogue;
+  assert.deepEqual(cached, live.products);
+
+  for (const request of [
+    { query: '', category: '', page: 1 },
+    { query: '', category: '', page: 2 },
+    { query: '', category: 'Bracelets', page: 1 },
+    { query: 'silver', category: '', page: 1 },
+    { query: 'wood bracelet', category: '', page: 1 },
+    { query: 'bead', category: 'Beads & jewellery making', page: 1 },
+    { query: 'nosuchproduct', category: '', page: 1 },
+  ]) {
+    const from = (request.page - 1) * PAGE_SIZE;
+    const served = (await serveStoredCatalogue(client, { ...request, from })).body;
+    const local = instorePage(cached, { ...request, pageSize: PAGE_SIZE });
+    assert.deepEqual(local.products, served.products, `same products for ${JSON.stringify(request)}`);
+    assert.equal(local.total, served.total, `same total for ${JSON.stringify(request)}`);
+    assert.equal(local.from, from);
+  }
+});
+
+test('classification and tokens are memoised per product without changing an outcome', () => {
+  const product = {
+    sku: '8618100133', barcode: '', name: 'BRACELET WOODEN BEADS', title: 'BRACELET WOODEN BEADS',
+    originalDescription: 'BRACELET WOODEN BEADS', category: 'string beads',
+  };
+  const twin = { ...product };
+  assert.equal(discoveryGroup(product), discoveryGroup(twin));
+  assert.equal(discoveryGroup(product), 'Bracelets');
+  // A second read of the same object is the same answer, and a separate object
+  // with the same fields is classified independently to the same answer.
+  assert.equal(discoveryGroup(product), 'Bracelets');
+  assert.deepEqual(instoreSearchTokens(product), instoreSearchTokens(twin));
+  assert.equal(matchesInstoreSearch(product, 'wood'), true);
+  assert.equal(matchesInstoreSearch(twin, 'wood'), true);
 });
 
 test('the stored ?catalogue=1 payload keeps the whole collection in its live order', async () => {

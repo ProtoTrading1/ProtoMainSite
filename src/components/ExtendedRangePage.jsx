@@ -1,18 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
-import { fetchExtendedRange } from '../lib/extendedRange';
-import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../../lib/instore-discovery.mjs';
+import { fetchExtendedRange, instoreCatalogue, loadInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
+import { discoveryTiles } from '../../lib/instore-discovery.mjs';
+import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
-function localPage(catalogue, query, category, page) {
- const products = catalogue.filter((product) => matchesInstoreSearch(product, query)
-    && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
-  const from = (page - 1) * 60;
-  return { products: products.slice(from, from + 60), total: products.length, tiles: discoveryTiles(catalogue) };
-}
+const PAGE_SIZE = INSTORE_PAGE_SIZE;
 
 export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange }) {
   const [query, setQuery] = useState('');
@@ -20,8 +16,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [page, setPage] = useState(1);
   const [retry, setRetry] = useState(0);
   const [products, setProducts] = useState([]);
-  const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: 60 });
+  const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE });
   const [tiles, setTiles] = useState([]);
+  // The complete collection, once it has been fetched in the background. While
+  // it is held, every search, category and page is answered without a request.
+  const [catalogue, setCatalogue] = useState(() => instoreCatalogue());
   // Beads stays the first browse tile, but opening the page must show the
   // complete collection rather than silently applying that tile as a filter.
   const [category, setCategory] = useState(browseCategory);
@@ -31,20 +30,68 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const resultsRef = useRef(null);
   const searchRef = useRef(null);
 
+  const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
+
+  // Once the collection is in memory, a search, a category tile or a page
+  // button is answered here: no request, no spinner.
   useEffect(() => {
+    if (!catalogue) return;
+    // instorePage is the API's own page definition, applied to the same
+    // already-verified products it sent, so a locally answered view is the
+    // view the server would have returned.
+    const view = instorePage(catalogue, { query: submittedQuery, category, page, pageSize: PAGE_SIZE });
+    setProducts(view.products);
+    setTiles(localTiles || []);
+    setMeta({ total: view.total, page, pageSize: PAGE_SIZE });
+    setError(false);
+    setLoading(false);
+  }, [catalogue, localTiles, submittedQuery, category, page]);
+
+  useEffect(() => {
+    if (catalogue) return undefined;
     const controller = new AbortController();
-    setLoading(true); setError(false);
+    const apply = (data) => {
+      setProducts(Array.isArray(data?.products) ? data.products : []);
+      setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
+      setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || PAGE_SIZE) });
+    };
+    // A view this tab has already seen is painted at once and replaced as soon
+    // as the fresh response lands, so returning to Instore Products does not
+    // start again from an empty grid.
+    const stored = storedExtendedRange(submittedQuery, { page, category });
+    if (stored) apply(stored);
+    setLoading(!stored); setError(false);
     fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
       .then((data) => {
         if (controller.signal.aborted) return;
-        setProducts(Array.isArray(data?.products) ? data.products : []);
-        setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
-        setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || 60) });
+        apply(data);
       })
-      .catch(() => { if (!controller.signal.aborted) setError(true); })
+      .catch(() => { if (!controller.signal.aborted && !stored) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedQuery, page, retry, category]);
+  }, [submittedQuery, page, retry, category, catalogue]);
+
+  // Fetched once per tab, and only after the first page is on screen and the
+  // browser is idle, so this never competes with the products the customer is
+  // waiting for. Skipped on a connection they are paying for by the megabyte.
+  useEffect(() => {
+    if (catalogue || loading || error || !products.length) return undefined;
+    const connection = typeof navigator === 'undefined' ? null : navigator.connection;
+    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return undefined;
+    let cancelled = false;
+    let idleHandle = null;
+    let timer = null;
+    const start = () => loadInstoreCatalogue().then((collection) => {
+      if (!cancelled && collection) setCatalogue(collection);
+    });
+    if (typeof window.requestIdleCallback === 'function') idleHandle = window.requestIdleCallback(start, { timeout: 3000 });
+    else timer = window.setTimeout(start, 1200);
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null) window.cancelIdleCallback?.(idleHandle);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [catalogue, loading, error, products.length]);
 
   // The app router owns the hash. Mirroring its parsed browse value here
   // prevents a native category link from leaving this page on stale results.
