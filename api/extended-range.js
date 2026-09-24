@@ -3,13 +3,17 @@ import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { readCompleteRows } from './_complete-rows.js';
+import {
+  catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
+  controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
+  readCatalogueSearchCandidates, readCatalogueState, releaseCatalogueRefresh, writeCatalogueSnapshot,
+} from './_instore-catalogue.js';
+
+export { readCompleteRows };
 
 const PAGE_SIZE = 60;
 const MAX_PAGE = 10_000;
-// The Positill index currently contains more than 40,000 sellable codes.
-// Keep a finite guardrail against an accidental unbounded read, but do not
-// mistake a complete catalogue of that size for a partial response.
-const MAX_COMPLETE_CATALOGUE_ROWS = 100_000;
 // Instore is intentionally a high-availability collection. Small residual
 // quantities create disappointing customer journeys, so do not show an item
 // until there are at least ten units available to sell.
@@ -21,6 +25,7 @@ const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
 // avoids re-reading thousands of rows on every search or category click.
 const CATALOGUE_CACHE_TTL_MS = 30_000;
 const catalogueCache = new Map();
+const SOURCE_LABEL = 'verified Instore image index with live stock eligibility';
 
 async function getCachedCatalogue(key, loader) {
   const now = Date.now();
@@ -39,33 +44,6 @@ async function getCachedCatalogue(key, loader) {
     });
   catalogueCache.set(key, { promise, expiresAt: 0 });
   return promise;
-}
-
-// Read every page before making an eligibility decision. A partial normal
-// catalogue read would make the "not already on main site" rule unsafe.
-export async function readCompleteRows(makeQuery, { allowChangingCount = false } = {}) {
-  const page = (offset) => makeQuery().order('sku', { ascending: true }).range(offset, offset + 999);
-  const first = await page(0);
-  if (first.error) throw new Error(`Catalogue lookup incomplete: ${first.error.message || 'initial query failed'}`);
-  if (!Array.isArray(first.data)) throw new Error('Catalogue lookup incomplete: initial data was not an array');
-  if (!Number.isInteger(first.count) || first.count < 0 || first.count > MAX_COMPLETE_CATALOGUE_ROWS) throw new Error(`Catalogue lookup incomplete: initial count ${String(first.count)}`);
-  if (first.count === 0) return [];
-
-  // We know the complete page count after the first request. Parallel page
-  // reads keep the preview below the browser's request timeout as the staged
-  // catalogue grows, without relaxing production's consistency requirement.
-  const pages = Math.ceil(first.count / 1000);
-  const remaining = await Promise.all(Array.from({ length: pages - 1 }, (_, index) => page((index + 1) * 1000)));
-  const responses = [first, ...remaining];
-  const invalidResponse = responses.find(({ data, error, count }) => error || !Array.isArray(data) || !Number.isInteger(count) || count < 0 || count > MAX_COMPLETE_CATALOGUE_ROWS || (!allowChangingCount && count !== first.count));
-  if (invalidResponse) {
-    if (invalidResponse.error) throw new Error(`Catalogue lookup incomplete: ${invalidResponse.error.message || 'page query failed'}`);
-    if (!Array.isArray(invalidResponse.data)) throw new Error('Catalogue lookup incomplete: page data was not an array');
-    throw new Error(`Catalogue lookup incomplete: page count ${String(invalidResponse.count)} did not match ${String(first.count)}`);
-  }
-  const rows = responses.flatMap(({ data }) => data);
-  if (!allowChangingCount && rows.length !== first.count) throw new Error('Catalogue lookup truncated');
-  return rows;
 }
 
 export function excludeMainCatalogueProducts(products, catalogueRows) {
@@ -158,6 +136,98 @@ export function applyInstoreImageControls(rows, controls, listingControls = new 
     image_control_status: controls?.get(String(row?.sku || '').trim().toUpperCase()) || 'visible',
     listing_control_status: listingControls?.get(String(row?.sku || '').trim().toUpperCase()) || 'visible',
   }));
+}
+
+// The complete live read: the Positill-backed source index, the main
+// catalogue duplicate index and the Instore controls, resolved into the
+// products a customer may see. This is the authoritative build; the stored
+// read model below is only ever a copy of its result.
+export async function loadLiveInstoreCatalogue(client, { includeStaged = false } = {}) {
+  // These two complete reads are independent. Fetch them concurrently so a
+  // large staged preview cannot spend its whole serverless response window
+  // waiting for the main-catalogue duplicate index to begin.
+  const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
+    readCompleteRows(() => client.from('extended_range_items')
+      .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
+      .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
+      .eq('image_review_status', 'verified')
+      .in('is_active', includeStaged ? [true, false] : [true])
+      .gt('price', 0)
+      .gte('available_stock', 0)
+      .like('image_url', 'https://%'), { allowChangingCount: includeStaged }),
+    readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
+    readInstoreImageControls(client),
+    readInstoreListingControls(client),
+  ]);
+  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls, listingControls), '', { includeStaged });
+  return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
+}
+
+export async function storeInstoreCatalogue(client, { products, tiles, imageControls, listingControls }) {
+  try {
+    await writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls });
+  } catch (error) {
+    // A cache that cannot be written must not fail a request that already has
+    // the correct products in hand.
+    console.error('instore catalogue snapshot not stored:', error?.message || error);
+    await releaseCatalogueRefresh(client, error?.message || 'snapshot not stored');
+  }
+}
+
+// Returns { body } when the stored read model can answer the request
+// completely. Otherwise body is null and staleBeforeMs says how old a snapshot
+// the live read that follows may leave in place: a snapshot built under
+// superseded Instore controls is rebuilt at once rather than waited out.
+export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
+  const ttlMs = catalogueTtlMs();
+  if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
+  let state;
+  let fingerprint;
+  try {
+    // The control tables are tiny and are read on every request, so hiding an
+    // Instore image or listing takes effect immediately rather than waiting
+    // for the stored collection to be rebuilt.
+    const [stateRow, imageControls, listingControls] = await Promise.all([
+      readCatalogueState(client),
+      readInstoreImageControls(client),
+      readInstoreListingControls(client),
+    ]);
+    state = stateRow;
+    fingerprint = controlsFingerprint(imageControls, listingControls);
+  } catch (error) {
+    console.error('instore catalogue snapshot unreadable:', error?.message || error);
+    return { body: null, staleBeforeMs: ttlMs };
+  }
+  if (!catalogueSnapshotIsFresh(state, fingerprint, ttlMs)) {
+    const supersededByControls = String(state?.controls_fingerprint || '') !== fingerprint;
+    return { body: null, staleBeforeMs: supersededByControls ? 0 : ttlMs };
+  }
+
+  try {
+    const [{ products, total }, catalogue] = await Promise.all([
+      catalogueSearchPatterns(query).length
+        ? readCatalogueSearchCandidates(client, { query, category }).then((candidates) => {
+          // The same matcher and the same ranking the live read applies. The
+          // database has only narrowed the collection to the stored tokens.
+          const filtered = candidates
+            .filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category))
+            .sort((left, right) => compareInstoreSearch(left, right, query));
+          return { products: filtered.slice(from, from + PAGE_SIZE), total: filtered.length };
+        })
+        : readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE }),
+      includeCatalogue ? readCatalogueProducts(client) : Promise.resolve(undefined),
+    ]);
+    return {
+      body: {
+        count: Math.min(PAGE_SIZE, Math.max(0, total - from)), page, pageSize: PAGE_SIZE,
+        total, tiles: state.tiles, products, catalogue,
+      },
+      staleBeforeMs: ttlMs,
+    };
+  } catch (error) {
+    console.error('instore catalogue snapshot unusable:', error?.message || error);
+    return { body: null, staleBeforeMs: ttlMs };
+  }
 }
 
 export function stockClient() {
@@ -288,37 +358,42 @@ export default async function handler(req, res) {
     }
     const includeStaged = false;
     const client = stockClient();
-    // These two complete reads are independent. Fetch them concurrently so a
-    // large staged preview cannot spend its whole serverless response window
-    // waiting for the main-catalogue duplicate index to begin.
-    const allEligible = await getCachedCatalogue(includeStaged ? 'preview' : 'production', async () => {
-      const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
-        readCompleteRows(() => client.from('extended_range_items')
-          .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
-          .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
-          .eq('image_review_status', 'verified')
-          .in('is_active', includeStaged ? [true, false] : [true])
-          .gt('price', 0)
-          .gte('available_stock', 0)
-          .like('image_url', 'https://%'), { allowChangingCount: includeStaged }),
-        readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
-        readInstoreImageControls(client),
-        readInstoreListingControls(client),
-      ]);
-      const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls, listingControls), '', { includeStaged });
-      return excludeMainCatalogueProducts(eligible, catalogue);
-    });
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
-    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
     const from = (page - 1) * PAGE_SIZE;
+
+    // The stored read model answers browsing from one small page instead of
+    // rebuilding the whole collection. It is only used while it is fresh and
+    // was built under the Instore controls currently in force; otherwise the
+    // live read below runs exactly as it always has.
+    const stored = await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
+    if (stored.body) {
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Vary', 'Authorization');
+      return res.status(200).json({ source: SOURCE_LABEL, ...stored.body });
+    }
+
+    // One caller rebuilds the stored collection; the rest just serve. Claiming
+    // before the read means the snapshot is written from source rows that were
+    // read now, not from a warm in-process copy of an earlier request's rows.
+    const claimed = await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
+    const live = await (claimed
+      ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
+        await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
+        throw error;
+      })
+      : getCachedCatalogue(includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
+    const allEligible = live.products;
+    const filtered = allEligible.filter((product) => matchesInstoreSearch(product, query) && (!category || discoveryGroup(product) === category)).sort((left, right) => compareInstoreSearch(left, right, query));
+    const tiles = discoveryTiles(allEligible);
+    if (claimed) await storeInstoreCatalogue(client, { ...live, tiles });
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Vary', 'Authorization');
     return res.status(200).json({
-      source: 'verified Instore image index with live stock eligibility',
+      source: SOURCE_LABEL,
       count: Math.min(PAGE_SIZE, Math.max(0, filtered.length - from)), page, pageSize: PAGE_SIZE,
-      total: filtered.length, tiles: discoveryTiles(allEligible), products: filtered.slice(from, from + PAGE_SIZE),
+      total: filtered.length, tiles, products: filtered.slice(from, from + PAGE_SIZE),
       // The first authenticated response includes the same already-verified
       // data used by this handler. The browser can then search and browse it
       // instantly without bypassing the stock, price, image, or duplicate gate.

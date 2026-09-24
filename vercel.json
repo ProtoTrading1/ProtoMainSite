@@ -87,8 +87,17 @@
       ]
     }
   ],
+  "crons": [
+    {
+      "path": "/api/instore-catalogue-refresh",
+      "schedule": "* * * * *"
+    }
+  ],
   "functions": {
     "api/extended-range.js": {
+      "maxDuration": 60
+    },
+    "api/instore-catalogue-refresh.js": {
       "maxDuration": 60
     },
     "api/send-order.js": {
