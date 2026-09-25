@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
-import { fetchExtendedRange, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
+import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
 import { discoveryTiles } from '../../lib/instore-discovery.mjs';
 import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
 import './InstoreProducts.css';
@@ -21,6 +21,10 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   // The complete collection, once it has been fetched in the background. While
   // it is held, every search, category and page is answered without a request.
   const [catalogue, setCatalogue] = useState(() => instoreCatalogue());
+  // Whether this browser's own store has been consulted yet. Nothing is
+  // requested from the network until it has: if the collection is already
+  // here, a paged request would be a round trip for data we hold.
+  const [localChecked, setLocalChecked] = useState(() => Boolean(instoreCatalogue()));
   // Beads stays the first browse tile, but opening the page must show the
   // complete collection rather than silently applying that tile as a filter.
   const [category, setCategory] = useState(browseCategory);
@@ -48,7 +52,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   }, [catalogue, localTiles, submittedQuery, category, page]);
 
   useEffect(() => {
-    if (catalogue) return undefined;
+    if (catalogue || !localChecked) return undefined;
     const controller = new AbortController();
     const apply = (data) => {
       setProducts(Array.isArray(data?.products) ? data.products : []);
@@ -69,7 +73,19 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       .catch(() => { if (!controller.signal.aborted && !stored) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [submittedQuery, page, retry, category, catalogue]);
+  }, [submittedQuery, page, retry, category, catalogue, localChecked]);
+
+  // Look in this browser's own store first. It is free and usually holds the
+  // collection, in which case this page renders with no request at all.
+  useEffect(() => {
+    if (catalogue) return undefined;
+    let cancelled = false;
+    hydrateInstoreCatalogue()
+      .then((local) => { if (!cancelled && local) setCatalogue(local); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLocalChecked(true); });
+    return () => { cancelled = true; };
+  }, [catalogue]);
 
   // Portal boot already starts this collection, so usually it is in hand
   // before this page is opened. Joining the same load covers a customer who

@@ -94,6 +94,42 @@ export async function readCatalogueState(client) {
   return data || null;
 }
 
+function hiddenControlMap(skus) {
+  return new Map((Array.isArray(skus) ? skus : [])
+    .map((sku) => [String(sku || '').trim().toUpperCase(), 'hidden']));
+}
+
+/**
+ * The whole answer for a landing or category page in one database round trip:
+ * the snapshot's freshness and tiles, the current hidden controls, the total,
+ * and the page of products. The caller still compares the controls against the
+ * fingerprint the snapshot was built under, exactly as it does when it reads
+ * the control tables itself, so a superseded snapshot is still refused.
+ */
+export async function readCatalogueView(client, { category = '', from = 0, pageSize = 60 } = {}) {
+  const { data, error } = await client.rpc('instore_catalogue_view', {
+    p_category: category, p_from: from, p_limit: pageSize,
+  });
+  if (error) throw new Error(`Instore catalogue view unavailable: ${error.message || 'rpc failed'}`);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Instore catalogue view was empty');
+  const total = Number(data.total);
+  if (!Number.isInteger(total) || total < 0) throw new Error('Instore catalogue view returned no total');
+  return {
+    state: {
+      refreshed_at: data.refreshed_at,
+      product_count: Number(data.product_count),
+      controls_fingerprint: String(data.controls_fingerprint || ''),
+      tiles: Array.isArray(data.tiles) ? data.tiles : null,
+    },
+    fingerprint: controlsFingerprint(
+      hiddenControlMap(data.hidden_image_skus),
+      hiddenControlMap(data.hidden_listing_skus),
+    ),
+    total,
+    products: Array.isArray(data.products) ? data.products : [],
+  };
+}
+
 // The landing page and a category view are the stored order, so the database
 // applies the paging and the count.
 export async function readCatalogueOrderedPage(client, { category = '', from = 0, pageSize = 60 } = {}) {

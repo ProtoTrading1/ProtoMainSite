@@ -95,8 +95,11 @@ export function prefetchCatalog() {
   // login paints without a loading pass.
   void fetchFeaturedCatalogProducts().catch(() => {});
   // Instore Products loads on the same boot, so opening it is not the moment
-  // it gets downloaded. It waits for the main catalogue payload first: the
-  // storefront's own products must never queue behind the extended range.
+  // it gets downloaded. Its stored copy is read immediately — that costs
+  // nothing and is what makes opening the section instant — while the download
+  // waits for the main catalogue payload, because the storefront's own products
+  // must never queue behind the extended range.
+  void import('./extendedRange').then((module) => module.hydrateInstoreCatalogue()).catch(() => {});
   void getAllCached()
     .catch(() => null)
     .then(() => import('./extendedRange'))

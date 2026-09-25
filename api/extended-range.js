@@ -8,7 +8,8 @@ import { readCompleteRows } from './_complete-rows.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
   controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
-  readCatalogueSearchCandidates, readCatalogueState, releaseCatalogueRefresh, writeCatalogueSnapshot,
+  readCatalogueSearchCandidates, readCatalogueState, readCatalogueView,
+  releaseCatalogueRefresh, writeCatalogueSnapshot,
 } from './_instore-catalogue.js';
 
 export { readCompleteRows };
@@ -182,6 +183,29 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
   const ttlMs = catalogueTtlMs();
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
+
+  // A landing or category page is the whole answer in one database round trip.
+  // Anything else — a search, or the full-collection payload — needs the reads
+  // below, and so does a database that has not had migration 072 applied.
+  if (!catalogueSearchPatterns(query).length && !includeCatalogue) {
+    try {
+      const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
+      if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
+        return {
+          body: {
+            count: Math.min(PAGE_SIZE, Math.max(0, view.total - from)), page, pageSize: PAGE_SIZE,
+            total: view.total, tiles: view.state.tiles, products: view.products, catalogue: undefined,
+          },
+          staleBeforeMs: ttlMs,
+        };
+      }
+      const supersededByControls = String(view.state.controls_fingerprint || '') !== view.fingerprint;
+      return { body: null, staleBeforeMs: supersededByControls ? 0 : ttlMs };
+    } catch (error) {
+      console.error('instore catalogue view unusable:', error?.message || error);
+    }
+  }
+
   let state;
   let fingerprint;
   try {

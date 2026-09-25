@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, instoreSearchTokens, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import {
   buildCatalogueRows, catalogueSearchPatterns, catalogueSearchTokens, catalogueSnapshotIsFresh,
-  catalogueTtlMs, controlsFingerprint, writeCatalogueSnapshot,
+  catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueView, writeCatalogueSnapshot,
 } from '../api/_instore-catalogue.js';
 import { instorePage } from '../lib/instore-page.mjs';
 import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-range.js';
@@ -146,6 +146,25 @@ function stubStockClient(tables) {
       });
       return { data: state(), error: null };
     }
+    if (name === 'instore_catalogue_view') {
+      const current = state();
+      const matching = rowsOf('instore_catalogue')
+        .filter((row) => !args.p_category || row.discovery_group === args.p_category)
+        .sort((left, right) => left.sort_index - right.sort_index);
+      return {
+        data: {
+          refreshed_at: current.refreshed_at,
+          product_count: current.product_count,
+          controls_fingerprint: current.controls_fingerprint,
+          tiles: current.tiles,
+          hidden_image_skus: rowsOf('instore_image_controls').filter((row) => row.status === 'hidden').map((row) => row.sku).sort(),
+          hidden_listing_skus: rowsOf('instore_listing_controls').filter((row) => row.status === 'hidden').map((row) => row.sku).sort(),
+          total: matching.length,
+          products: matching.slice(args.p_from, args.p_from + args.p_limit).map((row) => row.payload),
+        },
+        error: null,
+      };
+    }
     throw new Error(`unexpected rpc ${name}`);
   };
 
@@ -214,6 +233,50 @@ test('the stored Instore collection answers browsing exactly as the live read do
     assert.equal(catalogue, undefined);
     assert.deepEqual(body, liveResponse(live.products, request), `identical response for ${JSON.stringify(request)}`);
   }
+});
+
+test('the one-call landing read returns exactly what the separate reads return', async () => {
+  const { client, live } = await seededClient();
+
+  for (const request of [
+    { query: '', category: '', page: 1 },
+    { query: '', category: '', page: 2 },
+    { query: '', category: '', page: 3 },
+    { query: '', category: 'Bracelets', page: 1 },
+    { query: '', category: 'Soft toys', page: 1 },
+    { query: '', category: 'Nothing here', page: 1 },
+    // A page past the end is a real request: an empty page, not a wrong total.
+    { query: '', category: 'Bracelets', page: 9 },
+  ]) {
+    const from = (request.page - 1) * PAGE_SIZE;
+    const view = await readCatalogueView(client, { category: request.category, from, pageSize: PAGE_SIZE });
+    const separate = await readCatalogueOrderedPage(client, { category: request.category, from, pageSize: PAGE_SIZE });
+    assert.deepEqual(view.products, separate.products, `same products for ${JSON.stringify(request)}`);
+    assert.equal(view.total, separate.total, `same total for ${JSON.stringify(request)}`);
+    // And the whole served body is still the live read's body.
+    const served = (await serveStoredCatalogue(client, { ...request, from })).body;
+    assert.deepEqual(served, { ...liveResponse(live.products, request), catalogue: undefined });
+  }
+});
+
+test('the one-call read derives the same control fingerprint from the SKUs it returns', async () => {
+  const { client } = await seededClient();
+  const view = await readCatalogueView(client, { from: 0, pageSize: PAGE_SIZE });
+  // No controls are set, so the snapshot's fingerprint must match what the
+  // returned (empty) hidden lists produce.
+  assert.equal(view.fingerprint, view.state.controls_fingerprint);
+  assert.equal(catalogueSnapshotIsFresh(view.state, view.fingerprint, 150_000), true);
+});
+
+test('a superseded snapshot is refused by the one-call read too', async () => {
+  const { client, live } = await seededClient();
+  const changed = await stubbedControls(client, 'instore_listing_controls', [{ sku: live.products[2].sku, status: 'hidden' }]);
+  const view = await readCatalogueView(changed, { from: 0, pageSize: PAGE_SIZE });
+  assert.notEqual(view.fingerprint, view.state.controls_fingerprint);
+  assert.equal(catalogueSnapshotIsFresh(view.state, view.fingerprint, 150_000), false);
+  const stored = await serveStoredCatalogue(changed, { query: '', category: '', page: 1, from: 0 });
+  assert.equal(stored.body, null);
+  assert.equal(stored.staleBeforeMs, 0);
 });
 
 test('a view the browser answers from the cached collection is the served view', async () => {

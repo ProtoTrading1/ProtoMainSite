@@ -1,4 +1,6 @@
 import { authenticatedGetJson } from './authHeaders';
+import { preloadProductImages } from './imageUrl';
+import { instorePage } from '../../lib/instore-page.mjs';
 import {
   RESPONSE_CACHE_TTL_MS, STORAGE_KEY_PREFIX, STORED_RESPONSE_LIMIT,
   STORED_RESPONSE_MAX_BYTES, instoreRequestKey, storedResponseIsUsable,
@@ -13,10 +15,14 @@ const IDB_STORE = 'collection';
 const IDB_VERSION = 1;
 const IDB_KEY = 'approved-customer-v1';
 const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;
+// Roughly the first screen of cards, rather than the main catalogue's 60: the
+// rest arrive lazily as the customer scrolls.
+const LANDING_IMAGE_PRELOAD = 24;
 
 const responseCache = new Map();
 let catalogueRequest = null;
 let catalogueProducts = null;
+let hydration = null;
 
 function openCollectionDb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
@@ -89,6 +95,7 @@ export function clearStoredInstoreResponses() {
   responseCache.clear();
   catalogueRequest = null;
   catalogueProducts = null;
+  hydration = null;
   void clearPersistedCollection().catch(() => {});
   const store = storage();
   if (!store) return;
@@ -185,32 +192,57 @@ export async function fetchExtendedRange(query = '', { signal, page = 1, categor
  * Returns null when it is not available. Callers must keep working from the
  * paged endpoint in that case.
  */
+// The images the customer sees first, warmed the way the main catalogue warms
+// its own card thumbnails, so the grid is populated rather than filling in.
+function preloadLandingImages(products) {
+  if (!products?.length) return;
+  const landing = instorePage(products, { pageSize: LANDING_IMAGE_PRELOAD });
+  preloadProductImages(landing.products.map((product) => product.image), { limit: LANDING_IMAGE_PRELOAD });
+}
+
 async function fetchCollection() {
   const data = await fetchExtendedRange('', { page: 1, includeCatalogue: true });
   const products = Array.isArray(data?.catalogue) && data.catalogue.length ? data.catalogue : null;
   if (products) {
     catalogueProducts = products;
+    preloadLandingImages(products);
     await writePersistedCollection(products).catch(() => {});
   }
   return products;
 }
 
-export function loadInstoreCatalogue() {
+/**
+ * The collection from this browser's own store. No network and no waiting for
+ * an idle moment: reading it is free, and it is what makes opening Instore
+ * Products immediate rather than a request.
+ */
+export function hydrateInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
-  if (!catalogueRequest) {
-    catalogueRequest = readPersistedCollection()
-      .catch(() => null)
+  if (!hydration) {
+    hydration = readPersistedCollection()
       .then((persisted) => {
-        if (!persisted) return fetchCollection();
-        // Use the stored collection at once so browsing is immediate, and
-        // refresh it behind the customer so the next view is current.
-        catalogueProducts = persisted;
-        void fetchCollection().catch(() => null);
-        return persisted;
+        if (persisted && !catalogueProducts) {
+          catalogueProducts = persisted;
+          preloadLandingImages(persisted);
+        }
+        return catalogueProducts;
       })
-      .catch(() => null)
-      .finally(() => { catalogueRequest = null; });
+      .catch(() => null);
   }
+  return hydration;
+}
+
+function fetchWhenIdle() {
+  if (catalogueRequest) return catalogueRequest;
+  const connection = typeof navigator === 'undefined' ? null : navigator.connection;
+  // Nothing optional on a connection the customer pays for by the megabyte.
+  if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return Promise.resolve(catalogueProducts);
+  catalogueRequest = new Promise((resolve) => {
+    const start = () => resolve(fetchCollection().catch(() => null));
+    if (typeof window === 'undefined') start();
+    else if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
+    else window.setTimeout(start, 1200);
+  }).finally(() => { catalogueRequest = null; });
   return catalogueRequest;
 }
 
@@ -223,21 +255,18 @@ export function instoreCatalogue() {
  * prefetchCatalog() starts the main catalogue, so opening Instore Products is
  * not the moment it gets downloaded.
  *
- * This is the entry point every caller should use: it waits for the browser to
- * be idle so the download never competes with what is on screen, and it does
- * nothing on a connection the customer is paying for by the megabyte. It
- * resolves with the collection, or null when it is unavailable, so a page can
- * join a load that is already running rather than starting a second one.
+ * The local copy is read straight away and returned if it is there; the
+ * download only ever happens on an idle browser, and is a background refresh
+ * when a local copy already answered. Resolves with the collection, or null,
+ * so a page can join a load already running instead of starting a second one.
  */
 export function prefetchInstoreCatalogue() {
-  if (catalogueProducts) return Promise.resolve(catalogueProducts);
-  if (catalogueRequest) return catalogueRequest;
-  const connection = typeof navigator === 'undefined' ? null : navigator.connection;
-  if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const start = () => resolve(loadInstoreCatalogue());
-    if (typeof window === 'undefined') start();
-    else if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
-    else window.setTimeout(start, 1500);
+  return hydrateInstoreCatalogue().then((local) => {
+    if (local) {
+      // Refresh behind the customer so the next view is current.
+      void fetchWhenIdle();
+      return local;
+    }
+    return fetchWhenIdle();
   });
 }

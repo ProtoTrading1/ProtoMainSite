@@ -71,8 +71,9 @@ test('the page answers locally once it holds the collection, and prefetches out 
   // The server's own page definition, not a second copy of the rules.
   assert.match(page, /import \{ INSTORE_PAGE_SIZE, instorePage \} from '\.\.\/\.\.\/lib\/instore-page\.mjs'/);
   assert.match(page, /const view = instorePage\(catalogue, \{ query: submittedQuery, category, page, pageSize: PAGE_SIZE \}\)/);
-  // No request is made while the collection is held.
-  assert.match(page, /if \(catalogue\) return undefined;\s*const controller = new AbortController\(\)/);
+  // No request is made while the collection is held, nor before this browser's
+  // own store has been consulted.
+  assert.match(page, /if \(catalogue \|\| !localChecked\) return undefined;\s*const controller = new AbortController\(\)/);
   // A previously seen view is painted before the network answers.
   assert.match(page, /const stored = storedExtendedRange\(submittedQuery, \{ page, category \}\)/);
   assert.match(page, /setLoading\(!stored\)/);
@@ -102,6 +103,58 @@ test('the Instore collection is loaded during portal boot, like the main catalog
   assert.match(range, /if \(catalogueRequest\) return catalogueRequest;/);
 });
 
+test('the local copy is read at once, and only the download waits for idle', async () => {
+  const [range, products] = await Promise.all([
+    readSource('src/lib/extendedRange.js'),
+    readSource('src/lib/products.js'),
+  ]);
+
+  // Reading our own store is free, so it must not sit behind requestIdleCallback.
+  assert.match(range, /export function hydrateInstoreCatalogue\(\)/);
+  const hydrate = range.slice(range.indexOf('export function hydrateInstoreCatalogue'), range.indexOf('function fetchWhenIdle'));
+  assert.doesNotMatch(hydrate, /requestIdleCallback|setTimeout/);
+  // Only the network download is deferred and connection-guarded.
+  assert.match(range, /function fetchWhenIdle\(\)[\s\S]*requestIdleCallback/);
+  assert.match(range, /function fetchWhenIdle\(\)[\s\S]*connection\?\.saveData/);
+  // Boot reads the local copy immediately; only the download queues behind the
+  // main catalogue.
+  assert.match(products, /module\.hydrateInstoreCatalogue\(\)/);
+  assert.match(products, /void getAllCached\(\)\s*\.catch\(\(\) => null\)\s*\.then\(\(\) => import\('\.\/extendedRange'\)\)\s*\.then\(\(module\) => module\.prefetchInstoreCatalogue\(\)\)/);
+});
+
+test('the first screen of Instore images is warmed like the main catalogue warms its own', async () => {
+  const range = await readSource('src/lib/extendedRange.js');
+  assert.match(range, /import \{ preloadProductImages \} from '\.\/imageUrl'/);
+  // Warmed from both the stored copy and a fresh download.
+  assert.match(range, /preloadLandingImages\(persisted\)/);
+  assert.match(range, /preloadLandingImages\(products\)/);
+  // The landing order the customer actually sees, not an arbitrary slice.
+  assert.match(range, /instorePage\(products, \{ pageSize: LANDING_IMAGE_PRELOAD \}\)/);
+  // About a screenful, not the main catalogue's 60.
+  assert.match(range, /const LANDING_IMAGE_PRELOAD = 24;/);
+});
+
+test('the page makes no request until this browser\'s own store has been consulted', async () => {
+  const page = await readSource('src/components/ExtendedRangePage.jsx');
+  assert.match(page, /if \(catalogue \|\| !localChecked\) return undefined;/);
+  assert.match(page, /hydrateInstoreCatalogue\(\)[\s\S]*setLocalChecked\(true\)/);
+});
+
+test('a landing page is one database round trip, and the rest still are not', async () => {
+  const [api, store] = await Promise.all([
+    readSource('api/extended-range.js'),
+    readSource('api/_instore-catalogue.js'),
+  ]);
+  assert.match(store, /export async function readCatalogueView\(/);
+  // Used only where it is the whole answer.
+  assert.match(api, /if \(!catalogueSearchPatterns\(query\)\.length && !includeCatalogue\) \{/);
+  // A database without migration 072, or any other failure, falls through to
+  // the reads it replaces rather than failing the request.
+  assert.match(api, /console\.error\('instore catalogue view unusable:'[\s\S]*\n\s*\}\s*\n\s*\}/);
+  // The freshness and control rules are the same ones, not a second copy.
+  assert.match(api, /catalogueSnapshotIsFresh\(view\.state, view\.fingerprint, ttlMs\)/);
+});
+
 test('the collection survives a reload without downloading again', async () => {
   const range = await readSource('src/lib/extendedRange.js');
 
@@ -112,8 +165,10 @@ test('the collection survives a reload without downloading again', async () => {
   // A much shorter window than the main catalogue's 24 hours, because these
   // rows carry live stock figures.
   assert.match(range, /const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;/);
-  // A stored collection is used at once and refreshed behind the customer.
-  assert.match(range, /catalogueProducts = persisted;\s*\n\s*void fetchCollection\(\)/);
+  // A stored collection is adopted as soon as it is read...
+  assert.match(range, /if \(persisted && !catalogueProducts\) \{\s*\n\s*catalogueProducts = persisted;/);
+  // ...and refreshed behind the customer rather than awaited.
+  assert.match(range, /if \(local\) \{[\s\S]*void fetchWhenIdle\(\);\s*\n\s*return local;/);
   // Nothing stale, nothing shaped for older code, and nothing left at sign-out.
   assert.match(range, /if \(!Array\.isArray\(entry\?\.data\) \|\| !entry\.data\.length\) return null;/);
   assert.match(range, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
