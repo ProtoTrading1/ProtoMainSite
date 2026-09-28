@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import process from 'node:process';
 
-const port = 4173;
+const port = Number(process.env.PROTO_E2E_PORT) || 4173;
 
 export default defineConfig({
   testDir: './e2e',

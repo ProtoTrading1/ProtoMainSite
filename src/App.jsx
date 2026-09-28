@@ -6,6 +6,8 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
+import { fetchExtendedRange, instoreCatalogue } from './lib/extendedRange';
+import { instorePage } from '../lib/instore-page.mjs';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -257,6 +259,8 @@ export default function App({
   // re-renders this component (and the whole product grid) per keystroke — that
   // was the "typing is extremely slow" cause.
   const [searchQuery, setSearchQuery] = useState('');
+  const [instoreSearch, setInstoreSearch] = useState({ query: '', products: [], total: 0, loading: false, error: false });
+  const [instoreSearchTerm, setInstoreSearchTerm] = useState('');
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
 
@@ -273,6 +277,17 @@ export default function App({
 
   const goAllProducts = useCallback(() => {
     navigate([]);
+  }, [navigate]);
+
+  const openInstoreSearch = useCallback((term) => {
+    if (!instoreAvailable) return;
+    setInstoreSearchTerm(String(term || '').trim());
+    navigate(['instore-products']);
+  }, [navigate]);
+
+  const openInstoreBrowse = useCallback(() => {
+    setInstoreSearchTerm('');
+    navigate(['instore-products']);
   }, [navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
@@ -1116,6 +1131,34 @@ export default function App({
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
   }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
+
+  // Main search also discovers the same reviewed, Positill-backed Instore
+  // products as the dedicated collection. Never query the raw photo folder.
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!instoreAvailable || query.length < 2) {
+      setInstoreSearch({ query: '', products: [], total: 0, loading: false, error: false });
+      return undefined;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    setInstoreSearch({ query, products: [], total: 0, loading: true, error: false });
+    const timer = window.setTimeout(async () => {
+      try {
+        const catalogue = instoreCatalogue();
+        const result = catalogue
+          ? instorePage(catalogue, { query, pageSize: 12 })
+          : await fetchExtendedRange(query, { signal: controller.signal, page: 1 });
+        if (!cancelled) setInstoreSearch({
+          query, products: (result.products || []).slice(0, 12), total: Number(result.total) || 0,
+          loading: false, error: false,
+        });
+      } catch {
+        if (!cancelled) setInstoreSearch({ query, products: [], total: 0, loading: false, error: true });
+      }
+    }, 250);
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timer); };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -1983,7 +2026,9 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
-        onInstoreProducts={() => navigate(['instore-products'])}
+        onInstoreProducts={openInstoreBrowse}
+        instoreSearch={instoreSearch}
+        onInstoreSearch={openInstoreSearch}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
@@ -1998,7 +2043,7 @@ export default function App({
             path={path}
             navigate={navigate}
             onAllProducts={goAllProducts}
-            onInstoreProducts={() => navigate(['instore-products'])}
+            onInstoreProducts={openInstoreBrowse}
             setRefinement={setRefinement}
             counts={counts}
             customer={customer}
@@ -2007,6 +2052,7 @@ export default function App({
 
         <main className="content-area">
           {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
+            initialQuery={instoreSearchTerm}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}
@@ -2049,6 +2095,8 @@ export default function App({
             onProductPreview={handleProductPreview}
             inStockOnly={inStockOnly}
             searchActive={Boolean(searchQuery.trim())}
+            instoreSearch={instoreSearch}
+            onViewAllInstore={openInstoreSearch}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}

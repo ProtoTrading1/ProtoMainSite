@@ -10,9 +10,9 @@ import './InstoreDisclaimer.css';
 
 const PAGE_SIZE = INSTORE_PAGE_SIZE;
 
-export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange }) {
-  const [query, setQuery] = useState('');
-  const [submittedQuery, setSubmittedQuery] = useState('');
+export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange, initialQuery = '' }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const [page, setPage] = useState(1);
   const [retry, setRetry] = useState(0);
   const [products, setProducts] = useState([]);
@@ -35,6 +35,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const searchRef = useRef(null);
 
   const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+    setSubmittedQuery(initialQuery);
+    if (initialQuery) { setCategory(''); setPage(1); }
+  }, [initialQuery]);
 
   // Once the collection is in memory, a search, a category tile or a page
   // button is answered here: no request, no spinner.
@@ -108,8 +114,6 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   }, [browseCategory]);
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
-  const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
-
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
   const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };

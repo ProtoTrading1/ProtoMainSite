@@ -45,7 +45,7 @@ function tokenFor(user) {
   return `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: user.id, email: user.email, exp: now + 3600 })}.e2e`;
 }
 
-function installSyntheticServices(context, accountCart, safety, products = catalogue) {
+function installSyntheticServices(context, accountCart, safety, products = catalogue, instoreProducts = []) {
   return context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -135,6 +135,18 @@ function installSyntheticServices(context, accountCart, safety, products = catal
     }
 
     if (pathname === '/api/products') return json(route, products);
+    if (pathname === '/api/extended-range') {
+      const term = String(url.searchParams.get('q') || '').toLowerCase();
+      const matches = instoreProducts.filter((item) => !term || `${item.name} ${item.sku}`.toLowerCase().includes(term));
+      return json(route, {
+        products: matches,
+        total: matches.length,
+        page: 1,
+        pageSize: 60,
+        catalogue: url.searchParams.has('catalogue') ? instoreProducts : undefined,
+        tiles: [],
+      });
+    }
     if (pathname === '/api/featured-products') {
       return json(route, { items: products.map(({ sku }) => ({ sku })) });
     }
@@ -186,6 +198,64 @@ test('closing a product preview preserves the catalogue scroll position', async 
     await expect(page.getByRole('dialog')).toBeHidden();
 
     await expect.poll(() => content.evaluate((element) => element.scrollTop)).toBe(before);
+  } finally {
+    await context.close();
+  }
+});
+
+test('main search finds reviewed Instore products without a menu category', async ({ browser }) => {
+  const visor = {
+    ...product('8626000775', 'Car Visor Organiser', 39.13),
+    isExtendedRange: true,
+    categoryPath: [],
+    image: 'https://example.test/visor.jpg',
+  };
+  const accountCart = { created: true, items: [line(legacyProduct, 1)], activityAt: Date.now(), revision: 1 };
+  const safety = { authRequests: 0, destructiveRequests: [] };
+  const context = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+  await installSyntheticServices(context, accountCart, safety, catalogue, [visor]);
+  const page = await context.newPage();
+  await seedLegacyBrowserBasket(page, accountCart.items);
+
+  try {
+    await signIn(page);
+    const search = page.locator('.header-search-premium__input');
+    await search.fill('visor');
+    await search.press('Enter');
+    const instoreResults = page.locator('.unified-instore-results');
+    await expect(instoreResults.getByText('Car Visor Organiser')).toBeVisible();
+    await expect(instoreResults.getByRole('button', { name: /View all 1 Instore matches/ })).toBeVisible();
+    await instoreResults.getByRole('button', { name: /View all 1 Instore matches/ }).click();
+    await expect(page.locator('#instore-search')).toHaveValue('visor');
+    await expect(page.getByText('Car Visor Organiser').first()).toBeVisible();
+    await search.fill('visor');
+    await expect(page.locator('.header-search-dropdown').getByText('Car Visor Organiser')).toBeVisible();
+    await search.press('Enter');
+    await expect(page.locator('.unified-instore-results').getByText('Car Visor Organiser')).toBeVisible();
+    expect(safety.destructiveRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
+test('mobile main search finds an Instore-only product', async ({ browser }) => {
+  const visor = { ...product('8626000775', 'Car Visor Organiser', 39.13), isExtendedRange: true };
+  const accountCart = { created: true, items: [line(legacyProduct, 1)], activityAt: Date.now(), revision: 1 };
+  const safety = { authRequests: 0, destructiveRequests: [] };
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await installSyntheticServices(context, accountCart, safety, catalogue, [visor]);
+  const page = await context.newPage();
+  await seedLegacyBrowserBasket(page, accountCart.items);
+
+  try {
+    await signIn(page);
+    await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search' }).click();
+    const search = page.locator('.mobile-action-search-drop input[type="search"]');
+    await search.fill('visor');
+    await expect(page.locator('.mobile-search-results').getByText('Car Visor Organiser')).toBeVisible();
+    await search.press('Enter');
+    await expect(page.locator('.unified-instore-results').getByText('Car Visor Organiser')).toBeVisible();
+    expect(safety.destructiveRequests).toEqual([]);
   } finally {
     await context.close();
   }

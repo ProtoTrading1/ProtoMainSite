@@ -269,6 +269,7 @@ function SearchProductResult({
             <span className={`sp-stock-badge sp-stock-badge--${stock.tone}`}>{stock.label}</span>
             {packLabel && <span>{packLabel}</span>}
             {product.isNew && <span className="sp-new-badge">New</span>}
+            {product.isExtendedRange && <span className="sp-new-badge">Instore</span>}
             {previouslyOrdered && <span className="sp-reorder-badge">Previously ordered</span>}
           </span>
         </div>
@@ -540,6 +541,7 @@ export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
+  instoreSearch = { query: '', products: [], loading: false }, onInstoreSearch,
   previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
 }) {
@@ -759,9 +761,13 @@ export default function Header({
     liftSearch(val);
   };
 
+  const instoreMatchesFor = (term) => instoreSearch.query.toLowerCase() === term.trim().toLowerCase()
+    ? instoreSearch.products.slice(0, 8) : [];
+  const desktopSuggestions = [...suggestions.slice(0, 12), ...instoreMatchesFor(inputValue)];
+
   const keyboardItems = [
     ...catMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
-    ...suggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+    ...desktopSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
   ];
   const activeDesktopItem = activeIdx >= 0 ? keyboardItems[activeIdx] : null;
   const activeDesktopItemId = activeDesktopItem ? `${desktopListboxId}-${activeDesktopItem.id}` : undefined;
@@ -799,6 +805,11 @@ export default function Header({
   }, [searchOpen, activeDesktopItemId]);
 
   const pickProduct = (p) => {
+    if (p.isExtendedRange && onInstoreSearch) {
+      onInstoreSearch(p.sku || p.code || p.name);
+      closeSearch();
+      return;
+    }
     const directCode = isIdentifierQuery(inputValue)
       ? (p.websiteSku || p.sku || p.code || inputValue)
       : p.name;
@@ -845,6 +856,7 @@ export default function Header({
   const [mobileSuggestions, setMobileSuggestions] = useState([]);
   const [mobileCatMatches, setMobileCatMatches] = useState([]);
   const [mobileInput, setMobileInput] = useState('');
+  const mobileCombinedSuggestions = [...mobileSuggestions.slice(0, 8), ...instoreMatchesFor(mobileInput)];
   const mobileSearchInputRef = useRef(null);
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
@@ -926,7 +938,7 @@ export default function Header({
   };
   const mobileKeyboardItems = [
     ...mobileCatMatches.map((cat) => ({ type: 'cat', id: `cat-${cat.id}`, cat })),
-    ...mobileSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
+    ...mobileCombinedSuggestions.map((product) => ({ type: 'product', id: `product-${product.id}`, product })),
   ];
   const activeMobileItem = mobileActiveIdx >= 0 ? mobileKeyboardItems[mobileActiveIdx] : null;
   const activeMobileItemId = activeMobileItem ? `${mobileListboxId}-${activeMobileItem.id}` : undefined;
@@ -1062,7 +1074,7 @@ export default function Header({
             <div className="header-search-dropdown">
               <SearchPanel
                 query={inputValue}
-                suggestions={suggestions}
+                suggestions={desktopSuggestions}
                 catMatches={catMatches}
                 activeItemId={activeDesktopItemId}
                 listboxId={desktopListboxId}
@@ -1080,7 +1092,9 @@ export default function Header({
                   setShowRequest(true);
                 }}
                 previousOrderCodes={previousOrderCodes}
-                searchState={desktopSearchState}
+                searchState={desktopSearchState === 'ready' && desktopSuggestions.length === 0 && instoreAvailable
+                  && inputValue.trim().length >= 2 && instoreSearch.query.toLowerCase() !== inputValue.trim().toLowerCase()
+                  ? 'loading' : desktopSearchState}
                 onRetry={() => scheduleSuggestions(inputValue)}
               />
             </div>
@@ -1306,7 +1320,7 @@ export default function Header({
               </button>
             );
           })}
-          {mobileSuggestions.map((p) => {
+          {mobileCombinedSuggestions.map((p) => {
             const optionId = `${mobileListboxId}-product-${p.id}`;
             const isActive = activeMobileItemId === optionId;
             return (
@@ -1323,7 +1337,7 @@ export default function Header({
               />
             );
           })}
-          {mobileSearchState !== 'loading' && mobileSearchState !== 'error' && mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
+          {mobileSearchState !== 'loading' && mobileSearchState !== 'error' && mobileCombinedSuggestions.length === 0 && mobileCatMatches.length === 0 && !instoreSearch.loading && (
             <div className="sp-empty sp-empty--mobile">
               <Search size={24} />
               <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>

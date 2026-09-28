@@ -2044,6 +2044,39 @@ textarea:focus-visible,
   gap: 22px;
   color: var(--text-primary);
 }
+.unified-instore-results {
+  padding: 22px;
+  border: 1px solid #e6d8cf;
+  border-radius: 16px;
+  background: #fffaf6;
+}
+.unified-instore-results__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.unified-instore-results__eyebrow { color: #8b1a1a; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.unified-instore-results__heading h2 { margin: 4px 0; font-size: clamp(20px, 2vw, 26px); }
+.unified-instore-results__heading p, .unified-instore-results__main-empty { margin: 0; color: #5f5960; }
+.unified-instore-results__heading button {
+  border: 1px solid #8b1a1a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  color: #8b1a1a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.unified-instore-results__heading button:hover { background: #8b1a1a; color: #fff; }
+@media (max-width: 640px) {
+  .unified-instore-results { padding: 15px; }
+  .unified-instore-results__heading { flex-direction: column; }
+  .unified-instore-results__heading button { width: 100%; white-space: normal; }
+}
 .trade-hero {
   min-height: 220px;
   display: grid;
