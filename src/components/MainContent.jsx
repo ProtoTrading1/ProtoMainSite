@@ -344,41 +344,12 @@ export default function MainContent({
       ) : resultsControl}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{resultsAnnouncement}</p>
 
-      {matchingInstoreSearch && (instoreSearch.loading || instoreSearch.error || instoreSearch.total > 0) && (
-        <section className="unified-instore-results" aria-labelledby="unified-instore-title" aria-busy={instoreSearch.loading}>
-          <div className="unified-instore-results__heading">
-            <div>
-              <span className="unified-instore-results__eyebrow">Also in Instore Products</span>
-              <h2 id="unified-instore-title">More matches for “{searchQuery.trim()}”</h2>
-              <p>Reviewed products from our wider range, searchable without a menu category.</p>
-            </div>
-            {instoreSearch.total > 0 && <button type="button" onClick={() => onViewAllInstore(searchQuery)}>
-              View all {instoreSearch.total.toLocaleString()} Instore matches →
-            </button>}
-          </div>
-          {instoreSearch.loading && <p role="status">Searching Instore Products…</p>}
-          {instoreSearch.error && <p role="alert">Instore matches could not be loaded. The main catalogue results are still available.</p>}
-          {instoreSearch.products.length > 0 && <div className="product-grid">
-            {instoreSearch.products.map((product) => <ProductCard
-              key={`instore-${product.id}`}
-              product={product}
-              addToCart={addToCart}
-              cartQty={cartQtyForProduct(product, cartQtyMap)}
-              special={specialForProduct(product, specialsMap)}
-              priority={false}
-              onSearchEngage={onSearchProductClick ? () => onSearchProductClick(product, 0) : null}
-              onProductPreview={onProductPreview}
-            />)}
-          </div>}
-        </section>
-      )}
-
       {shouldShowSkeleton ? (
         <ProductGridSkeleton count={12} />
       ) : holdWhileEmptyLoading ? (
         <div aria-hidden="true" style={{ minHeight: '40vh' }} />
-      ) : products.length === 0 && matchingInstoreSearch && instoreSearch.total > 0 ? (
-        <p className="unified-instore-results__main-empty">No main-catalogue matches. Instore matches are shown above.</p>
+      ) : products.length === 0 && matchingInstoreSearch && (instoreSearch.loading || instoreSearch.error || instoreSearch.total > 0) ? (
+        <p className="unified-instore-results__main-empty">No main-catalogue matches. Checking Instore Products below.</p>
       ) : products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />
@@ -441,6 +412,35 @@ export default function MainContent({
             </div>
           )}
         </>
+      )}
+
+      {matchingInstoreSearch && (instoreSearch.loading || instoreSearch.error || instoreSearch.total > 0) && (
+        <section className="unified-instore-results" aria-labelledby="unified-instore-title" aria-busy={instoreSearch.loading}>
+          <div className="unified-instore-results__heading">
+            <div>
+              <span className="unified-instore-results__eyebrow">Also in Instore Products</span>
+              <h2 id="unified-instore-title">More matches for “{searchQuery.trim()}”</h2>
+              <p>Reviewed products from our wider range, searchable without a menu category.</p>
+            </div>
+            {instoreSearch.total > 0 && <button type="button" onClick={() => onViewAllInstore(searchQuery)}>
+              View all {instoreSearch.total.toLocaleString()} Instore matches →
+            </button>}
+          </div>
+          {instoreSearch.loading && <p role="status">Searching Instore Products…</p>}
+          {instoreSearch.error && <p role="alert">Instore matches could not be loaded. The main catalogue results are still available.</p>}
+          {instoreSearch.products.length > 0 && <div className="product-grid">
+            {instoreSearch.products.map((product) => <ProductCard
+              key={`instore-${product.id}`}
+              product={product}
+              addToCart={addToCart}
+              cartQty={cartQtyForProduct(product, cartQtyMap)}
+              special={specialForProduct(product, specialsMap)}
+              priority={false}
+              onSearchEngage={onSearchProductClick ? () => onSearchProductClick(product, 0) : null}
+              onProductPreview={onProductPreview}
+            />)}
+          </div>}
+        </section>
       )}
 
     </div>

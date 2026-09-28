@@ -261,6 +261,43 @@ test('mobile main search finds an Instore-only product', async ({ browser }) => 
   }
 });
 
+for (const viewport of [{ name: 'desktop', width: 1440, height: 800 }, { name: 'mobile', width: 390, height: 844 }]) {
+  test(`${viewport.name} search shows Proto catalogue images before Instore images`, async ({ browser }) => {
+    const protoProduct = product('E2E-PROTO-VISOR', 'Proto Visor Clip', 49);
+    const instoreProduct = { ...product('E2E-INSTORE-VISOR', 'Car Visor Organiser', 39), isExtendedRange: true };
+    const accountCart = { created: true, items: [line(legacyProduct, 1)], activityAt: Date.now(), revision: 1 };
+    const safety = { authRequests: 0, destructiveRequests: [] };
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+    await installSyntheticServices(context, accountCart, safety, [...catalogue, protoProduct], [instoreProduct]);
+    const page = await context.newPage();
+    await seedLegacyBrowserBasket(page, accountCart.items);
+
+    try {
+      await signIn(page);
+      if (viewport.name === 'mobile') {
+        await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search' }).click();
+      }
+      const search = viewport.name === 'mobile'
+        ? page.locator('.mobile-action-search-drop input[type="search"]')
+        : page.locator('.header-search-premium__input');
+      await search.fill('visor');
+      await search.press('Enter');
+
+      const instoreResults = page.locator('.unified-instore-results');
+      await expect(page.getByText('Proto Visor Clip', { exact: true })).toBeVisible();
+      await expect(instoreResults.getByText('Car Visor Organiser')).toBeVisible();
+      const mainGridPrecedesInstore = await instoreResults.evaluate((section) => {
+        const mainGrid = section.parentElement.querySelector('.product-grid');
+        return Boolean(mainGrid && mainGrid.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING);
+      });
+      expect(mainGridPrecedesInstore).toBe(true);
+      expect(safety.destructiveRequests).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 async function seedLegacyBrowserBasket(page, items) {
   await page.addInitScript(({ seededItems }) => {
     localStorage.setItem('proto_cart', JSON.stringify(seededItems));
