@@ -2069,6 +2069,7 @@ export default function App({
             resultsTotal={catalogTotal}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
+            cartPreferenceMap={cartPreferenceMap}
             onCartQtyChange={handleCartQtyChange}
             specialsMap={specialsMap}
             path={path}

@@ -7,6 +7,7 @@ import ProductCard from './ProductCard';
 import { ProductGridSkeleton } from './ProductCardSkeleton';
 import CategoryLanding from './CategoryLanding';
 import { slugToLabel } from '../lib/taxonomy';
+import './InstoreProducts.css';
 
 function cartQtyForProduct(product, cartQtyMap) {
   if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length) {
@@ -28,6 +29,7 @@ export default function MainContent({
   resultsTotal = products.length,
   addToCart,
   cartQtyMap = {},
+  cartPreferenceMap = {},
   onCartQtyChange = () => {},
   specialsMap = {},
   path,
@@ -62,6 +64,7 @@ export default function MainContent({
   const [isGridFadeIn, setIsGridFadeIn] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [resultsAnnouncement, setResultsAnnouncement] = useState('');
+  const [instorePreferences, setInstorePreferences] = useState({});
   const pendingReorderRef = useRef(false);
   const previousBrowseStateRef = useRef(null);
   const hasAnnouncedResultsRef = useRef(false);
@@ -79,6 +82,9 @@ export default function MainContent({
   const pathKey = path.join('/');
   const searchKey = searchQuery.trim().toLowerCase();
   const matchingInstoreSearch = Boolean(searchKey && instoreSearch.query.toLowerCase() === searchKey);
+  const preferenceFor = (id) => Object.hasOwn(instorePreferences, id)
+    ? instorePreferences[id]
+    : (cartPreferenceMap[id] || '');
   const refinementsKey = useMemo(
     () => Object.entries(refinements || {})
       .sort(([a], [b]) => a.localeCompare(b))
@@ -432,12 +438,21 @@ export default function MainContent({
             {instoreSearch.products.map((product) => <ProductCard
               key={`instore-${product.id}`}
               product={product}
-              addToCart={addToCart}
+              addToCart={(item, qty, point) => {
+                addToCart(item, qty, point, preferenceFor(product.id));
+                setInstorePreferences((current) => ({ ...current, [product.id]: '' }));
+              }}
               cartQty={cartQtyForProduct(product, cartQtyMap)}
               special={specialForProduct(product, specialsMap)}
               priority={false}
               onSearchEngage={onSearchProductClick ? () => onSearchProductClick(product, 0) : null}
-              onProductPreview={onProductPreview}
+              // Instore items are absent from the main-catalogue detail lookup.
+              // Keep their preview local, as on the dedicated Instore page.
+              preferenceSlot={<label className="instore-preference instore-preference--in-card">
+                Preferred colour/design <small>(optional)</small>
+                <textarea value={preferenceFor(product.id)} onChange={(event) => setInstorePreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" />
+                <span>Subject to availability. Your preference will accompany this item.</span>
+              </label>}
             />)}
           </div>}
         </section>

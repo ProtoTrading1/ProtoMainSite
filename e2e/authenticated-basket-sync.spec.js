@@ -286,17 +286,54 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 800 }, { name: '
       const instoreResults = page.locator('.unified-instore-results');
       await expect(page.getByText('Proto Visor Clip', { exact: true })).toBeVisible();
       await expect(instoreResults.getByText('Car Visor Organiser')).toBeVisible();
+      const preference = instoreResults.getByRole('textbox', { name: /Preferred colour\/design/ });
+      await expect(preference).toBeVisible();
+      await instoreResults.getByRole('button', { name: 'Car Visor Organiser', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: /Car Visor Organiser/i })).toBeVisible();
+      await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
       const mainGridPrecedesInstore = await instoreResults.evaluate((section) => {
         const mainGrid = section.parentElement.querySelector('.product-grid');
         return Boolean(mainGrid && mainGrid.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING);
       });
       expect(mainGridPrecedesInstore).toBe(true);
+      await preference.fill('silver, if available');
+      await instoreResults.getByRole('button', { name: 'Add to Cart' }).click();
+      await expect.poll(() => accountCart.items.find((item) => item.product.id === instoreProduct.id)?.preference)
+        .toBe('silver, if available');
+      await expect(preference).toHaveValue('');
       expect(safety.destructiveRequests).toEqual([]);
     } finally {
       await context.close();
     }
   });
 }
+
+test('Ball Pin 8610100400S accepts a colour request from main search', async ({ browser }) => {
+  const ballPin = { ...product('8610100400S', 'Ball Pin 5cm ±100PCS', 49.50), isExtendedRange: true };
+  const accountCart = { created: true, items: [line(legacyProduct, 1)], activityAt: Date.now(), revision: 1 };
+  const safety = { authRequests: 0, destructiveRequests: [] };
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await installSyntheticServices(context, accountCart, safety, catalogue, [ballPin]);
+  const page = await context.newPage();
+  await seedLegacyBrowserBasket(page, accountCart.items);
+
+  try {
+    await signIn(page);
+    await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search' }).click();
+    const search = page.locator('.mobile-action-search-drop input[type="search"]');
+    await search.fill('8610100400S');
+    await search.press('Enter');
+    const result = page.locator('.unified-instore-results');
+    await expect(result.getByText('Ball Pin 5cm ±100PCS', { exact: true })).toBeVisible();
+    await result.getByRole('textbox', { name: /Preferred colour\/design/ }).fill('silver');
+    await result.getByRole('button', { name: 'Add to Cart' }).click();
+    await expect.poll(() => accountCart.items.find((item) => item.product.id === '8610100400S')?.preference)
+      .toBe('silver');
+    expect(safety.destructiveRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
 
 async function seedLegacyBrowserBasket(page, items) {
   await page.addInitScript(({ seededItems }) => {
