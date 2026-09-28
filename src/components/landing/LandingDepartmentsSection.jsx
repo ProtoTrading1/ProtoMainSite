@@ -39,7 +39,7 @@ export default function LandingDepartmentsSection({ onApply }) {
         transition={{ duration: 0.42, ease: 'easeOut' }}
       >
         <span className="lp-eyebrow">Catalogue departments</span>
-        <h2>12 buying departments, 5,000+ products.</h2>
+        <h2>12 buying departments, 8,000+ products.</h2>
         <p className="lp-departments-access-note">
           Browse trade prices, live stock and the full catalogue after your online trade account is approved.
         </p>

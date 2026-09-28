@@ -37,3 +37,8 @@ test('the retired /register path redirects to the public home', async () => {
     permanent: false,
   });
 });
+
+test('the public departments headline reflects the customer-visible catalogue scale', async () => {
+  const departments = await readFile(new URL('../../src/components/landing/LandingDepartmentsSection.jsx', import.meta.url), 'utf8');
+  assert.match(departments, /12 buying departments, 8,000\+ products\./);
+});

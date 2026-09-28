@@ -77,7 +77,7 @@ export default function LandingHero({ onApply }) {
           <div className="vhero-trust-item" role="listitem">
             <CheckCircle2 size={15} />
             <div>
-              <strong>5,000+ PRODUCTS</strong>
+              <strong>8,000+ PRODUCTS</strong>
               <span>One supplier for your business.</span>
             </div>
           </div>

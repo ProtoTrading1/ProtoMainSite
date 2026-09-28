@@ -20,6 +20,7 @@ test('uses one clear label for each trade-account journey', async () => {
   assert.match(hero, /Register again/);
   assert.match(hero, /New to Proto Trading online\?/);
   assert.match(hero, /Apply for online access/);
+  assert.match(hero, /<strong>8,000\+ PRODUCTS<\/strong>/);
   assert.doesNotMatch(hero, /Existing customers must /);
   assert.doesNotMatch(hero, /Sign In/);
   assert.doesNotMatch(hero, /onLogin/);
