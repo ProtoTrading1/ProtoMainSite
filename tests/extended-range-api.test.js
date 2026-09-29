@@ -12,6 +12,7 @@ const valid = {
 test('Instore feed includes only reviewed priced records with more than ten available units', () => {
   const products = buildExtendedRangeProducts([
     { ...valid, available_stock: 11 },
+    { ...valid, sku: '8618100139', available_stock: 10.9 },
     { ...valid, sku: '8618100134', available_stock: 0 },
     { ...valid, sku: '8618100138', available_stock: 9 },
     { ...valid, sku: '8618100135', available_stock: -1 },

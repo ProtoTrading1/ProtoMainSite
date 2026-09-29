@@ -44,6 +44,8 @@ test('normalizes common plural, joined-word and regional customer phrases', () =
     { sku: 'HAIR001', title: 'HAIR BRUSH ASSORTED', category: 'HAIR ACCESSORIES' },
     { sku: 'PENCIL001', title: 'COLOR PENCILS 12X2 COLOURS', category: 'STATIONERY/ART' },
     { sku: 'BAG001', title: 'DIY BACKPACK W/MARKERS', category: 'BAGS & WALLETS' },
+    { sku: 'GLUE001', title: 'BEAD GLUE B6000 50ML', category: 'CRAFTS AND ALLIED' },
+    { sku: 'NAIL001', title: 'NAIL GLUE', category: 'COSMETICS SKIN CARE' },
   ];
 
   for (const query of ['paint brushes', 'paintbrush', 'paintbrushes']) {
@@ -55,8 +57,12 @@ test('normalizes common plural, joined-word and regional customer phrases', () =
   for (const query of ['colour pencils', 'colored pencils', 'colouring pencils']) {
     assert.equal(matchesInstoreSearch(products[2], query), true, query);
   }
-  for (const query of ['backpack', 'back pack', 'back packs']) {
+  for (const query of ['backpack', 'back pack', 'back packs', 'school bag', 'school bags', 'book bag']) {
     assert.equal(matchesInstoreSearch(products[3], query), true, query);
+  }
+  for (const query of ['bead glue', 'beading glue', 'craft glue', 'craft adhesive']) {
+    assert.equal(matchesInstoreSearch(products[4], query), true, query);
+    assert.equal(matchesInstoreSearch(products[5], query), false, `${query} excludes nail glue`);
   }
 });
 

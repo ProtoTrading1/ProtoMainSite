@@ -21,6 +21,8 @@ const products = [
   { id: 'hair-brush', code: 'HB706', name: 'Hair Brush Assorted', stockOnHand: 16 },
   { id: 'colour-pencils', code: 'CP707', name: 'Color Pencils 12X2 Colours', stockOnHand: 16 },
   { id: 'backpack', code: 'BP708', name: 'DIY Backpack With Markers', stockOnHand: 16 },
+  { id: 'bead-glue', code: 'BG709', name: 'Bead Glue B6000 50ml', stockOnHand: 16 },
+  { id: 'nail-glue', code: 'NG710', name: 'Nail Glue', stockOnHand: 16 },
 ];
 
 prepareSearchIndex(products);
@@ -69,6 +71,9 @@ test('uses the shared customer-language families across the main catalogue', () 
   assert.equal(getSuggestions(products, 'hair brushes', 5)[0]?.id, 'hair-brush');
   assert.equal(getSuggestions(products, 'colored pencils', 5)[0]?.id, 'colour-pencils');
   assert.equal(getSuggestions(products, 'back pack', 5)[0]?.id, 'backpack');
+  assert.equal(getSuggestions(products, 'school bag', 5)[0]?.id, 'backpack');
+  assert.equal(getSuggestions(products, 'craft glue', 5)[0]?.id, 'bead-glue');
+  assert.equal(getSuggestions(products, 'craft glue', 5).some((product) => product.id === 'nail-glue'), false);
 });
 
 test('understands deterministic shopping constraints without weakening exact identifiers', () => {

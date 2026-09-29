@@ -415,6 +415,29 @@ test('stored and live searches agree for soft-toy aliases without rebuilding the
   }
 });
 
+test('stored and live searches agree for school-bag and craft-glue language', () => {
+  const products = [
+    { sku: 'BAG001', barcode: '', name: 'DIY BACKPACK W/MARKERS', title: 'DIY BACKPACK W/MARKERS', originalDescription: 'DIY BACKPACK W/MARKERS', category: 'bags wallets' },
+    { sku: 'GLUE001', barcode: '', name: 'BEAD GLUE B6000 50ML', title: 'BEAD GLUE B6000 50ML', originalDescription: 'BEAD GLUE B6000 50ML', category: 'crafts and allied' },
+    { sku: 'NAIL001', barcode: '', name: 'NAIL GLUE', title: 'NAIL GLUE', originalDescription: 'NAIL GLUE', category: 'cosmetics skin care' },
+  ];
+  const candidateMatches = (product, query) => {
+    const tokens = catalogueSearchTokens(product);
+    return catalogueSearchPatternSets(query)
+      .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
+  };
+
+  for (const [query, sku] of [['school bag', 'BAG001'], ['school bags', 'BAG001'], ['craft glue', 'GLUE001'], ['craft adhesive', 'GLUE001']]) {
+    assert.equal(candidateMatches(products.find((product) => product.sku === sku), query), true, `stored search finds "${query}"`);
+    assert.deepEqual(
+      products.filter((product) => candidateMatches(product, query)).map((product) => product.sku),
+      products.filter((product) => matchesInstoreSearch(product, query)).map((product) => product.sku),
+      `stored/live parity for "${query}"`,
+    );
+  }
+  assert.equal(candidateMatches(products[2], 'craft glue'), false, 'craft glue excludes nail glue');
+});
+
 test('stored candidate terms and live intent filters agree for structured soft-toy searches', () => {
   const products = [
     { sku: '8626110059', barcode: '6008626110059', name: 'SOFT TOY BLUE DOLPHIN ±50CM', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'soft toys', price: 89.99, stockQty: 14 },

@@ -86,6 +86,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const listingHidden = row?.listing_control_status === 'hidden';
     const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
     const availableStock = Number(row?.available_stock);
+    const customerVisibleStock = Math.floor(availableStock);
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
@@ -97,7 +98,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || !Number.isFinite(availableStock) || availableStock <= MIN_INSTORE_AVAILABLE_STOCK
+      || !Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK
       || price <= 0) return [];
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
@@ -106,7 +107,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       description: String(row?.original_description || '').trim(),
       originalDescription: String(row?.original_description || '').trim(),
       price, image: imageUrl, images: imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
-      stockQty: Math.floor(availableStock), stockOnHand: Math.floor(availableStock), inStock: true,
+      stockQty: customerVisibleStock, stockOnHand: customerVisibleStock, inStock: true,
       minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
