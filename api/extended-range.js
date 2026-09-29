@@ -4,6 +4,7 @@ import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import { instorePage } from '../lib/instore-page.mjs';
+import { searchQueryHasStructuredIntent } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
@@ -183,11 +184,13 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
   const ttlMs = catalogueTtlMs();
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
+  const searchPatterns = catalogueSearchPatterns(query);
+  const structuredOnly = !searchPatterns.length && searchQueryHasStructuredIntent(query);
 
   // A landing or category page is the whole answer in one database round trip.
   // Anything else — a search, or the full-collection payload — needs the reads
   // below, and so does a database that has not had migration 072 applied.
-  if (!catalogueSearchPatterns(query).length && !includeCatalogue) {
+  if (!searchPatterns.length && !structuredOnly && !includeCatalogue) {
     try {
       const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
       if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
@@ -229,21 +232,27 @@ export async function serveStoredCatalogue(client, { query, category, page, from
   }
 
   try {
-    const [{ products, total }, catalogue] = await Promise.all([
-      catalogueSearchPatterns(query).length
-        ? readCatalogueSearchCandidates(client, { query, category }).then((candidates) => {
-          // The same page definition the live read uses. The database has only
-          // narrowed the collection to the stored token matches first.
-          const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
-          return { products: view.products, total: view.total };
-        })
-        : readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE }),
-      includeCatalogue ? readCatalogueProducts(client) : Promise.resolve(undefined),
-    ]);
+    const catalogue = includeCatalogue || structuredOnly
+      ? await readCatalogueProducts(client)
+      : undefined;
+    let result;
+    if (searchPatterns.length) {
+      const candidates = await readCatalogueSearchCandidates(client, { query, category });
+      // The same page definition the live read uses. The database has only
+      // narrowed the collection to the stored token matches first.
+      const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
+      result = { products: view.products, total: view.total };
+    } else if (structuredOnly) {
+      const view = instorePage(catalogue, { query, category, page, pageSize: PAGE_SIZE });
+      result = { products: view.products, total: view.total };
+    } else {
+      result = await readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE });
+    }
+    const { products, total } = result;
     return {
       body: {
         count: Math.min(PAGE_SIZE, Math.max(0, total - from)), page, pageSize: PAGE_SIZE,
-        total, tiles: state.tiles, products, catalogue,
+        total, tiles: state.tiles, products, catalogue: includeCatalogue ? catalogue : undefined,
       },
       staleBeforeMs: ttlMs,
     };

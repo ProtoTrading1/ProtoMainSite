@@ -59,3 +59,31 @@ test('uses the shared customer-language families across the main catalogue', () 
   assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
   assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');
 });
+
+test('understands deterministic shopping constraints without weakening exact identifiers', () => {
+  const phaseOneProducts = [
+    { id: 'blue-dolphin-50', code: '8626110059', barcode: '6008626110059', name: 'Soft Toy Blue Dolphin 50cm', price: 89.99, stockOnHand: 14, colour: 'Blue', size: '50cm', categoryPath: ['Soft toys'] },
+    { id: 'blue-teddy-live', code: 'BT800', name: 'Soft Toy Blue Teddy', price: 79.99, stockOnHand: 11, colour: 'Blue', categoryPath: ['Soft toys'] },
+    { id: 'blue-teddy-out', code: 'BT801', name: 'Soft Toy Blue Teddy', price: 69.99, stockOnHand: 0, colour: 'Blue', categoryPath: ['Soft toys'] },
+    { id: 'cheap-soft-toy', code: 'ST900', name: 'Soft Toy Rabbit', price: 99.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
+    { id: 'expensive-soft-toy', code: 'ST901', name: 'Soft Toy Rabbit Deluxe', price: 149.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
+    { id: 'long-dolphin', code: 'ST902', name: 'Soft Toy Blue Dolphin 150cm', price: 79.99, stockOnHand: 12, colour: 'Blue', size: '150cm', categoryPath: ['Soft toys'] },
+    { id: 'vat-over-cap', code: 'ST903', name: 'Soft Toy Fox', price: 90, priceInclVat: 103.5, stockOnHand: 12, categoryPath: ['Soft toys'] },
+  ];
+  prepareSearchIndex(phaseOneProducts);
+  assert.equal(getSuggestions(phaseOneProducts, 'blue dolphin 50cm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 50 cm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 500mm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 0.5m', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 50 cm', 10).some((product) => product.id === 'long-dolphin'), false);
+  assert.deepEqual(
+    new Set(getSuggestions(phaseOneProducts, 'cheap soft toys under R100', 10).map((product) => product.id)),
+    new Set(['blue-teddy-live', 'blue-teddy-out', 'cheap-soft-toy', 'blue-dolphin-50', 'long-dolphin']),
+  );
+  assert.deepEqual(
+    getSuggestions(phaseOneProducts, 'in stock blue teddy', 10).map((product) => product.id),
+    ['blue-teddy-live'],
+  );
+  assert.equal(getSuggestions(phaseOneProducts, '8626110059', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toys under R100', 10).some((product) => product.id === 'vat-over-cap'), false);
+});

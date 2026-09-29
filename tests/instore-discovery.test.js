@@ -49,6 +49,22 @@ test('keeps soft-toy synonyms out of cosmetics and non-toy plush materials', () 
   }
 });
 
+test('applies Phase 1 measurements, price, availability and colour intent deterministically', () => {
+  const products = [
+    { sku: '8626110059', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'SOFT TOYS', price: 89.99, stockQty: 14 },
+    { sku: '8626110060', title: 'SOFT TOY BLUE DOLPHIN ±30CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±30CM', category: 'SOFT TOYS', price: 69.99, stockQty: 14 },
+    { sku: '8626110061', title: 'SOFT TOY BLUE TEDDY', originalDescription: 'SOFT TOY BLUE TEDDY', category: 'SOFT TOYS', price: 79.99, stockQty: 12 },
+    { sku: '8626110062', title: 'SOFT TOY BLUE TEDDY', originalDescription: 'SOFT TOY BLUE TEDDY', category: 'SOFT TOYS', price: 59.99, stockQty: 0 },
+    { sku: '8626110063', title: 'SOFT TOY RABBIT', originalDescription: 'SOFT TOY RABBIT', category: 'SOFT TOYS', price: 149.99, stockQty: 12 },
+  ];
+
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'blue dolphin 50cm')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toy 50 cm')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'cheap soft toys under R100')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'in stock blue teddy')).map((product) => product.sku), ['8626110061']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, '8626110059')).map((product) => product.sku), ['8626110059']);
+});
+
 test('uses Positill department wording to keep party items distinct from toys', () => {
   assert.equal(discoveryGroup({ title: 'PARTY TOY CLUB', category: 'PARTY / FANCY DRES' }), 'Party items');
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');

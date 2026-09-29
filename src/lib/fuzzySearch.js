@@ -5,7 +5,10 @@ import {
   isIdentifierQuery,
   normalizeIdentifier,
 } from './identifierNormalize.js';
-import { firstRelatedSearchTerm, searchQueryVariants } from '../../lib/search-language.mjs';
+import {
+  firstRelatedSearchTerm, parseSearchQuery, productMatchesSearchIntent,
+  searchQueryUsesFamily, searchQueryVariants,
+} from '../../lib/search-language.mjs';
 
 const SCORE = {
   EXACT_SKU: 100,
@@ -427,17 +430,21 @@ function scoreProduct(product, query) {
 }
 
 export function fuzzyFilter(products, query) {
+  const intent = parseSearchQuery(query);
   const variants = searchQueryVariants(query);
-  if (variants.length === 0) return products;
+  const eligible = products.filter((product) => productMatchesSearchIntent(product, intent));
+  if (variants.length === 0) return eligible;
   // Semantic families include their intended synonyms and common misspellings.
   // Requiring a keyword-strength match prevents another one-edit word such as
   // `blush` from leaking into results for the known family `plush`.
   const minimumScore = variants.length > 1 ? SCORE.KEYWORD : SEARCH_MIN_CONFIDENCE;
-  const isSoftToyFamily = variants.length > 1 && variants.includes('soft toy');
+  const isSoftToyFamily = searchQueryUsesFamily(query, 'soft toy');
 
   const candidateSet = new Set();
   for (const variant of variants) {
-    for (const product of candidateProducts(products, variant)) candidateSet.add(product);
+    for (const product of candidateProducts(products, variant)) {
+      if (productMatchesSearchIntent(product, intent)) candidateSet.add(product);
+    }
   }
 
   const scored = [...candidateSet]

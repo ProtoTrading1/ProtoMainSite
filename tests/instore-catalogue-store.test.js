@@ -223,6 +223,8 @@ test('the stored Instore collection answers browsing exactly as the live read do
     { query: 'mug', category: '', page: 1 },
     { query: 'nosuchproduct', category: '', page: 1 },
     { query: 'bracelet', category: '', page: 2 },
+    { query: 'under R20', category: '', page: 1 },
+    { query: 'in stock', category: '', page: 1 },
   ];
 
   for (const request of requests) {
@@ -408,6 +410,25 @@ test('stored and live searches agree for soft-toy aliases without rebuilding the
     assert.equal(matchesStored(query), true, `stored search finds "${query}"`);
     assert.equal(matchesStored(query), matchesInstoreSearch(product, query), `stored/live parity for "${query}"`);
   }
+});
+
+test('stored candidate terms and live intent filters agree for structured soft-toy searches', () => {
+  const products = [
+    { sku: '8626110059', barcode: '6008626110059', name: 'SOFT TOY BLUE DOLPHIN ±50CM', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'soft toys', price: 89.99, stockQty: 14 },
+    { sku: '8626110060', barcode: '', name: 'SOFT TOY BLUE DOLPHIN ±30CM', title: 'SOFT TOY BLUE DOLPHIN ±30CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±30CM', category: 'soft toys', price: 69.99, stockQty: 14 },
+  ];
+  const candidateMatches = (product, query) => {
+    const tokens = catalogueSearchTokens(product);
+    return catalogueSearchPatternSets(query)
+      .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
+  };
+
+  for (const query of ['blue dolphin 50cm', 'soft toy 50 cm', 'cheap soft toys under R100', 'in stock blue dolphin', '8626110059']) {
+    const candidates = products.filter((product) => candidateMatches(product, query));
+    const live = products.filter((product) => matchesInstoreSearch(product, query));
+    assert.ok(live.every((product) => candidates.includes(product)), `stored candidates retain every live match for "${query}"`);
+  }
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toy 50 centimetre')).map((product) => product.sku), ['8626110059']);
 });
 
 test('stored rows carry the default customer ordering and the browse category', () => {

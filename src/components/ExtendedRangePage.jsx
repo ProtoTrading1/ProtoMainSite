@@ -122,9 +122,27 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);
   const changePage = (next) => { setPage(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); };
+  const editSearch = () => {
+    setQuery(submittedQuery);
+    window.requestAnimationFrame(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    });
+  };
+  const searchActive = Boolean(submittedQuery);
+  const totalLabel = `${meta.total.toLocaleString()} ${meta.total === 1 ? 'product' : 'products'}`;
+  const resultFeedback = loading
+    ? 'Searching Instore Products…'
+    : error
+      ? 'Products could not be loaded.'
+      : products.length
+        ? `${totalLabel}${searchActive ? ` match “${submittedQuery}”` : ''}. Showing ${first.toLocaleString()}–${last.toLocaleString()}.`
+        : searchActive
+          ? `No products match “${submittedQuery}”.`
+          : 'The collection is currently empty.';
   const guideActionStyle = { width: '100%', border: 0, padding: 0, background: 'transparent', color: 'inherit', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', font: 'inherit', cursor: 'pointer' };
 
-  return <section className="instore" aria-labelledby="instore-title">
+  return <section className={`instore${searchActive ? ' instore--search-active' : ''}`} aria-labelledby="instore-title">
     <header className="instore-hero">
       <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">More products,<br />ready to order<span aria-hidden="true">.</span></h1><p>Search by everyday product names, see available stock, and add a colour or design preference for each item.</p></div>
       <ol className="instore-guide">
@@ -135,7 +153,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     </header>
     <aside className="instore-disclaimer" aria-label="Product image quality notice"><strong>Product images</strong><span>Some Instore product images are lower resolution and are for reference. Colours and details may differ from the actual product.</span></aside>
     <div className="instore-toolbar">
-      <div><span className="instore-kicker">LIVE COLLECTION</span><h2>What are you looking for?</h2><p>Try everyday words, such as “wooden bracelet”.</p></div>
+      <div><span className="instore-kicker">LIVE COLLECTION</span><h2>{searchActive ? 'Refine your search' : 'What are you looking for?'}</h2><p>{searchActive ? 'Search another product name or exact product code.' : 'Try everyday words, such as “wooden bracelet”.'}</p></div>
       <form className="instore-search" role="search" onSubmit={submit}>
         <label className="instore-sr-only" htmlFor="instore-search">Search Instore Products</label>
         <div><Search size={18} aria-hidden="true" /><input ref={searchRef} id="instore-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try bracelets, hair clips, mugs…" maxLength={80} />{(query || submittedQuery) && <button type="button" onClick={clear} aria-label="Clear search"><X size={16} /></button>}</div>
@@ -151,10 +169,16 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     })}</nav>
     </section>}
     <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
-      <p className="instore-summary" role="status" aria-live="polite">{loading ? 'Loading Instore Products…' : error ? 'Products could not be loaded.' : products.length ? `${first.toLocaleString()}–${last.toLocaleString()} of ${meta.total.toLocaleString()} products${submittedQuery ? ` for “${submittedQuery}”` : ''}` : submittedQuery ? `No results for “${submittedQuery}”` : 'The collection is currently empty.'}</p>
-      {loading && <div className="instore-loading" role="status"><span className="instore-spinner" aria-hidden="true"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
+      <div className="instore-results-bar">
+        <p className="instore-summary" role="status" aria-live="polite" aria-atomic="true">
+          <span>{searchActive ? 'Search results' : category ? `${category} products` : 'Instore collection'}</span>
+          <strong>{resultFeedback}</strong>
+        </p>
+        {searchActive && !loading && <button className="instore-clear-results" type="button" onClick={clear}><X size={16} aria-hidden="true" /> Clear search</button>}
+      </div>
+      {loading && <div className="instore-loading" aria-hidden="true"><span className="instore-spinner"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
       {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
-      {!loading && !error && !products.length && <div className="instore-state"><PackageSearch size={30} /><h3>No products found</h3><p>Try a shorter name or a different word.</p><button type="button" onClick={clear}>Clear search</button></div>}
+      {!loading && !error && !products.length && <div className="instore-state instore-state--no-results"><PackageSearch size={30} /><h3>{searchActive ? `No products match “${submittedQuery}”` : 'No products found'}</h3><p>{searchActive ? 'Try one product type at a time, remove details such as colour or size, or search by an exact product code.' : 'Clear the current filter to browse the complete Instore collection.'}</p><div className="instore-state-actions">{searchActive && <button className="instore-state-secondary" type="button" onClick={editSearch}><Search size={16} aria-hidden="true" /> Edit search</button>}<button type="button" onClick={clear}><X size={16} aria-hidden="true" /> Browse all products</button></div></div>}
       {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} preferenceSlot={<label className="instore-preference instore-preference--in-card">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label>} /></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
     </div>
 
