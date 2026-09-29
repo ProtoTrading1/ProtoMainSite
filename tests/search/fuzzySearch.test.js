@@ -13,6 +13,10 @@ const products = [
   { id: 'hair-clip', code: 'HC500', name: 'Hair Clip Assorted', stockOnHand: 18 },
   { id: 'phone-case', code: 'PC600', name: 'Mobile Phone Case', stockOnHand: 22 },
   { id: 'blush', code: 'BU700', name: 'Beauty Blush Palette', stockOnHand: 16 },
+  { id: 'teddy-clay', code: 'TC701', name: 'Teddy Modeling Clay', stockOnHand: 16 },
+  { id: 'teddy-crayons', code: 'TC702', name: 'Crayons Wax Jumbo Teddy', stockOnHand: 16 },
+  { id: 'plush-pen', code: 'PP703', name: 'Pen Plush Lion', stockOnHand: 16 },
+  { id: 'plush-fabric', code: 'PF704', name: 'Wool Plush Velvet', stockOnHand: 16 },
 ];
 
 prepareSearchIndex(products);
@@ -45,11 +49,13 @@ test('recovers an adjacent-letter typo', () => {
 });
 
 test('uses the shared customer-language families across the main catalogue', () => {
+  const nonToyIds = new Set(['blush', 'teddy-clay', 'teddy-crayons', 'plush-pen', 'plush-fabric']);
   for (const query of ['plush', 'stuffed animal', 'cuddly toy', 'pluch', 'tedi']) {
     const results = getSuggestions(products, query, 5);
     assert.equal(results[0]?.id, 'bear', query);
-    assert.equal(results.some((product) => product.id === 'blush'), false, `${query} excludes blush cosmetics`);
+    assert.equal(results.some((product) => nonToyIds.has(product.id)), false, `${query} excludes non-toy matches`);
   }
+  assert.equal(getSuggestions(products, 'teddy', 5).some((product) => nonToyIds.has(product.id)), false);
   assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
   assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');
 });

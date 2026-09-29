@@ -142,6 +142,18 @@ function productSearchText(product) {
     .join(' ');
 }
 
+function isSoftToyProduct(product) {
+  const text = normalize([
+    product.name,
+    product.description,
+    product.originalDescription,
+    product.category,
+    product.categoryLabel,
+    (product.categoryPath || []).join(' '),
+  ].filter(Boolean).join(' '));
+  return /\b(?:soft toys?|plush toys?|stuffed (?:toys?|animals?)|teddy bears?|cuddly toys?)\b/.test(text);
+}
+
 function getSearchIndex(product) {
   const cached = searchIndex.get(product);
   if (cached) return cached;
@@ -421,6 +433,7 @@ export function fuzzyFilter(products, query) {
   // Requiring a keyword-strength match prevents another one-edit word such as
   // `blush` from leaking into results for the known family `plush`.
   const minimumScore = variants.length > 1 ? SCORE.KEYWORD : SEARCH_MIN_CONFIDENCE;
+  const isSoftToyFamily = variants.length > 1 && variants.includes('soft toy');
 
   const candidateSet = new Set();
   for (const variant of variants) {
@@ -428,6 +441,7 @@ export function fuzzyFilter(products, query) {
   }
 
   const scored = [...candidateSet]
+    .filter((product) => !isSoftToyFamily || isSoftToyProduct(product))
     .map((product) => ({
       product,
       score: Math.max(...variants.map((variant) => scoreProduct(product, variant))),
