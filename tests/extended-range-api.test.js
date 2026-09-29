@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyInstoreImageControls, buildExtendedRangeProducts, buildPreviewProducts, readCompletePreviewRows, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
+import { applyInstoreImageControls, buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, readCompletePreviewRows, readCompleteRows, signPreviewImages } from '../api/extended-range.js';
 
 const valid = {
   sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS',
@@ -71,6 +71,30 @@ test('isolated preview mapping uses the VAT-inclusive run price and cannot make 
   assert.equal(products[0].stockQty, 10);
   assert.equal(buildPreviewProducts([{ ...previewRow, available_stock: 0 }]).length, 0);
   assert.equal(buildPreviewProducts([{ ...previewRow, image_url: null }]).length, 0);
+});
+
+test('read-only Vercel previews cannot fall through to the production-backed catalogue', () => {
+  const original = {
+    vercel: process.env.VERCEL_ENV,
+    apiFlag: process.env.INSTORE_PREVIEW_ENABLED,
+    uiFlag: process.env.VITE_INSTORE_PREVIEW_READ_ONLY,
+  };
+  try {
+    process.env.VERCEL_ENV = 'preview';
+    delete process.env.INSTORE_PREVIEW_ENABLED;
+    process.env.VITE_INSTORE_PREVIEW_READ_ONLY = 'true';
+    assert.equal(isIsolatedPreviewRequest({ headers: { host: 'candidate.vercel.app' } }), true);
+    assert.equal(isIsolatedPreviewRequest({ headers: { host: 'site.proto.co.za' } }), false);
+    process.env.VERCEL_ENV = 'production';
+    assert.equal(isIsolatedPreviewRequest({ headers: { host: 'candidate.vercel.app' } }), false);
+  } finally {
+    if (original.vercel === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = original.vercel;
+    if (original.apiFlag === undefined) delete process.env.INSTORE_PREVIEW_ENABLED;
+    else process.env.INSTORE_PREVIEW_ENABLED = original.apiFlag;
+    if (original.uiFlag === undefined) delete process.env.VITE_INSTORE_PREVIEW_READ_ONLY;
+    else process.env.VITE_INSTORE_PREVIEW_READ_ONLY = original.uiFlag;
+  }
 });
 
 test('isolated preview preserves a VAT-inclusive price that is not on the normal price grid', () => {
