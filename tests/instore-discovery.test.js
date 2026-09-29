@@ -36,16 +36,17 @@ test('finds the whole eligible soft-toy range by everyday names and common missp
   }
 });
 
-test('does not confuse a known soft-toy synonym with blush cosmetics', () => {
-  const blush = {
-    sku: 'BEAUTY001',
-    title: 'BEAUTY BLUSH PALETTE',
-    originalDescription: 'COSMETIC BLUSH PALETTE',
-    category: 'COSMETICS SKIN CARE',
-  };
+test('keeps soft-toy synonyms out of cosmetics and non-toy plush materials', () => {
+  const nonToys = [
+    { sku: 'BEAUTY001', title: 'BEAUTY BLUSH PALETTE', category: 'COSMETICS SKIN CARE' },
+    { sku: 'PEN001', title: 'PEN PLUSH LION', category: 'STATIONERY/ART' },
+    { sku: 'WOOL001', title: 'WOOL PLUSH VELVET ±65M', category: 'CRAFTS AND ALLIED' },
+  ];
 
-  assert.equal(matchesInstoreSearch(blush, 'plush'), false);
-  assert.equal(matchesInstoreSearch(blush, 'pluch'), false);
+  for (const product of nonToys) {
+    assert.equal(matchesInstoreSearch(product, 'plush'), false, product.title);
+    assert.equal(matchesInstoreSearch(product, 'pluch'), false, product.title);
+  }
 });
 
 test('uses Positill department wording to keep party items distinct from toys', () => {
