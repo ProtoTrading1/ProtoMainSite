@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, instoreSearchTokens, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import {
-  buildCatalogueRows, catalogueSearchPatterns, catalogueSearchTokens, catalogueSnapshotIsFresh,
+  buildCatalogueRows, catalogueSearchPatterns, catalogueSearchPatternSets, catalogueSearchTokens, catalogueSnapshotIsFresh,
   catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueView, writeCatalogueSnapshot,
 } from '../api/_instore-catalogue.js';
 import { instorePage } from '../lib/instore-page.mjs';
@@ -401,8 +401,8 @@ test('stored and live searches agree for soft-toy aliases without rebuilding the
     title: 'SOFT TOY ±50CM GIRAFFE', originalDescription: 'SOFT TOY ±50CM GIRAFFE', category: 'soft toys',
   };
   const tokens = catalogueSearchTokens(product);
-  const matchesStored = (query) => catalogueSearchPatterns(query)
-    .every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens));
+  const matchesStored = (query) => catalogueSearchPatternSets(query)
+    .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
 
   for (const query of ['plush', 'pluch', 'teddy', 'tedi', 'stuffed animal', 'cuddly toy', 'softtoy']) {
     assert.equal(matchesStored(query), true, `stored search finds "${query}"`);

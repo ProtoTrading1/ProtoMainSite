@@ -82,6 +82,9 @@ export default function MainContent({
   const pathKey = path.join('/');
   const searchKey = searchQuery.trim().toLowerCase();
   const matchingInstoreSearch = Boolean(searchKey && instoreSearch.query.toLowerCase() === searchKey);
+  const mainSearchTotal = Math.max(0, Number(resultsTotal) || 0);
+  const instoreSearchTotal = matchingInstoreSearch ? Math.max(0, Number(instoreSearch.total) || 0) : 0;
+  const combinedSearchTotal = mainSearchTotal + instoreSearchTotal;
   const preferenceFor = (id) => Object.hasOwn(instorePreferences, id)
     ? instorePreferences[id]
     : (cartPreferenceMap[id] || '');
@@ -342,6 +345,18 @@ export default function MainContent({
         </div>
       )}
 
+      {searchQuery && matchingInstoreSearch && !loading && !instoreSearch.loading && !instoreSearch.error && combinedSearchTotal > 0 && (
+        <section className="unified-search-summary" aria-label="Complete search coverage">
+          <div>
+            <strong>{combinedSearchTotal.toLocaleString()} matching products across Proto</strong>
+            <span>{mainSearchTotal.toLocaleString()} in the main catalogue · {instoreSearchTotal.toLocaleString()} in Instore Products</span>
+          </div>
+          {instoreSearchTotal > 0 && <button type="button" onClick={() => onViewAllInstore(searchQuery)}>
+            See all {instoreSearchTotal.toLocaleString()} Instore matches →
+          </button>}
+        </section>
+      )}
+
       {journeyPrompt ? (
         <div className="catalog-utility-row">
           {journeyPrompt}
@@ -426,7 +441,9 @@ export default function MainContent({
             <div>
               <span className="unified-instore-results__eyebrow">Also in Instore Products</span>
               <h2 id="unified-instore-title">More matches for “{searchQuery.trim()}”</h2>
-              <p>Reviewed products from our wider range, searchable without a menu category.</p>
+              <p>{instoreSearch.products.length < instoreSearch.total
+                ? `Showing the first ${instoreSearch.products.length.toLocaleString()} of ${instoreSearch.total.toLocaleString()} reviewed matches.`
+                : 'Reviewed products from our wider range.'}</p>
             </div>
             {instoreSearch.total > 0 && <button type="button" onClick={() => onViewAllInstore(searchQuery)}>
               View all {instoreSearch.total.toLocaleString()} Instore matches →

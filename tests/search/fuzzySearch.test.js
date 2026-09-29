@@ -10,6 +10,8 @@ const products = [
   { id: 'oos-bag', code: 'BG400', name: 'Gift Bag', stockOnHand: 0 },
   { id: 'live-bag', code: 'BG401', name: 'Gift Bag', stockOnHand: 10 },
   { id: 'mkt-item', code: '70010002', barcode: '70010002', sku: 'MKT250', websiteSku: 'MKT250', name: 'Display Hooks', stockOnHand: 15 },
+  { id: 'hair-clip', code: 'HC500', name: 'Hair Clip Assorted', stockOnHand: 18 },
+  { id: 'phone-case', code: 'PC600', name: 'Mobile Phone Case', stockOnHand: 22 },
 ];
 
 prepareSearchIndex(products);
@@ -39,4 +41,12 @@ test('ranks available stock ahead when relevance is equal', () => {
 
 test('recovers an adjacent-letter typo', () => {
   assert.equal(getSuggestions(products, 'walelt', 5)[0]?.id, 'wallet');
+});
+
+test('uses the shared customer-language families across the main catalogue', () => {
+  for (const query of ['plush', 'stuffed animal', 'cuddly toy', 'pluch', 'tedi']) {
+    assert.equal(getSuggestions(products, query, 5)[0]?.id, 'bear', query);
+  }
+  assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
+  assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');
 });

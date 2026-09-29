@@ -17,6 +17,14 @@ this isolated candidate. Production remains unchanged.
 ## Allowed change set
 
 - `lib/instore-discovery.mjs`
+- `lib/search-language.mjs`
+- `api/_instore-catalogue.js`
+- `src/lib/fuzzySearch.js`
+- `src/components/MainContent.jsx`
+- `src/index.css`
+- `tests/search/fuzzySearch.test.js`
+- `tests/search/search-experience.test.js`
+- `tests/extended-range-api.test.js`
 - `tests/instore-discovery.test.js`
 - `tests/instore-catalogue-store.test.js`
 - `PROTO-SEARCH-CHANGE-MANIFEST.md`
@@ -26,16 +34,20 @@ this isolated candidate. Production remains unchanged.
 - Keep all existing Instore eligibility gates unchanged.
 - Keep stock, price, image review, duplicate suppression and explicit listing
   controls unchanged.
+- Use one bounded search-language layer for both the main catalogue and
+  Instore Products, covering customer synonyms, plurals and safe close typos.
 - Make the complete eligible `Soft toys` range discoverable with common
   customer wording and misspellings, on both stored/server search and local
   browser search.
+- Show the complete main-catalogue and Instore result totals in the site-wide
+  search and make the full Instore result set an obvious action.
 
 ## Explicitly excluded
 
 - No production deployment or alias change.
 - No database migration or data write.
 - No stock, checkout, price, image or listing-control change.
-- No main-catalogue search change.
+- No product eligibility, ordering or source-data change.
 
 ## Verification
 
@@ -43,8 +55,11 @@ this isolated candidate. Production remains unchanged.
   `plush` returned 5, `teddy` returned 2, and `stuffed animal`, `pluch` and
   `tedi` returned none.
 - Focused Instore/API tests: 45 passed.
-- Full repository suite: 397 passed across 84 test files.
+- Expanded focused search and Instore suite: 56 passed.
+- Full repository suite: 399 passed, 0 failed.
 - ESLint: passed.
-- Production build: passed; unchanged global CSS still compiles as
-  `index-CiIf4FZd.css`.
+- Production build: passed.
+- Local browser rendering was intentionally not configured with production
+  Supabase credentials; authenticated visual verification remains a preview
+  release gate.
 - No production deployment, database or application data was changed.

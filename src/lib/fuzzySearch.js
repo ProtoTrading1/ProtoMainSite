@@ -5,6 +5,7 @@ import {
   isIdentifierQuery,
   normalizeIdentifier,
 } from './identifierNormalize.js';
+import { firstRelatedSearchTerm, searchQueryVariants } from '../../lib/search-language.mjs';
 
 const SCORE = {
   EXACT_SKU: 100,
@@ -26,25 +27,6 @@ const searchIndex = new WeakMap();
 const suggestionCache = new WeakMap();
 const datasetIndex = new WeakMap();
 
-// Proto-specific language customers commonly use. The canonical term is added
-// to the query; the original words remain, so this expands rather than replaces
-// what the customer typed.
-const SEARCH_SYNONYMS = new Map([
-  ['purse', ['wallet', 'handbag']],
-  ['purses', ['wallet', 'handbag']],
-  ['teddy', ['soft toy']],
-  ['teddies', ['soft toy']],
-  ['stationary', ['stationery']],
-  ['earring back', ['butterfly']],
-  ['earring backs', ['butterfly']],
-  ['gift bag', ['paper bag', 'carrier bag']],
-  ['gift bags', ['paper bag', 'carrier bag']],
-  ['cellphone', ['mobile phone']],
-  ['cell phone', ['mobile phone']],
-  ['colouring', ['coloring']],
-  ['jewellery', ['jewelry']],
-]);
-
 function normalize(value) {
   return String(value || '')
     .toLowerCase()
@@ -59,26 +41,8 @@ function compact(value) {
   return normalize(value).replace(/\s+/g, '');
 }
 
-function queryVariants(value) {
-  const normalized = normalize(value);
-  if (!normalized) return [];
-  const variants = [normalized];
-  for (const [phrase, synonyms] of SEARCH_SYNONYMS) {
-    if (!normalized.includes(phrase)) continue;
-    for (const synonym of synonyms) {
-      variants.push(normalized.replace(phrase, synonym));
-    }
-  }
-  return [...new Set(variants)];
-}
-
 export function getRelatedSearchTerm(value) {
-  const normalized = normalize(value);
-  if (!normalized) return null;
-  for (const [phrase, synonyms] of SEARCH_SYNONYMS) {
-    if (normalized.includes(phrase)) return synonyms[0] || null;
-  }
-  return null;
+  return firstRelatedSearchTerm(value);
 }
 
 function words(text) {
@@ -451,7 +415,7 @@ function scoreProduct(product, query) {
 }
 
 export function fuzzyFilter(products, query) {
-  const variants = queryVariants(query);
+  const variants = searchQueryVariants(query);
   if (variants.length === 0) return products;
 
   const candidateSet = new Set();
