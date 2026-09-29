@@ -395,6 +395,21 @@ test('stored search tokens answer the same prefix rule the matcher applies', () 
   }
 });
 
+test('stored and live searches agree for soft-toy aliases without rebuilding the snapshot', () => {
+  const product = {
+    sku: '8626100117', barcode: '', name: 'SOFT TOY ±50CM GIRAFFE',
+    title: 'SOFT TOY ±50CM GIRAFFE', originalDescription: 'SOFT TOY ±50CM GIRAFFE', category: 'soft toys',
+  };
+  const tokens = catalogueSearchTokens(product);
+  const matchesStored = (query) => catalogueSearchPatterns(query)
+    .every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens));
+
+  for (const query of ['plush', 'pluch', 'teddy', 'tedi', 'stuffed animal', 'cuddly toy', 'softtoy']) {
+    assert.equal(matchesStored(query), true, `stored search finds "${query}"`);
+    assert.equal(matchesStored(query), matchesInstoreSearch(product, query), `stored/live parity for "${query}"`);
+  }
+});
+
 test('stored rows carry the default customer ordering and the browse category', () => {
   const products = [
     { sku: 'C', name: 'MUG CERAMIC', title: 'MUG CERAMIC', originalDescription: 'MUG CERAMIC', category: 'household' },

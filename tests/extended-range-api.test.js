@@ -28,6 +28,29 @@ test('plain language discovery search does not loosen eligibility', () => {
   assert.equal(buildExtendedRangeProducts([{ ...valid, available_stock: 0 }], 'bracelet').length, 0);
 });
 
+test('every approved Nutstore item above ten units stays discoverable by product code', () => {
+  const rows = Array.from({ length: 120 }, (_, index) => ({
+    ...valid,
+    sku: `86261${String(index).padStart(5, '0')}`,
+    barcode: `600${String(1000000 + index)}`,
+    title: `SOFT TOY ASSORTED ${index + 1}`,
+    original_description: `SOFT TOY ASSORTED ${index + 1}`,
+    available_stock: 11 + (index % 90),
+    category: 'SOFT TOYS',
+    image_url: `https://images.example.test/soft-toy-${index + 1}.jpg`,
+  }));
+  const catalogue = buildExtendedRangeProducts(rows);
+
+  assert.equal(catalogue.length, rows.length);
+  for (const row of rows) {
+    assert.deepEqual(
+      buildExtendedRangeProducts(rows, row.sku).map((product) => product.sku),
+      [row.sku],
+      `${row.sku} remains directly findable`,
+    );
+  }
+});
+
 test('legacy verified Instore records do not require a source-label backfill', () => {
   const legacy = { ...valid, available_stock: 10 };
   delete legacy.image_source;

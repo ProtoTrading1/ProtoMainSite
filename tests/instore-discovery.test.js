@@ -15,6 +15,27 @@ test('uses Positill department and description for the soft-toy browse tile', ()
   assert.equal(matchesInstoreSearch(product, 'giraffe'), true);
 });
 
+test('finds the whole eligible soft-toy range by everyday names and common misspellings', () => {
+  const softToys = Array.from({ length: 81 }, (_, index) => ({
+    sku: `86261${String(index).padStart(5, '0')}`,
+    title: `SOFT TOY ASSORTED ${index + 1}`,
+    originalDescription: `SOFT TOY ASSORTED ${index + 1}`,
+    category: 'SOFT TOYS',
+  }));
+
+  for (const query of [
+    'soft toy', 'soft toys', 'softtoy', 'plush', 'pluch', 'plsh',
+    'teddy', 'teddies', 'tedi', 'stuffed animal', 'stuffed toys',
+    'cuddly toy', 'cudly toy', 'softies',
+  ]) {
+    assert.equal(
+      softToys.filter((product) => matchesInstoreSearch(product, query)).length,
+      softToys.length,
+      `all eligible soft toys are discoverable for "${query}"`,
+    );
+  }
+});
+
 test('uses Positill department wording to keep party items distinct from toys', () => {
   assert.equal(discoveryGroup({ title: 'PARTY TOY CLUB', category: 'PARTY / FANCY DRES' }), 'Party items');
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');
