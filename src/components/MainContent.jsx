@@ -220,8 +220,16 @@ export default function MainContent({
   useEffect(() => {
     if (loading) return;
     const total = Math.max(0, Number(resultsTotal) || 0);
-    const message = total === 0
+    const additionalInstore = searchKey && !instoreSearch.loading && !instoreSearch.error
+      ? Math.max(0, Number(instoreSearch.total) || 0)
+      : 0;
+    const combinedTotal = total + additionalInstore;
+    const message = combinedTotal === 0
       ? 'No products match your current filters.'
+      : total === 0 && additionalInstore > 0
+        ? `${additionalInstore} products found in Instore.`
+        : additionalInstore > 0
+          ? `${combinedTotal} products found across Proto: ${total} in the main catalogue and ${additionalInstore} in Instore.`
       : totalPages > 1
         ? `${total} products found. Page ${page} of ${totalPages}.`
         : `${total} products found.`;
@@ -242,6 +250,9 @@ export default function MainContent({
     inStockOnly,
     sort,
     refinementsKey,
+    instoreSearch.loading,
+    instoreSearch.error,
+    instoreSearch.total,
   ]);
 
   // The skeleton may only appear when there is NOTHING painted yet. Replacing

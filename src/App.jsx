@@ -1080,6 +1080,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         <main className="content-area" onScroll={dismissWelcome}>
           {viewingInstoreProducts ? <ExtendedRangePage
             browseCategory={String(refinements.browse || '')}
+            initialQuery={searchQuery}
             onBrowseCategoryChange={(nextCategory) => {
               const next = { ...refinements };
               if (nextCategory) next.browse = nextCategory;

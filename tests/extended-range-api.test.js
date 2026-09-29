@@ -38,6 +38,9 @@ test('extended-range search applies structured customer intent after eligibility
   ];
 
   assert.deepEqual(buildExtendedRangeProducts(rows, 'blue dolphin 50 centimetre').map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(buildExtendedRangeProducts(rows, 'soft toy 0.5m').map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(buildExtendedRangeProducts(rows, 'soft toy 0,5m').map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(buildExtendedRangeProducts(rows, 'soft toy 500mm').map((product) => product.sku), ['8626110059']);
   assert.deepEqual(buildExtendedRangeProducts(rows, 'cheap soft toys under R100').map((product) => product.sku), ['8626110059', '8626110060', '8626110061']);
   assert.deepEqual(buildExtendedRangeProducts(rows, 'in stock blue teddy').map((product) => product.sku), ['8626110062']);
   assert.deepEqual(buildExtendedRangeProducts(rows, '8626110059').map((product) => product.sku), ['8626110059']);

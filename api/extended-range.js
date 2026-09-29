@@ -15,7 +15,7 @@ import {
 
 export { readCompleteRows };
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 24;
 const MAX_PAGE = 10_000;
 // Instore is intentionally a high-availability collection. Small residual
 // quantities create disappointing customer journeys, so do not show an item
@@ -61,7 +61,10 @@ export function excludeMainCatalogueProducts(products, catalogueRows) {
 }
 
 function normalizeQuery(value) {
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 80);
+  // Keep decimal punctuation until shared intent parsing has converted units.
+  // Removing it here turned 0.5m into 05m and made equivalent measurements
+  // disagree between the main catalogue and Instore search.
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9 _.,-]/g, '').slice(0, 80);
 }
 
 function normalizePage(value) {

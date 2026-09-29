@@ -4,6 +4,7 @@ import ProtoLogo from './ProtoLogo';
 import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
 import { discoveryTiles } from '../../lib/instore-discovery.mjs';
 import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
+import { parseSearchQuery, searchQueryVariants } from '../../lib/search-language.mjs';
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
@@ -150,6 +151,25 @@ export default function ExtendedRangePage({ browseCategory = '', onBrowseCategor
     });
   };
   const searchActive = Boolean(submittedQuery);
+  const recoveryQueries = useMemo(() => {
+    if (!submittedQuery) return [];
+    const original = submittedQuery.toLowerCase().replace(/\s+/g, ' ').trim();
+    const intent = parseSearchQuery(submittedQuery);
+    return [...new Set([intent.text, ...searchQueryVariants(submittedQuery)])]
+      .map((candidate) => String(candidate || '').trim())
+      .filter((candidate) => candidate && candidate.toLowerCase() !== original)
+      .slice(0, 3);
+  }, [submittedQuery]);
+  const tryRecoveryQuery = (candidate) => {
+    setQuery(candidate);
+    setSubmittedQuery(candidate);
+    setCategory('');
+    onBrowseCategoryChange?.('');
+    setPage(1);
+  };
+  const requestProduct = () => window.dispatchEvent(new CustomEvent('proto:open-product-request', {
+    detail: { query: submittedQuery },
+  }));
   const totalLabel = `${meta.total.toLocaleString()} ${meta.total === 1 ? 'product' : 'products'}`;
   const resultFeedback = loading
     ? 'Searching Instore Products…'
@@ -164,12 +184,12 @@ export default function ExtendedRangePage({ browseCategory = '', onBrowseCategor
 
   return <section className={`instore${searchActive ? ' instore--search-active' : ''}`} aria-labelledby="instore-title">
     <header className="instore-hero">
-      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">More products,<br />easier to find<span aria-hidden="true">.</span></h1><p>Search the verified Instore collection by everyday product names, similar terms, or an exact product code.</p></div>
-      <ol className="instore-guide">
+      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">{searchActive ? 'Instore search' : <>More products,<br />easier to find<span aria-hidden="true">.</span></>}</h1><p>{searchActive ? 'Verified products with current price and more than 10 units available.' : 'Search the verified Instore collection by everyday product names, similar terms, or an exact product code.'}</p></div>
+      {!searchActive && <ol className="instore-guide">
         <li><button type="button" style={guideActionStyle} onClick={() => searchRef.current?.focus()}><b>01</b><span>Search in plain language</span></button></li>
         <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>02</b><span>Check live stock</span></button></li>
         <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>03</b><span>Confirm code and price</span></button></li>
-      </ol>
+      </ol>}
     </header>
     <aside className="instore-disclaimer" aria-label="Product image quality notice"><strong>Product images</strong><span>Some Instore product images are lower resolution and are for reference. Colours and details may differ from the actual product.</span></aside>
     <div className="instore-toolbar">
@@ -198,7 +218,7 @@ export default function ExtendedRangePage({ browseCategory = '', onBrowseCategor
       </div>
       {loading && <div className="instore-loading" aria-hidden="true"><span className="instore-spinner"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
       {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
-      {!loading && !error && !products.length && <div className="instore-state instore-state--no-results"><PackageSearch size={30} /><h3>{searchActive ? `No products match “${submittedQuery}”` : 'No products found'}</h3><p>{searchActive ? 'Try one product type at a time, remove details such as colour or size, or search by an exact product code.' : 'Clear the current filter to browse the complete Instore collection.'}</p><div className="instore-state-actions">{searchActive && <button className="instore-state-secondary" type="button" onClick={editSearch}><Search size={16} aria-hidden="true" /> Edit search</button>}<button type="button" onClick={clear}><X size={16} aria-hidden="true" /> Browse all products</button></div></div>}
+      {!loading && !error && !products.length && <div className="instore-state instore-state--no-results"><PackageSearch size={30} /><h3>{searchActive ? `No products match “${submittedQuery}”` : 'No products found'}</h3><p>{searchActive ? 'Try a broader product phrase below, edit your wording, or send Proto a product request.' : 'Clear the current filter to browse the complete Instore collection.'}</p>{searchActive && recoveryQueries.length > 0 && <div className="instore-recovery" aria-label="Related searches"><span>Try instead</span><div>{recoveryQueries.map((candidate) => <button key={candidate} type="button" onClick={() => tryRecoveryQuery(candidate)}>{candidate}</button>)}</div></div>}<div className="instore-state-actions">{searchActive && <button className="instore-state-secondary" type="button" onClick={editSearch}><Search size={16} aria-hidden="true" /> Edit search</button>}<button type="button" onClick={clear}><X size={16} aria-hidden="true" /> Browse all products</button>{searchActive && <button className="instore-state-request" type="button" onClick={requestProduct}><PackageSearch size={16} aria-hidden="true" /> Request this product</button>}</div></div>}
       {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} />)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
     </div>
 

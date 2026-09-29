@@ -57,7 +57,10 @@ test('normalizes common plural, joined-word and regional customer phrases', () =
   for (const query of ['colour pencils', 'colored pencils', 'colouring pencils']) {
     assert.equal(matchesInstoreSearch(products[2], query), true, query);
   }
-  for (const query of ['backpack', 'back pack', 'back packs', 'school bag', 'school bags', 'book bag']) {
+  for (const query of [
+    'backpack', 'back pack', 'back packs', 'school bag', 'school bags', 'book bag',
+    'bulk school bags', 'school bags wholesale', 'MOQ 12 school bags', 'box of 24 school bags', 'dozen school bags',
+  ]) {
     assert.equal(matchesInstoreSearch(products[3], query), true, query);
   }
   for (const query of ['bead glue', 'beading glue', 'craft glue', 'craft adhesive']) {
@@ -99,8 +102,13 @@ test('applies Phase 1 measurements, price, availability and colour intent determ
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'blue dolphin 50cm')).map((product) => product.sku), ['8626110059']);
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toy 50 cm')).map((product) => product.sku), ['8626110059']);
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'cheap soft toys under R100')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys under 100 rand')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys R100 and below')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys below R100 incl VAT')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'in stock blue teddy')).map((product) => product.sku), ['8626110061']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'available blue teddy')).map((product) => product.sku), ['8626110061']);
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, '8626110059')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'sku 8626110059')).map((product) => product.sku), ['8626110059']);
 });
 
 test('uses Positill department wording to keep party items distinct from toys', () => {
@@ -112,6 +120,17 @@ test('does not classify socks as soft toys', () => {
   assert.notEqual(discoveryGroup({ title: 'COTTON SOCKS ASSORTED', category: 'SOCKS' }), 'Soft toys');
   assert.notEqual(discoveryGroup({ title: 'ANKLE SOCKS', category: 'SOFT TOYS' }), 'Soft toys');
   assert.equal(discoveryGroup({ title: 'SOFT TOY TEDDY BEAR', category: 'SOFT TOYS' }), 'Soft toys');
+});
+
+test('uses the reviewed soft-toy department for animal names that omit the object words', () => {
+  const dolphin = { sku: 'DOLPHIN50', title: 'BLUE DOLPHIN 50CM', originalDescription: 'BLUE DOLPHIN 50CM', category: 'SOFT TOYS' };
+  assert.equal(discoveryGroup(dolphin), 'Soft toys');
+  for (const query of ['soft toys', 'plush', 'stuffed animal']) {
+    assert.equal(matchesInstoreSearch(dolphin, query), true, query);
+  }
+
+  const sock = { sku: 'SOCK001', title: 'COTTON SOCKS ASSORTED', category: 'SOFT TOYS' };
+  assert.notEqual(discoveryGroup(sock), 'Soft toys');
 });
 
 test('keeps jewellery-making components out of finished jewellery', () => {

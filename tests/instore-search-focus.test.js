@@ -17,6 +17,27 @@ test('search results expose one accessible status and useful recovery actions', 
   assert.doesNotMatch(page, /className="instore-loading" role="status"/);
   assert.match(page, /> Edit search</);
   assert.match(page, /> Browse all products</);
+  assert.match(page, /> Request this product</);
+  assert.match(page, /searchQueryVariants\(submittedQuery\)/);
+  assert.match(page, /proto:open-product-request/);
+  assert.match(page, /!searchActive && <ol className="instore-guide"/);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.instore--search-active \.instore-grid\{grid-template-columns:1fr/);
   assert.match(css, /@media\(max-width:360px\)[\s\S]*?\.instore-clear-results\{width:100%/);
+});
+
+test('Instore result pages stay compact enough to compare on mobile and by keyboard', async () => {
+  const pager = await readFile(new URL('../lib/instore-page.mjs', import.meta.url), 'utf8');
+  const api = await readFile(new URL('../api/extended-range.js', import.meta.url), 'utf8');
+
+  assert.match(pager, /INSTORE_PAGE_SIZE = 24/);
+  assert.match(api, /const PAGE_SIZE = 24/);
+});
+
+test('combined search keeps its query and announces the combined result truthfully', async () => {
+  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/components/MainContent.jsx', import.meta.url), 'utf8');
+
+  assert.match(app, /<ExtendedRangePage[\s\S]*initialQuery=\{searchQuery\}/);
+  assert.match(main, /products found across Proto/);
+  assert.match(main, /products found in Instore/);
 });

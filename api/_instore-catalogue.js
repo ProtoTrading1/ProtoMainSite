@@ -153,15 +153,36 @@ export async function readCatalogueOrderedPage(client, { category = '', from = 0
 // and therefore the order equal-scoring products have always tied in.
 export async function readCatalogueSearchCandidates(client, { query, category = '' } = {}) {
   const patternSets = catalogueSearchPatternSets(query);
-  const resultSets = await Promise.all(patternSets.map((patterns) => readCompleteRows(() => {
+  const readPatterns = (patterns) => readCompleteRows(() => {
       let request = client.from('instore_catalogue').select('sku, payload', { count: 'exact' });
       if (category) request = request.eq('discovery_group', category);
       for (const pattern of patterns) request = request.like('search_tokens', pattern);
       return request;
-    })));
+    });
+  const resultSets = await Promise.all(patternSets.map(readPatterns));
   const products = new Map();
   for (const rows of resultSets) {
     for (const row of rows) products.set(String(row.sku || row.payload?.sku || ''), row.payload);
+  }
+  // The live matcher safely tolerates one edit in a six-letter word. If the
+  // exact stored-token prefilter found nothing, retry with that one long word
+  // omitted so the live matcher can make the final decision. A one-word typo
+  // needs the complete (still eligibility-filtered) snapshot. This fallback
+  // only runs after a zero-candidate read, never on a successful search.
+  if (!products.size && patternSets.length === 1) {
+    const terms = searchTermSets(query)[0] || [];
+    const typoTerms = terms.filter((term) => /^[a-z]{6,}$/.test(term));
+    for (const typoTerm of typoTerms) {
+      const remaining = terms.filter((term) => term !== typoTerm);
+      const rows = remaining.length
+        ? await readPatterns(remaining.map((term) => `% ${term}%`))
+        : await readCompleteRows(() => {
+          let request = client.from('instore_catalogue').select('sku, payload', { count: 'exact' });
+          if (category) request = request.eq('discovery_group', category);
+          return request;
+        });
+      for (const row of rows) products.set(String(row.sku || row.payload?.sku || ''), row.payload);
+    }
   }
   return [...products.values()];
 }

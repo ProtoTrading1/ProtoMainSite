@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getSuggestions, prepareSearchIndex } from '../../src/lib/fuzzySearch.js';
+import { isIdentifierQuery } from '../../src/lib/identifierNormalize.js';
 
 const products = [
   { id: 'wallet', code: '60010001', barcode: '60010001', sku: 'WA100', websiteSku: 'WA100', name: 'Ladies Wallet', stockOnHand: 20 },
@@ -39,7 +40,10 @@ test('keeps exact identifier lookup ahead of fuzzy text matches', () => {
 
 test('searches website SKU and barcode as equal first-class identifiers', () => {
   assert.equal(getSuggestions(products, 'WA100', 5)[0]?.id, 'wallet');
+  assert.equal(getSuggestions(products, 'sku WA100', 5)[0]?.id, 'wallet');
+  assert.equal(getSuggestions(products, 'WA-100', 5)[0]?.id, 'wallet');
   assert.equal(getSuggestions(products, '60010001', 5)[0]?.id, 'wallet');
+  assert.equal(getSuggestions(products, '6001 0001', 5)[0]?.id, 'wallet');
 });
 
 test('searches from a three-letter SKU prefix', () => {
@@ -52,6 +56,15 @@ test('ranks available stock ahead when relevance is equal', () => {
 
 test('recovers an adjacent-letter typo', () => {
   assert.equal(getSuggestions(products, 'walelt', 5)[0]?.id, 'wallet');
+});
+
+test('keeps numeric shopping language out of exact identifier lookup', () => {
+  for (const query of ['50cm', '0.5m', '500ml', '12 pack', 'pack of 12', 'A4 notebook', 'over R100']) {
+    assert.equal(isIdentifierQuery(query), false, query);
+  }
+  for (const query of ['WA100', '60010001', '6001 0001', 'sku WA100', 'code: 8613100205', '86/131/00205']) {
+    assert.equal(isIdentifierQuery(query), true, query);
+  }
 });
 
 test('uses the shared customer-language families across the main catalogue', () => {
@@ -72,6 +85,9 @@ test('uses the shared customer-language families across the main catalogue', () 
   assert.equal(getSuggestions(products, 'colored pencils', 5)[0]?.id, 'colour-pencils');
   assert.equal(getSuggestions(products, 'back pack', 5)[0]?.id, 'backpack');
   assert.equal(getSuggestions(products, 'school bag', 5)[0]?.id, 'backpack');
+  for (const query of ['bulk school bags', 'school bags wholesale', 'MOQ 12 school bags', 'box of 24 school bags', 'dozen school bags']) {
+    assert.equal(getSuggestions(products, query, 5)[0]?.id, 'backpack', query);
+  }
   assert.equal(getSuggestions(products, 'craft glue', 5)[0]?.id, 'bead-glue');
   assert.equal(getSuggestions(products, 'craft glue', 5).some((product) => product.id === 'nail-glue'), false);
 });
@@ -80,6 +96,7 @@ test('understands deterministic shopping constraints without weakening exact ide
   const phaseOneProducts = [
     { id: 'blue-dolphin-50', code: '8626110059', barcode: '6008626110059', name: 'Soft Toy Blue Dolphin 50cm', price: 89.99, stockOnHand: 14, colour: 'Blue', size: '50cm', categoryPath: ['Soft toys'] },
     { id: 'blue-teddy-live', code: 'BT800', name: 'Soft Toy Blue Teddy', price: 79.99, stockOnHand: 11, colour: 'Blue', categoryPath: ['Soft toys'] },
+    { id: 'red-teddy-live', code: 'RT800', name: 'Soft Toy Red Teddy', price: 84.99, stockOnHand: 13, colour: 'Red', categoryPath: ['Soft toys'] },
     { id: 'blue-teddy-out', code: 'BT801', name: 'Soft Toy Blue Teddy', price: 69.99, stockOnHand: 0, colour: 'Blue', categoryPath: ['Soft toys'] },
     { id: 'cheap-soft-toy', code: 'ST900', name: 'Soft Toy Rabbit', price: 99.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
     { id: 'expensive-soft-toy', code: 'ST901', name: 'Soft Toy Rabbit Deluxe', price: 149.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
@@ -94,11 +111,25 @@ test('understands deterministic shopping constraints without weakening exact ide
   assert.equal(getSuggestions(phaseOneProducts, 'soft toy 50 cm', 10).some((product) => product.id === 'long-dolphin'), false);
   assert.deepEqual(
     new Set(getSuggestions(phaseOneProducts, 'cheap soft toys under R100', 10).map((product) => product.id)),
-    new Set(['blue-teddy-live', 'blue-teddy-out', 'cheap-soft-toy', 'blue-dolphin-50', 'long-dolphin']),
+    new Set(['blue-teddy-live', 'red-teddy-live', 'blue-teddy-out', 'cheap-soft-toy', 'blue-dolphin-50', 'long-dolphin']),
   );
   assert.deepEqual(
     getSuggestions(phaseOneProducts, 'in stock blue teddy', 10).map((product) => product.id),
     ['blue-teddy-live'],
+  );
+  assert.deepEqual(
+    getSuggestions(phaseOneProducts, 'available blue teddy', 10).map((product) => product.id),
+    ['blue-teddy-live'],
+  );
+  for (const query of ['soft toys under 100 rand', 'soft toys R100 and below', 'soft toys below R100 incl VAT']) {
+    const ids = getSuggestions(phaseOneProducts, query, 20).map((product) => product.id);
+    assert.equal(ids.includes('expensive-soft-toy'), false, query);
+    assert.equal(ids.includes('vat-over-cap'), false, query);
+    assert.equal(ids.includes('cheap-soft-toy'), true, query);
+  }
+  assert.deepEqual(
+    new Set(getSuggestions(phaseOneProducts, 'red or blue soft toys', 20).map((product) => product.id)),
+    new Set(['blue-dolphin-50', 'blue-teddy-live', 'red-teddy-live', 'blue-teddy-out', 'long-dolphin']),
   );
   assert.equal(getSuggestions(phaseOneProducts, '8626110059', 5)[0]?.id, 'blue-dolphin-50');
   assert.equal(getSuggestions(phaseOneProducts, 'soft toys under R100', 10).some((product) => product.id === 'vat-over-cap'), false);

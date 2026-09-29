@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, instoreSearchTokens, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import {
   buildCatalogueRows, catalogueSearchPatterns, catalogueSearchPatternSets, catalogueSearchTokens, catalogueSnapshotIsFresh,
-  catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueView, writeCatalogueSnapshot,
+  catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueSearchCandidates, readCatalogueView, writeCatalogueSnapshot,
 } from '../api/_instore-catalogue.js';
 import { instorePage } from '../lib/instore-page.mjs';
 import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-range.js';
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 24;
 
 // A deliberately varied source index: several browse categories, names that
 // exercise search ranking, and enough products to page.
@@ -436,6 +436,16 @@ test('stored and live searches agree for school-bag and craft-glue language', ()
     );
   }
   assert.equal(candidateMatches(products[2], 'craft glue'), false, 'craft glue excludes nail glue');
+});
+
+test('stored candidate lookup defers a safe long-word typo to the live matcher', async () => {
+  const { client, live } = await seededClient();
+  const expected = live.products.filter((product) => matchesInstoreSearch(product, 'bracelat'));
+  assert.ok(expected.length > 0, 'fixture includes a bracelet recovered from the typo');
+
+  const candidates = await readCatalogueSearchCandidates(client, { query: 'bracelat' });
+  const actual = candidates.filter((product) => matchesInstoreSearch(product, 'bracelat'));
+  assert.deepEqual(actual.map((product) => product.sku), expected.map((product) => product.sku));
 });
 
 test('stored candidate terms and live intent filters agree for structured soft-toy searches', () => {
