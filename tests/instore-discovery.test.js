@@ -36,6 +36,18 @@ test('finds the whole eligible soft-toy range by everyday names and common missp
   }
 });
 
+test('does not confuse a known soft-toy synonym with blush cosmetics', () => {
+  const blush = {
+    sku: 'BEAUTY001',
+    title: 'BEAUTY BLUSH PALETTE',
+    originalDescription: 'COSMETIC BLUSH PALETTE',
+    category: 'COSMETICS SKIN CARE',
+  };
+
+  assert.equal(matchesInstoreSearch(blush, 'plush'), false);
+  assert.equal(matchesInstoreSearch(blush, 'pluch'), false);
+});
+
 test('uses Positill department wording to keep party items distinct from toys', () => {
   assert.equal(discoveryGroup({ title: 'PARTY TOY CLUB', category: 'PARTY / FANCY DRES' }), 'Party items');
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');

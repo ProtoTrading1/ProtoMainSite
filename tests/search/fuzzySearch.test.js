@@ -12,6 +12,7 @@ const products = [
   { id: 'mkt-item', code: '70010002', barcode: '70010002', sku: 'MKT250', websiteSku: 'MKT250', name: 'Display Hooks', stockOnHand: 15 },
   { id: 'hair-clip', code: 'HC500', name: 'Hair Clip Assorted', stockOnHand: 18 },
   { id: 'phone-case', code: 'PC600', name: 'Mobile Phone Case', stockOnHand: 22 },
+  { id: 'blush', code: 'BU700', name: 'Beauty Blush Palette', stockOnHand: 16 },
 ];
 
 prepareSearchIndex(products);
@@ -45,7 +46,9 @@ test('recovers an adjacent-letter typo', () => {
 
 test('uses the shared customer-language families across the main catalogue', () => {
   for (const query of ['plush', 'stuffed animal', 'cuddly toy', 'pluch', 'tedi']) {
-    assert.equal(getSuggestions(products, query, 5)[0]?.id, 'bear', query);
+    const results = getSuggestions(products, query, 5);
+    assert.equal(results[0]?.id, 'bear', query);
+    assert.equal(results.some((product) => product.id === 'blush'), false, `${query} excludes blush cosmetics`);
   }
   assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
   assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');

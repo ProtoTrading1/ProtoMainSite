@@ -417,6 +417,10 @@ function scoreProduct(product, query) {
 export function fuzzyFilter(products, query) {
   const variants = searchQueryVariants(query);
   if (variants.length === 0) return products;
+  // Semantic families include their intended synonyms and common misspellings.
+  // Requiring a keyword-strength match prevents another one-edit word such as
+  // `blush` from leaking into results for the known family `plush`.
+  const minimumScore = variants.length > 1 ? SCORE.KEYWORD : SEARCH_MIN_CONFIDENCE;
 
   const candidateSet = new Set();
   for (const variant of variants) {
@@ -428,7 +432,7 @@ export function fuzzyFilter(products, query) {
       product,
       score: Math.max(...variants.map((variant) => scoreProduct(product, variant))),
     }))
-    .filter((item) => item.score >= SEARCH_MIN_CONFIDENCE)
+    .filter((item) => item.score >= minimumScore)
     .sort((a, b) => {
       const scoreDelta = b.score - a.score;
       if (scoreDelta !== 0) return scoreDelta;
