@@ -86,6 +86,12 @@ export function prefetchCatalog() {
   // The home grid is Featured — resolve it now so the first screen after
   // login paints without a loading pass.
   void fetchFeaturedCatalogProducts().catch(() => {});
+  void import('./extendedRange').then((module) => module.hydrateInstoreCatalogue()).catch(() => {});
+  void getAllCached()
+    .catch(() => null)
+    .then(() => import('./extendedRange'))
+    .then((module) => module.prefetchInstoreCatalogue())
+    .catch(() => {});
 }
 
 function saveToLocalCache(data) {

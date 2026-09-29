@@ -4,6 +4,10 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
+import ExtendedRangePage from './components/ExtendedRangePage';
+import { instoreAvailable } from './lib/instoreAvailability';
+import { fetchExtendedRange, instoreCatalogue } from './lib/extendedRange';
+import { instorePage } from '../lib/instore-page.mjs';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -199,6 +203,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
+  const [instoreSearch, setInstoreSearch] = useState({ query: '', products: [], total: 0, loading: false, error: false });
   const [counts, setCounts] = useState({ '': 0 });
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
@@ -416,7 +421,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
   // if the first path segment isn't a known department, resolve to the
   // catalogue root instead of showing an empty/broken page.
   useEffect(() => {
-    if (path.length && !categories.some((c) => c.id === path[0])) {
+    if (path.length && !['instore-products', 'extended-range'].includes(path[0]) && !categories.some((c) => c.id === path[0])) {
       hashNavigate([]);
     }
   }, [path, hashNavigate]);
@@ -615,6 +620,43 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
   }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!instoreAvailable || query.length < 2) {
+      setInstoreSearch({ query: '', products: [], total: 0, loading: false, error: false });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+    setInstoreSearch({ query, products: [], total: 0, loading: true, error: false });
+    const timer = window.setTimeout(async () => {
+      try {
+        const catalogue = instoreCatalogue();
+        const result = catalogue
+          ? instorePage(catalogue, { query, pageSize: 12 })
+          : await fetchExtendedRange(query, { signal: controller.signal, page: 1 });
+        if (!cancelled) setInstoreSearch({
+          query,
+          products: (result.products || []).slice(0, 12),
+          total: Number(result.total) || 0,
+          loading: false,
+          error: false,
+        });
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          setInstoreSearch({ query, products: [], total: 0, loading: false, error: true });
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -995,6 +1037,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
+  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -1015,6 +1058,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
       />
@@ -1026,6 +1070,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             path={path}
             navigate={navigate}
             onAllProducts={goAllProducts}
+            onInstoreProducts={() => navigate(['instore-products'])}
             setRefinement={setRefinement}
             counts={counts}
             customer={customer}
@@ -1033,7 +1078,15 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         </aside>
 
         <main className="content-area" onScroll={dismissWelcome}>
-          <MainContent
+          {viewingInstoreProducts ? <ExtendedRangePage
+            browseCategory={String(refinements.browse || '')}
+            onBrowseCategoryChange={(nextCategory) => {
+              const next = { ...refinements };
+              if (nextCategory) next.browse = nextCategory;
+              else delete next.browse;
+              hashNavigate(path, next, { scroll: false });
+            }}
+          /> : <MainContent
             products={catalogProducts}
             resultsTotal={catalogTotal}
             addToCart={addToCart}
@@ -1069,7 +1122,9 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
             refinements={refinements}
-          />
+            instoreSearch={instoreSearch}
+            onViewAllInstore={() => navigate(['instore-products'])}
+          />}
         </main>
 
         <aside
@@ -1145,6 +1200,7 @@ export default function App({ customer, onLogout, onViewProfile, onViewAdmin }) 
         onHome={() => { goHome(); setMobileMenuOpen(false); }}
         onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
         onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
+        onInstoreProducts={() => { navigate(['instore-products']); setMobileMenuOpen(false); }}
       />
 
       {/* Mobile cart — opened from bottom tab bar */}

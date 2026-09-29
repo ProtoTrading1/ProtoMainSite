@@ -27,6 +27,8 @@ export async function resetPassword(email) {
 }
 
 export async function signOut() {
+  const { clearStoredInstoreResponses } = await import('./extendedRange');
+  clearStoredInstoreResponses();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }

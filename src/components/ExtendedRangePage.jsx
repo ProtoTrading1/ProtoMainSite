@@ -1,0 +1,206 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
+import ProtoLogo from './ProtoLogo';
+import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
+import { discoveryTiles } from '../../lib/instore-discovery.mjs';
+import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
+import './InstoreProducts.css';
+import './InstoreDisclaimer.css';
+
+const PAGE_SIZE = INSTORE_PAGE_SIZE;
+
+function money(value) {
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(value) || 0);
+}
+
+export function InstoreResultCard({ product, priority = false }) {
+  const name = String(product?.name || product?.title || product?.code || 'Instore product').trim();
+  const code = String(product?.code || product?.sku || '').trim();
+  const stock = Math.max(0, Math.floor(Number(product?.stockQty ?? product?.stockOnHand) || 0));
+  const image = String(product?.image || product?.images?.[0] || '').trim();
+  return <article className="instore-result-card">
+    <div className="instore-result-image">
+      {image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}
+    </div>
+    <div className="instore-result-body">
+      <p className="instore-result-code">{code || 'INSTORE PRODUCT'}</p>
+      <h3>{name}</h3>
+      <p className="instore-result-price">{money(product?.price)}</p>
+      <p className="instore-result-stock"><strong>{stock.toLocaleString()}</strong> available now</p>
+      <p className="instore-result-note">Read-only preview: ordering will be enabled only after checkout stock verification passes.</p>
+    </div>
+  </article>;
+}
+
+export default function ExtendedRangePage({ browseCategory = '', onBrowseCategoryChange, initialQuery = '' }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
+  const [page, setPage] = useState(1);
+  const [retry, setRetry] = useState(0);
+  const [products, setProducts] = useState([]);
+  const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE });
+  const [tiles, setTiles] = useState([]);
+  // The complete collection, once it has been fetched in the background. While
+  // it is held, every search, category and page is answered without a request.
+  const [catalogue, setCatalogue] = useState(() => instoreCatalogue());
+  // Whether this browser's own store has been consulted yet. Nothing is
+  // requested from the network until it has: if the collection is already
+  // here, a paged request would be a round trip for data we hold.
+  const [localChecked, setLocalChecked] = useState(() => Boolean(instoreCatalogue()));
+  // Beads stays the first browse tile, but opening the page must show the
+  // complete collection rather than silently applying that tile as a filter.
+  const [category, setCategory] = useState(browseCategory);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const resultsRef = useRef(null);
+  const searchRef = useRef(null);
+
+  const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+    setSubmittedQuery(initialQuery);
+    if (initialQuery) { setCategory(''); setPage(1); }
+  }, [initialQuery]);
+
+  // Once the collection is in memory, a search, a category tile or a page
+  // button is answered here: no request, no spinner.
+  useEffect(() => {
+    if (!catalogue) return;
+    // instorePage is the API's own page definition, applied to the same
+    // already-verified products it sent, so a locally answered view is the
+    // view the server would have returned.
+    const view = instorePage(catalogue, { query: submittedQuery, category, page, pageSize: PAGE_SIZE });
+    setProducts(view.products);
+    setTiles(localTiles || []);
+    setMeta({ total: view.total, page, pageSize: PAGE_SIZE });
+    setError(false);
+    setLoading(false);
+  }, [catalogue, localTiles, submittedQuery, category, page]);
+
+  useEffect(() => {
+    if (catalogue || !localChecked) return undefined;
+    const controller = new AbortController();
+    const apply = (data) => {
+      setProducts(Array.isArray(data?.products) ? data.products : []);
+      setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
+      setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || PAGE_SIZE) });
+    };
+    // A view this tab has already seen is painted at once and replaced as soon
+    // as the fresh response lands, so returning to Instore Products does not
+    // start again from an empty grid.
+    const stored = storedExtendedRange(submittedQuery, { page, category });
+    if (stored) apply(stored);
+    setLoading(!stored); setError(false);
+    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        apply(data);
+      })
+      .catch(() => { if (!controller.signal.aborted && !stored) setError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [submittedQuery, page, retry, category, catalogue, localChecked]);
+
+  // Look in this browser's own store first. It is free and usually holds the
+  // collection, in which case this page renders with no request at all.
+  useEffect(() => {
+    if (catalogue) return undefined;
+    let cancelled = false;
+    hydrateInstoreCatalogue()
+      .then((local) => { if (!cancelled && local) setCatalogue(local); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLocalChecked(true); });
+    return () => { cancelled = true; };
+  }, [catalogue]);
+
+  // Portal boot already starts this collection, so usually it is in hand
+  // before this page is opened. Joining the same load covers a customer who
+  // arrives before it has finished, or whose boot prefetch did not run.
+  useEffect(() => {
+    if (catalogue) return undefined;
+    let cancelled = false;
+    prefetchInstoreCatalogue().then((collection) => {
+      if (!cancelled && collection) setCatalogue(collection);
+    });
+    return () => { cancelled = true; };
+  }, [catalogue, retry]);
+
+  // The app router owns the hash. Mirroring its parsed browse value here
+  // prevents a native category link from leaving this page on stale results.
+  useEffect(() => {
+    setCategory(browseCategory);
+    setPage(1);
+    if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }, [browseCategory]);
+
+  // A typed search is a fresh discovery task, not an extra hidden category
+  // constraint. Category tiles remain a separate, explicit filter.
+  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };
+  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); searchRef.current?.focus(); };
+  const pages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
+  const first = (meta.page - 1) * meta.pageSize + 1;
+  const last = Math.min(meta.total, first + products.length - 1);
+  const changePage = (next) => { setPage(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); };
+  const editSearch = () => {
+    setQuery(submittedQuery);
+    window.requestAnimationFrame(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    });
+  };
+  const searchActive = Boolean(submittedQuery);
+  const totalLabel = `${meta.total.toLocaleString()} ${meta.total === 1 ? 'product' : 'products'}`;
+  const resultFeedback = loading
+    ? 'Searching Instore Products…'
+    : error
+      ? 'Products could not be loaded.'
+      : products.length
+        ? `${totalLabel}${searchActive ? ` match “${submittedQuery}”` : ''}. Showing ${first.toLocaleString()}–${last.toLocaleString()}.`
+        : searchActive
+          ? `No products match “${submittedQuery}”.`
+          : 'The collection is currently empty.';
+  const guideActionStyle = { width: '100%', border: 0, padding: 0, background: 'transparent', color: 'inherit', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', font: 'inherit', cursor: 'pointer' };
+
+  return <section className={`instore${searchActive ? ' instore--search-active' : ''}`} aria-labelledby="instore-title">
+    <header className="instore-hero">
+      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">More products,<br />easier to find<span aria-hidden="true">.</span></h1><p>Search the verified Instore collection by everyday product names, similar terms, or an exact product code.</p></div>
+      <ol className="instore-guide">
+        <li><button type="button" style={guideActionStyle} onClick={() => searchRef.current?.focus()}><b>01</b><span>Search in plain language</span></button></li>
+        <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>02</b><span>Check live stock</span></button></li>
+        <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>03</b><span>Confirm code and price</span></button></li>
+      </ol>
+    </header>
+    <aside className="instore-disclaimer" aria-label="Product image quality notice"><strong>Product images</strong><span>Some Instore product images are lower resolution and are for reference. Colours and details may differ from the actual product.</span></aside>
+    <div className="instore-toolbar">
+      <div><span className="instore-kicker">LIVE COLLECTION</span><h2>{searchActive ? 'Refine your search' : 'What are you looking for?'}</h2><p>{searchActive ? 'Search another product name or exact product code.' : 'Try everyday words, such as “wooden bracelet”.'}</p></div>
+      <form className="instore-search" role="search" onSubmit={submit}>
+        <label className="instore-sr-only" htmlFor="instore-search">Search Instore Products</label>
+        <div><Search size={18} aria-hidden="true" /><input ref={searchRef} id="instore-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try bracelets, hair clips, mugs…" maxLength={80} />{(query || submittedQuery) && <button type="button" onClick={clear} aria-label="Clear search"><X size={16} /></button>}</div>
+        <button type="submit">Search <ArrowRight size={16} /></button>
+      </form>
+    </div>
+    {!submittedQuery && tiles.length > 0 && <section className="instore-browse" aria-label="Browse product types">
+      <div className="instore-browse-heading"><strong>Browse by category</strong><span>Filter the collection, or continue with all products below.</span></div>
+      <nav className="instore-tiles instore-tiles--rail" aria-label="Browse by product type">{tiles.map((tile) => {
+      const active = category === tile.label;
+      const href = active ? '#/instore-products' : `#/instore-products?browse=${encodeURIComponent(tile.label)}`;
+      return <a key={tile.label} href={href} data-category={tile.label} data-active={active} aria-current={active ? 'page' : undefined} aria-label={`Show ${tile.count.toLocaleString()} ${tile.label} products`}><img src={tile.image} alt="" /><span>{tile.label}<small>{tile.count.toLocaleString()} products</small></span><ArrowRight size={16} /></a>;
+    })}</nav>
+    </section>}
+    <div ref={resultsRef} className="instore-results" tabIndex={-1} aria-busy={loading}>
+      <div className="instore-results-bar">
+        <p className="instore-summary" role="status" aria-live="polite" aria-atomic="true">
+          <span>{searchActive ? 'Search results' : category ? `${category} products` : 'Instore collection'}</span>
+          <strong>{resultFeedback}</strong>
+        </p>
+        {searchActive && !loading && <button className="instore-clear-results" type="button" onClick={clear}><X size={16} aria-hidden="true" /> Clear search</button>}
+      </div>
+      {loading && <div className="instore-loading" aria-hidden="true"><span className="instore-spinner"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
+      {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
+      {!loading && !error && !products.length && <div className="instore-state instore-state--no-results"><PackageSearch size={30} /><h3>{searchActive ? `No products match “${submittedQuery}”` : 'No products found'}</h3><p>{searchActive ? 'Try one product type at a time, remove details such as colour or size, or search by an exact product code.' : 'Clear the current filter to browse the complete Instore collection.'}</p><div className="instore-state-actions">{searchActive && <button className="instore-state-secondary" type="button" onClick={editSearch}><Search size={16} aria-hidden="true" /> Edit search</button>}<button type="button" onClick={clear}><X size={16} aria-hidden="true" /> Browse all products</button></div></div>}
+      {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} />)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
+    </div>
+
+  </section>;
+}
