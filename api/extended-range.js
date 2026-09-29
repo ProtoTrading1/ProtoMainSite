@@ -334,8 +334,15 @@ export function buildPreviewProducts(rows, rawQuery = '') {
 
 export function isIsolatedPreviewRequest(req) {
   const host = String(req.headers.host || '').split(':')[0];
+  // The customer-facing preview flag and the API flag describe the same
+  // isolated mode. Accept either one so a protected branch-scoped preview
+  // cannot render the read-only experience while silently falling through to
+  // the production-backed catalogue. The Vercel environment and hostname
+  // checks below keep this impossible on the production domain.
+  const isolatedPreviewEnabled = process.env.INSTORE_PREVIEW_ENABLED === 'true'
+    || process.env.VITE_INSTORE_PREVIEW_READ_ONLY === 'true';
   return process.env.VERCEL_ENV === 'preview'
-    && process.env.INSTORE_PREVIEW_ENABLED === 'true'
+    && isolatedPreviewEnabled
     && /\.vercel\.app$/i.test(host);
 }
 

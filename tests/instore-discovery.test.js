@@ -49,6 +49,14 @@ test('keeps soft-toy synonyms out of cosmetics and non-toy plush materials', () 
   }
 });
 
+test('does not turn an unrelated five-letter query into a neighbouring product word', () => {
+  const brushes = [
+    { sku: 'BRUSH001', title: 'BARBER BRUSH', category: 'COSMETICS SKIN CARE' },
+    { sku: 'BRUSH002', title: 'BLOW DRY BRUSH', category: 'HAIR ACCESSORIES' },
+  ];
+  assert.deepEqual(brushes.filter((product) => matchesInstoreSearch(product, 'blush')), []);
+});
+
 test('applies Phase 1 measurements, price, availability and colour intent deterministically', () => {
   const products = [
     { sku: '8626110059', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'SOFT TOYS', price: 89.99, stockQty: 14 },
