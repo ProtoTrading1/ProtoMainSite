@@ -5,9 +5,11 @@
  */
 export function displayProductText(value) {
   return String(value ?? '')
+    .replace(/^\s*["'“”‘’]+\s*(?=[\p{L}\p{N}])/u, '')
     .replaceAll('*', 'x')
     .replace(/\+\s*\/?\s*[-−]/g, '±')
     .replace(/\s+[-–—]\s+/g, ' | ')
     .replace(/\s*,\s*/g, ' | ')
-    .replace(/(\d)\s*[xX]\s*(\d)/g, '$1 x $2');
+    .replace(/(\d)\s*[xX]\s*(\d)/g, '$1 x $2')
+    .trim();
 }

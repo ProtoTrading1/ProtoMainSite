@@ -10,6 +10,13 @@ const products = [
   { id: 'oos-bag', code: 'BG400', name: 'Gift Bag', stockOnHand: 0 },
   { id: 'live-bag', code: 'BG401', name: 'Gift Bag', stockOnHand: 10 },
   { id: 'mkt-item', code: '70010002', barcode: '70010002', sku: 'MKT250', websiteSku: 'MKT250', name: 'Display Hooks', stockOnHand: 15 },
+  { id: 'hair-clip', code: 'HC500', name: 'Hair Clip Assorted', stockOnHand: 18 },
+  { id: 'phone-case', code: 'PC600', name: 'Mobile Phone Case', stockOnHand: 22 },
+  { id: 'blush', code: 'BU700', name: 'Beauty Blush Palette', stockOnHand: 16 },
+  { id: 'teddy-clay', code: 'TC701', name: 'Teddy Modeling Clay', stockOnHand: 16 },
+  { id: 'teddy-crayons', code: 'TC702', name: 'Crayons Wax Jumbo Teddy', stockOnHand: 16 },
+  { id: 'plush-pen', code: 'PP703', name: 'Pen Plush Lion', stockOnHand: 16 },
+  { id: 'plush-fabric', code: 'PF704', name: 'Wool Plush Velvet', stockOnHand: 16 },
 ];
 
 prepareSearchIndex(products);
@@ -39,4 +46,44 @@ test('ranks available stock ahead when relevance is equal', () => {
 
 test('recovers an adjacent-letter typo', () => {
   assert.equal(getSuggestions(products, 'walelt', 5)[0]?.id, 'wallet');
+});
+
+test('uses the shared customer-language families across the main catalogue', () => {
+  const nonToyIds = new Set(['blush', 'teddy-clay', 'teddy-crayons', 'plush-pen', 'plush-fabric']);
+  for (const query of ['plush', 'stuffed animal', 'cuddly toy', 'pluch', 'tedi']) {
+    const results = getSuggestions(products, query, 5);
+    assert.equal(results[0]?.id, 'bear', query);
+    assert.equal(results.some((product) => nonToyIds.has(product.id)), false, `${query} excludes non-toy matches`);
+  }
+  assert.equal(getSuggestions(products, 'teddy', 5).some((product) => nonToyIds.has(product.id)), false);
+  assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
+  assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');
+});
+
+test('understands deterministic shopping constraints without weakening exact identifiers', () => {
+  const phaseOneProducts = [
+    { id: 'blue-dolphin-50', code: '8626110059', barcode: '6008626110059', name: 'Soft Toy Blue Dolphin 50cm', price: 89.99, stockOnHand: 14, colour: 'Blue', size: '50cm', categoryPath: ['Soft toys'] },
+    { id: 'blue-teddy-live', code: 'BT800', name: 'Soft Toy Blue Teddy', price: 79.99, stockOnHand: 11, colour: 'Blue', categoryPath: ['Soft toys'] },
+    { id: 'blue-teddy-out', code: 'BT801', name: 'Soft Toy Blue Teddy', price: 69.99, stockOnHand: 0, colour: 'Blue', categoryPath: ['Soft toys'] },
+    { id: 'cheap-soft-toy', code: 'ST900', name: 'Soft Toy Rabbit', price: 99.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
+    { id: 'expensive-soft-toy', code: 'ST901', name: 'Soft Toy Rabbit Deluxe', price: 149.99, stockOnHand: 12, categoryPath: ['Soft toys'] },
+    { id: 'long-dolphin', code: 'ST902', name: 'Soft Toy Blue Dolphin 150cm', price: 79.99, stockOnHand: 12, colour: 'Blue', size: '150cm', categoryPath: ['Soft toys'] },
+    { id: 'vat-over-cap', code: 'ST903', name: 'Soft Toy Fox', price: 90, priceInclVat: 103.5, stockOnHand: 12, categoryPath: ['Soft toys'] },
+  ];
+  prepareSearchIndex(phaseOneProducts);
+  assert.equal(getSuggestions(phaseOneProducts, 'blue dolphin 50cm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 50 cm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 500mm', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 0.5m', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toy 50 cm', 10).some((product) => product.id === 'long-dolphin'), false);
+  assert.deepEqual(
+    new Set(getSuggestions(phaseOneProducts, 'cheap soft toys under R100', 10).map((product) => product.id)),
+    new Set(['blue-teddy-live', 'blue-teddy-out', 'cheap-soft-toy', 'blue-dolphin-50', 'long-dolphin']),
+  );
+  assert.deepEqual(
+    getSuggestions(phaseOneProducts, 'in stock blue teddy', 10).map((product) => product.id),
+    ['blue-teddy-live'],
+  );
+  assert.equal(getSuggestions(phaseOneProducts, '8626110059', 5)[0]?.id, 'blue-dolphin-50');
+  assert.equal(getSuggestions(phaseOneProducts, 'soft toys under R100', 10).some((product) => product.id === 'vat-over-cap'), false);
 });

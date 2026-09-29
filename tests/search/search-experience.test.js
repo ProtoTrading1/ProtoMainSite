@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const root = process.cwd();
 const header = readFileSync(join(root, 'src/components/Header.jsx'), 'utf8');
+const mainContent = readFileSync(join(root, 'src/components/MainContent.jsx'), 'utf8');
 
 test('desktop search has an explicit submit action and retains the slash shortcut', () => {
   assert.match(header, /className="header-search-premium__submit"/);
@@ -23,4 +24,11 @@ test('search distinguishes loading, connection failure and no-result states', ()
 test('product options do not wrap the quick-add button in an option role', () => {
   assert.doesNotMatch(header, /className=\{`sp-product-row[\s\S]{0,180}role="option"/);
   assert.match(header, /className="sp-product-main"\s+role="option"/);
+});
+
+test('site-wide results disclose complete catalogue coverage before the preview cards', () => {
+  assert.match(mainContent, /matching products across Proto/);
+  assert.match(mainContent, /in the main catalogue ·/);
+  assert.match(mainContent, /See all \{instoreSearchTotal\.toLocaleString\(\)\} Instore matches/);
+  assert.match(mainContent, /Showing the first/);
 });
