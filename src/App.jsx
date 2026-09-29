@@ -2007,6 +2007,7 @@ export default function App({
 
         <main className="content-area">
           {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
+            initialQuery={searchQuery}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}

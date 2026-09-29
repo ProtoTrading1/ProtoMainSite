@@ -77,8 +77,8 @@ function matchCategories(query) {
     .map(({ cat }) => cat);
 }
 
-function ProductRequestModal({ onClose }) {
-  const [description, setDescription] = useState('');
+function ProductRequestModal({ onClose, initialDescription = '' }) {
+  const [description, setDescription] = useState(initialDescription);
   const [qty, setQty] = useState('');
   const [image, setImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -549,6 +549,7 @@ export default function Header({
   const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
   const [showAbout, setShowAbout] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  const [requestDescription, setRequestDescription] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
   const [desktopSearchState, setDesktopSearchState] = useState('idle');
@@ -866,6 +867,17 @@ export default function Header({
     setMobileSearchState('idle');
     setMobileActiveIdx(-1);
   }, [setMobileSearchOpen]);
+
+  useEffect(() => {
+    const openProductRequest = (event) => {
+      closeSearch();
+      closeMobileSearch();
+      setRequestDescription(String(event?.detail?.query || '').trim());
+      setShowRequest(true);
+    };
+    window.addEventListener('proto:open-product-request', openProductRequest);
+    return () => window.removeEventListener('proto:open-product-request', openProductRequest);
+  }, [closeSearch, closeMobileSearch]);
   const handleMobileInput = (val) => {
     setMobileInput(val);
     liftSearch(val);
@@ -1344,7 +1356,7 @@ export default function Header({
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} />}
+      {showRequest && <ProductRequestModal initialDescription={requestDescription} onClose={() => setShowRequest(false)} />}
     </>
   );
 }

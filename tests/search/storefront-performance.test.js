@@ -34,6 +34,11 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
     /if \(exact\.length\) return exact;[\s\S]*applyIdentifierFilter\(q, identifier\)/,
     'prefix matching is only used when exact SKU/barcode matching is empty',
   );
+  assert.match(
+    productsApiSrc,
+    /rawIdentifier !== undefined && !identifier\) return res\.status\(200\)\.json\(\[\]\)/,
+    'a malformed identifier request fails closed instead of returning the full catalogue',
+  );
 });
 
 test('product detail begins a live stock lookup without querying every grid card', () => {
