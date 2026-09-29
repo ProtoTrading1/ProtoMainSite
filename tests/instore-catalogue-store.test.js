@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compareInstoreSearch, discoveryGroup, discoveryTiles, instoreSearchTokens, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import {
-  buildCatalogueRows, catalogueSearchPatterns, catalogueSearchTokens, catalogueSnapshotIsFresh,
-  catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueView, writeCatalogueSnapshot,
+  buildCatalogueRows, catalogueSearchPatterns, catalogueSearchPatternSets, catalogueSearchTokens, catalogueSnapshotIsFresh,
+  catalogueTtlMs, controlsFingerprint, readCatalogueOrderedPage, readCatalogueSearchCandidates, readCatalogueView, writeCatalogueSnapshot,
 } from '../api/_instore-catalogue.js';
 import { instorePage } from '../lib/instore-page.mjs';
 import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-range.js';
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 24;
 
 // A deliberately varied source index: several browse categories, names that
 // exercise search ranking, and enough products to page.
@@ -223,6 +223,8 @@ test('the stored Instore collection answers browsing exactly as the live read do
     { query: 'mug', category: '', page: 1 },
     { query: 'nosuchproduct', category: '', page: 1 },
     { query: 'bracelet', category: '', page: 2 },
+    { query: 'under R20', category: '', page: 1 },
+    { query: 'in stock', category: '', page: 1 },
   ];
 
   for (const request of requests) {
@@ -393,6 +395,76 @@ test('stored search tokens answer the same prefix rule the matcher applies', () 
   for (const query of ['wood', 'wooden', 'bracelet', 'wood bracelet', 'bead', 'beads', '8618100133', '6001234567', 'brace', 'zzz', 'wood zzz']) {
     assert.equal(matchesStored(query), matchesInstoreSearch(product, query), `same outcome for "${query}"`);
   }
+});
+
+test('stored and live searches agree for soft-toy aliases without rebuilding the snapshot', () => {
+  const product = {
+    sku: '8626100117', barcode: '', name: 'SOFT TOY ±50CM GIRAFFE',
+    title: 'SOFT TOY ±50CM GIRAFFE', originalDescription: 'SOFT TOY ±50CM GIRAFFE', category: 'soft toys',
+  };
+  const tokens = catalogueSearchTokens(product);
+  const matchesStored = (query) => catalogueSearchPatternSets(query)
+    .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
+
+  for (const query of [
+    'plush', 'plushie', 'plushies', 'pluch', 'teddy', 'teddy bear', 'teddy bears',
+    'tedi', 'stuffed animal', 'stufed animls', 'cuddly toy', 'soft doll', 'softtoy',
+  ]) {
+    assert.equal(matchesStored(query), true, `stored search finds "${query}"`);
+    assert.equal(matchesStored(query), matchesInstoreSearch(product, query), `stored/live parity for "${query}"`);
+  }
+});
+
+test('stored and live searches agree for school-bag and craft-glue language', () => {
+  const products = [
+    { sku: 'BAG001', barcode: '', name: 'DIY BACKPACK W/MARKERS', title: 'DIY BACKPACK W/MARKERS', originalDescription: 'DIY BACKPACK W/MARKERS', category: 'bags wallets' },
+    { sku: 'GLUE001', barcode: '', name: 'BEAD GLUE B6000 50ML', title: 'BEAD GLUE B6000 50ML', originalDescription: 'BEAD GLUE B6000 50ML', category: 'crafts and allied' },
+    { sku: 'NAIL001', barcode: '', name: 'NAIL GLUE', title: 'NAIL GLUE', originalDescription: 'NAIL GLUE', category: 'cosmetics skin care' },
+  ];
+  const candidateMatches = (product, query) => {
+    const tokens = catalogueSearchTokens(product);
+    return catalogueSearchPatternSets(query)
+      .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
+  };
+
+  for (const [query, sku] of [['school bag', 'BAG001'], ['school bags', 'BAG001'], ['craft glue', 'GLUE001'], ['craft adhesive', 'GLUE001']]) {
+    assert.equal(candidateMatches(products.find((product) => product.sku === sku), query), true, `stored search finds "${query}"`);
+    assert.deepEqual(
+      products.filter((product) => candidateMatches(product, query)).map((product) => product.sku),
+      products.filter((product) => matchesInstoreSearch(product, query)).map((product) => product.sku),
+      `stored/live parity for "${query}"`,
+    );
+  }
+  assert.equal(candidateMatches(products[2], 'craft glue'), false, 'craft glue excludes nail glue');
+});
+
+test('stored candidate lookup defers a safe long-word typo to the live matcher', async () => {
+  const { client, live } = await seededClient();
+  const expected = live.products.filter((product) => matchesInstoreSearch(product, 'bracelat'));
+  assert.ok(expected.length > 0, 'fixture includes a bracelet recovered from the typo');
+
+  const candidates = await readCatalogueSearchCandidates(client, { query: 'bracelat' });
+  const actual = candidates.filter((product) => matchesInstoreSearch(product, 'bracelat'));
+  assert.deepEqual(actual.map((product) => product.sku), expected.map((product) => product.sku));
+});
+
+test('stored candidate terms and live intent filters agree for structured soft-toy searches', () => {
+  const products = [
+    { sku: '8626110059', barcode: '6008626110059', name: 'SOFT TOY BLUE DOLPHIN ±50CM', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'soft toys', price: 89.99, stockQty: 14 },
+    { sku: '8626110060', barcode: '', name: 'SOFT TOY BLUE DOLPHIN ±30CM', title: 'SOFT TOY BLUE DOLPHIN ±30CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±30CM', category: 'soft toys', price: 69.99, stockQty: 14 },
+  ];
+  const candidateMatches = (product, query) => {
+    const tokens = catalogueSearchTokens(product);
+    return catalogueSearchPatternSets(query)
+      .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
+  };
+
+  for (const query of ['blue dolphin 50cm', 'soft toy 50 cm', 'cheap soft toys under R100', 'in stock blue dolphin', '8626110059']) {
+    const candidates = products.filter((product) => candidateMatches(product, query));
+    const live = products.filter((product) => matchesInstoreSearch(product, query));
+    assert.ok(live.every((product) => candidates.includes(product)), `stored candidates retain every live match for "${query}"`);
+  }
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toy 50 centimetre')).map((product) => product.sku), ['8626110059']);
 });
 
 test('stored rows carry the default customer ordering and the browse category', () => {
