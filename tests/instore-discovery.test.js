@@ -26,13 +26,37 @@ test('finds the whole eligible soft-toy range by everyday names and common missp
   for (const query of [
     'soft toy', 'soft toys', 'softtoy', 'plush', 'pluch', 'plsh',
     'teddy', 'teddies', 'tedi', 'stuffed animal', 'stuffed toys',
-    'cuddly toy', 'cudly toy', 'softies',
+    'teddy bear', 'teddy bears', 'plushie', 'plushies', 'animal plush',
+    'cuddly toy', 'cudly toy', 'softies', 'soft doll', 'soft dolls',
+    'stufed animls',
   ]) {
     assert.equal(
       softToys.filter((product) => matchesInstoreSearch(product, query)).length,
       softToys.length,
       `all eligible soft toys are discoverable for "${query}"`,
     );
+  }
+});
+
+test('normalizes common plural, joined-word and regional customer phrases', () => {
+  const products = [
+    { sku: 'PAINT001', title: 'PAINT BRUSH SET 3PC', category: 'STATIONERY/ART' },
+    { sku: 'HAIR001', title: 'HAIR BRUSH ASSORTED', category: 'HAIR ACCESSORIES' },
+    { sku: 'PENCIL001', title: 'COLOR PENCILS 12X2 COLOURS', category: 'STATIONERY/ART' },
+    { sku: 'BAG001', title: 'DIY BACKPACK W/MARKERS', category: 'BAGS & WALLETS' },
+  ];
+
+  for (const query of ['paint brushes', 'paintbrush', 'paintbrushes']) {
+    assert.equal(matchesInstoreSearch(products[0], query), true, query);
+  }
+  for (const query of ['hair brushes', 'hairbrush', 'hairbrushes']) {
+    assert.equal(matchesInstoreSearch(products[1], query), true, query);
+  }
+  for (const query of ['colour pencils', 'colored pencils', 'colouring pencils']) {
+    assert.equal(matchesInstoreSearch(products[2], query), true, query);
+  }
+  for (const query of ['backpack', 'back pack', 'back packs']) {
+    assert.equal(matchesInstoreSearch(products[3], query), true, query);
   }
 });
 

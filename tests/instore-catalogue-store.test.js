@@ -406,7 +406,10 @@ test('stored and live searches agree for soft-toy aliases without rebuilding the
   const matchesStored = (query) => catalogueSearchPatternSets(query)
     .some((patterns) => patterns.every((pattern) => new RegExp(`^${pattern.split('%').join('[\\s\\S]*')}$`).test(tokens)));
 
-  for (const query of ['plush', 'pluch', 'teddy', 'tedi', 'stuffed animal', 'cuddly toy', 'softtoy']) {
+  for (const query of [
+    'plush', 'plushie', 'plushies', 'pluch', 'teddy', 'teddy bear', 'teddy bears',
+    'tedi', 'stuffed animal', 'stufed animls', 'cuddly toy', 'soft doll', 'softtoy',
+  ]) {
     assert.equal(matchesStored(query), true, `stored search finds "${query}"`);
     assert.equal(matchesStored(query), matchesInstoreSearch(product, query), `stored/live parity for "${query}"`);
   }

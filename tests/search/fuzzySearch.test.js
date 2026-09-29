@@ -17,6 +17,10 @@ const products = [
   { id: 'teddy-crayons', code: 'TC702', name: 'Crayons Wax Jumbo Teddy', stockOnHand: 16 },
   { id: 'plush-pen', code: 'PP703', name: 'Pen Plush Lion', stockOnHand: 16 },
   { id: 'plush-fabric', code: 'PF704', name: 'Wool Plush Velvet', stockOnHand: 16 },
+  { id: 'paint-brush', code: 'PB705', name: 'Paint Brush Set 3PC', stockOnHand: 16 },
+  { id: 'hair-brush', code: 'HB706', name: 'Hair Brush Assorted', stockOnHand: 16 },
+  { id: 'colour-pencils', code: 'CP707', name: 'Color Pencils 12X2 Colours', stockOnHand: 16 },
+  { id: 'backpack', code: 'BP708', name: 'DIY Backpack With Markers', stockOnHand: 16 },
 ];
 
 prepareSearchIndex(products);
@@ -50,7 +54,10 @@ test('recovers an adjacent-letter typo', () => {
 
 test('uses the shared customer-language families across the main catalogue', () => {
   const nonToyIds = new Set(['blush', 'teddy-clay', 'teddy-crayons', 'plush-pen', 'plush-fabric']);
-  for (const query of ['plush', 'stuffed animal', 'cuddly toy', 'pluch', 'tedi']) {
+  for (const query of [
+    'plush', 'plushie', 'plushies', 'stuffed animal', 'cuddly toy',
+    'teddy bear', 'teddy bears', 'soft doll', 'stufed animls', 'pluch', 'tedi',
+  ]) {
     const results = getSuggestions(products, query, 5);
     assert.equal(results[0]?.id, 'bear', query);
     assert.equal(results.some((product) => nonToyIds.has(product.id)), false, `${query} excludes non-toy matches`);
@@ -58,6 +65,10 @@ test('uses the shared customer-language families across the main catalogue', () 
   assert.equal(getSuggestions(products, 'teddy', 5).some((product) => nonToyIds.has(product.id)), false);
   assert.equal(getSuggestions(products, 'barrette', 5)[0]?.id, 'hair-clip');
   assert.equal(getSuggestions(products, 'cellphone case', 5)[0]?.id, 'phone-case');
+  assert.equal(getSuggestions(products, 'paintbrushes', 5)[0]?.id, 'paint-brush');
+  assert.equal(getSuggestions(products, 'hair brushes', 5)[0]?.id, 'hair-brush');
+  assert.equal(getSuggestions(products, 'colored pencils', 5)[0]?.id, 'colour-pencils');
+  assert.equal(getSuggestions(products, 'back pack', 5)[0]?.id, 'backpack');
 });
 
 test('understands deterministic shopping constraints without weakening exact identifiers', () => {
