@@ -96,7 +96,7 @@ export function groupProductsByBarcode(products) {
       parentSku: primaryMember.barcode || rep.barcode || primaryMember.code || '',
       name: groupTitle,
       title: groupTitle,
-      image: rep.image || rep.localImage || groupImages[0] || '',
+      image: isAdminGroup\n        ? (primaryMember.image || primaryMember.localImage || primaryMember.images?.[0] || groupImages[0] || '')\n        : (rep.image || rep.localImage || groupImages[0] || ''),
       images: groupImages.length ? [...new Set(groupImages)] : rep.images,
       isVariantGroup: true,
       variantCount: variants.length,
