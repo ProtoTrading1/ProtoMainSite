@@ -5,10 +5,13 @@ import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../src/lib/passwordPol
 
 const readSource = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('registration and password reset share one eight-character password policy', async () => {
-  assert.equal(MIN_PASSWORD_LENGTH, 8);
-  assert.equal(passwordPolicyError('1234567'), 'Password must be at least 8 characters.');
-  assert.equal(passwordPolicyError('12345678'), '');
+test('registration and password reset share Supabase\'s ten-character password policy', async () => {
+  assert.equal(MIN_PASSWORD_LENGTH, 10);
+  assert.equal(
+    passwordPolicyError('123456789'),
+    'Please redo your password. Use at least 10 characters and avoid common or easy-to-guess passwords.',
+  );
+  assert.equal(passwordPolicyError('long-enough'), '');
 
   const [registrationApi, resetApi, resetPage] = await Promise.all([
     readSource('api/register-trade.js'),
@@ -19,6 +22,18 @@ test('registration and password reset share one eight-character password policy'
   assert.match(resetApi, /passwordPolicyError\(password\)/);
   assert.match(resetPage, /minLength=\{MIN_PASSWORD_LENGTH\}/);
   assert.doesNotMatch(`${resetApi}\n${resetPage}`, /at least 6 characters/i);
+});
+
+test('registration forms explain the complete password criteria before submission', async () => {
+  const [landing, registerPage, questionnaire] = await Promise.all([
+    readSource('src/pages/LandingPage.jsx'),
+    readSource('src/pages/RegisterPage.jsx'),
+    readSource('src/components/Questionnaire.jsx'),
+  ]);
+
+  for (const source of [landing, registerPage, questionnaire]) {
+    assert.match(source, /MIN_PASSWORD_LENGTH\}\+ characters; avoid common passwords/);
+  }
 });
 
 test('reset form stays unavailable until the one-time link is validated', async () => {

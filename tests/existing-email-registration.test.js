@@ -5,6 +5,8 @@ import {
   accountCreationFailureResponse,
   existingEmailResponse,
   isExistingEmailError,
+  isPasswordRequirementsError,
+  passwordRequirementsResponse,
 } from '../api/register-trade.js';
 import { submitTradeApplication } from '../src/lib/tradeApplication.js';
 
@@ -38,6 +40,21 @@ test('registration handler reserves HTTP 409 for confirmed duplicate-email failu
 
   assert.match(source, /if \(isExistingEmailError\(error\)\) \{\s*return res\.status\(409\)\.json\(existingEmailResponse\(\)\);/);
   assert.match(source, /return res\.status\(400\)\.json\(accountCreationFailureResponse\(\)\);/);
+});
+
+test('Supabase password rejections tell the customer to redo the password with clear criteria', () => {
+  assert.equal(isPasswordRequirementsError({ message: 'Password should be at least 10 characters.' }), true);
+  assert.equal(isPasswordRequirementsError({ message: 'Password is known to be weak and easy to guess, please choose a different one.' }), true);
+  assert.equal(isPasswordRequirementsError({ message: 'Unexpected provider failure.' }), false);
+
+  assert.deepEqual(passwordRequirementsResponse(), {
+    error: 'Please redo your password. Use at least 10 characters and avoid common or easy-to-guess passwords.',
+    code: 'PASSWORD_REQUIREMENTS_NOT_MET',
+  });
+
+  const source = read('api/register-trade.js');
+  assert.match(source, /if \(isPasswordRequirementsError\(error\)\)/);
+  assert.match(source, /PASSWORD_REQUIREMENTS_NOT_MET/);
 });
 
 test('registration client preserves structured recovery details', async (t) => {

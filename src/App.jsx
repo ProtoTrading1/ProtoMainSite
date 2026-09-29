@@ -37,6 +37,7 @@ import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
+import { groupProductsByBarcode } from './lib/productGroups';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
 import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
@@ -1311,16 +1312,21 @@ export default function App({
       return;
     }
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
-    const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
+    const requestedPreference = typeof preference === 'string'
+      ? normalizeItemPreference(preference)
+      : (product.isColourAssortment ? normalizeItemPreference(product.colourRequest) : undefined);
     setCartItems((prev) => {
-      const sameProduct = prev.filter((i) => i.product.id === product.id);
+      const sameProduct = prev.filter((i) => product.isColourAssortment
+        ? i.product.isColourAssortment && i.product.sku === product.sku
+        : i.product.id === product.id);
       // An Instore code can represent assorted colours/designs. Keep each
       // customer preference as a separate basket line, but cap the combined
       // quantity at the single live-stock balance for that code.
-      const existing = product.isExtendedRange === true
+      const separatePreferences = product.isExtendedRange === true || product.isColourAssortment === true;
+      const existing = separatePreferences
         ? sameProduct.find((i) => (i.preference || '') === (requestedPreference || ''))
         : sameProduct[0];
-      const alreadyRequested = product.isExtendedRange === true
+      const alreadyRequested = separatePreferences
         ? sameProduct.reduce((total, i) => total + Number(i.qty || 0), 0)
         : Number(existing?.qty || 0);
       const availableToAdd = Math.max(0, maxQty - alreadyRequested);
@@ -1964,7 +1970,10 @@ export default function App({
     let cancelled = false;
     void fetchProductsBySkus([productDetailKey]).then((products) => {
       if (cancelled) return;
-      const product = products.get(productDetailKey.toUpperCase()) || null;
+      const fetched = products.get(productDetailKey.toUpperCase()) || null;
+      const product = fetched?.barcode === 'CP50ML'
+        ? groupProductsByBarcode([fetched])[0]
+        : fetched;
       setPreviewProduct(product);
       if (!product) {
         const next = { ...refinements };

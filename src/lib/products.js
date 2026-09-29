@@ -12,12 +12,29 @@ import {
   motarroPathMatchesFilter,
 } from './mottaroCategory';
 import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
+import { craftPaintColours } from '../data/craftPaintColours.js';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
 import { authenticatedGetJson } from './authHeaders';
 
 export const DEFAULT_SORT = 'featured';
+const craftPaintLegacyPhotos = new Map([
+  ['CP50ML-BLU', 'Blue'],
+  ['CP50ML-RED', 'Red'],
+  ['CP50ML-GRN', 'Green'],
+  ['CP50ML-PUR', 'Purple'],
+].map(([sku, colour]) => [sku, craftPaintColours.find((entry) => entry.colour === colour)?.image]));
+
+function removeOldCraftPaintPhotos(products) {
+  if (!Array.isArray(products)) return products;
+  return products
+    .filter((product) => String(product.sku || product.websiteSku || '').toUpperCase() !== 'CP50ML-DBLU')
+    .map((product) => {
+      const image = craftPaintLegacyPhotos.get(String(product.sku || product.websiteSku || '').toUpperCase());
+      return image ? { ...product, image, images: [image], localImage: '', secondaryImage: '' } : product;
+    });
+}
 const FEATURED_PRODUCTS_BATCH_SIZE = 80;
 
 export const CATALOG_SORT_OPTIONS = [
@@ -193,7 +210,7 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticate
   if (authenticated) {
     const { response, data } = await authenticatedGetJson(url, { cache, timeoutMs });
     if (!response.ok) throw new Error(`${url} ${response.status}`);
-    return data;
+    return url.startsWith('/api/products') ? removeOldCraftPaintPhotos(data) : data;
   }
 
   const controller = new AbortController();
@@ -205,7 +222,8 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticate
       ...(cache ? { cache } : {}),
     });
     if (!response.ok) throw new Error(`${url} ${response.status}`);
-    return await response.json();
+    const data = await response.json();
+    return url.startsWith('/api/products') ? removeOldCraftPaintPhotos(data) : data;
   } finally {
     clearTimeout(timer);
   }
@@ -231,7 +249,7 @@ function startCatalogFetch() {
     })
     .then((products) => {
       const hadPrior = !!_cache;
-      _cache = products;
+      _cache = removeOldCraftPaintPhotos(products);
       saveToLocalCache(products);
       void saveToIndexedCache(products);
       if (hadPrior) {
@@ -255,7 +273,7 @@ function getAllCached() {
 
   if (!_persistentCachePromise) {
     _persistentCachePromise = loadFromPersistentCache().then((stale) => {
-      if (stale?.length && !_cache) _cache = stale;
+      if (stale?.length && !_cache) _cache = removeOldCraftPaintPhotos(stale);
       if (!_loadPromise) _loadPromise = startCatalogFetch();
       return _cache ? Promise.resolve(_cache) : _loadPromise;
     });

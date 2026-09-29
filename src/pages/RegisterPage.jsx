@@ -504,7 +504,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       </div>
                     )}
                     <div className={`lp-quiz-field${fieldHasIssue('password') ? ' lp-quiz-field--error' : ''}`}>
-                      <label htmlFor="register-password">Password <span className="lp-register-optional">(min. {MIN_PASSWORD_LENGTH} characters)</span></label>
+                      <label htmlFor="register-password">Password <span className="lp-register-optional">({MIN_PASSWORD_LENGTH}+ characters; avoid common passwords)</span></label>
                       <div className="lp-quiz-pw-wrap">
                         <input
                           type={showPw ? 'text' : 'password'}

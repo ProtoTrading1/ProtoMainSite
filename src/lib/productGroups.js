@@ -1,3 +1,5 @@
+import { craftPaintColours } from '../data/craftPaintColours.js';
+
 /**
  * Grouping key for a product row. An explicit admin variant group (migration
  * 052, attached as `groupId` when catalogGrouping is on) wins over the legacy
@@ -62,6 +64,46 @@ export function groupProductsByBarcode(products) {
     seenGroups.add(entry.key);
 
     const variants = groups.get(entry.key) || [];
+    // The supplier supplied 55 colour photos for one Positill item, CP50ML.
+    // These are colour requests against shared stock, not 55 stock-bearing SKUs.
+    // Build the choices from a real sellable row while replacing every old
+    // collage/colour image on the customer-facing card.
+    if (entry.key === 'b:CP50ML' && variants.length) {
+      const source = variants.find((v) => String(v.sku || '').toUpperCase() === 'CP50ML-BLU') || variants[0];
+      const colourVariants = craftPaintColours.map(({ number, colour, image }) => ({
+        ...source,
+        id: `CP50ML-COLOUR-${String(number).padStart(2, '0')}`,
+        name: `CRAFT PAINT | ${colour.toUpperCase()} | 50ML`,
+        title: `CRAFT PAINT | ${colour.toUpperCase()} | 50ML`,
+        description: `CRAFT PAINT | ${colour.toUpperCase()} | 50ML`,
+        originalDescription: `CRAFT PAINT | ${colour.toUpperCase()} | 50ML`,
+        image,
+        images: [image],
+        secondaryImage: '',
+        localImage: '',
+        colour,
+        colourRequest: colour,
+        isColourAssortment: true,
+      }));
+      const primaryColour = colourVariants.find((variant) => variant.colour === 'Blue') || colourVariants[0];
+      out.push({
+        ...source,
+        id: 'group_CP50ML',
+        name: primaryColour.name,
+        title: primaryColour.title,
+        description: primaryColour.description,
+        originalDescription: primaryColour.originalDescription,
+        image: primaryColour.image,
+        images: [primaryColour.image],
+        secondaryImage: '',
+        localImage: '',
+        isColourAssortment: true,
+        isVariantGroup: true,
+        variantCount: colourVariants.length,
+        variants: colourVariants,
+      });
+      continue;
+    }
     if (variants.length <= 1) {
       out.push(variants[0] || { id: entry.key, code: entry.key, barcode: entry.key, name: entry.key });
       continue;

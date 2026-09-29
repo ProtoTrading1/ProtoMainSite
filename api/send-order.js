@@ -20,6 +20,7 @@ import {
   validatePromoCode,
 } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
+import { craftPaintColours } from '../src/data/craftPaintColours.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
 import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
@@ -40,6 +41,7 @@ export const MAX_PDF_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024;
 // leaving roughly 2 MB of safety beneath the Brevo attachment threshold.
 export const MAX_PDF_THUMBNAIL_BYTES = 16 * 1024;
 export const PDF_IMAGE_CONCURRENCY = 6;
+const craftPaintImageByColour = new Map(craftPaintColours.map((entry) => [entry.colour.toUpperCase(), entry.image]));
 
 function money(value) {
   return `R${Number(value || 0).toFixed(2)}`;
@@ -444,6 +446,11 @@ async function resolveStandardPrices(items) {
     const authoritativeSku = cleanText(row.sku);
     const authoritativeBarcode = cleanText(row.barcode);
     const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
+    const requestedColour = normalizeItemPreference(item.preference).toUpperCase();
+    const craftPaintImage = authoritativeBarcode === 'CP50ML'
+      ? craftPaintImageByColour.get(requestedColour)
+      : null;
+    const orderImage = craftPaintImage ? `${PUBLIC_ASSET_URL}${craftPaintImage}` : cleanText(row.image_url_one);
     return {
       qty,
       ...itemPreferenceFields(item),
@@ -452,10 +459,10 @@ async function resolveStandardPrices(items) {
         sku: authoritativeSku,
         code: authoritativeBarcode,
         barcode: authoritativeBarcode,
-        name: cleanText(row.title, authoritativeSku),
+        name: craftPaintImage ? `CRAFT PAINT | ${requestedColour} | 50ML` : cleanText(row.title, authoritativeSku),
         price,
-        image: cleanText(row.image_url_one),
-        remoteImage: cleanText(row.image_url_one),
+        image: orderImage,
+        remoteImage: orderImage,
         unitsOfIssue,
         casePack: sellingUnitDetails(unitsOfIssue).label,
         packDescription: cleanText(row.pack_description),

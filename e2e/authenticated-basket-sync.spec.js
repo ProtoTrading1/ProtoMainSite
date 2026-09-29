@@ -335,6 +335,43 @@ test('Ball Pin 8610100400S accepts a colour request from main search', async ({ 
   }
 });
 
+for (const device of [
+  { name: 'desktop', viewport: { width: 1280, height: 800 }, isMobile: false },
+  { name: 'mobile', viewport: { width: 390, height: 844 }, isMobile: true },
+]) {
+  test(`${device.name} CP50ML deep link replaces old photos with 55 colour choices`, async ({ browser }) => {
+    const oldPaint = {
+      ...product('CP50ML-BLU', 'CRAFT PAINT | BLUE | 50ML', 16.50),
+      code: 'CP50ML', barcode: 'CP50ML', websiteSku: 'CP50ML-BLU',
+      image: '/old-collage.jpg', images: ['/old-collage.jpg'],
+    };
+    const accountCart = { created: true, items: [line(legacyProduct, 1)], activityAt: Date.now(), revision: 1 };
+    const safety = { authRequests: 0, destructiveRequests: [] };
+    const context = await browser.newContext({ viewport: device.viewport, isMobile: device.isMobile, hasTouch: device.isMobile });
+    await installSyntheticServices(context, accountCart, safety, [...catalogue, oldPaint]);
+    const page = await context.newPage();
+    await seedLegacyBrowserBasket(page, accountCart.items);
+
+    try {
+      await signIn(page);
+      await page.goto('/#/?product=CP50ML-BLU');
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('55 colours', { exact: true })).toBeVisible();
+      await expect(dialog.getByRole('heading', { name: 'CRAFT PAINT | BLUE | 50ML' })).toBeVisible();
+      await expect(dialog.locator('img[src="/old-collage.jpg"]')).toHaveCount(0);
+      await expect(dialog.locator('.pz-main-image img')).toHaveAttribute('src', /craft-paint-50ml\/7\.jpg/);
+      await dialog.getByRole('radio', { name: /CRAFT PAINT \| MAGENTA \| 50ML/ }).click();
+      await expect(dialog.locator('.pz-main-image img')).toHaveAttribute('src', /craft-paint-50ml\/11\.jpg/);
+      await dialog.getByRole('button', { name: 'Add 1 to order' }).click();
+      await expect.poll(() => accountCart.items.find((item) => item.product.colourRequest === 'Magenta')?.preference)
+        .toBe('Magenta');
+      expect(safety.destructiveRequests).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 async function seedLegacyBrowserBasket(page, items) {
   await page.addInitScript(({ seededItems }) => {
     localStorage.setItem('proto_cart', JSON.stringify(seededItems));

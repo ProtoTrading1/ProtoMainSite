@@ -6,7 +6,10 @@ import {
   lookupProtoActiveCustomer,
 } from './_customer-onboard.js';
 import { PUBLIC_SITE_URL } from './_public-site-url.js';
-import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
+import {
+  PASSWORD_REQUIREMENTS_TEXT,
+  passwordPolicyError,
+} from '../src/lib/passwordPolicy.js';
 
 const BREVO_SENDER = {
   name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -65,6 +68,19 @@ export function existingEmailResponse() {
     error: 'This email is already registered. Sign in, or reset your password if you have forgotten it.',
     code: 'EMAIL_ALREADY_REGISTERED',
     recovery: 'SIGN_IN_OR_RESET_PASSWORD',
+  };
+}
+
+export function isPasswordRequirementsError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('password should be at least')
+    || message.includes('password is known to be weak');
+}
+
+export function passwordRequirementsResponse() {
+  return {
+    error: `Please redo your password. ${PASSWORD_REQUIREMENTS_TEXT}`,
+    code: 'PASSWORD_REQUIREMENTS_NOT_MET',
   };
 }
 
@@ -440,6 +456,9 @@ export default async function handler(req, res) {
     // other account-creation failure generic and never echo provider messages.
     if (isExistingEmailError(error)) {
       return res.status(409).json(existingEmailResponse());
+    }
+    if (isPasswordRequirementsError(error)) {
+      return res.status(400).json(passwordRequirementsResponse());
     }
     return res.status(400).json(accountCreationFailureResponse());
   }

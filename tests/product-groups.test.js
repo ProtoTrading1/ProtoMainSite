@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { variantGroupKey, groupProductsByBarcode } from '../src/lib/productGroups.js';
+import { craftPaintColours } from '../src/data/craftPaintColours.js';
 
 // A storefront-adapted row: id/sku are the SKU, code/barcode are the barcode.
 const row = (sku, barcode, over = {}) => ({
@@ -64,4 +65,25 @@ test('admin group with a single visible member collapses to a normal card', () =
   ]);
   assert.equal(out.length, 1);
   assert.ok(!out[0].isVariantGroup);
+});
+
+test('CP50ML shows exactly the 55 supplied colour photos under one shared-stock card', () => {
+  const oldRows = [
+    row('CP50ML-BLU', 'CP50ML', { name: 'CRAFT PAINT | BLUE | 50ML', image: 'old-blue.jpg', price: 16.5, stockQty: 2566 }),
+    row('CP50ML-DBLU', 'CP50ML', { name: 'CRAFT PAINT | DARK BLUE | 50ML', image: 'old-dark-blue.jpg', price: 16.5, stockQty: 2566 }),
+  ];
+  const [card] = groupProductsByBarcode(oldRows);
+  assert.equal(card.id, 'group_CP50ML');
+  assert.equal(card.variantCount, 55);
+  assert.equal(card.variants.length, craftPaintColours.length);
+  assert.ok(card.isColourAssortment);
+  assert.equal(card.variants[0].colourRequest, 'Red');
+  assert.equal(card.variants[0].name, 'CRAFT PAINT | RED | 50ML');
+  assert.equal(card.variants[0].originalDescription, 'CRAFT PAINT | RED | 50ML');
+  assert.equal(card.variants[0].sku, 'CP50ML-BLU');
+  assert.equal(card.variants.find((v) => v.colour === 'Blue').image, '/images/craft-paint-50ml/7.jpg');
+  assert.ok(!card.variants.some((v) => v.colour === 'Dark Blue'));
+  assert.ok(!JSON.stringify(card).includes('old-blue.jpg'));
+  assert.ok(!JSON.stringify(card).includes('old-dark-blue.jpg'));
+  assert.equal(new Set(card.variants.map((v) => v.id)).size, 55);
 });

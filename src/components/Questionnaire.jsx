@@ -360,7 +360,7 @@ export default function Questionnaire({ onLogin }) {
               )}
 
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label htmlFor="questionnaire-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. {MIN_PASSWORD_LENGTH} characters)</span></label>
+                <label htmlFor="questionnaire-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>({MIN_PASSWORD_LENGTH}+ characters; avoid common passwords)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
                     type={showPw ? 'text' : 'password'}

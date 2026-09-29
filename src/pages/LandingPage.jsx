@@ -675,7 +675,7 @@ function Questionnaire({ onLogin }) {
               )}
 
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label htmlFor="trade-new-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
+                <label htmlFor="trade-new-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>({MIN_PASSWORD_LENGTH}+ characters; avoid common passwords)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
                     id="trade-new-password"

@@ -348,7 +348,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const variantCount = product?.variantCount || variants.length;
   const baseTags = Array.isArray(product?.tags) ? product.tags : [];
   const safeTags = isVariantGroup
-    ? [{ label: variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
+    ? [{ label: product.isColourAssortment ? `${variantCount} colours` : (variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants'), bg: '#7F1D1D', color: '#fff' }, ...baseTags]
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
@@ -696,8 +696,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             <div className="pz-details">
               <div className="pz-scroll">
                 <div className="pz-code-block">
-                  <span className="pz-code">{productSkuLabel(activeProduct)}</span>
-                  <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>
+                  <span className="pz-code">{product.isColourAssortment ? 'ITEM: CP50ML' : productSkuLabel(activeProduct)}</span>
+                  {!product.isColourAssortment && <span className="pz-code pz-code--secondary">{productBarcodeLabel(activeProduct)}</span>}
                   <button type="button" className="pz-share-btn" onClick={shareProduct}>
                     <Link size={14} aria-hidden="true" /> {linkCopied ? 'Link copied' : 'Share product'}
                   </button>
@@ -744,8 +744,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 {/* Variant list for grouped products — click to swap image */}
                 {isVariantGroup && variants.length > 0 && (
                   <div ref={variantsRef} className="pz-variants">
-                    <span className="pz-variants-label">Select a variant</span>
-                    <span className="pz-variants-help">Choose one option to confirm live stock and order quantity.</span>
+                    <span className="pz-variants-label">{product.isColourAssortment ? 'Choose a colour' : 'Select a variant'}</span>
+                    <span className="pz-variants-help">{product.isColourAssortment ? 'Colours share one stock balance. We will confirm your chosen colour when processing the order.' : 'Choose one option to confirm live stock and order quantity.'}</span>
                     <div className="pz-variants-list" role="radiogroup" aria-label="Select a variant">
                       {variants.map((v) => {
                         const isSelected = selectedVariant?.id === v.id;
@@ -761,15 +761,15 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                             onClick={() => selectVariant(v)}
                           >
                             {v.image && (
-                              <img src={v.image} alt={v.name} className="pz-variant-img" />
+                              <img src={v.image} alt={v.name} className="pz-variant-img" loading="lazy" decoding="async" />
                             )}
                             <div className="pz-variant-info">
                               <span className="pz-variant-name">{v.name}</span>
-                              <span className="pz-variant-code">{productSkuLabel(v, true)}</span>
-                              <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>
-                              {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
+                              {!product.isColourAssortment && <span className="pz-variant-code">{productSkuLabel(v, true)}</span>}
+                              {!product.isColourAssortment && <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>}
+                              {v.colour && !product.isColourAssortment && <span className="pz-variant-colour">{v.colour}</span>}
                               <span className={`pz-variant-availability pz-variant-availability--${optionClass}`}>
-                                {optionAvailability.label}
+                                {product.isColourAssortment ? 'Colour subject to availability' : optionAvailability.label}
                               </span>
                             </div>
                             {Number(v.price) > 0 && <span className="pz-variant-price">R{Number(v.price).toFixed(2)}</span>}
@@ -791,6 +791,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
                 {(!isVariantGroup || selectedVariant) && (
                   <div className="pz-stock-check">
+                    {product.isColourAssortment && <p className="pz-variants-help">Live stock below is for all CP50ML colours combined, not this colour alone.</p>}
                     <StockCheck
                       sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
                       autoCheck
@@ -824,7 +825,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                       disabled={!modalCanOrder}
                       onClick={() => {
                         if (!modalCanOrder) return;
-                        addToCart(activeProduct, qty, null, true);
+                        addToCart(activeProduct, qty, null, activeProduct.colourRequest || true);
                         setJustAdded(true);
                         setTimeout(() => setJustAdded(false), 1800);
                       }}
