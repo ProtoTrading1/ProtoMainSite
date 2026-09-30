@@ -29,6 +29,12 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
   assert.match(headerSrc, /fetchIdentifierProducts\(query\)/, 'desktop suggestions share the catalogue identifier request');
   assert.match(headerSrc, /fetchIdentifierProducts\(val\)/, 'mobile suggestions share the catalogue identifier request');
   assert.match(productsApiSrc, /async function fetchIdentifierRows/, 'server has a dedicated identifier path');
+  assert.match(productsApiSrc, /async function expandIdentifierAdminGroupRows/, 'identifier lookup can expand an admin group server-side');
+  assert.match(
+    productsApiSrc,
+    /if \(identifier && groupInfo\) \{[\s\S]*expandIdentifierAdminGroupRows\(supabase, rows, groupInfo\)/,
+    'exact code lookups do not depend on a stale browser catalogue to show every admin-group option',
+  );
   assert.match(
     productsApiSrc,
     /if \(exact\.length\) return exact;[\s\S]*applyIdentifierFilter\(q, identifier\)/,

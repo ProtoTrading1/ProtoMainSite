@@ -275,6 +275,62 @@ async function fetchIdentifierRows(supabase, identifier) {
   );
 }
 
+function normalizeSkuKey(sku) {
+  return String(sku || '').trim().toUpperCase();
+}
+
+async function expandIdentifierAdminGroupRows(supabase, rows, groupInfo) {
+  if (!groupInfo || !Array.isArray(rows) || !rows.length) return rows;
+
+  const matchedSkus = rows.map((row) => normalizeSkuKey(row.sku)).filter(Boolean);
+  const groupIds = new Set(
+    matchedSkus
+      .map((sku) => groupInfo.get(sku)?.groupId)
+      .filter(Boolean),
+  );
+  if (!groupIds.size) return rows;
+
+  const memberSkus = [];
+  for (const [sku, info] of groupInfo.entries()) {
+    if (groupIds.has(info?.groupId)) memberSkus.push(sku);
+  }
+  if (!memberSkus.length) return rows;
+
+  const existingSkus = new Set(matchedSkus);
+  const missingSkus = memberSkus.filter((sku) => !existingSkus.has(sku));
+  const missingBatches = [];
+  for (let i = 0; i < missingSkus.length; i += MAX_SKUS_PER_REQUEST) {
+    missingBatches.push(missingSkus.slice(i, i + MAX_SKUS_PER_REQUEST));
+  }
+
+  const fetchedRows = missingBatches.length
+    ? (await Promise.all(missingBatches.map((batch) =>
+      fetchAllRows(supabase, 'website_stock', STOCK_SELECT, (query) => query.in('sku', batch))))).flat()
+    : [];
+
+  const rowsBySku = new Map();
+  for (const row of [...rows, ...fetchedRows]) {
+    const sku = normalizeSkuKey(row.sku);
+    if (sku && !rowsBySku.has(sku)) rowsBySku.set(sku, row);
+  }
+
+  const ordered = [];
+  const seen = new Set();
+  for (const sku of memberSkus) {
+    const row = rowsBySku.get(sku);
+    if (!row || seen.has(sku)) continue;
+    ordered.push(row);
+    seen.add(sku);
+  }
+  for (const row of rows) {
+    const sku = normalizeSkuKey(row.sku);
+    if (sku && seen.has(sku)) continue;
+    ordered.push(row);
+    if (sku) seen.add(sku);
+  }
+  return ordered;
+}
+
 /**
  * Adapt a stock row for the storefront.
  *
@@ -483,7 +539,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const [rows, tree, salesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
+    const [initialRows, tree, initialSalesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
       identifier
         ? fetchIdentifierRows(supabase, identifier)
         : fetchAllRows(
@@ -501,6 +557,14 @@ export default async function handler(req, res) {
       loadGroupInfoMapIfEnabled(supabase),
       loadIncomingAvailabilityMap(supabase),
     ]);
+    let rows = initialRows;
+    let salesByBarcode = initialSalesByBarcode;
+    if (identifier && groupInfo) {
+      rows = await expandIdentifierAdminGroupRows(supabase, rows, groupInfo);
+      if (rows.length !== initialRows.length) {
+        salesByBarcode = await loadSalesByBarcode(supabase, rows.map((row) => row.sku).filter(Boolean));
+      }
+    }
     const products = rows
       // Defence in depth: invalid catalogue rows must never reach a customer,
       // even if an importer, manual edit, or future sync leaves one live.
