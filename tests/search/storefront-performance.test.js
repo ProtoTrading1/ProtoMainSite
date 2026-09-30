@@ -36,6 +36,11 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
     'exact code lookups do not depend on a stale browser catalogue to show every admin-group option',
   );
   assert.match(
+    productsLibSrc,
+    /needsGroupExpansion[\s\S]*refreshProductCache\(\{ maxAgeMs: 0 \}\)[\s\S]*expandBarcodeSiblings\(pool, products\)/,
+    'admin-group exact searches force a fresh catalogue before using it to expand option siblings',
+  );
+  assert.match(
     productsApiSrc,
     /if \(exact\.length\) return exact;[\s\S]*applyIdentifierFilter\(q, identifier\)/,
     'prefix matching is only used when exact SKU/barcode matching is empty',

@@ -48,12 +48,12 @@ let _lastLiveRefreshAt = 0;
 // Bump both persistent-cache versions whenever a release changes the catalogue
 // contract. This prevents an older price/unit payload becoming the first paint
 // after a customer reloads onto the new application bundle.
-const LS_KEY = 'proto_catalog_v12';
-const LEGACY_LS_KEYS = ['proto_catalog_v10', 'proto_catalog_v11'];
+const LS_KEY = 'proto_catalog_v13';
+const LEGACY_LS_KEYS = ['proto_catalog_v10', 'proto_catalog_v11', 'proto_catalog_v12'];
 const IDB_NAME = 'proto-catalogue';
 const IDB_STORE = 'catalogue';
-const IDB_VERSION = 3;
-const IDB_KEY = 'approved-customer-v3';
+const IDB_VERSION = 4;
+const IDB_KEY = 'approved-customer-v4';
 // Bounds how stale the FIRST paint can be on a repeat visit; the background
 // revalidate corrects it within moments. 24h so the common case — a customer
 // logging back in the next morning — still paints the catalogue instantly
@@ -729,7 +729,12 @@ export async function fetchProductPage({
       let products = matches;
       const needsGroupExpansion = matches.some((product) => String(product?.groupId || '').trim());
       if (needsGroupExpansion) {
-        const pool = await getAllCached().catch(() => products);
+        // Exact code searches for admin-managed groups must not expand against
+        // yesterday's IndexedDB/localStorage catalogue. Otherwise the card can
+        // correctly say "multiple variants" while the option selector only has
+        // the single exact row that seeded the search.
+        const pool = await refreshProductCache({ maxAgeMs: 0 }).catch(() =>
+          getAllCached().catch(() => products));
         products = expandBarcodeSiblings(pool, products);
       }
       products = applyInStockFilter(products, inStockOnly);
