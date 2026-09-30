@@ -58,6 +58,18 @@ test('admin group: distinct barcodes collapse, title from group, identity from p
   assert.deepEqual(card.variants.map((v) => v.id).sort(), ['SKU1', 'SKU2']);
 });
 
+test('admin group drops a malformed duplicate SKU when its barcode matches a valid member', () => {
+  const g = { groupId: 'GID', groupPrimarySku: 'SKU1', groupTitle: 'Paint' };
+  const out = groupProductsByBarcode([
+    row('SKU1', 'MP040-12', { ...g, name: 'Azure', image: 'azure.jpg' }),
+    row('[OBJECT OBJECT]', 'MP040-12', { ...g, name: 'Azure legacy', image: 'legacy.jpg' }),
+  ]);
+  const card = out.find((p) => p.isVariantGroup);
+  assert.ok(card);
+  assert.equal(card.variantCount, 1);
+  assert.deepEqual(card.variants.map((v) => v.sku), ['SKU1']);
+});
+
 test('admin group with a single visible member collapses to a normal card', () => {
   const out = groupProductsByBarcode([
     row('SKU1', 'BC1', { groupId: 'GID', groupPrimarySku: 'SKU1', groupTitle: 'Lonely' }),

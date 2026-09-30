@@ -30,6 +30,38 @@ function deriveGroupTitle(variants) {
   return names[0];
 }
 
+function isMalformedSku(product) {
+  return /^\[?\s*object\s+object\s*\]?$/i.test(String(product?.sku ?? '').trim());
+}
+
+function variantIdentity(product) {
+  return String(product?.barcode || product?.code || product?.sku || product?.id || '')
+    .trim()
+    .toUpperCase();
+}
+
+// Admin grouping can contain a legacy duplicate whose SKU was imported as
+// "[OBJECT OBJECT]" while retaining the same barcode as the real variant.
+// Keep the valid source row, and keep a unique malformed row only when there
+// is no matching valid member to replace it with.
+function cleanAdminVariants(variants) {
+  const out = [];
+  const positions = new Map();
+  for (const variant of variants) {
+    const key = variantIdentity(variant);
+    if (!key || !positions.has(key)) {
+      positions.set(key, out.length);
+      out.push(variant);
+      continue;
+    }
+    const position = positions.get(key);
+    const existing = out[position];
+    if (isMalformedSku(existing) && !isMalformedSku(variant)) out[position] = variant;
+    // Otherwise the existing valid member wins and the duplicate is omitted.
+  }
+  return out;
+}
+
 /** Collapse variant rows that share a barcode into one card with a variants[] list. */
 export function groupProductsByBarcode(products) {
   if (!Array.isArray(products) || !products.length) return [];
@@ -81,7 +113,8 @@ export function groupProductsByBarcode(products) {
     // variant badge communicates alternatives; a shared-prefix label can cut
     // off useful colour and size details.
     const groupTitle = adminTitle || primaryMember.name || primaryMember.title || deriveGroupTitle(variants) || entry.key;
-    const groupImages = variants.flatMap((v) => v.images || (v.image ? [v.image] : [])).filter(Boolean);
+    const displayVariants = isAdminGroup ? cleanAdminVariants(variants) : variants;
+    const groupImages = displayVariants.flatMap((v) => v.images || (v.image ? [v.image] : [])).filter(Boolean);
     // Keep barcode-group ids byte-identical to before (`group_<barcode>`); admin
     // groups get a stable, distinct id.
     const idKey = isAdminGroup
@@ -89,7 +122,10 @@ export function groupProductsByBarcode(products) {
       : String(primaryMember.barcode || primaryMember.code || entry.key.replace(/^b:/, ''));
 
     out.push({
-      ...rep,
+      // Admin groups use the designated primary member for card metadata as
+      // well as its image, so SKU, barcode, modal default, and image cannot
+      // disagree. Legacy barcode groups retain the previous representative.
+      ...(isAdminGroup ? primaryMember : rep),
       id: `group_${idKey}`,
       code: primaryMember.code || rep.code || '',
       barcode: primaryMember.barcode || rep.barcode || '',
@@ -101,8 +137,9 @@ export function groupProductsByBarcode(products) {
         : (rep.image || rep.localImage || groupImages[0] || ''),
       images: groupImages.length ? [...new Set(groupImages)] : rep.images,
       isVariantGroup: true,
-      variantCount: variants.length,
-      variants,
+      variantCount: displayVariants.length,
+      variants: displayVariants,
+      ...(isAdminGroup ? { primaryVariantId: primaryMember.id } : {}),
     });
   }
 

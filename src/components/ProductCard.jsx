@@ -47,6 +47,11 @@ function productBarcodeLabel(product, compact = false) {
   return compact ? `Barcode ${barcode}` : `Barcode: ${barcode}`;
 }
 
+function initialVariantForProduct(product) {
+  if (!product?.isVariantGroup || !product?.primaryVariantId || !Array.isArray(product.variants)) return null;
+  return product.variants.find((variant) => String(variant.id) === String(product.primaryVariantId)) || null;
+}
+
 function productReferenceLabel(product) {
   const sku = productSku(product);
   const barcode = productBarcode(product);
@@ -353,7 +358,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
   const [focusOptionsOnOpen, setFocusOptionsOnOpen] = useState(initialFocusOptions);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(() => initialVariantForProduct(product));
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
