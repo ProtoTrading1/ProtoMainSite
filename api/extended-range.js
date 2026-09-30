@@ -4,6 +4,7 @@ import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import { instorePage } from '../lib/instore-page.mjs';
+import { searchQueryHasStructuredIntent } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
@@ -14,11 +15,11 @@ import {
 
 export { readCompleteRows };
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 24;
 const MAX_PAGE = 10_000;
 // Instore is intentionally a high-availability collection. Small residual
 // quantities create disappointing customer journeys, so do not show an item
-// until there are at least ten units available to sell.
+// until there are more than ten units available to sell.
 export const MIN_INSTORE_AVAILABLE_STOCK = 10;
 const PREVIEW_IMAGE_BUCKET = 'preview-instore-images';
 const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
@@ -60,7 +61,10 @@ export function excludeMainCatalogueProducts(products, catalogueRows) {
 }
 
 function normalizeQuery(value) {
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').slice(0, 80);
+  // Keep decimal punctuation until shared intent parsing has converted units.
+  // Removing it here turned 0.5m into 05m and made equivalent measurements
+  // disagree between the main catalogue and Instore search.
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9 _.,-]/g, '').slice(0, 80);
 }
 
 function normalizePage(value) {
@@ -85,6 +89,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const listingHidden = row?.listing_control_status === 'hidden';
     const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
     const availableStock = Number(row?.available_stock);
+    const customerVisibleStock = Math.floor(availableStock);
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
@@ -96,7 +101,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || !Number.isFinite(availableStock) || availableStock < MIN_INSTORE_AVAILABLE_STOCK
+      || !Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK
       || price <= 0) return [];
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
@@ -105,7 +110,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       description: String(row?.original_description || '').trim(),
       originalDescription: String(row?.original_description || '').trim(),
       price, image: imageUrl, images: imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
-      stockQty: Math.floor(availableStock), stockOnHand: Math.floor(availableStock), inStock: true,
+      stockQty: customerVisibleStock, stockOnHand: customerVisibleStock, inStock: true,
       minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
@@ -183,11 +188,13 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
   const ttlMs = catalogueTtlMs();
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
+  const searchPatterns = catalogueSearchPatterns(query);
+  const structuredOnly = !searchPatterns.length && searchQueryHasStructuredIntent(query);
 
   // A landing or category page is the whole answer in one database round trip.
   // Anything else — a search, or the full-collection payload — needs the reads
   // below, and so does a database that has not had migration 072 applied.
-  if (!catalogueSearchPatterns(query).length && !includeCatalogue) {
+  if (!searchPatterns.length && !structuredOnly && !includeCatalogue) {
     try {
       const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
       if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
@@ -229,21 +236,27 @@ export async function serveStoredCatalogue(client, { query, category, page, from
   }
 
   try {
-    const [{ products, total }, catalogue] = await Promise.all([
-      catalogueSearchPatterns(query).length
-        ? readCatalogueSearchCandidates(client, { query, category }).then((candidates) => {
-          // The same page definition the live read uses. The database has only
-          // narrowed the collection to the stored token matches first.
-          const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
-          return { products: view.products, total: view.total };
-        })
-        : readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE }),
-      includeCatalogue ? readCatalogueProducts(client) : Promise.resolve(undefined),
-    ]);
+    const catalogue = includeCatalogue || structuredOnly
+      ? await readCatalogueProducts(client)
+      : undefined;
+    let result;
+    if (searchPatterns.length) {
+      const candidates = await readCatalogueSearchCandidates(client, { query, category });
+      // The same page definition the live read uses. The database has only
+      // narrowed the collection to the stored token matches first.
+      const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
+      result = { products: view.products, total: view.total };
+    } else if (structuredOnly) {
+      const view = instorePage(catalogue, { query, category, page, pageSize: PAGE_SIZE });
+      result = { products: view.products, total: view.total };
+    } else {
+      result = await readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE });
+    }
+    const { products, total } = result;
     return {
       body: {
         count: Math.min(PAGE_SIZE, Math.max(0, total - from)), page, pageSize: PAGE_SIZE,
-        total, tiles: state.tiles, products, catalogue,
+        total, tiles: state.tiles, products, catalogue: includeCatalogue ? catalogue : undefined,
       },
       staleBeforeMs: ttlMs,
     };
@@ -325,8 +338,15 @@ export function buildPreviewProducts(rows, rawQuery = '') {
 
 export function isIsolatedPreviewRequest(req) {
   const host = String(req.headers.host || '').split(':')[0];
+  // The customer-facing preview flag and the API flag describe the same
+  // isolated mode. Accept either one so a protected branch-scoped preview
+  // cannot render the read-only experience while silently falling through to
+  // the production-backed catalogue. The Vercel environment and hostname
+  // checks below keep this impossible on the production domain.
+  const isolatedPreviewEnabled = process.env.INSTORE_PREVIEW_ENABLED === 'true'
+    || process.env.VITE_INSTORE_PREVIEW_READ_ONLY === 'true';
   return process.env.VERCEL_ENV === 'preview'
-    && process.env.INSTORE_PREVIEW_ENABLED === 'true'
+    && isolatedPreviewEnabled
     && /\.vercel\.app$/i.test(host);
 }
 

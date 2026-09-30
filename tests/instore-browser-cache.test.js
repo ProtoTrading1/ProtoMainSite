@@ -147,7 +147,7 @@ test('a landing page is one database round trip, and the rest still are not', as
   ]);
   assert.match(store, /export async function readCatalogueView\(/);
   // Used only where it is the whole answer.
-  assert.match(api, /if \(!catalogueSearchPatterns\(query\)\.length && !includeCatalogue\) \{/);
+  assert.match(api, /if \(!searchPatterns\.length && !structuredOnly && !includeCatalogue\) \{/);
   // A database without migration 072, or any other failure, falls through to
   // the reads it replaces rather than failing the request.
   assert.match(api, /console\.error\('instore catalogue view unusable:'[\s\S]*\n\s*\}\s*\n\s*\}/);

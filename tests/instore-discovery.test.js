@@ -15,6 +15,113 @@ test('uses Positill department and description for the soft-toy browse tile', ()
   assert.equal(matchesInstoreSearch(product, 'giraffe'), true);
 });
 
+test('finds the whole eligible soft-toy range by everyday names and common misspellings', () => {
+  const softToys = Array.from({ length: 81 }, (_, index) => ({
+    sku: `86261${String(index).padStart(5, '0')}`,
+    title: `SOFT TOY ASSORTED ${index + 1}`,
+    originalDescription: `SOFT TOY ASSORTED ${index + 1}`,
+    category: 'SOFT TOYS',
+  }));
+
+  for (const query of [
+    'soft toy', 'soft toys', 'softtoy', 'softtoys', 'soft toyz', 'soft animal', 'plush', 'pluch', 'plsh',
+    'teddy', 'teddies', 'tedi', 'stuffed animal', 'stuffed toys',
+    'teddy bear', 'teddy bears', 'plushie', 'plushies', 'animal plush',
+    'cuddly toy', 'cudly toy', 'softies', 'soft doll', 'soft dolls',
+    'stufed animls',
+  ]) {
+    assert.equal(
+      softToys.filter((product) => matchesInstoreSearch(product, query)).length,
+      softToys.length,
+      `all eligible soft toys are discoverable for "${query}"`,
+    );
+  }
+});
+
+test('normalizes common plural, joined-word and regional customer phrases', () => {
+  const products = [
+    { sku: 'PAINT001', title: 'PAINT BRUSH SET 3PC', category: 'STATIONERY/ART' },
+    { sku: 'HAIR001', title: 'HAIR BRUSH ASSORTED', category: 'HAIR ACCESSORIES' },
+    { sku: 'PENCIL001', title: 'COLOR PENCILS 12X2 COLOURS', category: 'STATIONERY/ART' },
+    { sku: 'BAG001', title: 'DIY BACKPACK W/MARKERS', category: 'BAGS & WALLETS' },
+    { sku: 'GLUE001', title: 'BEAD GLUE B6000 50ML', category: 'CRAFTS AND ALLIED' },
+    { sku: 'NAIL001', title: 'NAIL GLUE', category: 'COSMETICS SKIN CARE' },
+  ];
+
+  for (const query of ['paint brushes', 'paintbrush', 'paintbrushes']) {
+    assert.equal(matchesInstoreSearch(products[0], query), true, query);
+  }
+  for (const query of ['hair brushes', 'hairbrush', 'hairbrushes']) {
+    assert.equal(matchesInstoreSearch(products[1], query), true, query);
+  }
+  for (const query of ['colour pencils', 'colored pencils', 'colouring pencils']) {
+    assert.equal(matchesInstoreSearch(products[2], query), true, query);
+  }
+  for (const query of [
+    'backpack', 'back pack', 'back packs', 'school bag', 'school bags', 'book bag',
+    'bulk school bags', 'school bags wholesale', 'MOQ 12 school bags', 'box of 24 school bags', 'dozen school bags',
+  ]) {
+    assert.equal(matchesInstoreSearch(products[3], query), true, query);
+  }
+  for (const query of ['bead glue', 'beading glue', 'craft glue', 'craft adhesive']) {
+    assert.equal(matchesInstoreSearch(products[4], query), true, query);
+    assert.equal(matchesInstoreSearch(products[5], query), false, `${query} excludes nail glue`);
+  }
+});
+
+test('keeps soft-toy synonyms out of cosmetics and non-toy plush materials', () => {
+  const nonToys = [
+    { sku: 'BEAUTY001', title: 'BEAUTY BLUSH PALETTE', category: 'COSMETICS SKIN CARE' },
+    { sku: 'PEN001', title: 'PEN PLUSH LION', category: 'STATIONERY/ART' },
+    { sku: 'WOOL001', title: 'WOOL PLUSH VELVET ±65M', category: 'CRAFTS AND ALLIED' },
+  ];
+
+  for (const product of nonToys) {
+    assert.equal(matchesInstoreSearch(product, 'plush'), false, product.title);
+    assert.equal(matchesInstoreSearch(product, 'pluch'), false, product.title);
+  }
+});
+
+test('does not expand a short alias qualifier into an unrelated soft-toy prefix', () => {
+  const products = [
+    { sku: 'PENGUIN001', title: 'SOFT TOY PENGUIN', category: 'SOFT TOYS' },
+    { sku: 'FOX001', title: 'SOFT TOY FOX', category: 'SOFT TOYS' },
+    { sku: 'PEN001', title: 'PEN PLUSH LION', category: 'STATIONERY/ART' },
+  ];
+
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush pen')), []);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush fox')).map((product) => product.sku), ['FOX001']);
+});
+
+test('does not turn an unrelated five-letter query into a neighbouring product word', () => {
+  const brushes = [
+    { sku: 'BRUSH001', title: 'BARBER BRUSH', category: 'COSMETICS SKIN CARE' },
+    { sku: 'BRUSH002', title: 'BLOW DRY BRUSH', category: 'HAIR ACCESSORIES' },
+  ];
+  assert.deepEqual(brushes.filter((product) => matchesInstoreSearch(product, 'blush')), []);
+});
+
+test('applies Phase 1 measurements, price, availability and colour intent deterministically', () => {
+  const products = [
+    { sku: '8626110059', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'SOFT TOYS', price: 89.99, stockQty: 14 },
+    { sku: '8626110060', title: 'SOFT TOY BLUE DOLPHIN ±30CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±30CM', category: 'SOFT TOYS', price: 69.99, stockQty: 14 },
+    { sku: '8626110061', title: 'SOFT TOY BLUE TEDDY', originalDescription: 'SOFT TOY BLUE TEDDY', category: 'SOFT TOYS', price: 79.99, stockQty: 12 },
+    { sku: '8626110062', title: 'SOFT TOY BLUE TEDDY', originalDescription: 'SOFT TOY BLUE TEDDY', category: 'SOFT TOYS', price: 59.99, stockQty: 0 },
+    { sku: '8626110063', title: 'SOFT TOY RABBIT', originalDescription: 'SOFT TOY RABBIT', category: 'SOFT TOYS', price: 149.99, stockQty: 12 },
+  ];
+
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'blue dolphin 50cm')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toy 50 cm')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'cheap soft toys under R100')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys under 100 rand')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys R100 and below')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'soft toys below R100 incl VAT')).map((product) => product.sku), ['8626110059', '8626110060', '8626110061', '8626110062']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'in stock blue teddy')).map((product) => product.sku), ['8626110061']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'available blue teddy')).map((product) => product.sku), ['8626110061']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, '8626110059')).map((product) => product.sku), ['8626110059']);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'sku 8626110059')).map((product) => product.sku), ['8626110059']);
+});
+
 test('uses Positill department wording to keep party items distinct from toys', () => {
   assert.equal(discoveryGroup({ title: 'PARTY TOY CLUB', category: 'PARTY / FANCY DRES' }), 'Party items');
   assert.equal(discoveryGroup({ title: 'TOY PUZZLE ANIMAL', category: 'TOYS + GAMES' }), 'Toys & games');
@@ -24,6 +131,17 @@ test('does not classify socks as soft toys', () => {
   assert.notEqual(discoveryGroup({ title: 'COTTON SOCKS ASSORTED', category: 'SOCKS' }), 'Soft toys');
   assert.notEqual(discoveryGroup({ title: 'ANKLE SOCKS', category: 'SOFT TOYS' }), 'Soft toys');
   assert.equal(discoveryGroup({ title: 'SOFT TOY TEDDY BEAR', category: 'SOFT TOYS' }), 'Soft toys');
+});
+
+test('uses the reviewed soft-toy department for animal names that omit the object words', () => {
+  const dolphin = { sku: 'DOLPHIN50', title: 'BLUE DOLPHIN 50CM', originalDescription: 'BLUE DOLPHIN 50CM', category: 'SOFT TOYS' };
+  assert.equal(discoveryGroup(dolphin), 'Soft toys');
+  for (const query of ['soft toys', 'plush', 'stuffed animal']) {
+    assert.equal(matchesInstoreSearch(dolphin, query), true, query);
+  }
+
+  const sock = { sku: 'SOCK001', title: 'COTTON SOCKS ASSORTED', category: 'SOFT TOYS' };
+  assert.notEqual(discoveryGroup(sock), 'Soft toys');
 });
 
 test('keeps jewellery-making components out of finished jewellery', () => {

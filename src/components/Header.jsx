@@ -77,8 +77,8 @@ function matchCategories(query) {
     .map(({ cat }) => cat);
 }
 
-function ProductRequestModal({ onClose }) {
-  const [description, setDescription] = useState('');
+function ProductRequestModal({ onClose, initialDescription = '' }) {
+  const [description, setDescription] = useState(initialDescription);
   const [qty, setQty] = useState('');
   const [image, setImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -542,6 +542,7 @@ export default function Header({
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
+  onMobileSearchRequest, mobileSearchLabel = 'Search', mobileSearchControlsId,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSearchOpenInternal, setMobileSearchOpenInternal] = useState(false);
@@ -549,6 +550,7 @@ export default function Header({
   const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
   const [showAbout, setShowAbout] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  const [requestDescription, setRequestDescription] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [catMatches, setCatMatches] = useState([]);
   const [desktopSearchState, setDesktopSearchState] = useState('idle');
@@ -866,9 +868,28 @@ export default function Header({
     setMobileSearchState('idle');
     setMobileActiveIdx(-1);
   }, [setMobileSearchOpen]);
+  const requestMobileSearch = () => {
+    if (onMobileSearchRequest) {
+      closeMobileSearch();
+      onMobileSearchRequest();
+      return;
+    }
+    if (mobileSearchOpen) closeMobileSearch();
+    else openMobileSearch();
+  };
+
+  useEffect(() => {
+    const openProductRequest = (event) => {
+      closeSearch();
+      closeMobileSearch();
+      setRequestDescription(String(event?.detail?.query || '').trim());
+      setShowRequest(true);
+    };
+    window.addEventListener('proto:open-product-request', openProductRequest);
+    return () => window.removeEventListener('proto:open-product-request', openProductRequest);
+  }, [closeSearch, closeMobileSearch]);
   const handleMobileInput = (val) => {
     setMobileInput(val);
-    liftSearch(val);
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     const requestId = ++suggestionRequestRef.current;
@@ -1167,7 +1188,7 @@ export default function Header({
           <Home size={20} />
           <span>Home</span>
         </button>
-        <button type="button" className={`mobile-tab-bar-btn${mobileSearchOpen ? ' active' : ''}`} onClick={mobileSearchOpen ? closeMobileSearch : openMobileSearch}>
+        <button type="button" className={`mobile-tab-bar-btn${mobileSearchOpen ? ' active' : ''}`} onClick={requestMobileSearch} aria-label={mobileSearchLabel} aria-controls={mobileSearchControlsId}>
           <Search size={20} />
           <span>Search</span>
         </button>
@@ -1265,11 +1286,12 @@ export default function Header({
         )}
         <button type="button" onClick={closeMobileSearch} aria-label="Close"><X size={15} /></button>
       </div>
-      {mobileSearchOpen && scanError && <div className="mobile-search-scan-error">{scanError}</div>}
+      {mobileSearchOpen && scanError && !mobileInput.trim() && <div className="mobile-search-scan-error">{scanError}</div>}
 
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
         <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
+          {scanError && <div className="mobile-search-scan-error">{scanError}</div>}
           {mobileSearchState === 'loading' && (
             <div className="sp-search-status sp-search-status--loading" role="status" aria-live="polite">
               <Loader2 size={16} className="spin-icon" aria-hidden="true" />
@@ -1344,7 +1366,7 @@ export default function Header({
       )}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-      {showRequest && <ProductRequestModal onClose={() => setShowRequest(false)} />}
+      {showRequest && <ProductRequestModal initialDescription={requestDescription} onClose={() => setShowRequest(false)} />}
     </>
   );
 }

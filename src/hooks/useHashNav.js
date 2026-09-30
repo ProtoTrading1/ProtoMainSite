@@ -1,28 +1,8 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { scrollToTop } from '../lib/scrollToTop';
+import { buildHash, parseHash } from '../lib/hashRoute';
 
-/** Parse window.location.hash into path + refinements */
-function parseHash() {
-  const raw = window.location.hash.replace(/^#\/?/, '');
-  const [pathStr = '', queryStr = ''] = raw.split('?');
-  const segments = pathStr ? pathStr.split('/').filter(Boolean) : [];
-  const routePrefix = '';
-  const decode = (s) => { try { return decodeURIComponent(s).trim(); } catch { return s.trim(); } };
-  const path = (routePrefix ? segments.slice(1) : segments).map(decode);
-  const refinements = {};
-  if (queryStr) {
-    new URLSearchParams(queryStr).forEach((v, k) => { refinements[k] = v; });
-  }
-  return { path, refinements, routePrefix };
-}
-
-/** Build a hash string from path + refinements */
-function buildHash(path, refinements = {}, routePrefix = '') {
-  const segments = routePrefix ? [routePrefix, ...path] : path;
-  const pathStr = segments.join('/');
-  const queryStr = new URLSearchParams(refinements).toString();
-  return `#/${pathStr}${queryStr ? '?' + queryStr : ''}`;
-}
+const parseWindowHash = () => parseHash(window.location.hash);
 
 /**
  * useHashNav — zero-dependency URL state for category navigation.
@@ -36,7 +16,7 @@ function buildHash(path, refinements = {}, routePrefix = '') {
  *   reset       fn         go back to root
  */
 export function useHashNav() {
-  const [state, setState] = useState(parseHash);
+  const [state, setState] = useState(parseWindowHash);
   const shouldScrollOnHashChangeRef = useRef(true);
 
   useEffect(() => {
@@ -45,7 +25,7 @@ export function useHashNav() {
         scrollToTop();
       }
       shouldScrollOnHashChangeRef.current = true;
-      setState(parseHash());
+      setState(parseWindowHash());
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
@@ -57,7 +37,7 @@ export function useHashNav() {
     if (window.location.hash === nextHash) {
       if (shouldScroll) scrollToTop();
       shouldScrollOnHashChangeRef.current = true;
-      setState(parseHash());
+      setState(parseWindowHash());
       return;
     }
     shouldScrollOnHashChangeRef.current = shouldScroll;
@@ -65,7 +45,7 @@ export function useHashNav() {
       window.history.replaceState(null, '', nextHash);
       if (shouldScroll) scrollToTop();
       shouldScrollOnHashChangeRef.current = true;
-      setState(parseHash());
+      setState(parseWindowHash());
       return;
     }
     window.location.hash = nextHash;

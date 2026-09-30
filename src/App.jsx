@@ -6,6 +6,8 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
+import { fetchExtendedRange, instoreCatalogue } from './lib/extendedRange';
+import { instorePage } from '../lib/instore-page.mjs';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -17,6 +19,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
+import { instorePageFromRefinements, instorePageRefinements, instoreSearchQueryFromRefinements, instoreSearchRefinements, instoreSearchRoute } from './lib/instoreSearchRoute';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
@@ -281,6 +284,7 @@ export default function App({
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
+  const [instoreSearch, setInstoreSearch] = useState({ query: '', products: [], total: 0, loading: false, error: false });
   const [counts, setCounts] = useState({ '': 0 });
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
@@ -309,6 +313,7 @@ export default function App({
   const desktopCartRef = useRef(null);
   const mobileCartDialogRef = useRef(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
+  const instoreSearchInputRef = useRef(null);
   const lastSearchLogKeyRef = useRef('');
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
@@ -1116,6 +1121,43 @@ export default function App({
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
   }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!instoreAvailable || query.length < 2) {
+      setInstoreSearch({ query: '', products: [], total: 0, loading: false, error: false });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+    setInstoreSearch({ query, products: [], total: 0, loading: true, error: false });
+    const timer = window.setTimeout(async () => {
+      try {
+        const catalogue = instoreCatalogue();
+        const result = catalogue
+          ? instorePage(catalogue, { query, pageSize: 12 })
+          : await fetchExtendedRange(query, { signal: controller.signal, page: 1 });
+        if (!cancelled) setInstoreSearch({
+          query,
+          products: (result.products || []).slice(0, 12),
+          total: Number(result.total) || 0,
+          loading: false,
+          error: false,
+        });
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          setInstoreSearch({ query, products: [], total: 0, loading: false, error: true });
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -1947,6 +1989,16 @@ export default function App({
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
   const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
+  const instoreRouteQuery = instoreSearchQueryFromRefinements(refinements);
+  const instoreRoutePage = instorePageFromRefinements(refinements);
+  const focusInstoreSearch = useCallback(() => {
+    instoreSearchInputRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    instoreSearchInputRef.current?.focus({ preventScroll: true });
+  }, []);
+  const viewAllInstoreMatches = useCallback(() => {
+    const route = instoreSearchRoute(searchQuery);
+    hashNavigate(route.path, route.refinements, { scroll: true });
+  }, [hashNavigate, searchQuery]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -1986,6 +2038,9 @@ export default function App({
         onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
+        onMobileSearchRequest={viewingInstoreProducts ? focusInstoreSearch : undefined}
+        mobileSearchLabel={viewingInstoreProducts ? 'Search Instore Products' : 'Search'}
+        mobileSearchControlsId={viewingInstoreProducts ? 'instore-search' : undefined}
       />
 
       {instoreAnnouncementPrompt}
@@ -2007,16 +2062,19 @@ export default function App({
 
         <main className="content-area">
           {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
+            initialQuery={instoreRouteQuery}
+            initialPage={instoreRoutePage}
+            searchInputRef={instoreSearchInputRef}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}
             specialsMap={specialsMap}
             browseCategory={String(refinements.browse || '')}
-            onBrowseCategoryChange={(nextCategory) => {
-              const next = { ...refinements };
-              if (nextCategory) next.browse = nextCategory;
-              else delete next.browse;
-              hashNavigate(path, next, { scroll: false });
+            onSearchQueryChange={(nextQuery) => {
+              hashNavigate(path, instoreSearchRefinements(refinements, nextQuery), { scroll: false });
+            }}
+            onPageChange={(nextPage) => {
+              hashNavigate(path, instorePageRefinements(refinements, nextPage), { scroll: false });
             }}
           /> : <MainContent
             products={catalogProducts}
@@ -2053,6 +2111,8 @@ export default function App({
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
+            instoreSearch={instoreSearch}
+            onViewAllInstore={viewAllInstoreMatches}
           />}
         </main>
 

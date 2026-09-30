@@ -29,4 +29,12 @@ describe('mobile category navigation', () => {
     assert.match(mobileNav, /querySelectorAll\(/);
     assert.match(mobileNav, /document\.body\.style\.overflow = 'hidden'/);
   });
+
+  it('shows one feature-gated Instore entry and never bypasses the availability guard', async () => {
+    const mobileNav = await readSource('src/components/MobileNav.jsx');
+    const instoreLabels = mobileNav.match(/> Instore Products<\/button>/g) || [];
+
+    assert.equal(instoreLabels.length, 1);
+    assert.match(mobileNav, /\{instoreAvailable && <button[\s\S]*> Instore Products<\/button>\}/);
+  });
 });

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
@@ -190,11 +191,13 @@ function parseSkuQuery(raw) {
 }
 
 function parseIdentifierQuery(raw) {
-  const value = String(raw || '').trim().toUpperCase();
+  if (!isIdentifierQuery(raw)) return null;
+  const value = normalizeIdentifier(raw);
   if (!value || value.length < 4 || value.length > 64) return null;
-  // Identifier search is intentionally strict before interpolating into a
-  // PostgREST filter. Product codes are letters, digits and simple separators.
-  if (!/^[A-Z0-9_-]+$/.test(value)) return null;
+  // Normalization and this final allowlist keep the interpolated PostgREST
+  // filter strict while accepting the same labelled/separated code forms as
+  // the browser.
+  if (!/^[A-Z0-9]+$/.test(value)) return null;
   return value;
 }
 
@@ -370,7 +373,11 @@ export default async function handler(req, res) {
 
   try {
     const requestedSkus = parseSkuQuery(req.query?.skus);
-    const identifier = requestedSkus ? null : parseIdentifierQuery(req.query?.identifier);
+    const rawIdentifier = requestedSkus ? null : req.query?.identifier;
+    const identifier = requestedSkus ? null : parseIdentifierQuery(rawIdentifier);
+    // A malformed identifier request must fail closed. Falling through here
+    // used to return the entire protected catalogue to an exact-code caller.
+    if (!requestedSkus && rawIdentifier !== undefined && !identifier) return res.status(200).json([]);
     const browsePath = requestedSkus || identifier ? null : parseBrowsePath(req.query?.browsePath);
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
