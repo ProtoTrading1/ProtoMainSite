@@ -246,12 +246,6 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
               style={{ width: '100%', minHeight: 52, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, border: 0, background: '#fff7f7', borderBottom: '1px solid #f3f4f6', color: '#7f1d1d', font: 'inherit', fontWeight: 800, textAlign: 'left', cursor: 'pointer' }}
             ><Search size={17} aria-hidden="true" /> Instore Products</button>}
             <button
-              type="button"
-              onClick={() => { onInstoreProducts?.(); onClose(); }}
-              aria-current={['instore-products', 'extended-range'].includes(path[0]) ? 'page' : undefined}
-              style={{ width: '100%', minHeight: 52, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, border: 0, background: '#fff7f7', borderBottom: '1px solid #f3f4f6', color: '#7f1d1d', font: 'inherit', fontWeight: 800, textAlign: 'left', cursor: 'pointer' }}
-            ><Search size={17} aria-hidden="true" /> Instore Products</button>
-            <button
               onClick={() => {
                 navigate([]);
                 onClose();

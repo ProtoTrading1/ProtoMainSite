@@ -71,7 +71,8 @@ test('uses the shared customer-language families across the main catalogue', () 
   const nonToyIds = new Set(['blush', 'teddy-clay', 'teddy-crayons', 'plush-pen', 'plush-fabric']);
   for (const query of [
     'plush', 'plushie', 'plushies', 'stuffed animal', 'cuddly toy',
-    'teddy bear', 'teddy bears', 'soft doll', 'stufed animls', 'pluch', 'tedi',
+    'teddy bear', 'teddy bears', 'soft doll', 'softtoys', 'soft toyz',
+    'soft animal', 'stufed animls', 'pluch', 'tedi',
   ]) {
     const results = getSuggestions(products, query, 5);
     assert.equal(results[0]?.id, 'bear', query);
@@ -90,6 +91,9 @@ test('uses the shared customer-language families across the main catalogue', () 
   }
   assert.equal(getSuggestions(products, 'craft glue', 5)[0]?.id, 'bead-glue');
   assert.equal(getSuggestions(products, 'craft glue', 5).some((product) => product.id === 'nail-glue'), false);
+  assert.deepEqual(getSuggestions([
+    { id: 'penguin', code: 'ST711', name: 'Soft Toy Penguin', categoryPath: ['Soft toys'], stockOnHand: 12 },
+  ], 'plush pen', 5), []);
 });
 
 test('understands deterministic shopping constraints without weakening exact identifiers', () => {

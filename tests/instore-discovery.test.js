@@ -24,7 +24,7 @@ test('finds the whole eligible soft-toy range by everyday names and common missp
   }));
 
   for (const query of [
-    'soft toy', 'soft toys', 'softtoy', 'plush', 'pluch', 'plsh',
+    'soft toy', 'soft toys', 'softtoy', 'softtoys', 'soft toyz', 'soft animal', 'plush', 'pluch', 'plsh',
     'teddy', 'teddies', 'tedi', 'stuffed animal', 'stuffed toys',
     'teddy bear', 'teddy bears', 'plushie', 'plushies', 'animal plush',
     'cuddly toy', 'cudly toy', 'softies', 'soft doll', 'soft dolls',
@@ -80,6 +80,17 @@ test('keeps soft-toy synonyms out of cosmetics and non-toy plush materials', () 
     assert.equal(matchesInstoreSearch(product, 'plush'), false, product.title);
     assert.equal(matchesInstoreSearch(product, 'pluch'), false, product.title);
   }
+});
+
+test('does not expand a short alias qualifier into an unrelated soft-toy prefix', () => {
+  const products = [
+    { sku: 'PENGUIN001', title: 'SOFT TOY PENGUIN', category: 'SOFT TOYS' },
+    { sku: 'FOX001', title: 'SOFT TOY FOX', category: 'SOFT TOYS' },
+    { sku: 'PEN001', title: 'PEN PLUSH LION', category: 'STATIONERY/ART' },
+  ];
+
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush pen')), []);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush fox')).map((product) => product.sku), ['FOX001']);
 });
 
 test('does not turn an unrelated five-letter query into a neighbouring product word', () => {
