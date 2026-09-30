@@ -381,9 +381,9 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 
   useEffect(() => {
-    setSelectedVariant(null);
+    setSelectedVariant(initialVariantForProduct(product));
     setActiveImageIdx(0);
-  }, [product?.id]);
+  }, [product?.id, product?.primaryVariantId]);
 
   const selectVariant = (variant) => {
     if (!variant) return;
