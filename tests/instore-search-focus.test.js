@@ -38,6 +38,6 @@ test('combined search keeps its query and announces the combined result truthful
   const main = await readFile(new URL('../src/components/MainContent.jsx', import.meta.url), 'utf8');
 
   assert.match(app, /<ExtendedRangePage[\s\S]*initialQuery=\{searchQuery\}/);
-  assert.match(main, /products found across Proto/);
+  assert.match(main, /matching products across Proto/);
   assert.match(main, /products found in Instore/);
 });

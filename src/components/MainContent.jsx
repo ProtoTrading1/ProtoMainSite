@@ -6,6 +6,7 @@ import {
 import ProductCard from './ProductCard';
 import { ProductGridSkeleton } from './ProductCardSkeleton';
 import CategoryLanding from './CategoryLanding';
+import { InstoreResultCard } from './ExtendedRangePage';
 import { slugToLabel } from '../lib/taxonomy';
 
 function cartQtyForProduct(product, cartQtyMap) {
@@ -54,6 +55,8 @@ export default function MainContent({
   onResetFilters = () => {},
   refinements = {},
   journeyPrompt = null,
+  instoreSearch = { query: '', products: [], total: 0, loading: false, error: false },
+  onViewAllInstore = () => {},
 }) {
   const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [isGridMuted, setIsGridMuted] = useState(false);
@@ -205,7 +208,7 @@ export default function MainContent({
       : total === 0 && additionalInstore > 0
         ? `${additionalInstore} products found in Instore.`
         : additionalInstore > 0
-          ? `${combinedTotal} products found across Proto: ${total} in the main catalogue and ${additionalInstore} in Instore.`
+          ? `${combinedTotal} matching products across Proto: ${total} in the main catalogue and ${additionalInstore} in Instore.`
       : totalPages > 1
         ? `${total} products found. Page ${page} of ${totalPages}.`
         : `${total} products found.`;
@@ -265,6 +268,7 @@ export default function MainContent({
   const displayedProducts = shouldChunk ? products.slice(0, visibleCount) : products;
   const hasPartial = shouldChunk && visibleCount < products.length;
   const skeletonCount = Math.min(products.length - visibleCount, PRIORITY_CHUNK_SIZE);
+  const instoreSearchTotal = Math.max(0, Number(instoreSearch.total) || 0);
 
   return (
     <div className="catalog-page">
@@ -356,7 +360,7 @@ export default function MainContent({
         <ProductGridSkeleton count={12} />
       ) : holdWhileEmptyLoading ? (
         <div aria-hidden="true" style={{ minHeight: '40vh' }} />
-      ) : products.length === 0 ? (
+      ) : products.length === 0 && !instoreSearch.loading && instoreSearch.products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />
           <h3>No products match your current filters.</h3>
@@ -418,6 +422,16 @@ export default function MainContent({
             </div>
           )}
         </>
+      )}
+
+      {searchQuery && (
+        <section className="catalog-instore-results" aria-labelledby="catalog-instore-title">
+          <div className="catalog-instore-heading"><div><span>INSTORE PRODUCTS</span><h2 id="catalog-instore-title">More matching products across Proto</h2><p>{resultsTotal.toLocaleString()} in the main catalogue · {instoreSearchTotal.toLocaleString()} additional Instore matches with more than 10 units available.</p></div>{instoreSearchTotal > 0 && <button type="button" onClick={onViewAllInstore}>See all {instoreSearchTotal.toLocaleString()} Instore matches</button>}</div>
+          {instoreSearch.loading && <p className="catalog-instore-status" role="status">Searching the Instore collection…</p>}
+          {!instoreSearch.loading && instoreSearch.error && <p className="catalog-instore-status catalog-instore-status--error">Instore results are temporarily unavailable. Main catalogue results above are unaffected.</p>}
+          {!instoreSearch.loading && !instoreSearch.error && instoreSearch.total === 0 && <p className="catalog-instore-status">No additional Instore matches found.</p>}
+          {!instoreSearch.loading && !instoreSearch.error && instoreSearch.products.length > 0 && <><p className="catalog-instore-preview-count">Showing the first {instoreSearch.products.length.toLocaleString()} matches.</p><div className="catalog-instore-grid">{instoreSearch.products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} />)}</div></>}
+        </section>
       )}
 
     </div>

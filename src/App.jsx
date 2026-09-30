@@ -6,6 +6,8 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
+import { fetchExtendedRange, instoreCatalogue } from './lib/extendedRange';
+import { instorePage } from '../lib/instore-page.mjs';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -281,6 +283,7 @@ export default function App({
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
+  const [instoreSearch, setInstoreSearch] = useState({ query: '', products: [], total: 0, loading: false, error: false });
   const [counts, setCounts] = useState({ '': 0 });
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
@@ -1116,6 +1119,43 @@ export default function App({
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
   }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!instoreAvailable || query.length < 2) {
+      setInstoreSearch({ query: '', products: [], total: 0, loading: false, error: false });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+    setInstoreSearch({ query, products: [], total: 0, loading: true, error: false });
+    const timer = window.setTimeout(async () => {
+      try {
+        const catalogue = instoreCatalogue();
+        const result = catalogue
+          ? instorePage(catalogue, { query, pageSize: 12 })
+          : await fetchExtendedRange(query, { signal: controller.signal, page: 1 });
+        if (!cancelled) setInstoreSearch({
+          query,
+          products: (result.products || []).slice(0, 12),
+          total: Number(result.total) || 0,
+          loading: false,
+          error: false,
+        });
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          setInstoreSearch({ query, products: [], total: 0, loading: false, error: true });
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -2054,6 +2094,8 @@ export default function App({
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
+            instoreSearch={instoreSearch}
+            onViewAllInstore={() => navigate(['instore-products'])}
           />}
         </main>
 

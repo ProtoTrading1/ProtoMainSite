@@ -11,6 +11,24 @@ import './InstoreDisclaimer.css';
 
 const PAGE_SIZE = INSTORE_PAGE_SIZE;
 
+const money = (value) => `R${(Number(value) || 0).toFixed(2)}`;
+
+export function InstoreResultCard({ product, priority = false }) {
+  const name = String(product?.name || product?.title || product?.code || 'Instore product').trim();
+  const code = String(product?.code || product?.sku || '').trim();
+  const stock = Math.max(0, Math.floor(Number(product?.stockQty ?? product?.stockOnHand) || 0));
+  const image = String(product?.image || product?.images?.[0] || '').trim();
+  return <article className="instore-result-card">
+    <div className="instore-result-image">{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</div>
+    <div className="instore-result-body">
+      <p className="instore-result-code">{code || 'INSTORE PRODUCT'}</p><h3>{name}</h3>
+      <p className="instore-result-price">{money(product?.price)}</p>
+      <p className="instore-result-stock"><strong>{stock.toLocaleString()}</strong> available now</p>
+      <p className="instore-result-note">Open Instore Products to add this item and record a colour or design preference.</p>
+    </div>
+  </article>;
+}
+
 export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange, initialQuery = '' }) {
   const [query, setQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
