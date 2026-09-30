@@ -28,7 +28,7 @@ test('finds the whole eligible soft-toy range by everyday names and common missp
     'teddy', 'teddies', 'tedi', 'stuffed animal', 'stuffed toys',
     'teddy bear', 'teddy bears', 'plushie', 'plushies', 'animal plush',
     'cuddly toy', 'cudly toy', 'softies', 'soft doll', 'soft dolls',
-    'stufed animls',
+    'stufed animls', 'sotf toys', 'sotf toy', 'soft tosy',
   ]) {
     assert.equal(
       softToys.filter((product) => matchesInstoreSearch(product, query)).length,
