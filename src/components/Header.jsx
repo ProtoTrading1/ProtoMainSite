@@ -13,6 +13,7 @@ import ProtoLogo from './ProtoLogo';
 import AboutModal from './AboutModal';
 import { authHeaders } from '../lib/authHeaders';
 import { shouldPrefetchData } from '../lib/imageUrl';
+import { catalogueSearchRoute } from '../lib/catalogueSearchRoute';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -807,7 +808,8 @@ export default function Header({
     saveRecent(directCode);
     setRecentSearches(loadRecent());
     setSearchImmediate(directCode);
-    navigateForSearch?.([]);
+    const route = catalogueSearchRoute(directCode);
+    navigateForSearch?.(route.path, route.refinements);
     setSuggestions([]);
     setCatMatches([]);
     setActiveIdx(-1);
@@ -825,7 +827,8 @@ export default function Header({
     saveRecent(term);
     setRecentSearches(loadRecent());
     setSearchImmediate(term);
-    navigateForSearch?.([]);
+    const route = catalogueSearchRoute(term);
+    navigateForSearch?.(route.path, route.refinements);
     setSuggestions([]);
     setCatMatches([]);
     setActiveIdx(-1);
@@ -1058,6 +1061,8 @@ export default function Header({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setSearchImmediate('');
+                  const route = catalogueSearchRoute('');
+                  navigateForSearch?.(route.path, route.refinements);
                   setSuggestions([]);
                   setCatMatches([]);
                   setDesktopSearchState('idle');
@@ -1256,7 +1261,7 @@ export default function Header({
           aria-activedescendant={activeMobileItemId}
         />
         {mobileInput && (
-          <button type="button" onClick={() => { setMobileInput(''); setSearchImmediate(''); setMobileSuggestions([]); setMobileCatMatches([]); setMobileSearchState('idle'); }} aria-label="Clear">
+          <button type="button" onClick={() => { const route = catalogueSearchRoute(''); setMobileInput(''); setSearchImmediate(''); navigateForSearch?.(route.path, route.refinements); setMobileSuggestions([]); setMobileCatMatches([]); setMobileSearchState('idle'); }} aria-label="Clear">
             <X size={15} />
           </button>
         )}

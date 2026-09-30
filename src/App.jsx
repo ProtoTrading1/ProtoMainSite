@@ -20,7 +20,9 @@ const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmM
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { instorePageFromRefinements, instorePageRefinements, instoreSearchQueryFromRefinements, instoreSearchRefinements, instoreSearchRoute } from './lib/instoreSearchRoute';
+import { catalogueSearchQueryFromRoute, catalogueSearchRoute } from './lib/catalogueSearchRoute';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
+import { catalogueResultsForQuery } from './lib/catalogueResultQuery.js';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
 import { fetchSpecials, buildSpecialsMap } from './lib/specials';
@@ -246,6 +248,7 @@ export default function App({
   const catalogueRefinements = useMemo(() => {
     const next = { ...refinements };
     delete next.product;
+    delete next.q;
     return next;
   }, [refinements]);
   const pathKey = path.join('/');
@@ -259,7 +262,8 @@ export default function App({
   // value locally and only pushes here after a short debounce, so typing never
   // re-renders this component (and the whole product grid) per keystroke — that
   // was the "typing is extremely slow" cause.
-  const [searchQuery, setSearchQuery] = useState('');
+  const routeSearchQuery = catalogueSearchQueryFromRoute(path, refinements);
+  const [searchQuery, setSearchQuery] = useState(routeSearchQuery);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
 
@@ -281,10 +285,29 @@ export default function App({
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
+  useEffect(() => {
+    setSearchQuery((current) => (current === routeSearchQuery ? current : routeSearchQuery));
+  }, [routeSearchQuery]);
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogResultQuery, setCatalogResultQuery] = useState('');
+  const visibleCatalogResults = useMemo(
+    () => catalogueResultsForQuery(routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal),
+    [routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal],
+  );
+  const catalogueResultsPending = loading || routeSearchQuery.trim() !== catalogResultQuery.trim();
   const [instoreSearch, setInstoreSearch] = useState({ query: '', products: [], total: 0, loading: false, error: false });
+  const visibleInstoreSearch = useMemo(() => {
+    if (instoreSearch.query.trim() === routeSearchQuery.trim()) return instoreSearch;
+    return {
+      query: routeSearchQuery.trim(),
+      products: [],
+      total: 0,
+      loading: Boolean(routeSearchQuery.trim()),
+      error: false,
+    };
+  }, [instoreSearch, routeSearchQuery]);
   const [counts, setCounts] = useState({ '': 0 });
   const [usingFallback, setUsingFallback] = useState(false);
   const [page, setPage] = useState(1);
@@ -1095,6 +1118,7 @@ export default function App({
           if (!cancelled && l1Data.total > 0) {
             setCatalogProducts(l1Data.products);
             setCatalogTotal(l1Data.total);
+            setCatalogResultQuery(searchQuery);
             warmPageImages(l1Data.products);
             return;
           }
@@ -1102,6 +1126,7 @@ export default function App({
 
         setCatalogProducts(pageData.products);
         setCatalogTotal(pageData.total);
+        setCatalogResultQuery(searchQuery);
         warmPageImages(pageData.products);
       } catch {
         // Never fall back to a public catalogue file: trade pricing and stock
@@ -1110,6 +1135,7 @@ export default function App({
         setUsingFallback(false);
         setCatalogTotal(0);
         setCatalogProducts([]);
+        setCatalogResultQuery(searchQuery);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -1160,14 +1186,14 @@ export default function App({
   }, [searchQuery]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    if (!routeSearchQuery.trim()) {
       searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
       lastSearchLogKeyRef.current = '';
       return;
     }
-    if (loading) return;
+    if (catalogueResultsPending) return;
 
-    const term = searchQuery.trim();
+    const term = routeSearchQuery.trim();
     if (term.length < 3) return;
 
     const logKey = `${term}|${pathKey}|${activeCollection}`;
@@ -1182,7 +1208,7 @@ export default function App({
     const timer = setTimeout(() => {
       void logSearch({
         searchTerm: term,
-        resultsFound: catalogTotal,
+        resultsFound: visibleCatalogResults.total,
         customerId: customer?.id ?? null,
         customerEmail: customer?.email ?? null,
         filtersApplied,
@@ -1198,12 +1224,12 @@ export default function App({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, catalogTotal, loading, activeCollection, path, pathKey, customer?.id, customer?.email]);
+  }, [routeSearchQuery, visibleCatalogResults.total, catalogueResultsPending, activeCollection, path, pathKey, customer?.id, customer?.email]);
 
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
     : path.map((seg, i) => ({ label: seg, path: path.slice(0, i + 1) }));
-  const recommendationProducts = useMemo(() => catalogProducts.slice(0, 4), [catalogProducts]);
+  const recommendationProducts = useMemo(() => visibleCatalogResults.products.slice(0, 4), [visibleCatalogResults.products]);
 
   // Resolve the category node for the current path (used by CategoryLanding)
   const categoryNode = useMemo(() => {
@@ -1954,7 +1980,7 @@ export default function App({
     }
     if (previewProductKey === productDetailKey) return undefined;
 
-    const visible = catalogProducts.find((product) => productDetailId(product) === productDetailKey);
+    const visible = visibleCatalogResults.products.find((product) => productDetailId(product) === productDetailKey);
     if (visible) {
       setPreviewProduct(visible);
       return undefined;
@@ -1973,7 +1999,7 @@ export default function App({
       }
     });
     return () => { cancelled = true; };
-  }, [catalogProducts, hashNavigate, path, previewProductKey, productDetailKey, refinements]);
+  }, [visibleCatalogResults.products, hashNavigate, path, previewProductKey, productDetailKey, refinements]);
 
   const handleSearchProductClick = useCallback((product, index) => {
     const track = searchTrackRef.current;
@@ -1986,7 +2012,7 @@ export default function App({
     });
   }, [searchQuery, page]);
 
-  const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(visibleCatalogResults.total / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
   const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
   const instoreRouteQuery = instoreSearchQueryFromRefinements(refinements);
@@ -1999,6 +2025,11 @@ export default function App({
     const route = instoreSearchRoute(searchQuery);
     hashNavigate(route.path, route.refinements, { scroll: true });
   }, [hashNavigate, searchQuery]);
+  const clearCatalogueSearch = useCallback(() => {
+    setSearchQuery('');
+    const route = catalogueSearchRoute('');
+    hashNavigate(route.path, route.refinements, { scroll: false });
+  }, [hashNavigate]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -2077,8 +2108,8 @@ export default function App({
               hashNavigate(path, instorePageRefinements(refinements, nextPage), { scroll: false });
             }}
           /> : <MainContent
-            products={catalogProducts}
-            resultsTotal={catalogTotal}
+            products={visibleCatalogResults.products}
+            resultsTotal={visibleCatalogResults.total}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             onCartQtyChange={handleCartQtyChange}
@@ -2086,15 +2117,15 @@ export default function App({
             path={path}
             navigate={navigate}
             breadcrumb={breadcrumb}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            searchQuery={routeSearchQuery}
+            onClearSearch={clearCatalogueSearch}
             sort={sort}
             setSort={handleSortChange}
             onShortcut={handleShortcut}
             activeCollection={activeCollection}
             collectionLabel={collectionLabel(activeCollection)}
             recommendationProducts={recommendationProducts}
-            loading={loading}
+            loading={catalogueResultsPending}
             page={page}
             totalPages={totalPages}
             onPageChange={handlePageChange}
@@ -2106,12 +2137,12 @@ export default function App({
             categories={categories}
             onProductPreview={handleProductPreview}
             inStockOnly={inStockOnly}
-            searchActive={Boolean(searchQuery.trim())}
+            searchActive={Boolean(routeSearchQuery.trim())}
             onSearchProductClick={handleSearchProductClick}
             onResetFilters={handleResetFilters}
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
-            instoreSearch={instoreSearch}
+            instoreSearch={visibleInstoreSearch}
             onViewAllInstore={viewAllInstoreMatches}
           />}
         </main>

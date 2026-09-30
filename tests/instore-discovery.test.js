@@ -90,6 +90,7 @@ test('does not expand a short alias qualifier into an unrelated soft-toy prefix'
   ];
 
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush pen')), []);
+  assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'toy pen')), []);
   assert.deepEqual(products.filter((product) => matchesInstoreSearch(product, 'plush fox')).map((product) => product.sku), ['FOX001']);
 });
 
