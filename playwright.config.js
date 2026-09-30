@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import process from 'node:process';
 
-const port = 4173;
+const port = Number(process.env.PROTO_PLAYWRIGHT_PORT || 4173);
 
 export default defineConfig({
   testDir: './e2e',
@@ -34,7 +34,9 @@ export default defineConfig({
       VITE_INTERCOM_APP_ID: '',
     },
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
+    // Never attach release checks to an unrelated process that happens to own
+    // this port. A prior false run tested a different local application.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

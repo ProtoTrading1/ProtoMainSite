@@ -29,10 +29,10 @@ export function InstoreResultCard({ product, priority = false }) {
   </article>;
 }
 
-export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', onBrowseCategoryChange, initialQuery = '' }) {
+export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', initialQuery = '', initialPage = 1, onSearchQueryChange, onPageChange, searchInputRef }) {
   const [query, setQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage);
   const [retry, setRetry] = useState(0);
   const [products, setProducts] = useState([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE });
@@ -51,15 +51,17 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const resultsRef = useRef(null);
-  const searchRef = useRef(null);
+  const internalSearchRef = useRef(null);
+  const searchRef = searchInputRef || internalSearchRef;
 
   const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
 
   useEffect(() => {
     setQuery(initialQuery);
     setSubmittedQuery(initialQuery);
-    if (initialQuery) { setCategory(''); setPage(1); }
-  }, [initialQuery]);
+    setCategory(initialQuery ? '' : browseCategory);
+    setPage(initialPage);
+  }, [initialQuery, browseCategory, initialPage]);
 
   // Once the collection is in memory, a search, a category tile or a page
   // button is answered here: no request, no spinner.
@@ -124,26 +126,39 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     return () => { cancelled = true; };
   }, [catalogue, retry]);
 
-  // The app router owns the hash. Mirroring its parsed browse value here
-  // prevents a native category link from leaving this page on stale results.
   useEffect(() => {
-    setCategory(browseCategory);
-    setPage(1);
     if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }, [browseCategory]);
 
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
-  const choose = (value, nextCategory = category) => { setQuery(value); setSubmittedQuery(value); setCategory(nextCategory); setPage(1); };
-
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
-  const submit = (event) => { event.preventDefault(); setSubmittedQuery(query.trim()); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); };
-  const clear = () => { setQuery(''); setSubmittedQuery(''); setCategory(''); onBrowseCategoryChange?.(''); setPage(1); searchRef.current?.focus(); };
+  const submit = (event) => {
+    event.preventDefault();
+    const nextQuery = query.trim();
+    setQuery(nextQuery); setSubmittedQuery(nextQuery); setCategory(''); setPage(1);
+    onSearchQueryChange?.(nextQuery);
+  };
+  const clear = () => {
+    setQuery(''); setSubmittedQuery(''); setCategory(''); setPage(1);
+    onSearchQueryChange?.('');
+    searchRef.current?.focus();
+  };
   const editSearch = () => { setQuery(submittedQuery); window.requestAnimationFrame(() => searchRef.current?.focus()); };
   const pages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
+  useEffect(() => {
+    if (!loading && page > pages) {
+      setPage(pages);
+      onPageChange?.(pages);
+    }
+  }, [loading, onPageChange, page, pages]);
   const first = (meta.page - 1) * meta.pageSize + 1;
   const last = Math.min(meta.total, first + products.length - 1);
-  const changePage = (next) => { setPage(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' }); };
+  const changePage = (next) => {
+    setPage(next);
+    onPageChange?.(next);
+    resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+  };
   const guideActionStyle = { width: '100%', border: 0, padding: 0, background: 'transparent', color: 'inherit', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', font: 'inherit', cursor: 'pointer' };
   const searchActive = Boolean(submittedQuery);
   const recoveryQueries = useMemo(() => {
@@ -157,7 +172,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   }, [submittedQuery]);
   const tryRecoveryQuery = (candidate) => {
     setQuery(candidate); setSubmittedQuery(candidate); setCategory('');
-    onBrowseCategoryChange?.(''); setPage(1);
+    onSearchQueryChange?.(candidate); setPage(1);
   };
   const requestProduct = () => window.dispatchEvent(new CustomEvent('proto:open-product-request', {
     detail: { query: submittedQuery },

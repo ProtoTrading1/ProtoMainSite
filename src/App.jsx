@@ -19,6 +19,7 @@ import lazyWithRetry from './lib/lazyWithRetry';
 const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmModal'), 'app-order-confirm-modal');
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
+import { instorePageFromRefinements, instorePageRefinements, instoreSearchQueryFromRefinements, instoreSearchRefinements, instoreSearchRoute } from './lib/instoreSearchRoute';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
@@ -312,6 +313,7 @@ export default function App({
   const desktopCartRef = useRef(null);
   const mobileCartDialogRef = useRef(null);
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
+  const instoreSearchInputRef = useRef(null);
   const lastSearchLogKeyRef = useRef('');
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
@@ -1987,6 +1989,16 @@ export default function App({
   const totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
   const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
+  const instoreRouteQuery = instoreSearchQueryFromRefinements(refinements);
+  const instoreRoutePage = instorePageFromRefinements(refinements);
+  const focusInstoreSearch = useCallback(() => {
+    instoreSearchInputRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    instoreSearchInputRef.current?.focus({ preventScroll: true });
+  }, []);
+  const viewAllInstoreMatches = useCallback(() => {
+    const route = instoreSearchRoute(searchQuery);
+    hashNavigate(route.path, route.refinements, { scroll: true });
+  }, [hashNavigate, searchQuery]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -2026,6 +2038,9 @@ export default function App({
         onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
+        onMobileSearchRequest={viewingInstoreProducts ? focusInstoreSearch : undefined}
+        mobileSearchLabel={viewingInstoreProducts ? 'Search Instore Products' : 'Search'}
+        mobileSearchControlsId={viewingInstoreProducts ? 'instore-search' : undefined}
       />
 
       {instoreAnnouncementPrompt}
@@ -2047,17 +2062,19 @@ export default function App({
 
         <main className="content-area">
           {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
-            initialQuery={searchQuery}
+            initialQuery={instoreRouteQuery}
+            initialPage={instoreRoutePage}
+            searchInputRef={instoreSearchInputRef}
             addToCart={addToCart}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}
             specialsMap={specialsMap}
             browseCategory={String(refinements.browse || '')}
-            onBrowseCategoryChange={(nextCategory) => {
-              const next = { ...refinements };
-              if (nextCategory) next.browse = nextCategory;
-              else delete next.browse;
-              hashNavigate(path, next, { scroll: false });
+            onSearchQueryChange={(nextQuery) => {
+              hashNavigate(path, instoreSearchRefinements(refinements, nextQuery), { scroll: false });
+            }}
+            onPageChange={(nextPage) => {
+              hashNavigate(path, instorePageRefinements(refinements, nextPage), { scroll: false });
             }}
           /> : <MainContent
             products={catalogProducts}
@@ -2095,7 +2112,7 @@ export default function App({
             refinements={catalogueRefinements}
             journeyPrompt={customerJourney?.presentation === 'basket' ? customerJourneyPrompt : null}
             instoreSearch={instoreSearch}
-            onViewAllInstore={() => navigate(['instore-products'])}
+            onViewAllInstore={viewAllInstoreMatches}
           />}
         </main>
 

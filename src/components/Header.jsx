@@ -542,6 +542,7 @@ export default function Header({
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
+  onMobileSearchRequest, mobileSearchLabel = 'Search', mobileSearchControlsId,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSearchOpenInternal, setMobileSearchOpenInternal] = useState(false);
@@ -867,6 +868,15 @@ export default function Header({
     setMobileSearchState('idle');
     setMobileActiveIdx(-1);
   }, [setMobileSearchOpen]);
+  const requestMobileSearch = () => {
+    if (onMobileSearchRequest) {
+      closeMobileSearch();
+      onMobileSearchRequest();
+      return;
+    }
+    if (mobileSearchOpen) closeMobileSearch();
+    else openMobileSearch();
+  };
 
   useEffect(() => {
     const openProductRequest = (event) => {
@@ -880,7 +890,6 @@ export default function Header({
   }, [closeSearch, closeMobileSearch]);
   const handleMobileInput = (val) => {
     setMobileInput(val);
-    liftSearch(val);
     setMobileActiveIdx(-1);
     clearTimeout(debounceRef.current);
     const requestId = ++suggestionRequestRef.current;
@@ -1179,7 +1188,7 @@ export default function Header({
           <Home size={20} />
           <span>Home</span>
         </button>
-        <button type="button" className={`mobile-tab-bar-btn${mobileSearchOpen ? ' active' : ''}`} onClick={mobileSearchOpen ? closeMobileSearch : openMobileSearch}>
+        <button type="button" className={`mobile-tab-bar-btn${mobileSearchOpen ? ' active' : ''}`} onClick={requestMobileSearch} aria-label={mobileSearchLabel} aria-controls={mobileSearchControlsId}>
           <Search size={20} />
           <span>Search</span>
         </button>
@@ -1277,11 +1286,12 @@ export default function Header({
         )}
         <button type="button" onClick={closeMobileSearch} aria-label="Close"><X size={15} /></button>
       </div>
-      {mobileSearchOpen && scanError && <div className="mobile-search-scan-error">{scanError}</div>}
+      {mobileSearchOpen && scanError && !mobileInput.trim() && <div className="mobile-search-scan-error">{scanError}</div>}
 
       {/* Mobile category + product results */}
       {mobileSearchOpen && mobileInput.trim() && (
         <div className="mobile-search-results" id={mobileListboxId} role="listbox" aria-label="Mobile search suggestions">
+          {scanError && <div className="mobile-search-scan-error">{scanError}</div>}
           {mobileSearchState === 'loading' && (
             <div className="sp-search-status sp-search-status--loading" role="status" aria-live="polite">
               <Loader2 size={16} className="spin-icon" aria-hidden="true" />
