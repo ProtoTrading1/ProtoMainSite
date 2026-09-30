@@ -19,12 +19,12 @@ test('committing a header search clears a stale department route', () => {
     header.indexOf('const commitSearch'),
     header.indexOf('}', header.indexOf('setSearchOpen(false)', header.indexOf('const commitSearch'))),
   );
-  assert.match(commitBlock, /navigateForSearch\?\.\(\[\]\)/, 'Enter-committed search returns to the full catalogue');
+  assert.match(commitBlock, /catalogueSearchRoute\(term\)/, 'Enter-committed search builds a shareable root route');
   const pickBlock = header.slice(
     header.indexOf('const pickProduct'),
     header.indexOf('const pickCategory'),
   );
-  assert.match(pickBlock, /navigateForSearch\?\.\(\[\]\)/, 'picking a product suggestion returns to the full catalogue');
+  assert.match(pickBlock, /catalogueSearchRoute\(directCode\)/, 'picking a product suggestion builds a shareable root route');
 });
 
 test('search results continue to use the full catalogue rather than the active browse branch', () => {

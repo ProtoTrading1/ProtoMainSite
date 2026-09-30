@@ -20,6 +20,7 @@ const OrderConfirmModal = lazyWithRetry(() => import('./components/OrderConfirmM
 const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'app-reorder-modal');
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { instorePageFromRefinements, instorePageRefinements, instoreSearchQueryFromRefinements, instoreSearchRefinements, instoreSearchRoute } from './lib/instoreSearchRoute';
+import { catalogueSearchQueryFromRoute, catalogueSearchRoute } from './lib/catalogueSearchRoute';
 import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
@@ -246,6 +247,7 @@ export default function App({
   const catalogueRefinements = useMemo(() => {
     const next = { ...refinements };
     delete next.product;
+    delete next.q;
     return next;
   }, [refinements]);
   const pathKey = path.join('/');
@@ -259,7 +261,8 @@ export default function App({
   // value locally and only pushes here after a short debounce, so typing never
   // re-renders this component (and the whole product grid) per keystroke — that
   // was the "typing is extremely slow" cause.
-  const [searchQuery, setSearchQuery] = useState('');
+  const routeSearchQuery = catalogueSearchQueryFromRoute(path, refinements);
+  const [searchQuery, setSearchQuery] = useState(routeSearchQuery);
   const [inStockOnly, setInStockOnly] = useState(readInStockOnly);
   const [sort, setSort] = useState(readInitialSort);
 
@@ -281,6 +284,9 @@ export default function App({
   const navigateForSearch = useCallback((newPath, newRefinements) => {
     hashNavigate(newPath, newRefinements, { scroll: true });
   }, [hashNavigate]);
+  useEffect(() => {
+    setSearchQuery((current) => (current === routeSearchQuery ? current : routeSearchQuery));
+  }, [routeSearchQuery]);
   const [loading, setLoading] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
@@ -1999,6 +2005,11 @@ export default function App({
     const route = instoreSearchRoute(searchQuery);
     hashNavigate(route.path, route.refinements, { scroll: true });
   }, [hashNavigate, searchQuery]);
+  const clearCatalogueSearch = useCallback(() => {
+    setSearchQuery('');
+    const route = catalogueSearchRoute('');
+    hashNavigate(route.path, route.refinements, { scroll: false });
+  }, [hashNavigate]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -2087,7 +2098,7 @@ export default function App({
             navigate={navigate}
             breadcrumb={breadcrumb}
             searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            onClearSearch={clearCatalogueSearch}
             sort={sort}
             setSort={handleSortChange}
             onShortcut={handleShortcut}

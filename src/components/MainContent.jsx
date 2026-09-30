@@ -34,7 +34,7 @@ export default function MainContent({
   path,
   navigate,
   searchQuery = '',
-  setSearchQuery = () => {},
+  onClearSearch = () => {},
   sort = 'best-selling',
   setSort = () => {},
   onShortcut = () => {},
@@ -340,7 +340,7 @@ export default function MainContent({
           <button
             type="button"
             className="active-search-clear"
-            onClick={() => setSearchQuery('')}
+            onClick={onClearSearch}
             aria-label="Clear search"
           >
             Clear search
