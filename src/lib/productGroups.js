@@ -34,30 +34,61 @@ function isMalformedSku(product) {
   return /^\[?\s*object\s+object\s*\]?$/i.test(String(product?.sku ?? '').trim());
 }
 
-function variantIdentity(product) {
-  return String(product?.barcode || product?.code || product?.sku || product?.id || '')
+function validSkuIdentity(product) {
+  if (isMalformedSku(product)) return '';
+  return String(product?.sku || product?.id || '')
+    .trim()
+    .toUpperCase();
+}
+
+function barcodeIdentity(product) {
+  return String(product?.barcode || product?.code || '')
     .trim()
     .toUpperCase();
 }
 
 // Admin grouping can contain a legacy duplicate whose SKU was imported as
 // "[OBJECT OBJECT]" while retaining the same barcode as the real variant.
-// Keep the valid source row, and keep a unique malformed row only when there
-// is no matching valid member to replace it with.
+// Keep each valid source row by SKU, even when a colour range intentionally
+// shares one barcode; keep a unique malformed row only when there is no
+// matching valid member to replace it with.
 function cleanAdminVariants(variants) {
   const out = [];
-  const positions = new Map();
+  const validSkuPositions = new Map();
+  const validBarcodePositions = new Map();
+  const malformedBarcodePositions = new Map();
+
   for (const variant of variants) {
-    const key = variantIdentity(variant);
-    if (!key || !positions.has(key)) {
-      positions.set(key, out.length);
+    const skuKey = validSkuIdentity(variant);
+    const barcodeKey = barcodeIdentity(variant);
+
+    if (skuKey) {
+      if (validSkuPositions.has(skuKey)) continue;
+
+      if (barcodeKey && malformedBarcodePositions.has(barcodeKey)) {
+        const position = malformedBarcodePositions.get(barcodeKey);
+        out[position] = variant;
+        malformedBarcodePositions.delete(barcodeKey);
+        validSkuPositions.set(skuKey, position);
+        if (!validBarcodePositions.has(barcodeKey)) validBarcodePositions.set(barcodeKey, position);
+        continue;
+      }
+
+      validSkuPositions.set(skuKey, out.length);
+      if (barcodeKey && !validBarcodePositions.has(barcodeKey)) validBarcodePositions.set(barcodeKey, out.length);
       out.push(variant);
       continue;
     }
-    const position = positions.get(key);
-    const existing = out[position];
-    if (isMalformedSku(existing) && !isMalformedSku(variant)) out[position] = variant;
-    // Otherwise the existing valid member wins and the duplicate is omitted.
+
+    const fallbackKey = barcodeKey || String(variant?.id || '').trim().toUpperCase();
+    if (!fallbackKey) {
+      out.push(variant);
+      continue;
+    }
+    if (validBarcodePositions.has(fallbackKey) || malformedBarcodePositions.has(fallbackKey)) continue;
+
+    malformedBarcodePositions.set(fallbackKey, out.length);
+    out.push(variant);
   }
   return out;
 }

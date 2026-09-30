@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { variantGroupKey, groupProductsByBarcode } from '../src/lib/productGroups.js';
+import { variantGroupKey, groupProductsByBarcode, expandBarcodeSiblings } from '../src/lib/productGroups.js';
 
 // A storefront-adapted row: id/sku are the SKU, code/barcode are the barcode.
 const row = (sku, barcode, over = {}) => ({
@@ -56,6 +56,25 @@ test('admin group: distinct barcodes collapse, title from group, identity from p
   assert.equal(card.variantCount, 2);
   // Every original variant survives inside the card for the selector.
   assert.deepEqual(card.variants.map((v) => v.id).sort(), ['SKU1', 'SKU2']);
+});
+
+test('admin group search expansion keeps shared-barcode siblings for the option selector', () => {
+  const g = { groupId: 'GID', groupPrimarySku: 'SPRAY1-MTWHT', groupTitle: 'Spray Paint 450ml' };
+  const pool = [
+    row('SPRAY1-MTWHT', 'SPRAY1', { ...g, variantLabel: 'Matt White #1007' }),
+    row('SPRAY1-MTBLK', 'SPRAY1', { ...g, variantLabel: 'Matt Black #4' }),
+    row('SPRAY1-BLU', 'SPRAY1', { ...g, variantLabel: '141-Blue #303' }),
+    row('OTHER', 'OTHERBC', { name: 'Other Product' }),
+  ];
+
+  const expanded = expandBarcodeSiblings(pool, [pool[1]]);
+  assert.deepEqual(expanded.map((v) => v.id).sort(), ['SPRAY1-BLU', 'SPRAY1-MTBLK', 'SPRAY1-MTWHT']);
+
+  const card = groupProductsByBarcode(expanded).find((p) => p.isVariantGroup);
+  assert.ok(card);
+  assert.equal(card.title, 'Spray Paint 450ml');
+  assert.equal(card.variantCount, 3);
+  assert.deepEqual(card.variants.map((v) => v.id).sort(), ['SPRAY1-BLU', 'SPRAY1-MTBLK', 'SPRAY1-MTWHT']);
 });
 
 test('admin group drops a malformed duplicate SKU when its barcode matches a valid member', () => {

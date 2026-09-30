@@ -726,7 +726,13 @@ export async function fetchProductPage({
   if (hasSearch && isIdentifierQuery(searchQuery)) {
     const matches = await fetchIdentifierProducts(searchQuery);
     if (matches.length) {
-      let products = applyInStockFilter(matches, inStockOnly);
+      let products = matches;
+      const needsGroupExpansion = matches.some((product) => String(product?.groupId || '').trim());
+      if (needsGroupExpansion) {
+        const pool = await getAllCached().catch(() => products);
+        products = expandBarcodeSiblings(pool, products);
+      }
+      products = applyInStockFilter(products, inStockOnly);
       products = groupProductsByBarcode(products);
       const total = products.length;
       const from = (page - 1) * pageSize;
