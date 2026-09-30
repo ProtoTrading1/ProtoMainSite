@@ -48,8 +48,15 @@ function productBarcodeLabel(product, compact = false) {
 }
 
 function initialVariantForProduct(product) {
-  if (!product?.isVariantGroup || !product?.primaryVariantId || !Array.isArray(product.variants)) return null;
-  return product.variants.find((variant) => String(variant.id) === String(product.primaryVariantId)) || null;
+  if (!product?.isVariantGroup || !Array.isArray(product.variants)) return null;
+  const keys = [product.primaryVariantId, product.sku, product.websiteSku, product.code, product.barcode]
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean);
+  return product.variants.find((variant) => {
+    const variantKeys = [variant.id, variant.sku, variant.websiteSku, variant.code, variant.barcode]
+      .map((value) => String(value || '').trim().toUpperCase());
+    return keys.some((key) => variantKeys.includes(key));
+  }) || null;
 }
 
 function productReferenceLabel(product) {
@@ -381,9 +388,9 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 
   useEffect(() => {
-    setSelectedVariant(null);
+    setSelectedVariant(initialVariantForProduct(product));
     setActiveImageIdx(0);
-  }, [product?.id]);
+  }, [product?.id, product?.primaryVariantId]);
 
   const selectVariant = (variant) => {
     if (!variant) return;
