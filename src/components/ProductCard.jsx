@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageOff, Link, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageOff, Link, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
@@ -57,6 +57,16 @@ function initialVariantForProduct(product) {
       .map((value) => String(value || '').trim().toUpperCase());
     return keys.some((key) => variantKeys.includes(key));
   }) || null;
+}
+
+// Short name for a variant in the image-panel nav label: its colour when the
+// catalogue has one, otherwise the last "|" segment of its name
+// ("CRAFT PAINT | METAL | 50ML | Bronze" → "Bronze").
+function variantShortLabel(variant) {
+  const colour = String(variant?.colour || '').trim();
+  if (colour) return displayProductText(colour);
+  const parts = String(variant?.name || '').split('|').map((part) => part.trim()).filter(Boolean);
+  return displayProductText(parts.length ? parts[parts.length - 1] : (variant?.name || ''));
 }
 
 function productReferenceLabel(product) {
@@ -399,6 +409,38 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     setActiveImageIdx(0);
   };
 
+  // Image-panel arrows: step through the group's variants, wrapping at either end.
+  const hasVariantNav = isVariantGroup && variants.length > 1;
+  const selectedVariantIdx = selectedVariant ? variants.findIndex((v) => v.id === selectedVariant.id) : -1;
+  const stepVariant = (direction) => {
+    if (!hasVariantNav) return;
+    const nextIdx = selectedVariantIdx < 0
+      ? (direction > 0 ? 0 : variants.length - 1)
+      : (selectedVariantIdx + direction + variants.length) % variants.length;
+    const next = variants[nextIdx];
+    selectVariant(next);
+    window.requestAnimationFrame(() => {
+      const row = variantsRef.current?.querySelector(`[data-variant-id="${CSS.escape(String(next.id))}"]`);
+      row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  };
+  const stepVariantRef = useRef(stepVariant);
+  useEffect(() => { stepVariantRef.current = stepVariant; });
+  const swipeStartRef = useRef(null);
+  const onImageTouchStart = (e) => {
+    if (!hasVariantNav || e.touches.length !== 1) return;
+    swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onImageTouchEnd = (e) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    stepVariantRef.current(dx < 0 ? 1 : -1);
+  };
+
   const showPreview = (focusOptions = false) => {
     setFocusOptionsOnOpen(Boolean(focusOptions));
     onSearchEngage?.();
@@ -478,6 +520,16 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
       if (e.key === 'Escape') {
         e.preventDefault();
         closePreview();
+        return;
+      }
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        const target = e.target;
+        const typing = target instanceof HTMLElement
+          && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+        if (!typing) {
+          e.preventDefault();
+          stepVariantRef.current(e.key === 'ArrowRight' ? 1 : -1);
+        }
         return;
       }
       if (e.key !== 'Tab') return;
@@ -671,7 +723,43 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   })}
                 </div>
               )}
-              <div className="pz-main-image">
+              <div
+                className="pz-main-image"
+                onTouchStart={onImageTouchStart}
+                onTouchEnd={onImageTouchEnd}
+              >
+                {hasVariantNav && (
+                  <div className="pz-variant-nav-label" aria-live="polite">
+                    <span className="pz-variant-nav-count">
+                      {selectedVariantIdx >= 0
+                        ? `Variant ${selectedVariantIdx + 1} of ${variants.length}`
+                        : `${variants.length} variants`}
+                    </span>
+                    <span className="pz-variant-nav-name">
+                      {selectedVariantIdx >= 0 ? variantShortLabel(selectedVariant) : 'Use the arrows to browse'}
+                    </span>
+                  </div>
+                )}
+                {hasVariantNav && (
+                  <>
+                    <button
+                      type="button"
+                      className="pz-variant-arrow pz-variant-arrow--prev"
+                      onClick={(e) => { e.stopPropagation(); stepVariant(-1); }}
+                      aria-label="Previous variant"
+                    >
+                      <ChevronLeft size={22} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="pz-variant-arrow pz-variant-arrow--next"
+                      onClick={(e) => { e.stopPropagation(); stepVariant(1); }}
+                      aria-label="Next variant"
+                    >
+                      <ChevronRight size={22} aria-hidden="true" />
+                    </button>
+                  </>
+                )}
                 <ProductImage
                   className="pz-main-image-img"
                   variant="modal"
@@ -766,6 +854,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                         return (
                           <button
                             key={v.id}
+                            data-variant-id={v.id}
                             type="button"
                             role="radio"
                             aria-checked={isSelected}
