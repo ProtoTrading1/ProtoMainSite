@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AddressAutocomplete from '../AddressAutocomplete';
-import { SADC_COUNTRIES, SA_PROVINCES } from '../../lib/sadcCountries';
+import { REGISTRATION_COUNTRIES, SA_PROVINCES } from '../../lib/sadcCountries';
 
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
@@ -150,12 +150,101 @@ export default function BillingDeliveryFields({
   buildingTypesClassName = 'lp-quiz-types lp-quiz-types--compact',
   countriesClassName = 'lp-quiz-countries',
 }) {
-  const billingUsesAutocomplete = !country || country === 'South Africa';
   const [countryPickerOpen, setCountryPickerOpen] = useState(country !== 'South Africa');
-  const showCountryPicker = countryPickerOpen || country !== 'South Africa' || fieldHasIssue('country');
+  const [otherCountrySelected, setOtherCountrySelected] = useState(
+    Boolean(country && !REGISTRATION_COUNTRIES.includes(country)),
+  );
+  const billingUsesAutocomplete = !otherCountrySelected && (!country || country === 'South Africa');
+  const showCountryPicker = countryPickerOpen || otherCountrySelected || country !== 'South Africa' || fieldHasIssue('country');
 
   return (
     <div className={gridClassName}>
+      <div className={`lp-register-country-block lp-quiz-field lp-quiz-field--full${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
+        {!showCountryPicker ? (
+          <div className="lp-register-country-summary">
+            <span>Country: {country}</span>
+            <button type="button" className="lp-register-link" onClick={() => setCountryPickerOpen(true)}>
+              Change country
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className={subheadClassName}>Country</div>
+            <div className={countriesClassName} role="group" aria-label="Country" aria-required="true">
+              {REGISTRATION_COUNTRIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`lp-quiz-country${!otherCountrySelected && country === c ? ' selected' : ''}`}
+                  onClick={() => {
+                    setOtherCountrySelected(false);
+                    setCountry(c);
+                    if (c !== 'South Africa') setProvince('');
+                    if (c === 'South Africa') setCountryPickerOpen(false);
+                  }}
+                  aria-pressed={!otherCountrySelected && country === c}
+                >
+                  {c}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`lp-quiz-country${otherCountrySelected ? ' selected' : ''}`}
+                aria-pressed={otherCountrySelected}
+                onClick={() => {
+                  if (!otherCountrySelected) setCountry('');
+                  setOtherCountrySelected(true);
+                  setProvince('');
+                }}
+              >
+                Other country
+              </button>
+            </div>
+            {otherCountrySelected && (
+              <div className="lp-quiz-field lp-quiz-field--full">
+                <label htmlFor="trade-other-country">Country name</label>
+                <input
+                  id="trade-other-country"
+                  name="country"
+                  autoComplete="country-name"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="Enter your country"
+                  required
+                  aria-required="true"
+                  aria-invalid={fieldHasIssue('country')}
+                />
+              </div>
+            )}
+            {country && country !== 'South Africa' && (
+              <p className="lp-register-field-hint lp-register-field-hint--block">
+                Enter your billing and delivery addresses manually. International delivery arrangements will be confirmed by our team.
+              </p>
+            )}
+            {!otherCountrySelected && country === 'South Africa' && (
+              <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('province') ? ' lp-quiz-field--error' : ''}`}>
+                <label htmlFor="trade-province">Province <span className="lp-register-optional">(optional — filled from address search)</span></label>
+                <select
+                  id="trade-province"
+                  name="province"
+                  autoComplete="address-level1"
+                  value={province}
+                  onChange={(e) => {
+                    setProvince(e.target.value);
+                    if (e.target.value) setCountry('South Africa');
+                  }}
+                >
+                  <option value="">Select province</option>
+                  {SA_PROVINCES.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>
+        )}
+      </div>
       <div className={subheadClassName}>Billing address</div>
       <p className="lp-register-field-hint lp-register-field-hint--block">
         Registered address for invoices and account records.
@@ -280,58 +369,6 @@ export default function BillingDeliveryFields({
           />
         </div>
       )}
-
-      <div className={`lp-register-country-block lp-quiz-field lp-quiz-field--full${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
-        {!showCountryPicker ? (
-          <div className="lp-register-country-summary">
-            <span>Country: {country}</span>
-            <button type="button" className="lp-register-link" onClick={() => setCountryPickerOpen(true)}>
-              Change country
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className={subheadClassName}>Country</div>
-            <div className={countriesClassName} role="group" aria-label="Country" aria-required="true">
-              {SADC_COUNTRIES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`lp-quiz-country${country === c ? ' selected' : ''}`}
-                  onClick={() => {
-                    setCountry(c);
-                    if (c !== 'South Africa') setProvince('');
-                    if (c === 'South Africa') setCountryPickerOpen(false);
-                  }}
-                  aria-pressed={country === c}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-            {country === 'South Africa' && (
-              <div className={`lp-quiz-field lp-quiz-field--full${fieldHasIssue('province') ? ' lp-quiz-field--error' : ''}`}>
-                <label htmlFor="trade-province">Province <span className="lp-register-optional">(optional — filled from address search)</span></label>
-                <select
-                  id="trade-province"
-                  name="province"
-                  autoComplete="address-level1"
-                  value={province}
-                  onChange={(e) => {
-                    setProvince(e.target.value);
-                    if (e.target.value) setCountry('South Africa');
-                  }}
-                >
-                  <option value="">Select province</option>
-                  {SA_PROVINCES.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
