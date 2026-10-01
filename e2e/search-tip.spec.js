@@ -50,6 +50,16 @@ test('basket use prevents a reminder without changing its contents', async ({ pa
   await expect(page.locator('.cart-item')).toHaveCount(0);
 });
 
+test('scrolling clears the tip from product images but still permits one unused-search reminder', async ({ page, context }) => {
+  await start(page, context);
+  if (test.info().project.name.includes('mobile')) await page.evaluate(() => window.scrollBy(0, 200));
+  else await page.locator('.content-area').evaluate((element) => { element.scrollTop = 100; });
+  await expect(tip(page)).toHaveCount(0);
+  await page.clock.fastForward(300000);
+  await expect(tip(page)).toBeVisible();
+  await expect(tip(page)).toContainText('SEARCH TIP');
+});
+
 test('a reminder waits until an unrelated dialog closes', async ({ page, context }) => {
   test.skip(test.info().project.name.includes('mobile'), 'About Us is a desktop navigation control.');
   await start(page, context);

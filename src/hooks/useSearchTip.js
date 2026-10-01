@@ -125,7 +125,18 @@ export default function useSearchTip({ accountId, ready, browsing, searched, eng
   useEffect(() => {
     if (!stage) return undefined;
     const timer = window.setTimeout(() => setStage(null), DISPLAY_MS);
-    return () => window.clearTimeout(timer);
+    // Do not cover product images once the customer starts moving through
+    // the catalogue. Scrolling closes this display without cancelling the
+    // optional reminder for customers who have not used search yet.
+    const onScroll = (event) => {
+      if (event.target?.closest?.('.customer-journey-prompt')) return;
+      setStage(null);
+    };
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('scroll', onScroll, true);
+    };
   }, [stage]);
 
   const dismiss = useCallback(() => {
