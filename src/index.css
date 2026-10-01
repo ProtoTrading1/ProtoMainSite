@@ -3504,6 +3504,7 @@ textarea:focus-visible,
   border: 1px solid #E5E7EB;
   border-radius: 6px;
   background: #fafafa;
+  overflow: hidden;
 }
 .drawer-thumb img {
   width: 88%;
@@ -3521,6 +3522,9 @@ textarea:focus-visible,
   text-overflow: ellipsis;
 }
 .drawer-line-body > span {
+  display: block;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
   color: #9ca3af;
   font-size: 10px;
   font-weight: 500;
