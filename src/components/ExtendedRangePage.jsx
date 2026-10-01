@@ -13,19 +13,21 @@ const PAGE_SIZE = INSTORE_PAGE_SIZE;
 
 const money = (value) => `R${(Number(value) || 0).toFixed(2)}`;
 
-export function InstoreResultCard({ product, priority = false }) {
+export function InstoreResultCard({ product, priority = false, addToCart, cartQty = 0 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
   const name = String(product?.name || product?.title || product?.code || 'Instore product').trim();
   const code = String(product?.code || product?.sku || '').trim();
   const stock = Math.max(0, Math.floor(Number(product?.stockQty ?? product?.stockOnHand) || 0));
   const image = String(product?.image || product?.images?.[0] || '').trim();
   return <article className="instore-result-card">
-    <div className="instore-result-image">{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</div>
+    <button type="button" className="instore-result-image" aria-label={`View ${name}`} onClick={() => setPreviewOpen(true)}>{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</button>
     <div className="instore-result-body">
       <p className="instore-result-code">{code || 'INSTORE PRODUCT'}</p><h3>{name}</h3>
       <p className="instore-result-price">{money(product?.price)}</p>
       <p className="instore-result-stock"><strong>{stock.toLocaleString()}</strong> available now</p>
       <p className="instore-result-note">Open Instore Products to add this item and record a colour or design preference.</p>
     </div>
+    {previewOpen && <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}><ProductCard product={product} addToCart={addToCart} cartQty={cartQty} initialZoomOpen={true} onZoomClose={() => setPreviewOpen(false)} /></div>}
   </article>;
 }
 
