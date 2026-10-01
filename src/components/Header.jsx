@@ -1179,7 +1179,7 @@ export default function Header({
               <CartProgressIcon cartTotal={cartTotal} size={22} />
             </span>
             <span className="cart-summary-meta">
-              <small>Basket</small>
+              <small>Order total</small>
               <strong className="cart-summary-amount">R{cartTotal.toFixed(2)}</strong>
             </span>
           </button>

@@ -243,11 +243,6 @@ textarea:focus-visible,
   .cart-drawer { display: none; }
 }
 
-/* Keep the automatic add-to-basket preview visible with the desktop header. */
-@media (min-width: 901px) and (max-width: 1200px) {
-  .cart-drawer.peek { display: block; }
-}
-
 @media (min-width: 1201px) {
   .mobile-cart-backdrop { display: none !important; }
 }
