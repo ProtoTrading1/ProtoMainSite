@@ -60,7 +60,7 @@ test('live stock cannot remain stuck behind session or request work', async () =
   assert.match(headers, /export function authenticatedGetJson/);
   assert.match(headers, /response\.status === 401/);
   assert.match(card, /authenticatedGetJson\(`\/api\/stock\?sku=/);
-  assert.match(card, /timeoutMs:\s*10000/);
+  assert.match(card, /timeoutMs:\s*isInstore\s*\?\s*25000\s*:\s*10000/);
   assert.match(card, /requestRef\.current\?\.abort\(\)/);
   assert.match(card, /Choose option/);
   assert.doesNotMatch(card, /Select option for live stock|View options/);
