@@ -180,6 +180,7 @@ function StockBadge({ product }) {
       {!product.isVariantGroup && sku ? <StockCheck
         sku={sku}
         source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+        isInstore={Boolean(product.isExtendedRange)}
       /> : null}
     </div>
   );
@@ -187,7 +188,7 @@ function StockBadge({ product }) {
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false, source = '' }) {
+function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
 
@@ -202,7 +203,9 @@ function StockCheck({ sku, autoCheck = false, source = '' }) {
       const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
-        timeoutMs: 10000,
+        // Instore includes a fresh SQL bridge read (up to 15 seconds) after
+        // authentication and product verification. Allow that read to finish.
+        timeoutMs: isInstore ? 25000 : 10000,
       });
       if (!response.ok) throw new Error(String(response.status));
       if (requestRef.current !== controller) return;
@@ -217,7 +220,7 @@ function StockCheck({ sku, autoCheck = false, source = '' }) {
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
     }
-  }, [sku, source]);
+  }, [sku, source, isInstore]);
 
   useEffect(() => () => {
     requestRef.current?.abort();
@@ -914,6 +917,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                     <StockCheck
                       sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
                       autoCheck
+                      isInstore={Boolean(activeProduct.isExtendedRange)}
                     />
                   </div>
                 )}

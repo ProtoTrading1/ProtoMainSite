@@ -53,7 +53,7 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
 });
 
 test('product detail begins a live stock lookup without querying every grid card', () => {
-  assert.match(productCardSrc, /function StockCheck\(\{ sku, autoCheck = false, source = '' \}\)/);
+  assert.match(productCardSrc, /function StockCheck\(\{ sku, autoCheck = false, source = '', isInstore = false \}\)/);
   assert.match(productCardSrc, /if \(autoCheck\) void check\(\)/);
   assert.match(productCardSrc, /<StockCheck[\s\S]*?autoCheck[\s\S]*?\/>/);
   assert.match(productCardSrc, /!product\.isVariantGroup && sku \? <StockCheck[\s\S]*?sku=\{sku\}[\s\S]*?\/>/, 'single-SKU grid stock remains explicitly requested');
