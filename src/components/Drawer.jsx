@@ -22,6 +22,22 @@ import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 
 const MIN_ORDER = 1000;
 
+function BasketThumbnail({ product }) {
+  const [failed, setFailed] = useState(false);
+  const src = optimizedImageUrl(product.image);
+  return (
+    <div className="drawer-thumb">
+      {src && !failed ? (
+        <img src={src} alt={product.name} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+      ) : (
+        <span role="img" aria-label={`${product.name}: image unavailable`}>
+          <Package size={22} aria-hidden="true" />
+        </span>
+      )}
+    </div>
+  );
+}
+
 function formatCartExpiry(remainingMs) {
   if (remainingMs === null || remainingMs === undefined) return '';
   if (remainingMs <= 0) return 'saved';
@@ -403,9 +419,7 @@ export default function Drawer({
             data-cart-product-id={item.product.id}
             key={item.product.id}
           >
-            <div className="drawer-thumb">
-              <img src={optimizedImageUrl(item.product.image)} alt={item.product.name} loading="lazy" decoding="async" />
-            </div>
+            <BasketThumbnail key={item.product.image || ''} product={item.product} />
             <div className="drawer-line-body">
               <h3>{item.product.name}</h3>
               {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
