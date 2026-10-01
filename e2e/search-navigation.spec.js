@@ -258,6 +258,41 @@ test('quick search offers live categories for typo families without broad qualif
   await expect(panel.getByRole('option', { name: /^Notebooks\b/ })).toBeVisible();
 });
 
+test('unchanged desktop search rebuilds suggestions after close and cold navigation', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await installSyntheticServices(context, {
+    taxonomy: [{ id: 'synthetic-toys', label: 'Toys', children: [{ id: 'soft-toys', label: 'Soft Toys' }] }],
+    catalogue: [product(100, 'Soft toy synthetic kangaroo')],
+  });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+    const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+    const panel = page.locator('.header-search-dropdown');
+    const assertSuggestions = async () => {
+      await expect(panel.getByRole('option', { name: /^Soft Toys\b/ })).toBeVisible();
+      await expect(panel.getByText('Soft toy synthetic kangaroo', { exact: true })).toBeVisible();
+      await expect(panel).not.toContainText('No quick matches');
+    };
+    await search.fill('sotf toys');
+    await assertSuggestions();
+    await search.press('Escape');
+    await expect(panel).toHaveCount(0);
+    // Input remains focused: clicking it must reopen without typing.
+    await search.click();
+    await assertSuggestions();
+    await page.locator('.header-search-premium__submit').click();
+    await expect(page).toHaveURL(/q=sotf\+toys/);
+    await page.reload();
+    await expect(search).toHaveValue('sotf toys');
+    await search.click();
+    await assertSuggestions();
+    await expect(page.getByRole('button', { name: /^Open cart\./ })).toHaveAttribute('aria-label', 'Open cart. 0 items. Order total R0.00.');
+  } finally {
+    await context.close();
+  }
+});
+
 test('quick search names wrap and phone actions have usable touch targets', async ({ page, context }) => {
   const name = 'Amber synthetic extra long product description with colour size and variant details that must remain readable';
   await installSyntheticServices(context, { catalogue: [product(100, name)] });

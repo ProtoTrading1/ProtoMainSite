@@ -590,6 +590,8 @@ export default function Header({
   }, [previousOrderCodes, matchCategories]);
 
   const closeSearch = useCallback(() => {
+    clearTimeout(debounceRef.current);
+    suggestionRequestRef.current += 1;
     setSearchOpen(false);
     setSuggestions([]);
     setCatMatches([]);
@@ -704,8 +706,11 @@ export default function Header({
   const openSearch = useCallback(() => {
     setRecentSearches(loadRecent());
     setSearchOpen(true);
-    void loadProductsOnce().catch(() => {});
-  }, [loadProductsOnce]);
+    // Closing clears results, and route hydration does not emit an input
+    // change. Rebuild the unchanged query whenever the panel is reopened.
+    scheduleSuggestions(inputValue);
+    if (!inputValue.trim()) void loadProductsOnce().catch(() => {});
+  }, [inputValue, loadProductsOnce, scheduleSuggestions]);
 
   const focusSearch = useCallback(() => {
     openSearch();
@@ -1042,6 +1047,7 @@ export default function Header({
               placeholder="Product name, SKU or barcode…"
               value={inputValue}
               onFocus={focusSearch}
+              onClick={() => { if (!searchOpen) openSearch(); }}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
               aria-label="Search by product name, SKU or barcode"
