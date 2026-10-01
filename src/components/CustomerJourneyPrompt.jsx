@@ -52,7 +52,7 @@ export default function CustomerJourneyPrompt({
 
   return (
     <aside
-      className={`customer-journey-prompt customer-journey-prompt--${presentation}${state.dismissing ? ' customer-journey-prompt--dismissing' : ''}`}
+      className={`customer-journey-prompt customer-journey-prompt--${presentation}${state.action === 'search' ? ' customer-journey-prompt--search' : ''}${state.dismissing ? ' customer-journey-prompt--dismissing' : ''}`}
       role="region"
       aria-labelledby={titleId}
       aria-describedby={messageId}
@@ -63,7 +63,10 @@ export default function CustomerJourneyPrompt({
         event.preventDefault();
         onDismiss(event);
       }}
-      style={isTimed ? { '--customer-journey-duration': `${state.dismissAfterMs}ms` } : undefined}
+      style={{
+        ...(isTimed ? { '--customer-journey-duration': `${state.dismissAfterMs}ms` } : {}),
+        ...(state.action === 'search' ? { top: state.anchorTop, left: state.anchorLeft, width: state.anchorWidth, right: 'auto' } : {}),
+      }}
     >
       <div className="customer-journey-prompt__accent" aria-hidden="true" />
 
@@ -134,7 +137,7 @@ export default function CustomerJourneyPrompt({
           className="customer-journey-prompt__close"
           type="button"
           onClick={onDismiss}
-          aria-label={presentation === 'basket' ? 'Close basket reminder and continue shopping' : 'Dismiss customer message'}
+          aria-label={state.action === 'search' ? 'Dismiss search tip' : presentation === 'basket' ? 'Close basket reminder and continue shopping' : 'Dismiss customer message'}
         >
           <X size={19} strokeWidth={2} aria-hidden="true" />
         </button>

@@ -395,3 +395,17 @@
     transform: none;
   }
 }
+
+/* Search guidance uses the existing popup palette and stays beneath the header. */
+.customer-journey-prompt--search {
+  left: 20px;
+  right: auto;
+  z-index: 110;
+  gap: 10px;
+  padding: 16px 44px 16px 16px;
+  border-radius: 14px;
+}
+.customer-journey-prompt--search .customer-journey-prompt__icon { width: 36px; height: 36px; }
+@media (max-width: 900px) {
+  .customer-journey-prompt--search { left: 12px; right: 12px; width: auto; }
+}
