@@ -197,13 +197,18 @@ export default function MainContent({
   }, [loading, products, reduceMotion]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || (searchKey && instoreSearch.loading)) {
+      setResultsAnnouncement('Searching products…');
+      return;
+    }
     const total = Math.max(0, Number(resultsTotal) || 0);
     const additionalInstore = searchKey && !instoreSearch.loading && !instoreSearch.error
       ? Math.max(0, Number(instoreSearch.total) || 0)
       : 0;
     const combinedTotal = total + additionalInstore;
-    const message = combinedTotal === 0
+    const message = searchKey && instoreSearch.error
+      ? `${total} main catalogue products found. Instore results are unavailable; the search is incomplete.`
+      : combinedTotal === 0
       ? 'No products match your current filters.'
       : total === 0 && additionalInstore > 0
         ? `${additionalInstore} products found in Instore.`
@@ -213,7 +218,7 @@ export default function MainContent({
         ? `${total} products found. Page ${page} of ${totalPages}.`
         : `${total} products found.`;
 
-    if (!hasAnnouncedResultsRef.current) {
+    if (!hasAnnouncedResultsRef.current && !searchKey) {
       hasAnnouncedResultsRef.current = true;
       return;
     }
@@ -360,7 +365,7 @@ export default function MainContent({
         <ProductGridSkeleton count={12} />
       ) : holdWhileEmptyLoading ? (
         <div aria-hidden="true" style={{ minHeight: '40vh' }} />
-      ) : products.length === 0 && !instoreSearch.loading && instoreSearch.products.length === 0 ? (
+      ) : products.length === 0 && !instoreSearch.loading && !instoreSearch.error && instoreSearch.products.length === 0 ? (
         <div className="empty-state">
           <Search size={32} />
           <h3>No products match your current filters.</h3>
@@ -426,7 +431,7 @@ export default function MainContent({
 
       {searchQuery && (
         <section className="catalog-instore-results" aria-labelledby="catalog-instore-title">
-          <div className="catalog-instore-heading"><div><span>INSTORE PRODUCTS</span><h2 id="catalog-instore-title">More matching products across Proto</h2><p>{resultsTotal.toLocaleString()} in the main catalogue · {instoreSearchTotal.toLocaleString()} additional Instore matches with more than 10 units available.</p></div>{instoreSearchTotal > 0 && <button type="button" onClick={onViewAllInstore}>See all {instoreSearchTotal.toLocaleString()} Instore matches</button>}</div>
+          <div className="catalog-instore-heading"><div><span>INSTORE PRODUCTS</span><h2 id="catalog-instore-title">More matching products across Proto</h2><p>{loading ? 'Searching the main catalogue…' : `${resultsTotal.toLocaleString()} in the main catalogue`} · {instoreSearch.loading ? 'Searching Instore…' : instoreSearch.error ? 'Instore results unavailable' : `${instoreSearchTotal.toLocaleString()} additional Instore matches with more than 10 units available.`}</p></div>{instoreSearchTotal > 0 && <button type="button" onClick={onViewAllInstore}>See all {instoreSearchTotal.toLocaleString()} Instore matches</button>}</div>
           {instoreSearch.loading && <p className="catalog-instore-status" role="status">Searching the Instore collection…</p>}
           {!instoreSearch.loading && instoreSearch.error && <p className="catalog-instore-status catalog-instore-status--error">Instore results are temporarily unavailable. Main catalogue results above are unaffected.</p>}
           {!instoreSearch.loading && !instoreSearch.error && instoreSearch.total === 0 && <p className="catalog-instore-status">No additional Instore matches found.</p>}

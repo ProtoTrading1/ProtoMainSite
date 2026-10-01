@@ -2051,6 +2051,7 @@ export default function App({
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{cartAnnouncement}</p>
       <Header
+        categories={categories}
         cartItemCount={totalItemCount}
         cartTotal={cartTotal}
         searchQuery={searchQuery}
