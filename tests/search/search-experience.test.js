@@ -28,7 +28,10 @@ test('product options do not wrap the quick-add button in an option role', () =>
 
 test('site-wide results disclose complete catalogue coverage before the preview cards', () => {
   assert.match(mainContent, /matching products across Proto/);
-  assert.match(mainContent, /in the main catalogue ·/);
+  assert.match(mainContent, /in the main catalogue/);
+  assert.match(mainContent, /loading \? 'Searching the main catalogue…'/);
+  assert.match(mainContent, /instoreSearch.loading \? 'Searching Instore…'/);
+  assert.match(mainContent, /Instore results unavailable/);
   assert.match(mainContent, /See all \{instoreSearchTotal\.toLocaleString\(\)\} Instore matches/);
   assert.match(mainContent, /Showing the first/);
 });

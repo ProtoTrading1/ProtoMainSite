@@ -448,6 +448,30 @@ test('stored candidate lookup defers a safe long-word typo to the live matcher',
   assert.deepEqual(actual.map((product) => product.sku), expected.map((product) => product.sku));
 });
 
+test('stored candidate search and final pages preserve live SKU sets for toy aliases and qualifiers', async () => {
+  const rows = sourceRows(5);
+  for (const [index, [title, category]] of [
+    ['SOFT TOY GIRAFFE', 'soft toys'], ['SOFT TOY LION', 'soft toys'], ['PLUSH BEAR', 'soft toys'],
+    ['BACKPACK SCHOOL BAG', 'bags wallets'], ['PURSE PRINTED LEATHER', 'bags wallets'],
+  ].entries()) {
+    rows[index].title = title;
+    rows[index].original_description = title;
+    rows[index].category = category;
+  }
+  const { client, live } = await seededClient({ rows });
+
+  for (const query of ['soft toys', 'sotf toys', 'soft tosy', 'plush toys', 'cheap soft toys under R100']) {
+    const candidates = await readCatalogueSearchCandidates(client, { query });
+    const finalPage = instorePage(candidates, { query, page: 1, pageSize: PAGE_SIZE });
+    const livePage = instorePage(live.products, { query, page: 1, pageSize: PAGE_SIZE });
+    assert.deepEqual(finalPage.products.map((product) => product.sku), livePage.products.map((product) => product.sku), `same final SKU set for "${query}"`);
+  }
+
+  const walletCandidates = await readCatalogueSearchCandidates(client, { query: 'wallet' });
+  const walletPage = instorePage(walletCandidates, { query: 'wallet', page: 1, pageSize: PAGE_SIZE });
+  assert.deepEqual(walletPage.products.map((product) => product.sku), [rows[4].sku], 'wallet excludes the backpack and includes the purse');
+});
+
 test('stored candidate terms and live intent filters agree for structured soft-toy searches', () => {
   const products = [
     { sku: '8626110059', barcode: '6008626110059', name: 'SOFT TOY BLUE DOLPHIN ±50CM', title: 'SOFT TOY BLUE DOLPHIN ±50CM', originalDescription: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'soft toys', price: 89.99, stockQty: 14 },

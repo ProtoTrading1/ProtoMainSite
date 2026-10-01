@@ -204,11 +204,15 @@
 }
 
 /* Search results dropdown — no glassmorphism */
+.app-header--premium:has(.header-search-dropdown) {
+  /* Active search sits above passive announcements, below modal dialogs. */
+  z-index: 560;
+}
 .header-search-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  right: 0;
+  width: min(640px, calc(100vw - 32px));
   z-index: 300;
   background: #111111;
   border: 1px solid #2A2A2A;
@@ -242,6 +246,71 @@
 .header-search-dropdown .sp-cat-label,
 .header-search-dropdown .sp-product-name {
   color: #F3F4F6;
+}
+
+/* Product identity leads; price and add action keep their own readable space. */
+.header-search-dropdown .sp-product-main {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) max-content;
+  gap: 12px;
+  min-height: 64px;
+}
+.header-search-dropdown .sp-product-name,
+.mobile-search-results .sp-product-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.header-search-dropdown .sp-product-identifiers,
+.mobile-search-results .sp-product-identifiers {
+  overflow-wrap: anywhere;
+}
+.header-search-dropdown .sp-product-price { color: #F3F4F6; }
+.header-search-dropdown .sp-quick-add,
+.mobile-search-results .sp-quick-add,
+.mobile-search-results .sp-cat-row {
+  min-height: 44px;
+  min-width: 44px;
+}
+.header-search-dropdown .sp-product-price small { color: #B8C0CC; }
+.header-search-dropdown .sp-product-code { color: #FCA5A5; }
+.header-search-dropdown .sp-product-barcode { color: #B8C0CC; }
+.header-search-dropdown .sp-section-head,
+.mobile-search-results .sp-section-head {
+  gap: 12px;
+  align-items: baseline;
+}
+.header-search-dropdown .sp-section-head span:first-child,
+.mobile-search-results .sp-section-head span:first-child { flex: 0 0 auto; }
+.header-search-dropdown .sp-section-head span:nth-child(2),
+.mobile-search-results .sp-section-head span:nth-child(2) {
+  text-align: right;
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+@media (max-width: 767px) {
+  /* Content-sized overlay: short suggestions should not hide the catalogue. */
+  .mobile-search-results[role="listbox"] {
+    bottom: auto;
+    max-height: min(58dvh, calc(100dvh - 144px));
+    padding-bottom: 12px;
+    overscroll-behavior: contain;
+  }
+  .mobile-search-results .sp-section-head {
+    padding: 12px 16px 4px;
+    color: #B8C0CC;
+  }
+  .mobile-search-results .sp-product-main {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+  .mobile-search-results .sp-product-price {
+    grid-column: 2;
+    text-align: left;
+  }
 }
 
 .header-search-dropdown .sp-section-head,
