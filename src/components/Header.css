@@ -654,16 +654,67 @@
   white-space: nowrap;
 }
 
-/* ── Medium desktop: prevent nav overlap ── */
-@media (max-width: 1440px) and (min-width: 1101px) {
+/* ── Constrained desktop: keep complete navigation readable ── */
+@media (min-width: 1101px) and (max-width: 1600px) {
   .app-header--premium {
-    --search-width: clamp(280px, 24vw, 340px);
-    --header-nav-gap: 20px;
+    --header-gap-nav-cart: clamp(8px, 1vw, 14px);
+    --header-gap-divider-cart: 16px;
+    --header-nav-gap: clamp(4px, 0.6vw, 8px);
+    height: auto;
+    flex-wrap: wrap;
+    padding: 12px 24px;
+    row-gap: 12px;
   }
 
-  .app-header--premium .header-search-premium-wrap,
-  .header-search-premium {
-    max-width: 340px;
+  .app-header--premium .header-nav-btn {
+    padding-inline: 10px;
+    font-size: 14px;
+    min-height: 44px;
+  }
+
+  .app-header--premium .header-search-premium-wrap {
+    order: 1;
+    flex: 0 0 100%;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .app-header--premium .header-search-premium {
+    width: 100%;
+    max-width: none;
+  }
+
+  .app-header--premium .header-nav {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
+
+  .app-header--premium .header-actions {
+    gap: 8px;
+  }
+
+  .app-header--premium .cart-summary {
+    gap: 7px;
+    padding-inline: 8px;
+  }
+}
+
+/* On wider desktops, keep navigation and actions at intrinsic width and let
+   the search control absorb any remaining width reduction. */
+@media (min-width: 1601px) {
+  .app-header--premium .header-search-premium-wrap {
+    flex: 0 1 var(--search-width);
+    min-width: 220px;
+  }
+
+  .app-header--premium .header-search-premium {
+    width: 100%;
+  }
+
+  .app-header--premium .header-utilities {
+    flex: 0 0 auto;
+    min-width: max-content;
   }
 }
 
@@ -697,6 +748,26 @@
     row-gap: 12px;
   }
 
+  .app-header--premium .header-utilities {
+    display: contents;
+  }
+
+  .app-header--premium .header-actions {
+    margin-left: auto;
+  }
+
+  .app-header--premium .header-nav {
+    display: flex;
+    order: 2;
+    flex: 0 0 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .app-header--premium .header-nav-btn {
+    min-height: 44px;
+  }
+
   .app-header--premium .header-search-premium-wrap {
     order: 3;
     margin-left: 0;
@@ -707,6 +778,74 @@
   .app-header--premium .header-search-premium {
     width: 100%;
     max-width: none;
+  }
+}
+
+/* Compact two-row desktop layout; narrower tablets retain the extra nav row. */
+@media (min-width: 1001px) and (max-width: 1100px) {
+  .app-header--premium .brand-block .proto-logo-wordmark {
+    --logo-height: 38px;
+  }
+
+  .app-header--premium .header-utilities {
+    display: flex;
+    flex: 1;
+    margin-left: 16px;
+    gap: 8px;
+  }
+
+  .app-header--premium .header-nav {
+    order: 0;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .app-header--premium .header-nav-btn {
+    padding-inline: 6px;
+    gap: 5px;
+  }
+
+  .app-header--premium .header-actions {
+    gap: 8px;
+  }
+
+  .app-header--premium .cart-summary {
+    margin-left: 0;
+    padding-inline: 8px;
+  }
+}
+
+/* Allow crowded navigation and enlarged text to wrap rather than hide the
+   basket. Normal customer headers still fit on their compact first row. */
+@media (min-width: 901px) {
+  .app-header--premium {
+    height: auto;
+    min-height: var(--header-premium-height);
+    padding-block: 12px;
+  }
+
+  .app-header--premium .header-utilities {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .app-header--premium .header-nav {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header--premium .header-actions {
+    flex-wrap: wrap;
+    max-width: 100%;
+    margin-left: auto;
+  }
+}
+
+@media (min-width: 1601px) {
+  .app-header--premium .header-utilities {
+    flex: 1;
   }
 }
 
