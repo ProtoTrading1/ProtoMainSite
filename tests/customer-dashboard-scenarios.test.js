@@ -64,13 +64,12 @@ test('an active basket uses singular item copy without introducing a second acti
   assert.equal(state.instoreLabel, 'New: browse Instore Products');
 });
 
-test('the app keeps the once-only Instore announcement independent from a restored basket', async () => {
+test('the app replaces the Instore announcement with search guidance while preserving basket prompts', async () => {
   const app = await readFile(appSourceUrl, 'utf8');
-
-  assert.match(app, /const showInstoreIntro = !hasSeenInstoreIntro\(customer\.id\);/);
-  assert.match(app, /const nextInstoreAnnouncement = restoredBasketIsUntouched && showInstoreIntro/);
-  assert.match(app, /setInstoreAnnouncement\(nextInstoreAnnouncement\)/);
-  assert.match(app, /\{instoreAnnouncementPrompt\}/);
+  assert.match(app, /const showInstoreIntro = false/);
+  assert.match(app, /useSearchTip/);
+  assert.match(app, /\{searchTipPrompt\}/);
+  assert.doesNotMatch(app, /instoreAnnouncementPrompt/);
 });
 
 test('an empty basket receives a one-time personalised Instore introduction', () => {
@@ -193,7 +192,7 @@ test('the journey prompt keeps first-name copy and excludes retired approval/ban
   assert.match(prompt, /aria-atomic="true"/);
   assert.match(prompt, /type="button"[\s\S]{0,120}onClick=\{onPrimary\}/);
   assert.match(prompt, /state\.instoreLabel/);
-  assert.match(app, /hasSeenInstoreIntro\(customer\.id\)/);
+  assert.match(app, /useSearchTip/);
   assert.match(app, /hashNavigate\(\['instore-products'\]\)/);
   assert.doesNotMatch(prompt, /main-site-banner\.jpg|site-hero-banner/);
   assert.match(app, /addEventListener\('pointerdown', dismissAfterOutsideInteraction/);

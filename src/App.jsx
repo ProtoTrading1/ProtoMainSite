@@ -12,6 +12,7 @@ import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
 import CustomerJourneyPrompt from './components/CustomerJourneyPrompt';
+import useSearchTip from './hooks/useSearchTip';
 
 import lazyWithRetry from './lib/lazyWithRetry';
 
@@ -65,7 +66,6 @@ const CART_EXPIRY_WARN_MS = 7 * 24 * 60 * 60 * 1000;
 const CART_EXPIRY_DANGER_MS = 24 * 60 * 60 * 1000;
 const CART_QTY_UNLIMITED = 9999;
 const CUSTOMER_JOURNEY_SESSION_KEY_PREFIX = 'proto_customer_journey_session_v1';
-const INSTORE_INTRO_SEEN_KEY_PREFIX = 'proto_instore_intro_seen_v1';
 const BASKET_REMINDER_SCROLL_DISMISS_PX = 96;
 const CUSTOMER_JOURNEY_EXIT_MS = 180;
 
@@ -98,28 +98,6 @@ function rememberJourneyThisLogin(customerId, loginSessionKey) {
   try {
     sessionStorage.setItem(key, '1');
   } catch { /* the in-memory guard still prevents repeats during this mount */ }
-}
-
-function instoreIntroSeenKey(customerId) {
-  return customerId ? `${INSTORE_INTRO_SEEN_KEY_PREFIX}:${customerId}` : null;
-}
-
-function hasSeenInstoreIntro(customerId) {
-  const key = instoreIntroSeenKey(customerId);
-  if (!key) return false;
-  try {
-    return localStorage.getItem(key) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function rememberInstoreIntro(customerId) {
-  const key = instoreIntroSeenKey(customerId);
-  if (!key) return;
-  try {
-    localStorage.setItem(key, '1');
-  } catch { /* a future login can show the helpful introduction again */ }
 }
 
 function isExplicitFirstPortalLogin(customer) {
@@ -379,7 +357,7 @@ export default function App({
   const [orderHistoryResolved, setOrderHistoryResolved] = useState(false);
   const [orderHistoryAvailable, setOrderHistoryAvailable] = useState(false);
   const [customerJourney, setCustomerJourney] = useState(null);
-  const [instoreAnnouncement, setInstoreAnnouncement] = useState(null);
+  const [journeyReady, setJourneyReady] = useState(false);
   const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
@@ -390,8 +368,8 @@ export default function App({
 
   useEffect(() => {
     journeyAccountRef.current = null;
+    setJourneyReady(false);
     setCustomerJourney(null);
-    setInstoreAnnouncement(null);
     setLoginBasketSnapshot(null);
   }, [customer?.id]);
 
@@ -1473,6 +1451,7 @@ export default function App({
 
     if (hasShownJourneyThisLogin(customer.id, loginSessionKey)) {
       setCustomerJourney(null);
+      setJourneyReady(true);
       return;
     }
 
@@ -1480,7 +1459,7 @@ export default function App({
     const restoredBasketIsUntouched = loginBasketSnapshot?.accountId === customer.id
       && loginBasketSnapshot.itemCount > 0
       && loginBasketSnapshot.fingerprint === cartFingerprint(cartItems);
-    const showInstoreIntro = !hasSeenInstoreIntro(customer.id);
+    const showInstoreIntro = false; // Replaced by the independent search tip.
     const nextJourney = selectCustomerDashboardState({
       firstName: customerFirstName(customer),
       firstLogin: firstPortalLogin,
@@ -1491,19 +1470,9 @@ export default function App({
       basketTotalInclVat: restoredBasketIsUntouched ? loginBasketSnapshot.totalInclVat : null,
       showInstoreIntro,
     });
-    const nextInstoreAnnouncement = restoredBasketIsUntouched && showInstoreIntro
-      ? selectCustomerDashboardState({
-        firstName: customerFirstName(customer),
-        showInstoreIntro: true,
-      })
-      : null;
-
     setCustomerJourney(nextJourney);
-    setInstoreAnnouncement(nextInstoreAnnouncement);
+    setJourneyReady(true);
     rememberJourneyThisLogin(customer.id, loginSessionKey);
-    if (nextJourney.action === 'instore' || nextInstoreAnnouncement?.action === 'instore') {
-      rememberInstoreIntro(customer.id);
-    }
     if (firstPortalLogin) {
       void markPortalWelcomeSeen().catch(() => {
         // Keep the server value null so the customer gets one more chance on
@@ -1522,7 +1491,6 @@ export default function App({
   ]);
 
   const journeyDismissTimerRef = useRef(null);
-  const instoreAnnouncementTimerRef = useRef(null);
 
   const dismissCustomerJourney = useCallback((event, { animate = false } = {}) => {
     const restoreCartFocus = customerJourney?.presentation === 'basket' && (
@@ -1561,28 +1529,11 @@ export default function App({
     if (journeyDismissTimerRef.current) window.clearTimeout(journeyDismissTimerRef.current);
   }, []);
 
-  const dismissInstoreAnnouncement = useCallback(() => {
-    if (instoreAnnouncementTimerRef.current) window.clearTimeout(instoreAnnouncementTimerRef.current);
-    instoreAnnouncementTimerRef.current = null;
-    setInstoreAnnouncement(null);
-  }, []);
-
-  useEffect(() => () => {
-    if (instoreAnnouncementTimerRef.current) window.clearTimeout(instoreAnnouncementTimerRef.current);
-  }, []);
-
   useEffect(() => {
     if (!customerJourney || !Number.isFinite(customerJourney.dismissAfterMs)) return undefined;
     const timer = window.setTimeout(dismissCustomerJourney, customerJourney.dismissAfterMs);
     return () => window.clearTimeout(timer);
   }, [customerJourney, dismissCustomerJourney]);
-
-  useEffect(() => {
-    if (!instoreAnnouncement || !Number.isFinite(instoreAnnouncement.dismissAfterMs)) return undefined;
-    const timer = window.setTimeout(dismissInstoreAnnouncement, instoreAnnouncement.dismissAfterMs);
-    instoreAnnouncementTimerRef.current = timer;
-    return () => window.clearTimeout(timer);
-  }, [dismissInstoreAnnouncement, instoreAnnouncement]);
 
   useEffect(() => {
     if (!customerJourney) return undefined;
@@ -1636,10 +1587,6 @@ export default function App({
     dismissCustomerJourney();
   }, [dismissCustomerJourney, hashNavigate]);
 
-  const handleInstoreAnnouncement = useCallback(() => {
-    hashNavigate(['instore-products']);
-    dismissInstoreAnnouncement();
-  }, [dismissInstoreAnnouncement, hashNavigate]);
   const cartExpiryRemainingMs = cartItems.length && cartLastActivityAt
     ? Math.max(0, cartLastActivityAt + CART_INACTIVITY_WINDOW_MS - cartClock)
     : null;
@@ -2039,12 +1986,28 @@ export default function App({
       onDismiss={dismissCustomerJourney}
     />
   ) : null;
-  const instoreAnnouncementPrompt = instoreAnnouncement ? (
-    <CustomerJourneyPrompt
-      state={instoreAnnouncement}
-      onPrimary={handleInstoreAnnouncement}
-      onDismiss={dismissInstoreAnnouncement}
-    />
+  const searchTip = useSearchTip({
+    accountId: customer?.id,
+    ready: cartHydrated && orderHistoryResolved && journeyReady,
+    browsing: path.length === 0 || viewingInstoreProducts,
+    searched: Boolean(searchQuery.trim() || instoreRouteQuery.trim()),
+    engaged: desktopDrawerVisible || mobileCartOpen || modalOpen || reorderModal || Boolean(previewProduct),
+    blocked: Boolean(customerJourney) || showPopup || mobileMenuOpen,
+  });
+  const focusSearchTip = () => {
+    searchTip.dismiss();
+    const input = viewingInstoreProducts
+      ? instoreSearchInputRef.current
+      : window.innerWidth > 900 ? document.querySelector('.header-search-premium-wrap input') : null;
+    if (input) {
+      input.scrollIntoView({ block: 'center', behavior: 'auto' });
+      input.focus({ preventScroll: true });
+    } else {
+      document.querySelector('.mobile-tab-bar-btn[aria-label="Search"]')?.click();
+    }
+  };
+  const searchTipPrompt = searchTip.state ? (
+    <CustomerJourneyPrompt state={searchTip.state} onPrimary={focusSearchTip} onDismiss={searchTip.dismiss} />
   ) : null;
 
   return (
@@ -2075,7 +2038,7 @@ export default function App({
         mobileSearchControlsId={viewingInstoreProducts ? 'instore-search' : undefined}
       />
 
-      {instoreAnnouncementPrompt}
+      {searchTipPrompt}
       {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
