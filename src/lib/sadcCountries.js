@@ -4,6 +4,8 @@ export const SADC_COUNTRIES = [
   'Zambia', 'Zimbabwe',
 ];
 
+export const REGISTRATION_COUNTRIES = [...SADC_COUNTRIES, 'Kenya'];
+
 export const SA_PROVINCES = [
   'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
   'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
