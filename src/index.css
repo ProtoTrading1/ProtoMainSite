@@ -6707,13 +6707,36 @@ textarea:focus-visible,
   .pz-qty-row { gap: 12px; }
   .pz-total { display: none; }
   .pz-main-image { touch-action: pan-y; }
+  /* Phones: the label gets its own row above the image instead of floating
+     over it, and replaces the "N variants" badge (it already carries the count). */
+  .pz-image-panel--variant-nav { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .pz-image-panel--variant-nav .pz-tags { display: none; }
   .pz-variant-nav-label {
-    top: 48px;
-    max-width: calc(100% - 120px);
-    padding: 4px 10px;
+    position: static;
+    transform: none;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 0;
+    max-width: none;
+    margin: 12px 56px 0 12px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    text-align: left;
   }
-  .pz-variant-nav-count { font-size: 9px; }
-  .pz-variant-nav-name { font-size: 12px; }
+  .pz-variant-nav-count {
+    flex-shrink: 0;
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: #8B1A1A;
+    color: #fff;
+    font-size: 10px;
+  }
+  .pz-variant-nav-name { min-width: 0; font-size: 13px; }
   .pz-variant-arrow { width: 40px; height: 40px; }
   .pz-variant-arrow--prev { left: 8px; }
   .pz-variant-arrow--next { right: 8px; }

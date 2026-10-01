@@ -60,13 +60,32 @@ function initialVariantForProduct(product) {
 }
 
 // Short name for a variant in the image-panel nav label: its colour when the
-// catalogue has one, otherwise the last "|" segment of its name
-// ("CRAFT PAINT | METAL | 50ML | Bronze" → "Bronze").
-function variantShortLabel(variant) {
+// catalogue has one, otherwise the words of its name that set it apart from
+// the rest of the group. A word counts as shared when more than half the
+// variants carry it (METAL and METALLIC count as the same word), so
+// "CRAFT PAINT METALLIC 50ML RED" in a craft-paint group becomes "RED".
+function nameWords(name) {
+  return String(name || '').split(/[\s|,/·–-]+/).map((word) => word.trim()).filter(Boolean);
+}
+
+function sameWord(a, b) {
+  if (a === b) return true;
+  return a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
+}
+
+function variantShortLabel(variant, variants) {
   const colour = String(variant?.colour || '').trim();
   if (colour) return displayProductText(colour);
-  const parts = String(variant?.name || '').split('|').map((part) => part.trim()).filter(Boolean);
-  return displayProductText(parts.length ? parts[parts.length - 1] : (variant?.name || ''));
+  const fullName = displayProductText(variant?.name || '');
+  const words = nameWords(variant?.name);
+  const others = (variants || []).map((v) => nameWords(v.name).map((w) => w.toUpperCase()));
+  if (others.length < 2 || !words.length) return fullName;
+  const distinct = words.filter((word) => {
+    const upper = word.toUpperCase();
+    const carriers = others.filter((list) => list.some((w) => sameWord(w, upper))).length;
+    return carriers * 2 <= others.length;
+  });
+  return distinct.length ? displayProductText(distinct.join(' ')) : fullName;
 }
 
 function productReferenceLabel(product) {
@@ -711,7 +730,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
           >
 
             {/* Dark image panel */}
-            <div className="pz-image-panel">
+            <div className={`pz-image-panel${hasVariantNav ? ' pz-image-panel--variant-nav' : ''}`}>
               <button ref={closeButtonRef} className="pz-close" onClick={closePreview} type="button" aria-label="Close">
                 <X size={18} />
               </button>
@@ -723,23 +742,23 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   })}
                 </div>
               )}
+              {hasVariantNav && (
+                <div className="pz-variant-nav-label" aria-live="polite">
+                  <span className="pz-variant-nav-count">
+                    {selectedVariantIdx >= 0
+                      ? `Variant ${selectedVariantIdx + 1} of ${variants.length}`
+                      : `${variants.length} variants`}
+                  </span>
+                  <span className="pz-variant-nav-name">
+                    {selectedVariantIdx >= 0 ? variantShortLabel(selectedVariant, variants) : 'Use the arrows to browse'}
+                  </span>
+                </div>
+              )}
               <div
                 className="pz-main-image"
                 onTouchStart={onImageTouchStart}
                 onTouchEnd={onImageTouchEnd}
               >
-                {hasVariantNav && (
-                  <div className="pz-variant-nav-label" aria-live="polite">
-                    <span className="pz-variant-nav-count">
-                      {selectedVariantIdx >= 0
-                        ? `Variant ${selectedVariantIdx + 1} of ${variants.length}`
-                        : `${variants.length} variants`}
-                    </span>
-                    <span className="pz-variant-nav-name">
-                      {selectedVariantIdx >= 0 ? variantShortLabel(selectedVariant) : 'Use the arrows to browse'}
-                    </span>
-                  </div>
-                )}
                 {hasVariantNav && (
                   <>
                     <button
