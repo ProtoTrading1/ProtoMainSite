@@ -430,7 +430,7 @@ export default function MainContent({
           {instoreSearch.loading && <p className="catalog-instore-status" role="status">Searching the Instore collection…</p>}
           {!instoreSearch.loading && instoreSearch.error && <p className="catalog-instore-status catalog-instore-status--error">Instore results are temporarily unavailable. Main catalogue results above are unaffected.</p>}
           {!instoreSearch.loading && !instoreSearch.error && instoreSearch.total === 0 && <p className="catalog-instore-status">No additional Instore matches found.</p>}
-          {!instoreSearch.loading && !instoreSearch.error && instoreSearch.products.length > 0 && <><p className="catalog-instore-preview-count">Showing the first {instoreSearch.products.length.toLocaleString()} matches.</p><div className="catalog-instore-grid">{instoreSearch.products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} />)}</div></>}
+          {!instoreSearch.loading && !instoreSearch.error && instoreSearch.products.length > 0 && <><p className="catalog-instore-preview-count">Showing the first {instoreSearch.products.length.toLocaleString()} matches.</p><div className="catalog-instore-grid">{instoreSearch.products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} addToCart={addToCart} cartQty={cartQtyMap[product.id] || 0} />)}</div></>}
         </section>
       )}
 

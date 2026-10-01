@@ -92,6 +92,9 @@ async function signIn(page) {
   await dialog.getByPlaceholder('name@business.co.za').fill(TEST_EMAIL);
   await dialog.locator('input[type="password"]').fill(TEST_PASSWORD);
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
+  if ((page.viewportSize()?.width || 1440) < 901) {
+    await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search', exact: true }).click();
+  }
   await expect(page.locator('input[aria-label="Search by product name, SKU or barcode"]:visible').first()).toBeVisible();
 }
 
@@ -187,4 +190,41 @@ test('catalogue search remains visible and usable at 1024px', async ({ browser }
   } finally {
     await context.close();
   }
+});
+
+test('every Instore search image opens its matching preview without leaving the search or changing the basket', async ({ page, context }) => {
+  await installSyntheticServices(context);
+  await signIn(page);
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  await search.fill('soft toys');
+  await search.press('Enter');
+  const results = page.locator('.catalog-instore-grid');
+  const images = results.getByRole('button', { name: /^View / });
+  await expect(images.first()).toBeVisible();
+  const count = await images.count();
+  expect(count).toBeGreaterThan(1);
+  const searchUrl = page.url();
+  const basket = (page.viewportSize()?.width || 1440) < 901
+    ? page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Cart', exact: true })
+    : page.getByRole('button', { name: /^Open cart\./ }).first();
+  const basketText = await basket.textContent();
+  for (let index = 0; index < count; index += 1) {
+    const name = (await images.nth(index).getAttribute('aria-label')).replace(/^View /, '');
+    if (index % 2) {
+      await images.nth(index).focus();
+      await images.nth(index).press('Enter');
+    } else {
+      await images.nth(index).click();
+    }
+    await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(searchUrl);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toHaveCount(0);
+    await expect(basket).toHaveText(basketText);
+  }
+  await images.first().click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+  await expect(page).toHaveURL(searchUrl);
 });
