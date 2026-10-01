@@ -5,7 +5,8 @@ import {
   Plus, ScanBarcode, Search, ShoppingCart, Star, Store, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
-import { fetchIdentifierProducts, fetchProducts } from '../lib/products';
+import { fetchIdentifierProducts, fetchProducts, subscribeCatalogRefresh } from '../lib/products';
+import { matchSearchCategories } from '../lib/searchCategories';
 import { isIdentifierQuery, normalizeIdentifier } from '../lib/identifierNormalize';
 import { DEPT_COLORS, LUCIDE_ICON_MAP } from '../lib/navConfig';
 import categoriesData from '../data/categories.json';
@@ -31,7 +32,7 @@ function clearRecent() {
 }
 
 // ─── Flatten categories tree for search matching ─────────────
-const FLAT_CATS = (() => {
+function flattenCategories(tree) {
   const out = [];
   function walk(nodes, path) {
     for (const n of nodes) {
@@ -39,44 +40,12 @@ const FLAT_CATS = (() => {
       if (n.children) walk(n.children, [...path, n.id]);
     }
   }
-  walk(categoriesData, []);
+  walk(tree, []);
   return out;
-})();
+}
+const FLAT_CATS = flattenCategories(categoriesData);
 
 const SEARCH_STARTER_DEPTS = FLAT_CATS.filter((cat) => cat.path.length === 1).slice(0, 6);
-
-function scoreCategoryMatch(label, query) {
-  const l = label.toLowerCase();
-  const q = query.trim().toLowerCase();
-  if (!l.includes(q) && !q.split(' ').some((w) => w.length > 2 && l.includes(w))) return 0;
-
-  let score = 10;
-  if (/\bbags?\b/.test(l)) score += 40;
-  if (/\s+bags?\s*$/.test(l)) score += 25;
-  if (l.startsWith(q)) score += 15;
-  if (/\b(components|straps|accessories|clasps|tools)\b/.test(l)) score -= 30;
-  if (/\bcases\b/.test(l)) score -= 15;
-  if (/\bpackets?\s+and\s+bags\b/.test(l)) score -= 10;
-  if (l.split(/\s+/).length <= 3) score += 5;
-  return score;
-}
-
-function matchCategories(query) {
-  if (!query.trim()) return [];
-  const q = query.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-  const seen = new Set();
-  return FLAT_CATS
-    .map((c) => ({ cat: c, score: scoreCategoryMatch(c.label, q) }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.cat.label.localeCompare(b.cat.label))
-    .filter(({ cat }) => {
-      if (seen.has(cat.label)) return false;
-      seen.add(cat.label);
-      return true;
-    })
-    .slice(0, 6)
-    .map(({ cat }) => cat);
-}
 
 function ProductRequestModal({ onClose, initialDescription = '' }) {
   const [description, setDescription] = useState(initialDescription);
@@ -309,7 +278,6 @@ function SearchPanel({
   recentSearches,
   onClearRecent,
   onAddProduct,
-  onRequestProduct,
   previousOrderCodes,
   searchState = 'idle',
   onRetry,
@@ -408,7 +376,7 @@ function SearchPanel({
           </button>
         </div>
       )}
-      {relatedSearchTerm && suggestions.length > 0 && (
+      {relatedSearchTerm && (suggestions.length > 0 || catMatches.length > 0) && (
         <div className="sp-related-search">
           We also searched for <strong>{relatedSearchTerm}</strong>
         </div>
@@ -416,7 +384,7 @@ function SearchPanel({
       {/* Category matches */}
       {catMatches.length > 0 && (
         <div className="sp-section">
-          <div className="sp-section-head"><span>Categories</span></div>
+          <div className="sp-section-head"><span>Browse categories</span><span>All products in each category</span></div>
           {catMatches.map((cat) => {
             const color = DEPT_COLORS[cat.path[0]] || '#374151';
             const Icon = cat.icon ? LUCIDE_ICON_MAP[cat.icon] : null;
@@ -496,10 +464,10 @@ function SearchPanel({
       {searchState !== 'loading' && searchState !== 'error' && suggestions.length === 0 && catMatches.length === 0 && (
         <div className="sp-empty">
           <Search size={24} />
-          <p>No results for "<strong>{query}</strong>"</p>
-          <span>{codeSearch ? 'Check the code, or remove the last digit to see the closest product codes.' : 'Try a different spelling, product type or department.'}</span>
-          <button type="button" className="sp-request-product" onClick={onRequestProduct}>
-            <PackageSearch size={15} /> Request this product
+          <p>No quick matches for "<strong>{query}</strong>"</p>
+          <span>{codeSearch ? 'Check the code, or search the full catalogue.' : 'Search all products, including Instore, before requesting an item.'}</span>
+          <button type="button" className="sp-request-product" onClick={() => onCommitSearch(query)}>
+            <Search size={15} /> Search all products
           </button>
         </div>
       )}
@@ -542,10 +510,13 @@ export default function Header({
   onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
   searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
+  categories = categoriesData,
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
   onMobileSearchRequest, mobileSearchLabel = 'Search', mobileSearchControlsId,
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchableCategories = useMemo(() => flattenCategories(categories), [categories]);
+  const matchCategories = useCallback((query) => matchSearchCategories(searchableCategories, query), [searchableCategories]);
   const [mobileSearchOpenInternal, setMobileSearchOpenInternal] = useState(false);
   const mobileSearchOpen = mobileSearchOpenProp ?? mobileSearchOpenInternal;
   const setMobileSearchOpen = onMobileSearchOpenChange ?? setMobileSearchOpenInternal;
@@ -556,6 +527,9 @@ export default function Header({
   const [catMatches, setCatMatches] = useState([]);
   const [desktopSearchState, setDesktopSearchState] = useState('idle');
   const [mobileSearchState, setMobileSearchState] = useState('idle');
+  const [mobileSuggestions, setMobileSuggestions] = useState([]);
+  const [mobileCatMatches, setMobileCatMatches] = useState([]);
+  const [mobileInput, setMobileInput] = useState('');
   const [activeIdx, setActiveIdx] = useState(-1);
   const [mobileActiveIdx, setMobileActiveIdx] = useState(-1);
   const [recentSearches, setRecentSearches] = useState(loadRecent);
@@ -584,7 +558,8 @@ export default function Header({
   ), [previousOrderItems]);
 
   const loadProductsOnce = useCallback(async () => {
-    if (productsCache.current) return productsCache.current;
+    // Always ask the shared catalogue cache: it can have revalidated since
+    // this header first loaded. Do not pin an old persistent snapshot forever.
     if (productsLoading.current) return productsLoading.current;
     productsLoading.current = (async () => {
       try {
@@ -612,7 +587,7 @@ export default function Header({
       - Number(previousOrderCodes.has(String(a.code || a.sku || '').toUpperCase()))
     )));
     setCatMatches(matchCategories(query));
-  }, [previousOrderCodes]);
+  }, [previousOrderCodes, matchCategories]);
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
@@ -657,6 +632,8 @@ export default function Header({
       return;
     }
     setDesktopSearchState('loading');
+    setSuggestions([]);
+    setCatMatches([]);
     const identifier = isIdentifierQuery(query);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
@@ -701,6 +678,28 @@ export default function Header({
       });
     }, identifier ? 45 : 85);
   }, [loadProductsOnce, updateSuggestions]);
+
+  useEffect(() => subscribeCatalogRefresh(() => {
+    productsCache.current = null;
+    if (!searchOpen && !mobileSearchOpen) return;
+    const requestId = ++suggestionRequestRef.current;
+    void fetchProducts().then((products) => {
+      if (requestId !== suggestionRequestRef.current) return;
+      if (searchOpen && inputValue.trim()) {
+        updateSuggestions(inputValue, products);
+        setDesktopSearchState('ready');
+      }
+      if (mobileSearchOpen && mobileInput.trim()) {
+        setMobileSuggestions(getSuggestions(products, mobileInput, 12));
+        setMobileCatMatches(matchCategories(mobileInput));
+        setMobileSearchState('ready');
+      }
+    }).catch(() => {
+      if (requestId !== suggestionRequestRef.current) return;
+      if (searchOpen) setDesktopSearchState('error');
+      if (mobileSearchOpen) setMobileSearchState('error');
+    });
+  }), [searchOpen, inputValue, updateSuggestions, mobileSearchOpen, mobileInput, matchCategories]);
 
   const openSearch = useCallback(() => {
     setRecentSearches(loadRecent());
@@ -757,6 +756,7 @@ export default function Header({
 
   const handleInput = (val) => {
     setInputValue(val);
+    setSearchOpen(true);
     setActiveIdx(-1);
     scheduleSuggestions(val);
     liftSearch(val);
@@ -847,9 +847,6 @@ export default function Header({
 
   // Mobile search — mobileInput is the transient typed text, separate from the
   // committed searchQuery so the input clears after a search without losing results.
-  const [mobileSuggestions, setMobileSuggestions] = useState([]);
-  const [mobileCatMatches, setMobileCatMatches] = useState([]);
-  const [mobileInput, setMobileInput] = useState('');
   const mobileSearchInputRef = useRef(null);
   const openMobileSearch = () => {
     setMobileSearchOpen(true);
@@ -903,6 +900,8 @@ export default function Header({
       return;
     }
     setMobileSearchState('loading');
+    setMobileSuggestions([]);
+    setMobileCatMatches([]);
     const identifier = isIdentifierQuery(val);
     debounceRef.current = setTimeout(() => {
       if (identifier) {
@@ -1101,10 +1100,6 @@ export default function Header({
                   setRecentSearches([]);
                 }}
                 onAddProduct={onSearchAddToCart}
-                onRequestProduct={() => {
-                  closeSearch();
-                  setShowRequest(true);
-                }}
                 previousOrderCodes={previousOrderCodes}
                 searchState={desktopSearchState}
                 onRetry={() => scheduleSuggestions(inputValue)}
@@ -1314,6 +1309,10 @@ export default function Header({
               </button>
             </div>
           )}
+          {getRelatedSearchTerm(mobileInput) && (mobileSuggestions.length > 0 || mobileCatMatches.length > 0) && (
+            <div className="sp-related-search">We also searched for <strong>{getRelatedSearchTerm(mobileInput)}</strong></div>
+          )}
+          {mobileCatMatches.length > 0 && <div className="sp-section-head"><span>Browse categories</span><span>All products in each category</span></div>}
           {mobileCatMatches.map((cat) => {
             const optionId = `${mobileListboxId}-cat-${cat.id}`;
             const isActive = activeMobileItemId === optionId;
@@ -1353,17 +1352,14 @@ export default function Header({
           {mobileSearchState !== 'loading' && mobileSearchState !== 'error' && mobileSuggestions.length === 0 && mobileCatMatches.length === 0 && (
             <div className="sp-empty sp-empty--mobile">
               <Search size={24} />
-              <p>No results for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>
-              <span>Try a different spelling or browse by department</span>
+              <p>No quick matches for &ldquo;<strong>{mobileInput.trim()}</strong>&rdquo;</p>
+              <span>Search all products, including Instore, before requesting an item.</span>
               <button
                 type="button"
                 className="sp-request-product"
-                onClick={() => {
-                  closeMobileSearch();
-                  setShowRequest(true);
-                }}
+                onClick={() => commitMobileSearch(mobileInput.trim())}
               >
-                <PackageSearch size={15} /> Request this product
+                <Search size={15} /> Search all products
               </button>
             </div>
           )}

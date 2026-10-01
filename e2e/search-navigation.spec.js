@@ -32,11 +32,18 @@ function tokenFor(user) {
   return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.synthetic`;
 }
 
-async function installSyntheticServices(context, { delayedCatalogueResponse } = {}) {
+async function installSyntheticServices(context, { delayedCatalogueResponse, taxonomy = [], catalogue = catalogueProducts } = {}) {
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const { pathname } = url;
+
+    // Session revalidation must use the same synthetic identity as sign-in.
+    // Letting this request fall through to Vite can intermittently sign out
+    // the fixture while the first authenticated page is mounting.
+    if (pathname.endsWith('/mock-supabase/auth/v1/user')) {
+      return json(route, { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' });
+    }
 
     if (pathname.endsWith('/mock-supabase/auth/v1/token')) {
       const user = { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' };
@@ -68,14 +75,14 @@ async function installSyntheticServices(context, { delayedCatalogueResponse } = 
       });
     }
     if (pathname === '/api/products') {
-      return json(route, catalogueProducts);
+      return json(route, catalogue);
     }
     if (pathname === '/api/featured-products') return json(route, { items: catalogueProducts.map(({ sku }) => ({ sku })) });
     if (pathname === '/api/customer-profile') {
       return json(route, { profile: { id: ACCOUNT_ID, email: TEST_EMAIL, name: 'Synthetic Search Customer', role: 'customer', is_approved: true } });
     }
     if (pathname === '/api/account-cart') return json(route, { items: [], activityAt: null, revision: 1 });
-    if (pathname === '/api/taxonomy') return json(route, { categories: [] });
+    if (pathname === '/api/taxonomy') return json(route, { categories: taxonomy });
     if (pathname === '/api/stock') return json(route, { qty: 50, to_order: false });
     if (pathname === '/api/specials') return json(route, { specials: [] });
     if (pathname === '/api/banner' || pathname === '/api/popup-special') return json(route, null);
@@ -165,6 +172,9 @@ test('a new catalogue query hides prior-query results while its Instore response
     await expect(page).toHaveURL(/q=cobalt/);
     await responseStarted;
     await expect(page.getByText('Amber synthetic result', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.catalog-page > [role="status"]')).toHaveText('Searching products…');
+    await expect(page.locator('.catalog-instore-heading')).toContainText('Searching Instore…');
+    await expect(page.locator('.catalog-instore-heading')).not.toContainText('0 additional');
     delay.resolve?.();
     await expect(page.getByText('Cobalt synthetic result', { exact: true })).toBeVisible();
   } finally {
@@ -227,4 +237,39 @@ test('every Instore search image opens its matching preview without leaving the 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(searchUrl);
+});
+
+test('quick search offers live categories for typo families without broad qualifier matches', async ({ page, context }) => {
+  await installSyntheticServices(context, { taxonomy: [
+    { id: 'synthetic-toys', label: 'Synthetic Toys', children: [{ id: 'soft-toys', label: 'Soft Toys' }] },
+    { id: 'synthetic-stationery', label: 'Stationery', children: [{ id: 'notebooks', label: 'Notebooks' }] },
+  ] });
+  await signIn(page);
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  await search.fill('sotf toys');
+  const panel = page.locator('.header-search-dropdown:visible, .mobile-search-results:visible').first();
+  await expect(panel.getByText('Browse categories', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('option', { name: /^Soft Toys\b/ })).toBeVisible();
+  await search.fill('plush pen');
+  await expect(panel.getByRole('option', { name: /^Soft Toys\b/ })).toHaveCount(0);
+  await expect(panel).toContainText('No quick matches');
+  await expect(panel.getByRole('button', { name: 'Search all products', exact: true })).toBeVisible();
+  await search.fill('notepads');
+  await expect(panel.getByRole('option', { name: /^Notebooks\b/ })).toBeVisible();
+});
+
+test('quick search names wrap and phone actions have usable touch targets', async ({ page, context }) => {
+  const name = 'Amber synthetic extra long product description with colour size and variant details that must remain readable';
+  await installSyntheticServices(context, { catalogue: [product(100, name)] });
+  await signIn(page);
+  await page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' }).fill('amber');
+  const panel = page.locator('.header-search-dropdown:visible, .mobile-search-results:visible').first();
+  await expect(panel.getByText(name, { exact: true })).toBeVisible();
+  const text = panel.locator('.sp-product-name').first();
+  expect(await text.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('normal');
+  const add = panel.getByRole('button', { name: `Add ${name} to order` });
+  const bounds = await add.boundingBox();
+  expect(bounds.height).toBeGreaterThanOrEqual(44);
+  expect(bounds.width).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
