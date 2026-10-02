@@ -1,3 +1,4 @@
+import { trackShoppingEvent, trackShoppingSearch, trackShoppingProduct, clearShoppingSearch, activeShoppingSearch, trackCatalogueVisit } from '../lib/shoppingAnalytics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
@@ -20,7 +21,7 @@ export function InstoreResultCard({ product, priority = false, addToCart, cartQt
   const stock = Math.max(0, Math.floor(Number(product?.stockQty ?? product?.stockOnHand) || 0));
   const image = String(product?.image || product?.images?.[0] || '').trim();
   return <article className="instore-result-card">
-    <button type="button" className="instore-result-image" aria-label={`View ${name}`} onClick={() => setPreviewOpen(true)}>{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</button>
+    <button type="button" className="instore-result-image" aria-label={`View ${name}`} onClick={() => { trackShoppingProduct('search_result_clicked', product, { searchId: activeShoppingSearch('main'), searchSource: 'main' }); setPreviewOpen(true); }}>{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</button>
     <div className="instore-result-body">
       <p className="instore-result-code">{code || 'INSTORE PRODUCT'}</p><h3>{name}</h3>
       <p className="instore-result-price">{money(product?.price)}</p>
@@ -31,7 +32,7 @@ export function InstoreResultCard({ product, priority = false, addToCart, cartQt
   </article>;
 }
 
-export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', initialQuery = '', initialPage = 1, onSearchQueryChange, onPageChange, searchInputRef }) {
+export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPreferenceMap = {}, specialsMap = {}, browseCategory = '', initialQuery = '', initialPage = 1, onSearchQueryChange, onPageChange, searchInputRef, analyticsCustomerId }) {
   const [query, setQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const [page, setPage] = useState(initialPage);
@@ -51,6 +52,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [category, setCategory] = useState(browseCategory);
   const [preferences, setPreferences] = useState({});
   const [loading, setLoading] = useState(true);
+  const [analyticsResultsKey, setAnalyticsResultsKey] = useState('');
   const [error, setError] = useState(false);
   const resultsRef = useRef(null);
   const internalSearchRef = useRef(null);
@@ -76,6 +78,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     setProducts(view.products);
     setTiles(localTiles || []);
     setMeta({ total: view.total, page, pageSize: PAGE_SIZE });
+    setAnalyticsResultsKey(JSON.stringify([submittedQuery, category]));
     setError(false);
     setLoading(false);
   }, [catalogue, localTiles, submittedQuery, category, page]);
@@ -87,6 +90,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       setProducts(Array.isArray(data?.products) ? data.products : []);
       setTiles(Array.isArray(data?.tiles) ? data.tiles : []);
       setMeta({ total: Math.max(0, Number(data?.total) || 0), page: Number(data?.page) || page, pageSize: Math.max(1, Number(data?.pageSize) || PAGE_SIZE) });
+      setAnalyticsResultsKey(JSON.stringify([submittedQuery, category]));
     };
     // A view this tab has already seen is painted at once and replaced as soon
     // as the fresh response lands, so returning to Instore Products does not
@@ -132,6 +136,25 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }, [browseCategory]);
 
+  useEffect(() => { clearShoppingSearch('instore'); }, [submittedQuery, category]);
+  const analyticsSearchKey = useRef('');
+  const analyticsBrowseKey = useRef(null);
+  useEffect(() => {
+    const key = String(category || '');
+    const visitKey = JSON.stringify([analyticsCustomerId, key]);
+    if (!analyticsCustomerId || analyticsBrowseKey.current === visitKey) return;
+    analyticsBrowseKey.current = visitKey;
+    trackCatalogueVisit(analyticsCustomerId, 'instore', { department: key });
+    if (key) trackShoppingEvent('department_viewed', { source: 'instore', metadata: { department: key } });
+  }, [category, analyticsCustomerId]);
+  useEffect(() => {
+    if (!submittedQuery.trim()) { analyticsSearchKey.current = ''; clearShoppingSearch('instore'); return; }
+    const key = JSON.stringify([submittedQuery, category]);
+    if (loading || error || analyticsResultsKey !== key) return;
+    if (analyticsSearchKey.current === key) return;
+    analyticsSearchKey.current = key;
+    trackShoppingSearch({ source: 'instore', searchTerm: submittedQuery.trim().slice(0, 200), resultsCount: meta.total, mainResultsCount: 0, instoreResultsCount: meta.total, metadata: { department: category } });
+  }, [submittedQuery, category, loading, error, meta.total, analyticsResultsKey]);
   const preferenceFor = (id) => Object.hasOwn(preferences, id) ? preferences[id] : (cartPreferenceMap[id] || '');
   // A typed search is a fresh discovery task, not an extra hidden category
   // constraint. Category tiles remain a separate, explicit filter.
@@ -220,7 +243,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       {loading && <div className="instore-loading" aria-hidden="true"><span className="instore-spinner"><ProtoLogo variant="icon" size={32} tagline={false} /></span><span>Searching products…</span></div>}
       {!loading && error && <div className="instore-state" role="alert"><RefreshCw size={28} /><h3>Let’s try that again</h3><p>We couldn’t load Instore Products. Your basket has not changed.</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button></div>}
       {!loading && !error && !products.length && <div className="instore-state instore-state--no-results"><PackageSearch size={30} /><h3>{searchActive ? `No products match “${submittedQuery}”` : 'No products found'}</h3><p>{searchActive ? 'Try a broader product phrase below, edit your wording, or send Proto a product request.' : 'Clear the current filter to browse the complete Instore collection.'}</p>{searchActive && recoveryQueries.length > 0 && <div className="instore-recovery" aria-label="Related searches"><span>Try instead</span><div>{recoveryQueries.map((candidate) => <button key={candidate} type="button" onClick={() => tryRecoveryQuery(candidate)}>{candidate}</button>)}</div></div>}<div className="instore-state-actions">{searchActive && <button className="instore-state-secondary" type="button" onClick={editSearch}><Search size={16} aria-hidden="true" /> Edit search</button>}<button type="button" onClick={clear}><X size={16} aria-hidden="true" /> Browse all products</button>{searchActive && <button className="instore-state-request" type="button" onClick={requestProduct}><PackageSearch size={16} aria-hidden="true" /> Request this product</button>}</div></div>}
-      {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} preferenceSlot={<label className="instore-preference instore-preference--in-card">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label>} /></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
+      {!loading && !error && products.length > 0 && <><div className="instore-grid">{products.map((product, index) => <article key={product.id} className="instore-item"><ProductCard product={product} onSearchEngage={() => { if (submittedQuery.trim()) trackShoppingProduct('search_result_clicked', product, { position: (page - 1) * PAGE_SIZE + index + 1 }); }} addToCart={(item, qty, point) => { addToCart(item, qty, point, preferenceFor(product.id)); setPreferences((current) => ({ ...current, [product.id]: '' })); }} cartQty={cartQtyMap[product.id] || 0} special={specialsMap[product.id] || null} priority={index < 4} preferenceSlot={<label className="instore-preference instore-preference--in-card">Preferred colour/design <small>(optional)</small><textarea value={preferenceFor(product.id)} onChange={(event) => setPreferences((current) => ({ ...current, [product.id]: event.target.value }))} maxLength={240} rows={2} placeholder="e.g. dark brown, if available" /><span>Subject to availability. Your preference will accompany this item.</span></label>} /></article>)}</div>{pages > 1 && <nav className="instore-pagination" aria-label="Product pages"><button disabled={page <= 1} type="button" onClick={() => changePage(page - 1)}><ArrowLeft size={16} /> Previous</button><span>Page {page} of {pages.toLocaleString()}</span><button disabled={page >= pages} type="button" onClick={() => changePage(page + 1)}>Next <ArrowRight size={16} /></button></nav>}</>}
     </div>
 
   </section>;

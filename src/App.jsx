@@ -1,3 +1,6 @@
+import usePersonalisedArrivals from './hooks/usePersonalisedArrivals';
+import PersonalisedArrivalTip from './components/PersonalisedArrivalTip';
+import { trackShoppingEvent, trackShoppingSearch, trackShoppingProduct, basketQuantityChanges, clearShoppingSearch, trackCatalogueVisit, shoppingSource } from './lib/shoppingAnalytics';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Header from './components/Header';
@@ -1230,7 +1233,9 @@ export default function App({
     if (cartSyncTimerRef.current) window.clearTimeout(cartSyncTimerRef.current);
   }, []);
 
+  const shoppingCartIntent = useRef(false);
   const markCartActivity = useCallback(() => {
+    shoppingCartIntent.current = true;
     const now = Date.now();
     setCartLastActivityAt(now);
     setCartClock(now);
@@ -1239,6 +1244,7 @@ export default function App({
 
   const clearCart = useCallback(({ allowUndo = true, intent = 'normal' } = {}) => {
     if (!cartHydratedRef.current) return;
+    shoppingCartIntent.current = intent === 'normal';
     const clearedAt = Date.now();
     if (allowUndo && cartItems.length) {
       setClearedCartSnapshot({
@@ -1747,6 +1753,7 @@ export default function App({
       const result = await submitOrder();
       setSubmittedOrderNumber(result.orderNumber || '');
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
+      trackShoppingEvent('order_submitted', { orderId: result.orderId || null });
       trackJourneyEvent('order_submit_succeeded', {
         journey: 'checkout',
         step: 'submit',
@@ -1949,6 +1956,7 @@ export default function App({
   }, [visibleCatalogResults.products, hashNavigate, path, previewProductKey, productDetailKey, refinements]);
 
   const handleSearchProductClick = useCallback((product, index) => {
+    trackShoppingProduct('search_result_clicked', product, { position: index + 1 + (page - 1) * CATALOG_PAGE_SIZE });
     const track = searchTrackRef.current;
     if (!track.rowId || !searchQuery.trim()) return;
     void logSearchClick({
@@ -1964,6 +1972,69 @@ export default function App({
   const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
   const instoreRouteQuery = instoreSearchQueryFromRefinements(refinements);
   const instoreRoutePage = instorePageFromRefinements(refinements);
+  const shoppingBrowseKey = useRef('');
+  const shoppingSearchKey = useRef('');
+  const previousShoppingBasket = useRef(null);
+  const shoppingCheckoutBasket = useRef(null);
+  const trackCheckoutReview = useCallback(() => {
+    if (!customer?.id || !cartHydrated || !cartItems.length) return;
+    const key = cartFingerprint(cartItems);
+    if (shoppingCheckoutBasket.current === key) return;
+    shoppingCheckoutBasket.current = key;
+    trackShoppingEvent('checkout_started', { metadata: { reason: 'review_opened' } });
+  }, [customer?.id, cartHydrated, cartItems]);
+  const shoppingAccount = useRef(null);
+  useEffect(() => {
+    if (shoppingAccount.current === customer?.id) return;
+    shoppingAccount.current = customer?.id;
+    shoppingBrowseKey.current = ''; shoppingSearchKey.current = ''; previousShoppingBasket.current = null; shoppingCheckoutBasket.current = null;
+    clearShoppingSearch('main'); clearShoppingSearch('instore');
+  }, [customer?.id]);
+  useEffect(() => {
+    if (!customer?.id || viewingInstoreProducts) return;
+    const key = JSON.stringify([pathKey, activeCollection]);
+    if (shoppingBrowseKey.current === key) return;
+    shoppingBrowseKey.current = key;
+    trackCatalogueVisit(customer.id, 'main', { collection: activeCollection });
+    if (path.length) trackShoppingEvent('department_viewed', {
+      source: 'main', metadata: { department: path.join('/'), collection: activeCollection },
+    });
+  }, [customer?.id, pathKey, activeCollection, viewingInstoreProducts, path]);
+  useEffect(() => {
+    // A new submitted query cannot inherit attribution from the previous one.
+    // The Instore page owns its independent query lifecycle.
+    clearShoppingSearch('main');
+    if (!viewingInstoreProducts) clearShoppingSearch('instore');
+    shoppingSearchKey.current = '';
+  }, [routeSearchQuery, pathKey, activeCollection, viewingInstoreProducts]);
+  useEffect(() => {
+    if (!customer?.id || viewingInstoreProducts) return;
+    const term = routeSearchQuery.trim();
+    if (!term) { shoppingSearchKey.current = ''; clearShoppingSearch('main'); clearShoppingSearch('instore'); return; }
+    // Count completed successful results, never loading or failed requests as zero results.
+    if (catalogueResultsPending || visibleInstoreSearch.loading || visibleInstoreSearch.error) return;
+    const key = JSON.stringify([term, pathKey, activeCollection]);
+    if (shoppingSearchKey.current === key) return;
+    const timer = window.setTimeout(() => {
+      shoppingSearchKey.current = key;
+      trackShoppingSearch({ source: 'main', searchTerm: term.slice(0, 200), resultsCount: visibleCatalogResults.total + visibleInstoreSearch.total,
+        mainResultsCount: visibleCatalogResults.total, instoreResultsCount: visibleInstoreSearch.total,
+        metadata: { department: path.join('/'), collection: activeCollection } });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [customer?.id, routeSearchQuery, pathKey, path, activeCollection, viewingInstoreProducts, catalogueResultsPending, visibleInstoreSearch.loading, visibleInstoreSearch.error, visibleCatalogResults.total, visibleInstoreSearch.total]);
+  useEffect(() => {
+    if (!customer?.id || !cartHydrated) { previousShoppingBasket.current = null; return; }
+    if (!cartItems.length || shoppingCheckoutBasket.current !== cartFingerprint(cartItems)) shoppingCheckoutBasket.current = null;
+    const previous = previousShoppingBasket.current;
+    const localChange = shoppingCartIntent.current;
+    shoppingCartIntent.current = false;
+    previousShoppingBasket.current = cartItems;
+    if (!localChange || !previous) return;
+    for (const change of basketQuantityChanges(previous, cartItems)) {
+      trackShoppingProduct(change.eventType, change.product, { quantity: change.quantity });
+    }
+  }, [customer?.id, cartHydrated, cartItems, cartLastActivityAt]);
   const focusInstoreSearch = useCallback(() => {
     instoreSearchInputRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' });
     instoreSearchInputRef.current?.focus({ preventScroll: true });
@@ -1995,7 +2066,7 @@ export default function App({
     blocked: Boolean(customerJourney) || showPopup || mobileMenuOpen,
   });
   const focusSearchTip = () => {
-    searchTip.dismiss();
+    searchTip.dismiss('try_search');
     const input = viewingInstoreProducts
       ? instoreSearchInputRef.current
       : window.innerWidth > 900 ? document.querySelector('.header-search-premium-wrap input') : null;
@@ -2009,6 +2080,29 @@ export default function App({
   const searchTipPrompt = searchTip.state ? (
     <CustomerJourneyPrompt state={searchTip.state} onPrimary={focusSearchTip} onDismiss={searchTip.dismiss} />
   ) : null;
+
+  const openPersonalisedProduct = useCallback(async (suggestion) => {
+    const code = String(suggestion?.code || '').trim().toUpperCase();
+    if (!code) return;
+    const exact = (product) => product && [product.code, product.sku, product.id]
+      .some(value => String(value || '').trim().toUpperCase() === code)
+      && shoppingSource(product) === suggestion.source;
+    const instore = instoreCatalogue();
+    let product = [...catalogProducts, ...instoreSearch.products, ...(Array.isArray(instore) ? instore : [])].find(exact);
+    if (!product) {
+      try { product = (await fetchProductsBySkus([code])).get(code); } catch { return; }
+    }
+    if (exact(product)) handleProductPreview(product);
+    else setCartAnnouncement('That product is no longer available in the catalogue.');
+  }, [catalogProducts, instoreSearch.products, handleProductPreview]);
+  const personalisedArrival = usePersonalisedArrivals({
+    accountId: customer?.id,
+    enabled: import.meta.env.DEV || import.meta.env.VITE_PERSONALISED_ARRIVALS_ENABLED === 'true',
+    ready: cartHydrated && orderHistoryResolved && journeyReady,
+    browsing: path.length === 0 || viewingInstoreProducts,
+    blocked: Boolean(searchTip.state || customerJourney || showPopup || mobileMenuOpen || desktopDrawerVisible || mobileCartOpen || modalOpen || reorderModal || previewProduct) || ['sending', 'sent', 'saved'].includes(orderStatus),
+    onOpenProduct: openPersonalisedProduct,
+  });
 
   return (
     <div className="app-root" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -2039,6 +2133,7 @@ export default function App({
       />
 
       {searchTipPrompt}
+      {personalisedArrival.state && <PersonalisedArrivalTip tip={personalisedArrival} />}
       {customerJourney?.presentation !== 'basket' ? customerJourneyPrompt : null}
 
       <div className="main-layout" style={{ flex: 1, minHeight: 0 }}>
@@ -2057,6 +2152,7 @@ export default function App({
 
         <main className="content-area">
           {viewingInstoreProducts && !instoreAvailable ? <section style={{ padding: 32 }} aria-labelledby="instore-paused-title"><h1 id="instore-paused-title">Instore Products is temporarily unavailable</h1><p>We’re checking this collection before reopening it. You can still shop our main catalogue.</p><button type="button" onClick={goAllProducts}>Shop main catalogue</button></section> : viewingInstoreProducts ? <ExtendedRangePage
+            analyticsCustomerId={customer?.id}
             initialQuery={instoreRouteQuery}
             initialPage={instoreRoutePage}
             searchInputRef={instoreSearchInputRef}
@@ -2126,6 +2222,7 @@ export default function App({
             clearCart={clearCart}
             onUndoClear={undoClearCart}
             canUndoClear={Boolean(clearedCartSnapshot)}
+            onCheckoutReview={trackCheckoutReview}
             sendOrderEmail={sendOrderEmail}
             customer={customer}
             autoCloseProgress={cartExpiryProgress}
@@ -2242,6 +2339,7 @@ export default function App({
                 clearCart={clearCart}
                 onUndoClear={undoClearCart}
                 canUndoClear={Boolean(clearedCartSnapshot)}
+                onCheckoutReview={trackCheckoutReview}
                 sendOrderEmail={sendOrderEmail}
                 customer={customer}
                 autoCloseProgress={cartExpiryProgress}
