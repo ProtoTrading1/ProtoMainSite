@@ -83,7 +83,7 @@ describe('account basket mutation validation', () => {
       }, { now: NOW }), /revision/i);
     }
 
-    for (const activityAt of [0, -1, 1.5, '123', NOW + 60_001]) {
+    for (const activityAt of [0, -1, 1.5, '123', NaN, Infinity]) {
       assertBadRequest(() => parseCartMutation({
         mode: 'save',
         items: [item('SKU-1')],
@@ -107,6 +107,23 @@ describe('account basket mutation validation', () => {
     }, { now: NOW });
     assert.equal(merge.mode, 'merge');
     assert.equal(merge.revision, null);
+  });
+
+  it('caps future device activity at server time without changing quantities or revisions', () => {
+    for (const mode of ['merge', 'save']) {
+      for (const skew of [1, 120000, 86400000, 31536000000]) {
+        const parsed = parseCartMutation({ mode, items: [item('CLOCK-SAFE', 15)],
+          activityAt: NOW + skew, revision: 7 }, { now: NOW });
+        assert.equal(parsed.activityAt, NOW);
+        assert.equal(parsed.items[0].qty, 15);
+        assert.equal(parsed.revision, 7);
+      }
+    }
+    const cleared = parseCartMutation({ activityAt: NOW + 120000, revision: 7 },
+      { method: 'DELETE', now: NOW });
+    assert.equal(cleared.activityAt, NOW);
+    assert.equal(cleared.revision, 7);
+    assert.deepEqual(cleared.items, []);
   });
 
   it('keeps separately requested colour/design variants of one SKU as separate basket lines', () => {
@@ -273,7 +290,7 @@ describe('account basket client orchestration contract', () => {
 
     assert.match(client, /clearAccountCart\(revision, activityAt\)/);
     assert.match(client, /requestAccountCart\('DELETE', \{ revision, activityAt \}\)/);
-    assert.match(app, /clearAccountCart\(cartRevisionRef\.current, operation\.activityAt\)/);
+    assert.match(app, /clearAccountCart\(operation\.baseRevision, operation\.activityAt\)/);
     assert.match(app, /if \(fingerprint === '\[\]'\)[\s\S]*?type: 'clear'[\s\S]*?activityAt:/);
     assert.match(app, /makeCartSyncOperation\([\s\S]*?cartClearActivityAtRef\.current[\s\S]*?nextOperation\.type === 'clear'/);
     assert.match(app, /cart(?:Save|Sync)(?:Queue|Chain|InFlight|Pending)/i);

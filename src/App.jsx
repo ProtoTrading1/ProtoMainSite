@@ -39,6 +39,8 @@ import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './l
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
+import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
@@ -307,6 +309,7 @@ export default function App({
   const [cartLastActivityAt, setCartLastActivityAt] = useState(readCartActivityAt);
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
+  const [cartSyncIssue, setCartSyncIssue] = useState(null);
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -332,6 +335,9 @@ export default function App({
   const currentCartRef = useRef({ items: cartItems, activityAt: cartLastActivityAt });
   const pendingCartSyncRef = useRef(null);
   const cartSyncInFlightRef = useRef(false);
+  const cartConflictRef = useRef(false);
+  const cartAutomaticRetryBlockedRef = useRef(false);
+  const cartUndoTokenRef = useRef(null);
   const cartSyncTimerRef = useRef(null);
   const cartSyncRetryCountRef = useRef(0);
   const cartSyncDrainRef = useRef(null);
@@ -469,18 +475,24 @@ export default function App({
   }, []);
 
   const drainCartSyncQueue = useCallback(async () => {
-    if (cartPreviewModeRef.current || cartSyncInFlightRef.current || !cartHydratedRef.current) return;
+    if (cartPreviewModeRef.current || cartConflictRef.current || cartAutomaticRetryBlockedRef.current || cartSyncInFlightRef.current || !cartHydratedRef.current) return;
     const operation = pendingCartSyncRef.current;
     const accountId = cartAccountRef.current;
     if (!operation || !accountId || operation.accountId !== accountId) return;
 
     pendingCartSyncRef.current = null;
     cartSyncInFlightRef.current = true;
+    const dispatchedItems = currentCartRef.current.items;
+    const dispatchedActivityAt = currentCartRef.current.activityAt;
+    operation.baseRevision ??= cartRevisionRef.current;
+    writePendingCart(localStorage, accountId, operation, operation.baseRevision);
     setCartSyncStatus('saving');
+    let acknowledged = false;
+    let automaticRetryAllowed = true;
     try {
       const saved = operation.type === 'clear'
-        ? await clearAccountCart(cartRevisionRef.current, operation.activityAt)
-        : await saveAccountCart(operation.items, operation.activityAt, cartRevisionRef.current);
+        ? await clearAccountCart(operation.baseRevision, operation.activityAt)
+        : await saveAccountCart(operation.items, operation.activityAt, operation.baseRevision);
       if (cartAccountRef.current !== accountId) return;
       cartRevisionRef.current = Number(saved.revision || 0);
       lastSavedCartRef.current = cartFingerprint(saved.items);
@@ -490,6 +502,7 @@ export default function App({
       }
       if (operation.intent === 'restore') cartRestoreFingerprintRef.current = null;
       cartSyncRetryCountRef.current = 0;
+      acknowledged = true;
     } catch (error) {
       if (cartAccountRef.current !== accountId) return;
       const restoreConflict = operation.intent === 'restore'
@@ -499,7 +512,22 @@ export default function App({
         && error.status === 409
         && Array.isArray(error.data?.items);
       if (restoreConflict || submittedClearConflict) {
+        const hasNewerLocalIntent = () => currentCartRef.current.items !== dispatchedItems
+          || currentCartRef.current.activityAt !== dispatchedActivityAt;
+        if (hasNewerLocalIntent()) {
+          cartConflictRef.current = true;
+          setCartSyncIssue(cartSyncFailure(error));
+          setCartSyncStatus('error');
+          return;
+        }
         const remoteItems = await hydrateAccountCartItems(error.data.items);
+        if (cartAccountRef.current !== accountId) return;
+        if (hasNewerLocalIntent()) {
+          cartConflictRef.current = true;
+          setCartSyncIssue(cartSyncFailure(error));
+          setCartSyncStatus('error');
+          return;
+        }
         const remoteActivityAt = error.data.activityAt || null;
         cartRevisionRef.current = Number(error.data.revision || 0);
         lastSavedCartRef.current = cartFingerprint(remoteItems);
@@ -513,12 +541,24 @@ export default function App({
           ? 'Your order was received. A newer basket from another device has been kept.'
           : 'A newer basket was saved on another device, so the older cleared basket was not restored.');
       } else if (error.status === 409 && Array.isArray(error.data?.items)) {
-        // Consume the newer revision but preserve this browser's latest intent.
-        // The queue immediately retries that intent against the new revision.
-        cartRevisionRef.current = Number(error.data.revision || 0);
-        cartSyncRetryCountRef.current = 0;
+        // A timeout may have committed already. A matching snapshot is an
+        // acknowledgement; divergence is NOT authority to overwrite a device.
+        if (cartFingerprint(error.data.items) === operation.fingerprint) {
+          cartRevisionRef.current = Number(error.data.revision || 0);
+          lastSavedCartRef.current = operation.fingerprint;
+          cartSyncRetryCountRef.current = 0;
+          acknowledged = true;
+        } else {
+          cartConflictRef.current = true;
+          pendingCartSyncRef.current ||= operation;
+          setCartSyncIssue(cartSyncFailure(error));
+          setCartSyncStatus('error');
+        }
       } else {
+        automaticRetryAllowed = ![400, 401, 403, 413, 422].includes(error?.status);
+        cartAutomaticRetryBlockedRef.current = !automaticRetryAllowed;
         cartSyncRetryCountRef.current += 1;
+        setCartSyncIssue(cartSyncFailure(error));
         setCartSyncStatus('error');
         trackJourneyEvent('basket_sync_failed', {
           journey: 'basket',
@@ -527,7 +567,7 @@ export default function App({
           metadata: { retry: cartSyncRetryCountRef.current },
         });
       }
-      if (!restoreConflict && !submittedClearConflict) {
+      if (!restoreConflict && !submittedClearConflict && !cartConflictRef.current) {
         const latest = currentCartRef.current;
         const latestFingerprint = cartFingerprint(latest.items);
         const nextOperation = makeCartSyncOperation(
@@ -556,12 +596,24 @@ export default function App({
           if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
           pendingCartSyncRef.current = nextOperation;
         }
-        if (pendingCartSyncRef.current) {
+        if (cartConflictRef.current) {
+          setCartSyncStatus('error');
+        } else if (pendingCartSyncRef.current) {
+          if (acknowledged) {
+            pendingCartSyncRef.current.baseRevision = cartRevisionRef.current;
+            writePendingCart(localStorage, accountId, pendingCartSyncRef.current, cartRevisionRef.current);
+          }
           const retryDelay = cartSyncRetryCountRef.current
             ? Math.min(30_000, 1000 * (2 ** Math.min(5, cartSyncRetryCountRef.current - 1)))
             : 0;
-          scheduleCartSync(retryDelay);
+          if (automaticRetryAllowed) scheduleCartSync(retryDelay);
+          else {
+            if (cartSyncTimerRef.current) window.clearTimeout(cartSyncTimerRef.current);
+            cartSyncTimerRef.current = null;
+            setCartSyncStatus('error');
+          }
         } else {
+          clearPendingCart(localStorage, accountId);
           setCartSyncStatus('saved');
         }
       }
@@ -591,17 +643,21 @@ export default function App({
     const previousUid = cartAccountRef.current;
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
+    cartConflictRef.current = false;
+    cartAutomaticRetryBlockedRef.current = false;
     cartPreviewModeRef.current = false;
     setCartPreviewMode(false);
     setCartHydrated(false);
     setLoginBasketSnapshot(null);
     setCartSyncStatus('loading');
+    setCartSyncIssue(null);
     pendingCartSyncRef.current = null;
     cartSyncRetryCountRef.current = 0;
     if (cartSyncTimerRef.current) window.clearTimeout(cartSyncTimerRef.current);
 
     let localItems = [];
     let localActivityAt = null;
+    const pendingDraft = readPendingCart(localStorage, uid);
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (!owner || owner === uid) {
@@ -619,6 +675,10 @@ export default function App({
       }
       localStorage.setItem(CART_OWNER_KEY, uid);
     } catch { /* use the in-memory fallback */ }
+    if (pendingDraft) {
+      localItems = pendingDraft.items;
+      localActivityAt = pendingDraft.activityAt;
+    }
 
     if (previousUid && previousUid !== uid) {
       setCartItems([]);
@@ -634,6 +694,27 @@ export default function App({
       setCartSyncStatus('loading');
       try {
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
+        if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
+          const draftItems = await hydrateAccountCartItems(pendingDraft.items);
+          if (cancelled || cartAccountRef.current !== uid) return;
+          cartRevisionRef.current = pendingDraft.baseRevision;
+          lastSavedCartRef.current = cartFingerprint(accountCart.items);
+          setCartItems(draftItems);
+          setCartLastActivityAt(localActivityAt);
+          currentCartRef.current = { items: draftItems, activityAt: localActivityAt };
+          cartHydratedRef.current = true;
+          setCartHydrated(true);
+          if (accountCart.revision !== pendingDraft.baseRevision) {
+            cartConflictRef.current = true;
+            setCartSyncIssue(cartSyncFailure({ status: 409 }));
+            setCartSyncStatus('error');
+          } else {
+            cartClearActivityAtRef.current = pendingDraft.type === 'clear' ? pendingDraft.activityAt : null;
+            cartClearIntentRef.current = pendingDraft.intent;
+            setCartSyncStatus('saving');
+          }
+          return;
+        }
         const hydratedItems = await hydrateAccountCartItems(accountCart.items);
         if (cancelled || cartAccountRef.current !== uid) return;
         cartRevisionRef.current = Number(accountCart.revision || 0);
@@ -660,6 +741,7 @@ export default function App({
         cartHydratedRef.current = true;
         setCartHydrated(true);
         setCartSyncStatus('saved');
+        clearPendingCart(localStorage, uid);
       } catch (error) {
         if (cancelled || cartAccountRef.current !== uid) return;
         // Preview deployments intentionally return 403 for account-cart so a
@@ -689,6 +771,7 @@ export default function App({
           return;
         }
         hydrationFailures += 1;
+        setCartSyncIssue(cartSyncFailure(error));
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
@@ -734,7 +817,17 @@ export default function App({
   useEffect(() => {
     if (!customer?.id || !cartHydratedRef.current || cartPreviewModeRef.current) return undefined;
     const fingerprint = cartFingerprint(cartItems);
-    if (fingerprint === lastSavedCartRef.current) return undefined;
+    if (fingerprint === lastSavedCartRef.current && !cartSyncInFlightRef.current && !cartConflictRef.current) {
+      if (cartSyncTimerRef.current) window.clearTimeout(cartSyncTimerRef.current);
+      cartSyncTimerRef.current = null;
+      pendingCartSyncRef.current = null;
+      cartClearActivityAtRef.current = null;
+      cartClearIntentRef.current = 'normal';
+      cartRestoreFingerprintRef.current = null;
+      clearPendingCart(localStorage, customer.id);
+      setCartSyncStatus('saved');
+      return undefined;
+    }
     const nextOperation = makeCartSyncOperation(
       customer.id,
       cartItems,
@@ -743,7 +836,11 @@ export default function App({
       cartRestoreFingerprintRef.current === fingerprint ? 'restore' : cartClearIntentRef.current,
     );
     if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
+    const existingDraft = readPendingCart(localStorage, customer.id);
+    writePendingCart(localStorage, customer.id, nextOperation, existingDraft?.baseRevision ?? cartRevisionRef.current);
     pendingCartSyncRef.current = nextOperation;
+    if (cartConflictRef.current) return undefined;
+    cartAutomaticRetryBlockedRef.current = false;
     setCartSyncStatus('saving');
     scheduleCartSync(450);
     return undefined;
@@ -765,6 +862,9 @@ export default function App({
       const hydratedItems = await hydrateAccountCartItems(remote.items);
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
+      if (Number(remote.revision || 0) <= cartRevisionRef.current) return;
+      cartUndoTokenRef.current = null;
+      setClearedCartSnapshot(null);
       cartRevisionRef.current = Number(remote.revision || 0);
       lastSavedCartRef.current = cartFingerprint(hydratedItems);
       setCartItems(hydratedItems);
@@ -773,8 +873,9 @@ export default function App({
       currentCartRef.current = { items: hydratedItems, activityAt: remote.activityAt || null };
       setCartClock(Date.now());
       setCartSyncStatus('saved');
-    } catch {
+    } catch (error) {
       // Keep the device copy, but make the failed account sync visible.
+      setCartSyncIssue(cartSyncFailure(error));
       setCartSyncStatus('error');
       trackJourneyEvent('basket_sync_failed', {
         journey: 'basket',
@@ -786,6 +887,11 @@ export default function App({
 
   const retryCartSync = useCallback(() => {
     if (!customer?.id) return;
+    if (cartConflictRef.current) {
+      setCartSyncStatus('error');
+      setCartSyncIssue(cartSyncFailure({ status: 409 }));
+      return;
+    }
     if (cartPreviewModeRef.current) {
       setCartSyncStatus('preview');
       return;
@@ -795,6 +901,7 @@ export default function App({
       void cartHydrateRetryRef.current?.();
       return;
     }
+    cartAutomaticRetryBlockedRef.current = false;
     setCartSyncStatus('saving');
     if (pendingCartSyncRef.current) scheduleCartSync(0);
     else void refreshAccountCart();
@@ -803,6 +910,7 @@ export default function App({
   useEffect(() => {
     if (!customer?.id) return undefined;
     const retryAndRefresh = () => {
+      if (cartAutomaticRetryBlockedRef.current) return;
       if (pendingCartSyncRef.current) scheduleCartSync(0);
       else void refreshAccountCart();
     };
@@ -1274,6 +1382,7 @@ export default function App({
     }
     cartClearIntentRef.current = intent;
     cartClearActivityAtRef.current = clearedAt;
+    cartUndoTokenRef.current = clearedAt;
     setCartItems([]);
     setCartLastActivityAt(null);
     currentCartRef.current = { items: [], activityAt: clearedAt };
@@ -1286,7 +1395,7 @@ export default function App({
   const undoClearCart = useCallback(() => {
     const snapshot = clearedCartSnapshot;
     const belongsToAccount = snapshot?.accountId === cartAccountRef.current;
-    const stillSameClear = snapshot?.clearedAt === cartClearActivityAtRef.current;
+    const stillSameClear = snapshot?.clearedAt === cartUndoTokenRef.current;
     if (!snapshot || !belongsToAccount || !stillSameClear || currentCartRef.current.items.length) {
       setClearedCartSnapshot(null);
       setCartAnnouncement('This basket changed on another device and could not be restored.');
@@ -1295,6 +1404,7 @@ export default function App({
     const restoredAt = Date.now();
     const restoredItems = snapshot.items.map((item) => ({ ...item }));
     cartClearActivityAtRef.current = null;
+    cartUndoTokenRef.current = null;
     cartClearIntentRef.current = 'normal';
     cartRestoreFingerprintRef.current = cartFingerprint(restoredItems);
     setCartItems(restoredItems);
@@ -1642,6 +1752,11 @@ export default function App({
     if (cartPreviewModeRef.current) {
       setCartAnnouncement('Preview basket only — order requests are disabled here.');
       return { ok: false, preview: true };
+    }
+    if (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
+      || cartSyncStatus !== 'saved' || cartFingerprint(cartItems) !== lastSavedCartRef.current) {
+      setCartAnnouncement('Please confirm account basket sync before submitting this order. Your items are kept.');
+      return { ok: false, syncRequired: true };
     }
     const courierChoice = opts?.courierChoice || null;
     const customerNotes = String(opts?.customerNotes || '').trim();
@@ -2241,6 +2356,7 @@ export default function App({
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
+            cartSyncIssue={cartSyncIssue}
             cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
@@ -2358,6 +2474,7 @@ export default function App({
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
+                cartSyncIssue={cartSyncIssue}
                 cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}
