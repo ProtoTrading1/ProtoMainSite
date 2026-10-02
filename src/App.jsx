@@ -587,6 +587,7 @@ export default function App({
     let cancelled = false;
     let hydrationRetryTimer = null;
     let hydrationFailures = 0;
+    let hydrationInFlight = false;
     const previousUid = cartAccountRef.current;
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
@@ -627,6 +628,10 @@ export default function App({
     }
 
     const hydrate = async () => {
+      // Manual retry and the backoff timer must not race account imports.
+      if (cancelled || hydrationInFlight) return;
+      hydrationInFlight = true;
+      setCartSyncStatus('loading');
       try {
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
         const hydratedItems = await hydrateAccountCartItems(accountCart.items);
@@ -703,7 +708,13 @@ export default function App({
           });
         }
         const retryDelay = Math.min(30_000, 3000 * (2 ** Math.min(4, hydrationFailures - 1)));
-        hydrationRetryTimer = window.setTimeout(hydrate, retryDelay);
+        // Repeating an unchanged invalid basket or permission failure cannot
+        // recover it. Leave the local basket intact and offer an explicit retry.
+        if (![400, 401, 403, 413, 422].includes(error?.status)) {
+          hydrationRetryTimer = window.setTimeout(hydrate, retryDelay);
+        }
+      } finally {
+        hydrationInFlight = false;
       }
     };
     cartHydrateRetryRef.current = () => {

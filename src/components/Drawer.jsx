@@ -486,7 +486,11 @@ export default function Drawer({
             <div style={{ width: `${progress}%` }} />
           </div>
         </div>
-        {basketLoading ? (
+        {basketLoading && syncFailed ? (
+          <button className="primary-order-button" type="button" onClick={onRetryCartSync}>
+            Retry account basket sync
+          </button>
+        ) : basketLoading ? (
           <button className="primary-order-button" type="button" disabled>
             <Loader2 size={17} className="spin" />
             Loading account basket…

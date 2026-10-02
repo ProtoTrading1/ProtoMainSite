@@ -1,25 +1,32 @@
 import { authHeaders, refreshAuthHeaders } from './authHeaders';
+import { boundedCartRequest } from './accountCartRequest.mjs';
 
 async function requestAccountCart(method, body) {
-  const request = (headers) => fetch('/api/account-cart', {
-    method,
-    headers,
-    credentials: 'same-origin',
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  return boundedCartRequest(async (signal) => {
+    const request = (headers) => fetch('/api/account-cart', {
+      method,
+      headers,
+      credentials: 'same-origin',
+      signal,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
 
-  let response = await request(await authHeaders());
-  if (response.status === 401) {
-    response = await request(await refreshAuthHeaders());
-  }
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error || 'Account basket could not be saved');
-    error.status = response.status;
-    error.data = data;
-    throw error;
-  }
-  return data;
+    let response = await request(await authHeaders());
+    if (response.status === 401) {
+      response = await request(await refreshAuthHeaders());
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || 'Account basket could not be saved');
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision)) {
+      throw new Error('Account basket response could not be confirmed');
+    }
+    return data;
+  });
 }
 
 export function cartFingerprint(items) {
