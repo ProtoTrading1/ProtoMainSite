@@ -712,7 +712,8 @@ export default function App({
         if (!pendingDraft && localItems.length && cartFingerprint(localItems) !== cartFingerprint(accountCart.items)) {
           // Keep legacy unsaved work before adopting the authoritative account
           // basket. Storage failure must stop recovery, not erase the device.
-          const copy = await preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt);
+          const copy = await preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt,
+            () => !cancelled && cartAccountRef.current === uid);
           if (cancelled || cartAccountRef.current !== uid) return;
           setDeviceBasketCopy(copy);
         }

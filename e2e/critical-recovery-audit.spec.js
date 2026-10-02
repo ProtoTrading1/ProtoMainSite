@@ -1,6 +1,6 @@
 // Local-only regressions derived from reproduced adversarial failures.
 import { expect, test } from '@playwright/test';
-import { ACCOUNT_ID, catalogueProducts, installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
+import { ACCOUNT_ID, TEST_EMAIL, TEST_PASSWORD, catalogueProducts, installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
 
 const copyKey = `proto_cart_device_copy_v1_${ACCOUNT_ID}`;
 const draftKey = 'proto_registration_draft_v1';
@@ -9,6 +9,41 @@ const account = [{ product: products[0], qty: 15 }];
 const local = [...account, { product: products[1], qty: 4 }];
 const drawer = page => page.locator('.order-drawer').filter({ visible: true }).first();
 const openBasket = async page => page.locator('[data-cart-trigger]').filter({ visible: true }).first().click();
+
+test('REGRESSION: logout cancels preservation queued behind a device-copy lock', async ({ page, context }) => {
+  const safety = await installAccessibilityServices(context, { products, cartItems: account });
+  await context.route('**/mock-supabase/auth/v1/logout*', route => route.fulfill({ status: 204, body: '' }));
+  await context.addInitScript(({ local }) => {
+    localStorage.setItem('proto_cart', JSON.stringify(local));
+    localStorage.setItem('proto_cart_last_activity_at', String(Date.now()));
+  }, { local });
+  await page.goto('/');
+  await page.evaluate(async accountId => {
+    let acquired;
+    const started = new Promise(resolve => { acquired = resolve; });
+    const hold = new Promise(resolve => { window.__releasePreserveLock = resolve; });
+    window.__heldPreserveLock = navigator.locks.request(`proto-device-copy-${accountId}`, async () => { acquired(); await hold; });
+    await started;
+  }, ACCOUNT_ID);
+  await page.getByRole('button', { name: /sign in/i }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Welcome back.' });
+  await dialog.getByPlaceholder('name@business.co.za').fill(TEST_EMAIL);
+  await dialog.locator('input[type="password"]').fill(TEST_PASSWORD);
+  await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.locator('.product-card').first()).toBeVisible();
+  await expect.poll(() => page.evaluate(async accountId => (await navigator.locks.query()).pending.filter(lock => lock.name === `proto-device-copy-${accountId}`).length, ACCOUNT_ID)).toBeGreaterThan(0);
+  const logout = page.getByRole('button', { name: /^log out$/i }).filter({ visible: true }).first();
+  if (!(await logout.isVisible())) await page.getByRole('button', { name: 'Categories', exact: true }).click();
+  await logout.click();
+  await expect(page.getByPlaceholder('Name', { exact: true })).toBeVisible();
+  await page.evaluate(async accountId => {
+    window.__releasePreserveLock();
+    await window.__heldPreserveLock;
+    await navigator.locks.request(`proto-device-copy-${accountId}`, () => {});
+  }, ACCOUNT_ID);
+  expect(await page.evaluate(key => localStorage.getItem(key), copyKey)).toBeNull();
+  expect(safety.blockedRequests).toEqual([]);
+});
 
 test('REGRESSION: logout cancels a discard queued behind another tab device-copy lock', async ({ page, context }) => {
   const safety = await installAccessibilityServices(context, { products, cartItems: account });
@@ -138,6 +173,9 @@ test('REGRESSION: stale discard confirmation preserves a newer cross-tab copy', 
   await drawer(other).getByRole('button', { name: 'Review device copy', exact: true }).click();
   await drawer(other).getByRole('button', { name: 'Discard device copy', exact: true }).click();
   await drawer(other).getByRole('button', { name: 'Discard saved device copy', exact: true }).click();
+  // The click starts an asynchronous lock operation. Establish its completed
+  // deletion before writing a new basket or navigating away from this tab.
+  await expect.poll(() => other.evaluate(key => localStorage.getItem(key), copyKey)).toBeNull();
   await other.evaluate(({ local }) => {
     local[1].qty = 99;
     localStorage.setItem('proto_cart', JSON.stringify(local));
@@ -147,12 +185,17 @@ test('REGRESSION: stale discard confirmation preserves a newer cross-tab copy', 
   await expect(other.locator('.product-card').first()).toBeVisible();
   await openBasket(other);
   await drawer(other).getByRole('button', { name: 'Review device copy', exact: true }).click();
-  await expect(drawer(other).getByRole('table')).toContainText('99');
-  await expect(drawer(page).getByRole('table')).not.toContainText('99');
+  await expect.poll(() => other.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null')?.items[1]?.qty, copyKey)).toBe(99);
+  const newerCopyBytes = await other.evaluate(key => localStorage.getItem(key), copyKey);
+  const deviceCell = target => drawer(target).getByRole('row').filter({ hasText: 'E2E-PINK' }).locator('td').first();
+  // The Current column can contain 99 even when preservation was refused and
+  // Device remains 4. Only the Device cell proves the intended precondition.
+  await expect(deviceCell(other)).toHaveText('99');
+  await expect(deviceCell(page)).toHaveText('4');
   await drawer(page).getByRole('button', { name: 'Discard saved device copy', exact: true }).click();
-  expect((await page.evaluate(key => JSON.parse(localStorage.getItem(key)), copyKey)).items[1].qty).toBe(99);
-  await expect(drawer(page).getByRole('table')).toContainText('99');
+  await expect(deviceCell(page)).toHaveText('99');
   await expect(drawer(page).getByRole('button', { name: 'Discard device copy', exact: true })).toBeVisible();
+  expect(await page.evaluate(key => localStorage.getItem(key), copyKey)).toBe(newerCopyBytes);
   await drawer(page).getByRole('button', { name: 'Discard device copy', exact: true }).click();
   await drawer(page).getByRole('button', { name: 'Discard saved device copy', exact: true }).click();
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), copyKey)).toBeNull();

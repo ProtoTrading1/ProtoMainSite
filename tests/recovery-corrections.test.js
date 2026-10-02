@@ -121,6 +121,35 @@ test('queued copy discard rechecks account eligibility inside the acquired lock'
   }
 });
 
+test('cancelled hydration cannot create a device copy after its queued preservation lock opens', async () => {
+  const store = storage();
+  store.setItem('proto_cart', 'untouched canonical basket');
+  const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let active = true;
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {} });
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
+    locks: { request: async (_name, operation) => { await gate; return operation(); } },
+  } });
+  try {
+    const pending = preserveLegacyCartCopy(store, 'a', items, 1, () => active);
+    active = false;
+    release();
+    assert.equal(await pending, null);
+    assert.equal(readLegacyCartCopy(store, 'a'), null);
+    assert.equal(store.getItem('proto_cart'), 'untouched canonical basket');
+    active = true;
+    assert.deepEqual((await preserveLegacyCartCopy(store, 'a', items, 1, () => active)).items, items);
+  } finally {
+    if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor);
+    else delete globalThis.window;
+    if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
+    else delete globalThis.navigator;
+  }
+});
+
 test('draft cleanup can be retried after a denied removal without altering details', () => {
   const store = storage();
   const originalRemove = store.removeItem;

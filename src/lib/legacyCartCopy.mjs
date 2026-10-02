@@ -20,8 +20,8 @@ function withCopyLock(accountId, operation) {
   return locks ? locks.request(`proto-device-copy-${accountId}`, operation) : Promise.resolve().then(operation);
 }
 
-export function preserveLegacyCartCopy(storage, accountId, items, activityAt) {
-  return withCopyLock(accountId, () => preserveCopy(storage, accountId, items, activityAt));
+export function preserveLegacyCartCopy(storage, accountId, items, activityAt, shouldProceed = () => true) {
+  return withCopyLock(accountId, () => shouldProceed() ? preserveCopy(storage, accountId, items, activityAt) : null);
 }
 
 function preserveCopy(storage, accountId, items, activityAt) {
