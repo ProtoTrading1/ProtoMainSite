@@ -5255,3 +5255,7 @@ a.lp-register-login { text-decoration: none; }
     display: none;
   }
 }
+.registration-draft-notice { padding: 16px; margin-bottom: 18px; border: 1px solid #b59456; border-radius: 12px; color: #f5ead8; background: #20180d; }
+.registration-draft-notice p { margin: 8px 0; line-height: 1.5; font-size: 13px; }
+.registration-draft-notice button { min-height: 44px; padding: 8px 12px; margin: 4px 8px 4px 0; border: 1px solid #b59456; border-radius: 8px; color: #f5ead8; background: transparent; cursor: pointer; }
+.registration-draft-notice button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }

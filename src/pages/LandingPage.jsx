@@ -10,6 +10,7 @@ import LandingApplySection from '../components/landing/LandingApplySection';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 import { checkRegistrationEmail } from '../lib/registrationEmailCheck';
+import useRegistrationDraft from '../hooks/useRegistrationDraft';
 import { PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
 import { motion } from 'motion/react';
 import {
@@ -292,6 +293,36 @@ function Questionnaire({ onLogin }) {
   const [emailCheck, setEmailCheck] = useState({ status: 'idle', checkedEmail: '', message: '' });
   const emailCheckSequence = useRef(0);
   const [stepError, setStepError] = useState('');
+  const draft = useRegistrationDraft({
+    step, companyName, contactName, vatNumber, email, phone, whatsappOptIn,
+    country, province, billingStreet, billingSuburb, billingCity, billingPostalCode,
+    deliverySameAsBilling, streetName, suburb, postalCode, city, buildingType,
+    unitNumber, otherBuildingType, tradingChannels, productCategories,
+    otherProductCategory, businessDescription, monthlySpend, website, customerCode,
+  }, done);
+  const restoreDraft = () => {
+    const saved = draft.candidate;
+    if (!saved) return;
+    const setters = {
+      companyName: setCompanyName, contactName: setContactName, vatNumber: setVatNumber,
+      email: setEmail, phone: setPhone, whatsappOptIn: setWhatsappOptIn, country: setCountry,
+      province: setProvince, billingStreet: setBillingStreet, billingSuburb: setBillingSuburb,
+      billingCity: setBillingCity, billingPostalCode: setBillingPostalCode, streetName: setStreetName,
+      suburb: setSuburb, postalCode: setPostalCode, city: setCity, buildingType: setBuildingType,
+      unitNumber: setUnitNumber, otherBuildingType: setOtherBuildingType,
+      tradingChannels: setTradingChannels, productCategories: setProductCategories,
+      otherProductCategory: setOtherProductCategory, businessDescription: setBusinessDescription,
+      monthlySpend: setMonthlySpend, website: setWebsite, customerCode: setCustomerCode,
+    };
+    for (const [field, setter] of Object.entries(setters)) setter(saved[field]);
+    handleDeliverySameAsBillingChange(saved.deliverySameAsBilling);
+    // Re-enter the password on Contact before continuing through restored data.
+    setPassword('');
+    setStep(Math.min(saved.step, 1));
+    setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+    setStepError('Your details were restored. Enter your password again to continue.');
+    draft.restored();
+  };
 
   useEffect(() => {
     trackJourneyEvent('registration_started', { journey: 'registration', step: 'company' });
@@ -454,7 +485,10 @@ function Questionnaire({ onLogin }) {
   };
 
   const handleKey = (e) => {
-    if (e.key === 'Enter') void advance();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!draft.candidate && emailCheck.status !== 'checking' && !submitting) void advance();
+    }
   };
 
   if (done) {
@@ -474,6 +508,13 @@ function Questionnaire({ onLogin }) {
 
   return (
     <div className="lp-quiz">
+      {draft.candidate && <div className="registration-draft-notice" role="status">
+        <strong>Continue your saved application?</strong>
+        <p>Details are kept for 24 hours in this tab. Passwords are never saved.</p>
+        <button type="button" onClick={restoreDraft}>Restore application details</button>
+        <button type="button" onClick={draft.discard}>Discard saved application</button>
+      </div>}
+      {draft.saveFailed && <p role="status">This browser could not save your application details. Keep this page open until you finish.</p>}
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />
@@ -885,7 +926,7 @@ function Questionnaire({ onLogin }) {
         <button
           type="button"
           className="lp-quiz-next"
-          disabled={submitting || emailCheck.status === 'checking' || (step === 1 && emailCheck.status === 'existing')}
+          disabled={Boolean(draft.candidate) || submitting || emailCheck.status === 'checking' || (step === 1 && emailCheck.status === 'existing')}
           onClick={() => void advance()}
         >
           {submitting ? 'Submitting…' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}

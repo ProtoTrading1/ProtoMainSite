@@ -15,6 +15,19 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
   const backdropRef = useRef(null);
   const cardRef = useRef(null);
   const mouseDownOrigin = useRef(null);
+  const requestRef = useRef(null);
+  const attemptRef = useRef(0);
+
+  const closeLogin = () => {
+    attemptRef.current += 1;
+    requestRef.current?.abort();
+    onClose();
+  };
+
+  useEffect(() => () => {
+    attemptRef.current += 1;
+    requestRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement;
@@ -22,6 +35,8 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        attemptRef.current += 1;
+        requestRef.current?.abort();
         onClose();
         return;
       }
@@ -51,22 +66,30 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    const attempt = ++attemptRef.current;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setError(''); setInfo(''); setLoading(true);
     try {
       if (mode === 'forgot') {
         if (!email) { setError('Enter your email address.'); setLoading(false); return; }
         await resetPassword(email);
+        if (controller.signal.aborted || attempt !== attemptRef.current) return;
         setInfo('If an online account exists for that email, we’ll send a reset link. Check your inbox and spam folder.');
         trackJourneyEvent('password_reset_requested', { journey: 'authentication', outcome: 'accepted' });
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
-        const { session } = await signIn(email, password);
+        const { session } = await signIn(email, password, { signal: controller.signal });
+        if (controller.signal.aborted || attempt !== attemptRef.current) return;
         if (session) {
           trackJourneyEvent('login_succeeded', { journey: 'authentication', outcome: 'success' });
           await onLogin(session);
         }
       }
     } catch (err) {
+      if (controller.signal.aborted || attempt !== attemptRef.current) return;
       const raw = err?.message || 'Authentication failed.';
       // Email confirmation was removed — accounts are gated by ADMIN APPROVAL.
       // Supabase can still answer "Email not confirmed" for an account created
@@ -80,7 +103,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         outcome: 'error',
       });
     } finally {
-      setLoading(false);
+      if (attempt === attemptRef.current) setLoading(false);
     }
   };
 
@@ -89,7 +112,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
       className="lm-backdrop"
       ref={backdropRef}
       onMouseDown={(e) => { mouseDownOrigin.current = e.target; }}
-      onClick={() => { if (mouseDownOrigin.current === backdropRef.current) onClose(); }}
+      onClick={() => { if (mouseDownOrigin.current === backdropRef.current) closeLogin(); }}
     >
       <div
         className="lm-card"
@@ -100,7 +123,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         onClick={(event) => event.stopPropagation()}
       >
           {/* Close */}
-          <button className="lm-close" type="button" onClick={onClose} aria-label="Close sign-in">
+          <button className="lm-close" type="button" onClick={closeLogin} aria-label="Close sign-in">
             <X size={18} aria-hidden="true" />
           </button>
 

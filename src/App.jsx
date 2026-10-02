@@ -41,6 +41,7 @@ import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
+import { readLegacyCartCopy, preserveLegacyCartCopy, discardLegacyCartCopy } from './lib/legacyCartCopy.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
@@ -310,6 +311,11 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartSyncIssue, setCartSyncIssue] = useState(null);
+  const [deviceBasketCopy, setDeviceBasketCopy] = useState(() => readLegacyCartCopy(localStorage, customer?.id));
+  const discardDeviceBasketCopy = () => {
+    if (discardLegacyCartCopy(localStorage, customer?.id)) setDeviceBasketCopy(null);
+    else setCartAnnouncement('The device copy could not be discarded. It is still kept here.');
+  };
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -658,6 +664,7 @@ export default function App({
     let localItems = [];
     let localActivityAt = null;
     const pendingDraft = readPendingCart(localStorage, uid);
+    setDeviceBasketCopy(readLegacyCartCopy(localStorage, uid));
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (!owner || owner === uid) {
@@ -694,6 +701,13 @@ export default function App({
       setCartSyncStatus('loading');
       try {
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
+        if (cancelled || cartAccountRef.current !== uid) return;
+        if (!pendingDraft && localItems.length && cartFingerprint(localItems) !== cartFingerprint(accountCart.items)) {
+          // Keep legacy unsaved work before adopting the authoritative account
+          // basket. Storage failure must stop recovery, not erase the device.
+          const copy = preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt);
+          setDeviceBasketCopy(copy);
+        }
         if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
           const draftItems = await hydrateAccountCartItems(pendingDraft.items);
           if (cancelled || cartAccountRef.current !== uid) return;
@@ -2357,6 +2371,8 @@ export default function App({
             cartExpiryTone={cartExpiryTone}
             cartSyncStatus={cartSyncStatus}
             cartSyncIssue={cartSyncIssue}
+            deviceBasketCopy={deviceBasketCopy}
+            onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
             cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
@@ -2475,6 +2491,8 @@ export default function App({
                 cartExpiryTone={cartExpiryTone}
                 cartSyncStatus={cartSyncStatus}
                 cartSyncIssue={cartSyncIssue}
+                deviceBasketCopy={deviceBasketCopy}
+                onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
                 cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}

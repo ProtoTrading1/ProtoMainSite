@@ -1,0 +1,9 @@
+.device-basket-copy { margin: 12px 16px; padding: 14px; border: 1px solid #c6aa7a; border-radius: 12px; background: #fffaf0; color: #3c3020; font-size: 13px; }
+.device-basket-copy p { margin: 8px 0; line-height: 1.5; }
+.device-basket-copy button { min-height: 44px; padding: 8px 12px; margin: 4px 6px 4px 0; border: 1px solid #8a6940; border-radius: 8px; background: white; color: #53391e; cursor: pointer; }
+.device-basket-copy button:focus-visible { outline: 3px solid #9d213b; outline-offset: 2px; }
+.device-basket-copy table { width: 100%; margin: 12px 0; border-collapse: collapse; table-layout: fixed; }
+.device-basket-copy caption { text-align: left; margin-bottom: 8px; }
+.device-basket-copy th, .device-basket-copy td { padding: 8px 4px; text-align: left; border-bottom: 1px solid #e5d5b8; overflow-wrap: anywhere; }
+.device-basket-copy th:first-child { width: 60%; }
+.device-basket-copy th span { display: block; font-weight: normal; font-size: 12px; }

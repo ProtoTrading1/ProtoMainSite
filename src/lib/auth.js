@@ -1,7 +1,10 @@
 import { supabase } from './supabase';
+import { loginTransport } from './loginTransport.mjs';
 
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+export async function signIn(email, password, { signal } = {}) {
+  const { data, error } = await loginTransport.run(
+    () => supabase.auth.signInWithPassword({ email: email.trim(), password }), signal,
+  );
   if (error) throw error;
   return data;
 }

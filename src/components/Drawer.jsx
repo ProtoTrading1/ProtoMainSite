@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
+import DeviceBasketCopy from './DeviceBasketCopy';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
@@ -118,6 +119,8 @@ export default function Drawer({
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
   cartSyncIssue = null,
+  deviceBasketCopy = null,
+  onDiscardDeviceBasketCopy,
   cartPreviewMode = false,
   priceChanges = [],
   onDismissPriceChanges,
@@ -380,6 +383,8 @@ export default function Drawer({
           <div style={{ width: `${Math.max(0, Math.min(100, autoCloseProgress))}%` }} />
         </div>
       )}
+
+      <DeviceBasketCopy copy={deviceBasketCopy} currentItems={cartItems} onDiscard={onDiscardDeviceBasketCopy} />
 
       {syncFailed && (
         <div className="cart-sync-alert" role="alert">
