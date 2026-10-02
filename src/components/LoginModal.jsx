@@ -61,7 +61,6 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    window.requestAnimationFrame(() => cardRef.current?.querySelector('input')?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
