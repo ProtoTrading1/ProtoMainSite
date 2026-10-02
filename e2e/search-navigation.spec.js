@@ -29,7 +29,7 @@ function json(route, body, status = 200) {
 
 function tokenFor(user) {
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.synthetic`;
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.${encode('synthetic-signature')}`;
 }
 
 async function installSyntheticServices(context, { delayedCatalogueResponse, taxonomy = [], catalogue = catalogueProducts } = {}) {

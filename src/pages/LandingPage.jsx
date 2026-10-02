@@ -501,6 +501,10 @@ function Questionnaire({ onLogin }) {
             ? `Welcome back, ${contactName}. Your email is on our active trade list — sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
+        {draft.completionCleanupFailed && <div role="alert">
+          <p>Your application was received, but this browser could not remove your saved details. Keep this tab private until they are removed.</p>
+          <button type="button" onClick={draft.retryCompletionCleanup}>Remove saved application details</button>
+        </div>}
         <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );
@@ -515,6 +519,7 @@ function Questionnaire({ onLogin }) {
         <button type="button" onClick={draft.discard}>Discard saved application</button>
       </div>}
       {draft.saveFailed && <p role="status">This browser could not save your application details. Keep this page open until you finish.</p>}
+      {draft.discardFailed && <p role="alert">Your saved application could not be discarded. It is still in this tab. Keep this tab private and try again.</p>}
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />

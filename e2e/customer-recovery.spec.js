@@ -36,7 +36,7 @@ test('legacy device copy survives account adoption, reload, review, Cancel and e
   expect((await read()).items).toEqual(local);
   await drawer.getByRole('button', { name: 'Discard device copy', exact: true }).click();
   await drawer.getByRole('button', { name: 'Discard saved device copy', exact: true }).click();
-  expect(await read()).toBeNull();
+  await expect.poll(read).toBeNull();
   await expect(drawer.locator('[data-cart-product-id]')).toHaveCount(1);
 });
 

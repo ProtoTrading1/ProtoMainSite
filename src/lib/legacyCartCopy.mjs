@@ -15,7 +15,16 @@ export function readLegacyCartCopy(storage, accountId) {
   } catch { return null; }
 }
 
+function withCopyLock(accountId, operation) {
+  const locks = typeof window === 'undefined' ? null : globalThis.navigator?.locks;
+  return locks ? locks.request(`proto-device-copy-${accountId}`, operation) : Promise.resolve().then(operation);
+}
+
 export function preserveLegacyCartCopy(storage, accountId, items, activityAt) {
+  return withCopyLock(accountId, () => preserveCopy(storage, accountId, items, activityAt));
+}
+
+function preserveCopy(storage, accountId, items, activityAt) {
   const existing = readLegacyCartCopy(storage, accountId);
   if (existing && quantities(existing.items) === quantities(items)) return existing;
   const copy = { accountId, items, activityAt, savedAt: Date.now() };
@@ -23,7 +32,17 @@ export function preserveLegacyCartCopy(storage, accountId, items, activityAt) {
   try {
     // If an earlier different/corrupt copy exists, leave both that copy and
     // today's canonical device basket untouched for review.
-    if (storage.getItem(`${prefix}${accountId}`) !== null) throw new Error('A different device copy is already kept');
+    const previous = storage.getItem(`${prefix}${accountId}`);
+    if (previous !== null) {
+      if (existing) throw new Error('A different device copy is already kept');
+      // Keep unreadable bytes separately before replacing the broken slot.
+      // A verified archive avoids trapping an otherwise valid local basket.
+      const archiveKey = `${prefix}${accountId}_unreadable_${Date.now()}_${globalThis.crypto.randomUUID()}`;
+      storage.setItem(archiveKey, previous);
+      if (storage.getItem(archiveKey) !== previous || storage.getItem(`${prefix}${accountId}`) !== previous) {
+        throw new Error('Unreadable copy could not be retained');
+      }
+    }
     storage.setItem(`${prefix}${accountId}`, encoded);
     if (storage.getItem(`${prefix}${accountId}`) !== encoded) throw new Error('Copy not confirmed');
     return copy;
@@ -35,8 +54,14 @@ export function preserveLegacyCartCopy(storage, accountId, items, activityAt) {
   }
 }
 
-export function discardLegacyCartCopy(storage, accountId) {
+export function discardLegacyCartCopy(storage, accountId, expectedCopy, shouldProceed = () => true) {
+  return withCopyLock(accountId, () => shouldProceed() && discardCopy(storage, accountId, expectedCopy));
+}
+
+function discardCopy(storage, accountId, expectedCopy) {
   try {
+    const current = readLegacyCartCopy(storage, accountId);
+    if (!expectedCopy || !current || JSON.stringify(current) !== JSON.stringify(expectedCopy)) return false;
     storage.removeItem(`${prefix}${accountId}`);
     return storage.getItem(`${prefix}${accountId}`) === null;
   } catch { return false; }

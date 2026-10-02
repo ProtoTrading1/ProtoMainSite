@@ -44,27 +44,27 @@ test('password transport consumes the entire body before the SDK can persist suc
   assert.equal(persisted, false);
 });
 
-test('password transport leaves non-password Supabase requests unchanged', async () => {
+test('auth transport leaves unrelated Supabase requests unchanged', async () => {
   const response = new Response('unchanged');
   const transport = createLoginTransport(async () => response);
-  assert.equal(await transport.fetch('https://example.invalid/auth/v1/token?grant_type=refresh_token'), response);
+  assert.equal(await transport.fetch('https://example.invalid/rest/v1/customers'), response);
 });
 
-test('legacy copy preserves quantities/preferences across reload and account isolation', () => {
+test('legacy copy preserves quantities/preferences across reload and account isolation', async () => {
   const store = storage();
-  const copy = preserveLegacyCartCopy(store, 'account-a', items, 123);
+  const copy = await preserveLegacyCartCopy(store, 'account-a', items, 123);
   assert.deepEqual(readLegacyCartCopy(store, 'account-a'), copy);
   assert.equal(readLegacyCartCopy(store, 'account-b'), null);
-  assert.throws(() => preserveLegacyCartCopy(store, 'account-a', [{ ...items[0], qty: 1 }], 456), { code: 'cart_device_storage' });
+  await assert.rejects(() => preserveLegacyCartCopy(store, 'account-a', [{ ...items[0], qty: 1 }], 456), { code: 'cart_device_storage' });
   assert.deepEqual(readLegacyCartCopy(store, 'account-a').items, items);
   store.setItem('proto_cart', 'current-account-copy');
-  assert.equal(discardLegacyCartCopy(store, 'account-a'), true);
+  assert.equal(await discardLegacyCartCopy(store, 'account-a', copy), true);
   assert.equal(store.getItem('proto_cart'), 'current-account-copy');
 });
 
-test('failed device storage prevents basket adoption', () => {
+test('failed device storage prevents basket adoption', async () => {
   const store = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
-  assert.throws(() => preserveLegacyCartCopy(store, 'account-a', items, 123), { code: 'cart_device_storage' });
+  await assert.rejects(() => preserveLegacyCartCopy(store, 'account-a', items, 123), { code: 'cart_device_storage' });
 });
 
 test('registration draft only stores permitted nonsecret fields and expires after 24 hours', () => {

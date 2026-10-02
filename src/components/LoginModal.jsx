@@ -12,13 +12,17 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const backdropRef = useRef(null);
   const cardRef = useRef(null);
   const mouseDownOrigin = useRef(null);
   const requestRef = useRef(null);
   const attemptRef = useRef(0);
+  const committingRef = useRef(false);
+  const submittingRef = useRef(false);
 
   const closeLogin = () => {
+    if (committingRef.current) return;
     attemptRef.current += 1;
     requestRef.current?.abort();
     onClose();
@@ -35,6 +39,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (committingRef.current) return;
         attemptRef.current += 1;
         requestRef.current?.abort();
         onClose();
@@ -66,7 +71,8 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     const attempt = ++attemptRef.current;
     requestRef.current?.abort();
     const controller = new AbortController();
@@ -81,7 +87,10 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         trackJourneyEvent('password_reset_requested', { journey: 'authentication', outcome: 'accepted' });
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
-        const { session } = await signIn(email, password, { signal: controller.signal });
+        const { session } = await signIn(email, password, {
+          signal: controller.signal,
+          onCommit: () => { committingRef.current = true; setCommitting(true); },
+        });
         if (controller.signal.aborted || attempt !== attemptRef.current) return;
         if (session) {
           trackJourneyEvent('login_succeeded', { journey: 'authentication', outcome: 'success' });
@@ -103,6 +112,9 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         outcome: 'error',
       });
     } finally {
+      submittingRef.current = false;
+      committingRef.current = false;
+      setCommitting(false);
       if (attempt === attemptRef.current) setLoading(false);
     }
   };
@@ -123,7 +135,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         onClick={(event) => event.stopPropagation()}
       >
           {/* Close */}
-          <button className="lm-close" type="button" onClick={closeLogin} aria-label="Close sign-in">
+          <button className="lm-close" type="button" onClick={closeLogin} aria-label="Close sign-in" disabled={committing}>
             <X size={18} aria-hidden="true" />
           </button>
 
@@ -169,7 +181,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
                 <div className="lm-label-row">
                   <label htmlFor="login-password">Password</label>
                   {mode === 'login' && (
-                    <button type="button" className="lm-forgot-link" onClick={() => { setMode('forgot'); setError(''); setInfo(''); }}>
+                    <button type="button" className="lm-forgot-link" disabled={loading} onClick={() => { setMode('forgot'); setError(''); setInfo(''); }}>
                       Forgot password?
                     </button>
                   )}
@@ -203,7 +215,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
             <button type="submit" className="lm-submit" disabled={loading}>
               {loading
-                ? (mode === 'forgot' ? 'Sending…' : 'Signing in…')
+                ? (committing ? 'Finishing sign in…' : mode === 'forgot' ? 'Sending…' : 'Signing in…')
                 : mode === 'forgot' ? 'Send reset link'
                 : 'Sign in'}
             </button>
@@ -211,7 +223,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
           {/* Back to login link when in forgot mode */}
           {mode === 'forgot' && (
-            <button type="button" className="lm-toggle" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
+            <button type="button" className="lm-toggle" disabled={loading} onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
               ← Back to sign in
             </button>
           )}
@@ -221,7 +233,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
             <div className="lm-account-options" aria-label="Other account options">
               <p><strong>Bought from Proto before, but not online?</strong> Re-register for the new website.</p>
               <p><strong>New trade customer?</strong> Apply for online trade access.</p>
-              <button type="button" className="lm-apply-link" onClick={onApply}>
+              <button type="button" className="lm-apply-link" onClick={onApply} disabled={loading}>
                 Re-register or apply
               </button>
             </div>

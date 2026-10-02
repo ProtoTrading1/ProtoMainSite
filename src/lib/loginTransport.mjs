@@ -1,8 +1,14 @@
 import { boundedRequest } from './boundedRequest.mjs';
 
-export function createLoginTransport(fetchImpl) {
+export function createLoginTransport(fetchImpl, { timeoutMs = 15000 } = {}) {
   let attemptSignal = null;
+  let committing = false;
   return {
+    async commit(saveSession) {
+      if (committing) throw new Error('Sign in is already finishing.');
+      committing = true;
+      try { return await saveSession(); } finally { committing = false; }
+    },
     async run(signIn, signal) {
       // Password attempts are serialized; a cancelled predecessor must finish
       // before the provider can dispatch another password request.
@@ -21,17 +27,22 @@ export function createLoginTransport(fetchImpl) {
     async fetch(input, init = {}) {
       const url = typeof input === 'string' ? input : input?.url || String(input);
       // Other Supabase requests keep their existing behavior and timeout rules.
-      if (!/\/auth\/v1\/token(?:\?|$)/.test(url) || !/[?&]grant_type=password(?:&|$)/.test(url)) {
+      const passwordRequest = /\/auth\/v1\/token(?:\?|$)/.test(url) && /[?&]grant_type=password(?:&|$)/.test(url);
+      const refreshRequest = /\/auth\/v1\/token(?:\?|$)/.test(url) && /[?&]grant_type=refresh_token(?:&|$)/.test(url);
+      const commitVerification = committing && /\/auth\/v1\/user(?:\?|$)/.test(url);
+      if (!passwordRequest && !refreshRequest && !commitVerification) {
         return fetchImpl(input, init);
       }
-      const callerSignal = attemptSignal || init.signal;
+      const callerSignal = passwordRequest ? attemptSignal || init.signal : init.signal;
       return boundedRequest(async (signal) => {
         const response = await fetchImpl(input, { ...init, signal });
         // Consume the body inside the deadline before the SDK sees a success
         // and persists its session. Cancel/late responses cannot sign in later.
         const bytes = await response.arrayBuffer();
         return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
-      }, { signal: callerSignal, timeoutMessage: 'Sign in timed out. Check your connection and try again.' });
+      }, { signal: callerSignal, timeoutMs, timeoutMessage: refreshRequest
+        ? 'Session recovery timed out. Check your connection and try again.'
+        : 'Sign in timed out. Check your connection and try again.' });
     },
   };
 }

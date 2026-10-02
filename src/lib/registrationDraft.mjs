@@ -36,5 +36,8 @@ export function saveRegistrationDraft(storage, values, now = Date.now()) {
 }
 
 export function clearRegistrationDraft(storage) {
-  try { storage.removeItem(REGISTRATION_DRAFT_KEY); } catch { /* private browsing */ }
+  try {
+    storage.removeItem(REGISTRATION_DRAFT_KEY);
+    return storage.getItem(REGISTRATION_DRAFT_KEY) === null;
+  } catch { return false; }
 }

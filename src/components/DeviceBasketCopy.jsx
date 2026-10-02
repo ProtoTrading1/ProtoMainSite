@@ -24,11 +24,11 @@ export default function DeviceBasketCopy({ copy, currentItems, onDiscard }) {
             return <tr key={`${id}-${index}`}><th scope="row">{item.product.code || id}<span>{item.product.name}</span>{item.preference && <span>{item.preference}</span>}</th><td>{item.qty}</td><td>{match?.qty || 0}</td></tr>;
           })}</tbody>
         </table>
-        {confirmDiscard ? <div>
+        {confirmDiscard === copy ? <div>
           <p>Discard only this saved device copy? Your current basket stays as it is.</p>
-          <button type="button" onClick={onDiscard}>Discard saved device copy</button>
+          <button type="button" onClick={() => onDiscard(copy)}>Discard saved device copy</button>
           <button type="button" onClick={() => setConfirmDiscard(false)}>Cancel</button>
-        </div> : <button type="button" onClick={() => setConfirmDiscard(true)}>Discard device copy</button>}
+        </div> : <button type="button" onClick={() => setConfirmDiscard(copy)}>Discard device copy</button>}
       </>}
     </section>
   );

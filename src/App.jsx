@@ -312,10 +312,6 @@ export default function App({
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartSyncIssue, setCartSyncIssue] = useState(null);
   const [deviceBasketCopy, setDeviceBasketCopy] = useState(() => readLegacyCartCopy(localStorage, customer?.id));
-  const discardDeviceBasketCopy = () => {
-    if (discardLegacyCartCopy(localStorage, customer?.id)) setDeviceBasketCopy(null);
-    else setCartAnnouncement('The device copy could not be discarded. It is still kept here.');
-  };
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -359,6 +355,17 @@ export default function App({
   const lastCheckoutOptionsRef = useRef(null);
   const lastCheckoutSubmissionRef = useRef(null);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
+  const discardDeviceBasketCopy = useCallback(async expectedCopy => {
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    const removed = await discardLegacyCartCopy(localStorage, customer?.id, expectedCopy,
+      () => cartAccountRef.current === expectedCopy?.accountId);
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    if (removed) setDeviceBasketCopy(null);
+    else {
+      setDeviceBasketCopy(readLegacyCartCopy(localStorage, customer?.id));
+      setCartAnnouncement('The device copy changed or could not be discarded. Review the latest copy before trying again.');
+    }
+  }, [customer?.id]);
   useEffect(() => {
     const submittedFingerprint = lastCheckoutSubmissionRef.current?.fingerprint;
     if (!submittedFingerprint || cartFingerprint(cartItems) !== submittedFingerprint) {
@@ -705,7 +712,8 @@ export default function App({
         if (!pendingDraft && localItems.length && cartFingerprint(localItems) !== cartFingerprint(accountCart.items)) {
           // Keep legacy unsaved work before adopting the authoritative account
           // basket. Storage failure must stop recovery, not erase the device.
-          const copy = preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt);
+          const copy = await preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt);
+          if (cancelled || cartAccountRef.current !== uid) return;
           setDeviceBasketCopy(copy);
         }
         if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
@@ -823,6 +831,7 @@ export default function App({
 
     return () => {
       cancelled = true;
+      if (cartAccountRef.current === uid) cartAccountRef.current = null;
       if (hydrationRetryTimer) window.clearTimeout(hydrationRetryTimer);
       cartHydrateRetryRef.current = null;
     };
