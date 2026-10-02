@@ -117,6 +117,7 @@ export default function Drawer({
   cartExpiryRemainingMs = null,
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
+  cartSyncIssue = null,
   cartPreviewMode = false,
   priceChanges = [],
   onDismissPriceChanges,
@@ -346,7 +347,7 @@ export default function Drawer({
           )}
         </div>
         <div className="drawer-header-actions">
-          {isReady && <span className="ready-pill">Ready</span>}
+          {isReady && cartReady && cartSyncStatus === 'saved' && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <>
               <span className="cart-saved-pill">{syncLabel}</span>
@@ -385,7 +386,8 @@ export default function Drawer({
           <ShieldAlert size={18} aria-hidden="true" />
           <div>
             <strong>Basket sync needs attention</strong>
-            <span>We cannot confirm this basket on your account. Retry before switching devices.</span>
+            <span>{cartSyncIssue?.detail || 'We cannot confirm this basket on your account. Retry before switching devices.'}</span>
+            {cartSyncIssue?.code && <span>Support code: {cartSyncIssue.code}</span>}
           </div>
           <button type="button" onClick={onRetryCartSync}>Retry sync</button>
         </div>
@@ -480,13 +482,17 @@ export default function Drawer({
         <div className="minimum-card">
           <div className="minimum-copy">
             <span>{isReady ? 'Minimum reached' : 'Minimum order'}</span>
-            <strong>{isReady ? 'Ready to submit' : `R${remaining.toFixed(2)} remaining`}</strong>
+            <strong>{isReady ? (cartSyncStatus === 'saved' ? 'Ready to submit' : 'Account sync required') : `R${remaining.toFixed(2)} remaining`}</strong>
           </div>
           <div className="progress-track" role="progressbar" aria-label="Minimum order progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(progress)}>
             <div style={{ width: `${progress}%` }} />
           </div>
         </div>
-        {basketLoading ? (
+        {syncFailed ? (
+          <button className="primary-order-button" type="button" onClick={onRetryCartSync}>
+            Retry account basket sync
+          </button>
+        ) : basketLoading ? (
           <button className="primary-order-button" type="button" disabled>
             <Loader2 size={17} className="spin" />
             Loading account basket…
@@ -495,6 +501,11 @@ export default function Drawer({
           <button className="primary-order-button" type="button" disabled aria-label="Preview basket only — ordering disabled">
             <ShoppingCart size={17} />
             Preview basket — ordering disabled
+          </button>
+        ) : cartSyncStatus === 'saving' ? (
+          <button className="primary-order-button" type="button" disabled>
+            <Loader2 size={17} className="spin" />
+            Saving account basket…
           </button>
         ) : isReady ? (
           <button className="primary-order-button" onClick={handleSubmitClick} type="button">

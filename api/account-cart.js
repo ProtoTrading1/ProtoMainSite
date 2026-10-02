@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
+import { cartSyncFailure } from '../src/lib/cartSyncRecovery.mjs';
 
 const MAX_LINES = 250;
 const MAX_QTY = 9999;
 const MAX_IDENTIFIER_LENGTH = 160;
 const MIN_ACTIVITY_AT = Date.UTC(2000, 0, 1);
-const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const CART_COLUMNS = 'items, activity_at, revision';
 
 export const config = {
@@ -135,11 +135,13 @@ function validateRevision(value, required) {
 function validateActivityAt(value, { required, now }) {
   if ((value === undefined || value === null) && !required) return null;
   if (!Number.isSafeInteger(value)
-    || value < MIN_ACTIVITY_AT
-    || value > now + MAX_CLOCK_SKEW_MS) {
+    || value < MIN_ACTIVITY_AT) {
     throw inputError('Basket activity time is invalid');
   }
-  return value;
+  // Device clocks are not authoritative. Future activity must not lock an
+  // otherwise valid basket out of sync or extend retention indefinitely.
+  // Cross-device ordering remains governed by revision, never this timestamp.
+  return Math.min(value, now);
 }
 
 export function parseCartMutation(body, { method = 'PUT', now = Date.now() } = {}) {
@@ -304,7 +306,10 @@ export default async function handler(req, res) {
   try {
     mutation = parseCartMutation(req.body, { method: req.method });
   } catch (error) {
-    return res.status(error?.status || 400).json({ error: error?.message || 'Invalid basket payload' });
+    const failure = cartSyncFailure(error);
+    // Categories only: no account identifiers, SKU, quantities or basket data.
+    console.warn('account-cart validation rejected:', failure.code);
+    return res.status(error?.status || 400).json({ error: error?.message || 'Invalid basket payload', code: failure.code });
   }
 
   const { data: current, error: readError } = await loadCurrentCart(supabase, customerId);
