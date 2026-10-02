@@ -1,19 +1,9 @@
+import { analyticsSessionId } from './analyticsSession.js';
 // Search event logging for the trade portal — fire-and-forget via /api/search-analytics.
 
 const STOPWORDS = new Set(['a', 'an', 'the', 'for', 'of', 'in', 'on', 'at', 'to', 'and', 'or', 'with']);
 
-function getSessionId() {
-  try {
-    let sid = sessionStorage.getItem('proto_search_session');
-    if (!sid) {
-      sid = crypto.randomUUID();
-      sessionStorage.setItem('proto_search_session', sid);
-    }
-    return sid;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
+const getSessionId = analyticsSessionId;
 
 async function postAnalytics(payload) {
   try {

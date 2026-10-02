@@ -137,7 +137,7 @@ export default function CustomerJourneyPrompt({
           className="customer-journey-prompt__close"
           type="button"
           onClick={onDismiss}
-          aria-label={state.action === 'search' ? 'Dismiss search tip' : presentation === 'basket' ? 'Close basket reminder and continue shopping' : 'Dismiss customer message'}
+          aria-label={state.dismissLabel || (state.action === 'search' ? 'Dismiss search tip' : presentation === 'basket' ? 'Close basket reminder and continue shopping' : 'Dismiss customer message')}
         >
           <X size={19} strokeWidth={2} aria-hidden="true" />
         </button>

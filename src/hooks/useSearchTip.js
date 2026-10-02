@@ -1,3 +1,4 @@
+import { trackShoppingEvent } from '../lib/shoppingAnalytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SEEN = 'proto_search_tip_seen_v1';
@@ -105,9 +106,11 @@ export default function useSearchTip({ accountId, ready, browsing, searched, eng
       if (!visit.initial && !read(localStorage, SEEN)) {
         visit.initial = true;
         write(localStorage, SEEN, true);
+        trackShoppingEvent('search_tip_shown', { tipStage: 'initial' });
         setStage('initial');
       } else if (!visit.reminder && Date.now() - visit.startedAt >= REMINDER_MS) {
         visit.reminder = true;
+        trackShoppingEvent('search_tip_shown', { tipStage: 'reminder' });
         setStage('reminder');
       } else return;
       write(sessionStorage, `${VISIT}:${accountId}`, visit);
@@ -139,10 +142,11 @@ export default function useSearchTip({ accountId, ready, browsing, searched, eng
     };
   }, [stage]);
 
-  const dismiss = useCallback(() => {
+  const dismiss = useCallback((reason = 'dismissed') => {
+    if (stage) trackShoppingEvent(reason === 'try_search' ? 'search_tip_search_clicked' : 'search_tip_dismissed', { tipStage: stage });
     write(localStorage, DISMISSED, true);
     stop();
-  }, [stop]);
+  }, [stop, stage]);
   return { state: stage ? {
     presentation: 'toast', action: 'search', anchorTop, anchorLeft, anchorWidth, eyebrow: stage === 'reminder' ? 'SEARCH TIP' : 'PROTO SEARCH',
     title: 'Find more with Proto search',

@@ -50,13 +50,14 @@ export async function installAccessibilityServices(context, { products = catalog
     }
     if (path === '/api/products') return json(products);
     if (path === '/api/featured-products') return json({ items: products.map(({ sku }) => ({ sku })) });
+    if (path === '/api/personalised-arrivals') return json({ suggestions: [] });
     if (path === '/api/taxonomy') return json({ categories: [] });
     if (path === '/api/stock') return json({ qty: 100, to_order: false });
     if (path === '/api/extended-range') return json({ products: [], total: 0, page: 1, pageSize: 24, catalogue: [], tiles: [] });
     if (path === '/api/specials') return json({ specials: [] });
     if (path === '/api/banner' || path === '/api/popup-special') return json(null);
     if (path === '/api/sort-orders') return json({});
-    if (['/api/journey-analytics', '/api/presence', '/api/search-analytics', '/api/track-event'].includes(path)) return json({ ok: true });
+    if (['/api/shopping-events', '/api/journey-analytics', '/api/presence', '/api/search-analytics', '/api/track-event'].includes(path)) return json({ ok: true });
     safety.blockedRequests.push(`${request.method()} ${path}`);
     return json({ error: 'Blocked by accessibility fixture' }, 503);
   });

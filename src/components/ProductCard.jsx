@@ -1,3 +1,4 @@
+import { trackShoppingPreview, closeShoppingPreview, releaseUnmountedPreview } from '../lib/shoppingAnalytics';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, ImageOff, Link, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
@@ -396,6 +397,16 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
   const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
+  const analyticsViewed = useRef(false);
+  useEffect(() => {
+    if (!zoomOpen) { analyticsViewed.current = false; return undefined; }
+    if (analyticsViewed.current) return undefined;
+    const timer = window.setTimeout(() => {
+      analyticsViewed.current = true;
+      trackShoppingPreview(product);
+    }, 100);
+    return () => { window.clearTimeout(timer); releaseUnmountedPreview(product); };
+  }, [zoomOpen, product]);
   const [focusOptionsOnOpen, setFocusOptionsOnOpen] = useState(initialFocusOptions);
   const [selectedVariant, setSelectedVariant] = useState(() => initialVariantForProduct(product));
   const [activeImageIdx, setActiveImageIdx] = useState(0);
@@ -480,11 +491,12 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const openPreview = () => showPreview(false);
   const openOptions = () => showPreview(true);
   const closePreview = useCallback(() => {
+    closeShoppingPreview(product);
     setZoomOpen(false);
     setFocusOptionsOnOpen(false);
     setSelectedVariant(null);
     onZoomClose?.();
-  }, [onZoomClose]);
+  }, [onZoomClose, product]);
 
   const handleAdd = () => {
     if (isVariantGroup) {

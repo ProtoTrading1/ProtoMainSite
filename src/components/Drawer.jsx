@@ -110,6 +110,7 @@ export default function Drawer({
   updateQty,
   clearCart,
   sendOrderEmail,
+  onCheckoutReview,
   customer,
   autoCloseProgress = 0,
   showAutoCloseBar = false,
@@ -223,6 +224,7 @@ export default function Drawer({
   }, [revealItemRequest, onRevealItemHandled]);
 
   const handleSubmitClick = () => {
+    onCheckoutReview?.();
     setShowCheckoutModal(true);
   };
 

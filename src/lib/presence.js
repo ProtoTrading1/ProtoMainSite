@@ -1,3 +1,4 @@
+import { analyticsSessionId } from './analyticsSession.js';
 /**
  * Presence heartbeat — tells the admin dashboard this customer is browsing.
  *
@@ -18,16 +19,7 @@
  * their last beat, and that window must stay at least two beats wide.
  */
 export const HEARTBEAT_MS = 60000;
-const SESSION_KEY = 'proto_journey_session';
-
-/** Reuses the journey session id so one tab reads as one session in both places. */
-function presenceSessionId() {
-  try {
-    return window.sessionStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
-}
+const presenceSessionId = analyticsSessionId;
 
 async function supabaseAccessToken() {
   try {

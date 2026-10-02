@@ -1,19 +1,6 @@
-const SESSION_KEY = 'proto_journey_session';
+import { analyticsSessionId } from './analyticsSession.js';
+const journeySessionId = analyticsSessionId;
 
-function journeySessionId() {
-  try {
-    let id = window.sessionStorage.getItem(SESSION_KEY);
-    if (!id) {
-      id = window.crypto.randomUUID();
-      window.sessionStorage.setItem(SESSION_KEY, id);
-    }
-    return id;
-  } catch {
-    return typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : null;
-  }
-}
 /**
  * Privacy-safe customer-journey event. Never include names, email addresses,
  * phone numbers, addresses, product lines, free-text notes or search terms.
