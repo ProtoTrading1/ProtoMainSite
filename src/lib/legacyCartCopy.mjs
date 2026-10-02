@@ -1,3 +1,5 @@
+import { validStoredCartItems } from './cartStorage.mjs';
+
 const prefix = 'proto_cart_device_copy_v1_';
 const quantities = (items) => JSON.stringify(items.map((item) => [
   String(item?.product?.id || item?.product?.sku || item?.product?.code || ''),
@@ -8,9 +10,7 @@ export function readLegacyCartCopy(storage, accountId) {
   if (!accountId) return null;
   try {
     const copy = JSON.parse(storage.getItem(`${prefix}${accountId}`) || 'null');
-    if (copy?.accountId !== accountId || !Array.isArray(copy.items) || !copy.items.length
-      || copy.items.length > 250 || !copy.items.every((item) => item?.product
-        && Number.isSafeInteger(item.qty) && item.qty > 0)) return null;
+    if (copy?.accountId !== accountId || !validStoredCartItems(copy.items) || !copy.items.length) return null;
     return copy;
   } catch { return null; }
 }
