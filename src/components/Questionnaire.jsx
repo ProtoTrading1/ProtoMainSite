@@ -9,10 +9,10 @@ import { PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
 const STEP_LABELS = ['Company', 'Contact', 'Addresses', 'Additional'];
 
 const MONTHLY_SPEND_BANDS = [
-  'R0 – R5,000',
-  'R5,000 – R10,000',
-  'R10,000 – R25,000',
-  'R25,000 – R50,000',
+  'R0 â€“ R5,000',
+  'R5,000 â€“ R10,000',
+  'R10,000 â€“ R25,000',
+  'R25,000 â€“ R50,000',
   'R50,000+',
 ];
 
@@ -30,6 +30,7 @@ export default function Questionnaire({ onLogin }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
+  const [notificationSent, setNotificationSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -178,6 +179,7 @@ export default function Questionnaire({ onLogin }) {
       customerCode: upperOrNull(customerCode),
       });
       setInstantAccess(Boolean(result?.instantAccess));
+      setNotificationSent(result?.notificationSent === true);
       setDone(true);
     } catch (err) {
       setSubmitError(err.message || 'Something went wrong. Please try again.');
@@ -197,9 +199,14 @@ export default function Questionnaire({ onLogin }) {
         <h3>{instantAccess ? "You're approved" : 'Application received'}</h3>
         <p>
           {instantAccess
-            ? `Welcome back, ${contactName}. Your trade account is approved — sign in with ${email.trim()} to access the catalogue.`
+            ? `Welcome back, ${contactName}. Your trade account is approved â€” sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
+        {!notificationSent && (
+          <p className="lp-quiz-error" role="alert">
+            Your application was saved, but we could not confirm the email notification. Please contact online@proto.co.za if you do not hear from us.
+          </p>
+        )}
         <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );
@@ -212,7 +219,7 @@ export default function Questionnaire({ onLogin }) {
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />
         ))}
       </div>
-      <p className="lp-quiz-step-label">Step {step + 1} of {STEP_LABELS.length} — {STEP_LABELS[step]}</p>
+      <p className="lp-quiz-step-label">Step {step + 1} of {STEP_LABELS.length} â€” {STEP_LABELS[step]}</p>
 
       <motion.div
         key={step}
@@ -336,7 +343,7 @@ export default function Questionnaire({ onLogin }) {
                           transition: 'all 0.15s',
                         }}
                       >
-                        {whatsappOptIn === true ? '✓ Yes, send updates' : 'Yes, send updates'}
+                        {whatsappOptIn === true ? 'âœ“ Yes, send updates' : 'Yes, send updates'}
                       </button>
                       <button
                         type="button"
@@ -352,7 +359,7 @@ export default function Questionnaire({ onLogin }) {
                           transition: 'all 0.15s',
                         }}
                       >
-                        {whatsappOptIn === false ? '✓ No WhatsApp updates' : 'No WhatsApp updates'}
+                        {whatsappOptIn === false ? 'âœ“ No WhatsApp updates' : 'No WhatsApp updates'}
                       </button>
                     </div>
                   </div>
@@ -445,7 +452,7 @@ export default function Questionnaire({ onLogin }) {
             </div>
             <div style={{ height: '18px' }} />
             <div id="questionnaire-trading-channel-label" className="lp-quiz-question-label">
-              1. How do you trade? <span>(required — select all that apply)</span>
+              1. How do you trade? <span>(required â€” select all that apply)</span>
             </div>
             <div className="lp-quiz-types" role="group" aria-labelledby="questionnaire-trading-channel-label" aria-required="true">
               {TRADING_CHANNELS.map((channel) => {
@@ -463,7 +470,7 @@ export default function Questionnaire({ onLogin }) {
               );})}
             </div>
             <div id="questionnaire-product-category-label" className="lp-quiz-question-label lp-quiz-question-label--second">
-              2. What do you mainly sell? <span>(required — select all that apply)</span>
+              2. What do you mainly sell? <span>(required â€” select all that apply)</span>
             </div>
             <div className="lp-quiz-types" role="group" aria-labelledby="questionnaire-product-category-label" aria-required="true">
               {PRODUCT_CATEGORIES.map((category) => {
@@ -503,7 +510,7 @@ export default function Questionnaire({ onLogin }) {
                 maxLength={400}
                 required
               />
-              <span className="lp-quiz-field-help">Minimum 20 characters · {businessDescription.length}/400</span>
+              <span className="lp-quiz-field-help">Minimum 20 characters Â· {businessDescription.length}/400</span>
             </div>
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
               <label>Website or social media <span style={{ opacity: 0.55, fontWeight: 400 }}>(optional)</span></label>
@@ -539,7 +546,7 @@ export default function Questionnaire({ onLogin }) {
       <div className="lp-quiz-nav">
         {step > 0 ? (
           <button type="button" className="lp-quiz-back" onClick={() => setStep(step - 1)} disabled={submitting}>
-            ← Back
+            â† Back
           </button>
         ) : <span />}
         <button
@@ -548,10 +555,11 @@ export default function Questionnaire({ onLogin }) {
           disabled={!canNext() || submitting}
           onClick={() => void advance()}
         >
-          {submitting ? 'Submitting…' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}
+          {submitting ? 'Submittingâ€¦' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}
           {!submitting && step < STEP_LABELS.length - 1 && <ArrowRight size={16} />}
         </button>
       </div>
     </div>
   );
 }
+

@@ -40,6 +40,15 @@ test('registration handler reserves HTTP 409 for confirmed duplicate-email failu
   assert.match(source, /return res\.status\(400\)\.json\(accountCreationFailureResponse\(\)\);/);
 });
 
+test('registration reports notification delivery without pretending email verification is required', () => {
+  const source = read('api/register-trade.js');
+
+  assert.match(source, /let customerNotificationSent = false;/);
+  assert.match(source, /customerNotificationSent = true;/);
+  assert.match(source, /emailVerificationRequired: false/);
+  assert.match(source, /notificationSent: customerNotificationSent/);
+});
+
 test('registration client preserves structured recovery details', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({
     error: 'Generic failure',
@@ -70,3 +79,4 @@ test('active registration journey offers a direct account-recovery action', () =
   assert.match(styles, /\.lp-register-recovery-action[\s\S]*min-height: 44px/);
   assert.match(styles, /\.lp-register-recovery-action:focus-visible[\s\S]*outline: 2px solid/);
 });
+
