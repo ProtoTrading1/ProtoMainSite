@@ -230,6 +230,7 @@ function collectionLabel(collection) {
   if (collection === 'hot') return 'Hot Sellers';
   if (collection === 'clearance') return 'Clearance Stock';
   if (collection === 'specials') return "This Week's Specials";
+  if (collection === 'just-added') return 'Just added';
   if (collection === 'instock') return 'In Stock';
   if (collection === 'soldout') return 'Out of Stock';
   return 'All Products';
@@ -1450,6 +1451,11 @@ export default function App({
       setSearchQuery('');
       navigate([]);
     }
+    if (id === 'just-added') {
+      setActiveCollection('just-added');
+      setSearchQuery('');
+      navigate([]);
+    }
     if (id === 'instock') {
       setActiveCollection('instock');
       setSearchQuery('');
@@ -2066,6 +2072,7 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onJustAdded={() => handleShortcut('just-added')}
         onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}

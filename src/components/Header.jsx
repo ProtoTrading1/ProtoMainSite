@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { instoreAvailable } from '../lib/instoreAvailability';
 import {
   Clock3, Home, Info, LayoutDashboard, LayoutGrid, Loader2, LogOut, Menu, PackageSearch, RotateCcw,
-  Plus, ScanBarcode, Search, ShoppingCart, Star, Store, Upload, User, X,
+  Plus, ScanBarcode, Search, ShoppingCart, Sparkles, Star, Store, Upload, User, X,
 } from 'lucide-react';
 import { getRelatedSearchTerm, getSuggestions, prepareSearchIndex } from '../lib/fuzzySearch';
 import { fetchIdentifierProducts, fetchProducts } from '../lib/products';
@@ -540,7 +540,7 @@ export { AboutModal };
 export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
-  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
+  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onJustAdded, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
   onMobileSearchRequest, mobileSearchLabel = 'Search', mobileSearchControlsId,
@@ -1135,6 +1135,10 @@ export default function Header({
             <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
               <Star size={14} className="spinning-star" />
               Specials
+            </button>
+            <button className="header-nav-btn header-nav-just-added" type="button" onClick={onJustAdded}>
+              <Sparkles size={14} aria-hidden="true" />
+              Just added
             </button>
           </nav>
 

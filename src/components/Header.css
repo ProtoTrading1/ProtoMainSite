@@ -522,6 +522,10 @@
   color: #C89A3C;
 }
 
+.app-header--premium .header-nav-just-added {
+  color: #C89A3C;
+}
+
 .app-header--premium .header-nav-instore {
   color: #E5E5E5;
 }
@@ -543,6 +547,11 @@
 }
 
 .app-header--premium .header-nav-specials:hover {
+  background: transparent;
+  color: #D4AD56;
+}
+
+.app-header--premium .header-nav-just-added:hover {
   background: transparent;
   color: #D4AD56;
 }
