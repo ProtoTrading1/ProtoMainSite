@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { catalogueProducts, installAccessibilityServices, LOCAL_ORIGIN, signInCatalogue } from './helpers/accessibility-services.js';
 
-const product = { ...catalogueProducts[0], price: 250, isExtendedRange: true, stockOnHand: 10, stockQty: 10 };
+const product = { ...catalogueProducts[0], price: 250, source: 'main', isExtendedRange: false, stockOnHand: 10, stockQty: 10 };
 const line = (preference, qty) => ({ product, preference, qty });
 
 async function setup(context, cartItems, lastOrder = null) {
