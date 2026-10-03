@@ -1,3 +1,5 @@
+import { requestJson } from './requestDeadline.mjs';
+
 export async function submitTradeApplication({
   email,
   username,
@@ -28,7 +30,7 @@ export async function submitTradeApplication({
   customerCode,
   company_fax,
 }) {
-  const res = await fetch('/api/register-trade', {
+  return requestJson('/api/register-trade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -61,14 +63,8 @@ export async function submitTradeApplication({
       customerCode,
       company_fax,
     }),
+  }, {
+    timeoutMs: 25_000,
+    message: 'We could not confirm your application. Check your email for confirmation before trying again. Your form is still here.',
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    const error = new Error(data.error || 'Registration failed');
-    error.code = data.code || null;
-    error.recovery = data.recovery || null;
-    throw error;
-  }
-  return data;
 }

@@ -39,10 +39,10 @@ export async function requireAdmin(req, res) {
   return user;
 }
 
-export async function getApprovedCustomer(user, res) {
-  const { data: customer, error } = await getServiceClient()
+export async function getApprovedCustomer(user, res, client = getServiceClient()) {
+  const { data: customer, error } = await client
     .from('customers')
-    .select('id, role, is_approved, name, business_name')
+    .select('id, role, is_approved, name, business_name, trade_email_verification_required, trade_email_verified_at')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -54,6 +54,11 @@ export async function getApprovedCustomer(user, res) {
 
   if (!customer || (customer.role !== 'admin' && customer.is_approved !== true)) {
     res.status(403).json({ error: 'Approved trade account required' });
+    return null;
+  }
+
+  if (customer.role !== 'admin' && customer.trade_email_verification_required === true && !customer.trade_email_verified_at) {
+    res.status(403).json({ error: 'Confirm your email before accessing the catalogue.', code: 'TRADE_EMAIL_VERIFICATION_REQUIRED' });
     return null;
   }
 

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
+import { basketLineKey, mergeBasketLines } from '../lib/basket-lines.mjs';
 import { cartSyncFailure } from '../src/lib/cartSyncRecovery.mjs';
 
 const MAX_LINES = 250;
@@ -95,14 +96,14 @@ function sanitizeProduct(product, identifiers) {
   };
 }
 
-function validateItems(value) {
+function validateItems(value, { stored = false } = {}) {
   if (!Array.isArray(value)) throw inputError('Basket items must be an array');
   if (value.length > MAX_LINES) {
     throw inputError(`A basket can contain at most ${MAX_LINES} product lines`, 413);
   }
 
   const seen = new Set();
-  return value.map((raw) => {
+  const items = value.map((raw) => {
     const identifiers = productIdentifiers(raw);
     // A requested colour/design is part of a basket line, not part of the
     // catalogue product. The same SKU may therefore legitimately appear once
@@ -110,11 +111,8 @@ function validateItems(value) {
     // "green" and "blue"). Keep rejecting true duplicates, including simple
     // casing/whitespace variations, so a retry cannot silently double a line.
     const preferenceFields = itemPreferenceFields(raw);
-    const preferenceKey = (preferenceFields.preference || '')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-    const key = `${identifiers.primary.toUpperCase()}\u0000${preferenceKey}`;
-    if (seen.has(key)) throw inputError(`Duplicate basket product: ${identifiers.primary}`);
+    const key = basketLineKey(raw);
+    if (seen.has(key) && !stored) throw inputError(`Duplicate basket product: ${identifiers.primary}`);
     seen.add(key);
 
     if (!Number.isSafeInteger(raw.qty) || raw.qty < 1 || raw.qty > MAX_QTY) {
@@ -122,6 +120,9 @@ function validateItems(value) {
     }
     return { product: sanitizeProduct(raw.product, identifiers), qty: raw.qty, ...preferenceFields };
   });
+  // Legacy casing/whitespace collisions must retain all requested quantities
+  // when reading an existing account row; never drop the duplicate line.
+  return stored ? mergeBasketLines(items) : items;
 }
 
 function validateRevision(value, required) {
@@ -182,7 +183,7 @@ function storedActivityAt(value) {
 
 export function cartPayload(row) {
   return {
-    items: row?.items === undefined || row?.items === null ? [] : validateItems(row.items),
+    items: row?.items === undefined || row?.items === null ? [] : validateItems(row.items, { stored: true }),
     activityAt: storedActivityAt(row?.activity_at),
     revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
       ? Number(row.revision)

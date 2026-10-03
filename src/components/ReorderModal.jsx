@@ -1,5 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
+import { basketLineKey } from '../../lib/basket-lines.mjs';
+
+function orderLineKey(item) {
+  return basketLineKey({ product: { id: item.productId || item.code }, preference: item.preference });
+}
 
 export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   const [selected, setSelected] = useState(() =>
@@ -11,7 +16,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   const dialogRef = useRef(null);
   const previousFocusRef = useRef(null);
   const titleId = useId();
-  const unavailableCodes = new Set(unavailable.map((item) => item.productId || item.code));
+  const unavailableLines = new Map(unavailable.map((item) => [orderLineKey(item), item]));
 
   useEffect(() => {
     if (!lastOrder) return undefined;
@@ -79,7 +84,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
         setUnavailable(missing);
         const parts = [`${result.added} item${result.added === 1 ? '' : 's'} added.`];
         if (missing.length) {
-          parts.push(`${missing.length} ${missing.length === 1 ? 'is' : 'are'} no longer available and could not be added.`);
+          parts.push(`${missing.length} requested ${missing.length === 1 ? 'line could' : 'lines could'} not be added in full. Review the highlighted quantities.`);
         }
         if (overflow) {
           parts.push(`${overflow} could not fit — an order can hold at most 250 different products.`);
@@ -125,7 +130,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
           )}
           <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>Select items to add back to your current order:</p>
           {items.map((item, i) => (
-            <label key={`${item.productId || item.code || 'line'}-${i}`} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f8fafc', cursor: 'pointer', opacity: unavailableCodes.has(item.productId || item.code) ? 0.45 : 1 }}>
+            <label key={`${item.productId || item.code || 'line'}-${i}`} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f8fafc', cursor: 'pointer', opacity: unavailableLines.has(orderLineKey(item)) ? 0.45 : 1 }}>
               <input
                 type="checkbox"
                 checked={selected.has(i)}
@@ -140,8 +145,9 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                   {item.code} · qty {item.qty} · R{Number(item.unitPrice).toFixed(2)} each
-                  {unavailableCodes.has(item.productId || item.code) && (
-                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · no longer available</span>
+                  {item.preference && <span> · Preferred: {item.preference}</span>}
+                  {unavailableLines.has(orderLineKey(item)) && (
+                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · {unavailableLines.get(orderLineKey(item)).reason === 'stock_limit' ? 'requested quantity unavailable' : 'no longer available'}</span>
                   )}
                 </div>
               </div>

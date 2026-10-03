@@ -9,8 +9,9 @@ describe('basket scroll stability', () => {
     const app = await readFile(new URL('../../src/App.jsx', import.meta.url), 'utf8');
     const styles = await readFile(new URL('../../src/index.css', import.meta.url), 'utf8');
 
-    assert.match(app, /setCartRevealRequest\(\{ productId: product\.id, token:/);
+    assert.match(app, /setCartRevealRequest\(\{ lineKey: basketLineKey\(incomingLine\), token:/);
     assert.match(drawer, /data-cart-product-id=\{item\.product\.id\}/);
+    assert.match(drawer, /data-cart-line-key=\{basketLineKey\(item\)\}/);
     assert.match(drawer, /line\.scrollIntoView\(\{ block: 'nearest'/);
     assert.match(drawer, /prefers-reduced-motion: reduce/);
     assert.match(drawer, /drawer-line--just-added/);

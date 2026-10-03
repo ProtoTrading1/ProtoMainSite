@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { loadCustomerProfile } from '../src/lib/customerProfileClient.mjs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const api = read('api/customer-profile.js');
@@ -27,10 +28,22 @@ test('profile client preserves server and timeout errors instead of returning nu
     authClient.indexOf('export async function getCustomerProfile'),
     authClient.indexOf('// Update WhatsApp opt-in'),
   );
-  assert.match(helper, /error\.status = res\.status/);
-  assert.match(helper, /error\.code = json\.code/);
-  assert.match(helper, /CUSTOMER_PROFILE_TIMEOUT/);
+  assert.match(helper, /loadCustomerProfile\(userId/);
+  const bounded = read('src/lib/customerProfileClient.mjs');
+  assert.match(bounded, /requestJson\(/);
+  assert.match(bounded, /CUSTOMER_PROFILE_TIMEOUT/);
   assert.doesNotMatch(helper, /return null/);
+});
+
+test('bounded profile client retains actual HTTP status and server code', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: 'Profile missing', code: 'CUSTOMER_PROFILE_NOT_FOUND' }), { status: 404 }));
+  await assert.rejects(loadCustomerProfile('synthetic-id', { headers: { Authorization: 'Bearer synthetic' } }), error => error.status === 404 && error.code === 'CUSTOMER_PROFILE_NOT_FOUND');
+});
+
+test('profile deadline covers stalled token headers and stalled response bodies', async (t) => {
+  await assert.rejects(loadCustomerProfile('synthetic-id', { headers: () => new Promise(() => {}), timeoutMs: 10 }), error => error.code === 'CUSTOMER_PROFILE_TIMEOUT');
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: () => new Promise(() => {}) }));
+  await assert.rejects(loadCustomerProfile('synthetic-id', { timeoutMs: 10 }), error => error.code === 'CUSTOMER_PROFILE_TIMEOUT');
 });
 
 test('signed-in customers receive a visible retry path when profile loading fails', () => {

@@ -1,3 +1,5 @@
+import { requestJson } from './requestDeadline.mjs';
+
 const FEATURED_TTL = 15_000;
 
 let _cache = null;
@@ -15,19 +17,16 @@ export async function getFeaturedProducts() {
   if (_cache && Date.now() - _cachedAt < FEATURED_TTL) return _cache;
   _cache = null;
   if (!_promise) {
-    _promise = fetch('/api/featured-products', { cache: 'no-store' })
-      .then((r) => r.json())
+    _promise = requestJson('/api/featured-products', { cache: 'no-store' }, { timeoutMs: 10_000 })
       .then((data) => {
-        _cache = Array.isArray(data?.items)
-          ? data.items.map((i) => String(i.sku || '').toUpperCase()).filter(Boolean)
-          : [];
+        if (!Array.isArray(data?.items)) throw new Error('Featured products are unavailable. Please try again.');
+        _cache = data.items.map((i) => String(i.sku || '').toUpperCase()).filter(Boolean);
         _cachedAt = Date.now();
         _promise = null;
         return _cache;
       })
-      .catch(() => {
+      .finally(() => {
         _promise = null;
-        return [];
       });
   }
   return _promise;

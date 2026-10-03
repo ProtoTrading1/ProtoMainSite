@@ -23,9 +23,9 @@ test('quantity stepping uses the current typed draft instead of stale persisted 
 test('checkout failure can retry the retained options with one idempotency key', () => {
   assert.match(appSource, /lastCheckoutOptionsRef\.current = checkoutOptions/);
   assert.match(appSource, /lastCheckoutSubmissionRef\.current = \{/);
-  assert.match(appSource, /fingerprint !== cartFingerprint\(cartItems\)/);
+  assert.match(appSource, /submittedBasketStillCurrent\(intent, cartFingerprint\(currentCartRef\.current\.items\)\)/);
   assert.match(appSource, /if \(!checkoutRefRef\.current\) checkoutRefRef\.current = makeClientRef\(\)/);
-  assert.match(appSource, /sendOrderEmail\(lastCheckoutOptionsRef\.current\)/);
+  assert.match(appSource, /sendOrderEmail\(pendingCheckoutRef\.current\.options, true\)/);
   assert.match(appSource, /sendOrderEmail=\{sendOrderEmail\}/, 'mobile checkout awaits and retains failed form state');
   assert.match(confirmationSource, /onClick=\{isError \? \(requiresReview \? onReview : onRetry\) : onClose\}/);
   assert.match(drawerSource, /if \(result\?\.ok\)/, 'failed submission leaves the delivery form intact');
@@ -74,7 +74,7 @@ test('reorder dialog and post-order actions expose accessible recovery paths', (
   assert.match(reorderSource, /aria-modal="true"/);
   assert.match(reorderSource, /event\.key === 'Escape'/);
   assert.match(reorderSource, /minHeight: 44/);
-  assert.match(confirmationSource, />\s*View order\s*</);
+  assert.match(confirmationSource, /'View order' : 'Check My Orders'/);
   assert.match(checkoutSource, />\s*Edit delivery address\s*</);
 });
 

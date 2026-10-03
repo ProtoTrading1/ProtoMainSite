@@ -3,6 +3,7 @@ import { Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import ProtoLogo from '../components/ProtoLogo';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
+import { requestJson, withDeadline } from '../lib/requestDeadline.mjs';
 import './ResetPasswordPage.css';
 
 export default function ResetPasswordPage({ token, recoverySession = false, onDone }) {
@@ -14,35 +15,41 @@ export default function ResetPasswordPage({ token, recoverySession = false, onDo
   const [tokenState, setTokenState] = useState(recoverySession ? 'valid' : token ? 'checking' : 'invalid');
   const [error, setError] = useState(recoverySession || token ? '' : 'This reset link is missing or invalid. Request a new one from sign in.');
   const [done, setDone] = useState(false);
+  const [validationAttempt, setValidationAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     if (recoverySession || !token) return undefined;
-
-    fetch('/api/validate-reset-token', {
+    setTokenState('checking');
+    setError('');
+    requestJson('/api/validate-reset-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.valid) throw new Error(data.error || 'This reset link is no longer valid.');
+    }, { timeoutMs: 10_000, message: 'We could not check your reset link. Check your connection, then try again.' })
+      .then((data) => {
+        if (!data.valid) {
+          const invalid = new Error(data.error || 'This reset link is no longer valid.');
+          invalid.invalidLink = true;
+          throw invalid;
+        }
         if (!cancelled) setTokenState('valid');
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err.message);
-          setTokenState('invalid');
+          const invalidLink = err.invalidLink || [400, 410].includes(err.status);
+          setError(invalidLink ? err.message : 'We could not check your reset link. Check your connection, then try again.');
+          setTokenState(invalidLink ? 'invalid' : 'unavailable');
           trackJourneyEvent('password_reset_failed', {
             journey: 'authentication',
             step: 'link_validation',
-            outcome: 'invalid_link',
+            outcome: invalidLink ? 'invalid_link' : 'connection_error',
           });
         }
       });
 
     return () => { cancelled = true; };
-  }, [token, recoverySession]);
+  }, [token, recoverySession, validationAttempt]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -54,18 +61,25 @@ export default function ResetPasswordPage({ token, recoverySession = false, onDo
     try {
       if (recoverySession) {
         const { supabase } = await import('../lib/supabase');
-        const { error: updateError } = await supabase.auth.updateUser({ password });
+        const { error: updateError } = await withDeadline(() => supabase.auth.updateUser({ password }), {
+          timeoutMs: 20_000,
+          message: 'We could not confirm your password update. Try signing in with your new password before requesting another reset link.',
+        });
         if (updateError) throw updateError;
-        const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' });
+        const { error: signOutError } = await withDeadline(() => supabase.auth.signOut({ scope: 'global' }), {
+          timeoutMs: 15_000,
+          message: 'Your password was updated, but signing out took too long. Return to sign in and use your new password.',
+        });
         if (signOutError) throw signOutError;
       } else {
-        const res = await fetch('/api/do-reset-password', {
+        await requestJson('/api/do-reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, password }),
+        }, {
+          timeoutMs: 20_000,
+          message: 'We could not confirm your password update. Try signing in with your new password before requesting another reset link.',
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Password reset failed.');
       }
       setDone(true);
       trackJourneyEvent('password_reset_completed', {
@@ -177,6 +191,8 @@ export default function ResetPasswordPage({ token, recoverySession = false, onDo
                 </form>
               ) : tokenState === 'invalid' ? (
                 <button type="button" className="reset-password-primary" onClick={onDone}>Back to sign in</button>
+              ) : tokenState === 'unavailable' ? (
+                <button type="button" className="reset-password-primary" onClick={() => setValidationAttempt((attempt) => attempt + 1)}>Retry link check</button>
               ) : null}
 
               <div className="reset-password-note">

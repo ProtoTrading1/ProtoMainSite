@@ -15,22 +15,25 @@ function isChunkLoadError(error) {
   );
 }
 
-export default function lazyWithRetry(importer, key) {
-  return lazy(async () => {
+export async function loadWithRetry(importer, key, browser = window) {
     try {
       const mod = await importer();
-      window.sessionStorage.removeItem(RETRY_KEY);
+      try { browser.sessionStorage.removeItem(RETRY_KEY); } catch { /* Optional storage cannot fail a successful import. */ }
       return mod;
     } catch (error) {
       const shouldReload = isChunkLoadError(error);
-      const retriedKey = window.sessionStorage.getItem(RETRY_KEY);
+      let retriedKey;
+      try { retriedKey = browser.sessionStorage.getItem(RETRY_KEY); } catch { throw error; }
       if (shouldReload && retriedKey !== key) {
-        window.sessionStorage.setItem(RETRY_KEY, key);
-        window.location.reload();
+        try { browser.sessionStorage.setItem(RETRY_KEY, key); } catch { throw error; }
+        browser.location.reload();
         return new Promise(() => {});
       }
-      window.sessionStorage.removeItem(RETRY_KEY);
+      try { browser.sessionStorage.removeItem(RETRY_KEY); } catch { /* Preserve the original failure for recovery. */ }
       throw error;
     }
-  });
+}
+
+export default function lazyWithRetry(importer, key) {
+  return lazy(() => loadWithRetry(importer, key));
 }

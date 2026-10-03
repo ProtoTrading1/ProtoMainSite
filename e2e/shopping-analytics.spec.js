@@ -62,7 +62,7 @@ test('a second basket after order submission is tracked without phantom submitte
   const events = [];
   await installAccessibilityServices(context, { products: catalogueProducts.map(product => ({ ...product, price: 1500 })) });
   await context.route('**/api/shopping-events', async route => { events.push(route.request().postDataJSON()); await route.fulfill({ json: { ok: true } }); });
-  await context.route('**/api/send-order', route => route.fulfill({ json: { orderId: 'ed130931-a3f5-4207-bd1f-25989291ce03', orderNumber: 'SYNTHETIC-1', emailDeliveryFailed: false } }));
+  await context.route('**/api/send-order', route => route.fulfill({ json: { success: true, orderId: 'ed130931-a3f5-4207-bd1f-25989291ce03', orderNumber: 'SYNTHETIC-1', emailDeliveryFailed: false } }));
   await signInCatalogue(page);
   await page.goto('/#/?q=notebook');
   await expect.poll(() => events.filter(e => e.eventType === 'search_results_viewed').length).toBe(1);

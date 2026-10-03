@@ -1,14 +1,16 @@
 import { authHeaders, refreshAuthHeaders } from './authHeaders';
 import { boundedCartRequest } from './accountCartRequest.mjs';
+import { basketLineKey, mergeBasketLines } from '../../lib/basket-lines.mjs';
 
 async function requestAccountCart(method, body) {
+  const payload = body?.items ? { ...body, items: mergeBasketLines(body.items) } : body;
   return boundedCartRequest(async (signal) => {
     const request = (headers) => fetch('/api/account-cart', {
       method,
       headers,
       credentials: 'same-origin',
       signal,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     });
 
     let response = await request(await authHeaders());
@@ -25,16 +27,12 @@ async function requestAccountCart(method, body) {
     if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision)) {
       throw new Error('Account basket response could not be confirmed');
     }
-    return data;
+    return { ...data, items: mergeBasketLines(data.items) };
   });
 }
 
 export function cartFingerprint(items) {
-  return JSON.stringify((Array.isArray(items) ? items : []).map((item) => [
-    String(item?.product?.id || item?.product?.sku || item?.product?.code || ''),
-    Number(item?.qty || 0),
-    String(item?.preference || ''),
-  ]));
+  return JSON.stringify(mergeBasketLines(items).map((item) => [basketLineKey(item), Number(item.qty || 0)]));
 }
 
 export function getAccountCart() {

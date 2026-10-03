@@ -16,8 +16,8 @@ export async function lookupProtoActiveByEmail(supabase, email) {
 /**
  * Resolve a possible existing customer match.
  *
- * Only an exact email match is identity-verified enough to grant immediate
- * access. A customer code can still help the team reconcile an application,
+ * An exact email match is eligibility evidence, not mailbox proof.
+ * A customer code can still help the team reconcile an application,
  * but it must never update a legacy record or approve an account on its own.
  */
 export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
@@ -46,7 +46,9 @@ export async function lookupProtoActiveCustomer(supabase, email, customerCode) {
   return { row: null, matchType: null };
 }
 
-/** True only when the customer's identity was verified by their registered email. */
-export function isVerifiedProtoActiveMatch(match) {
-  return Boolean(match?.matchType === 'email' && match?.row?.account_code);
+/** Call only with the user returned by successful server-side OTP verification. */
+export function isVerifiedProtoActiveMatch(match, verifiedUser) {
+  const confirmedEmail = verifiedUser?.email_confirmed_at && String(verifiedUser.email || '').trim().toLowerCase();
+  return Boolean(confirmedEmail && match?.matchType === 'email' && match?.row?.account_code
+    && String(match.row.email || '').trim().toLowerCase() === confirmedEmail);
 }

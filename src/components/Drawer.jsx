@@ -19,6 +19,7 @@ import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { basketLineKey, basketLineQuantityLimit, basketProductQuantity } from '../../lib/basket-lines.mjs';
 
 const MIN_ORDER = 1000;
 
@@ -51,17 +52,17 @@ function formatCartExpiry(remainingMs) {
   return `${hours}h ${minutes}m left`;
 }
 
-function QuantityStepper({ item, updateQty, disabled = false }) {
-  // Over-ordering is allowed (backorder request); the shortfall is surfaced by
-  // the per-line advisory below, so the input only enforces a sane ceiling.
+function QuantityStepper({ item, cartItems, quantityCapForProduct, updateQty, disabled = false }) {
   const [draftQty, setDraftQty] = useState(() => String(item.qty));
-  const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(item.product?.minQty) || 1)));
+  const maxQty = basketLineQuantityLimit(cartItems, item, quantityCapForProduct);
+  const minimumQty = Math.max(1, Math.min(maxQty, Math.floor(Number(item.product?.minQty) || 1)));
   useEffect(() => setDraftQty(String(item.qty)), [item.qty]);
 
   const commitQty = (value = draftQty) => {
-    const nextQty = normalizeCartQuantity(value, item.qty, minimumQty);
+    if (maxQty < 1) { setDraftQty(String(item.qty)); return; }
+    const nextQty = Math.min(maxQty, normalizeCartQuantity(value, item.qty, minimumQty));
     setDraftQty(String(nextQty));
-    updateQty(item.product.id, nextQty);
+    updateQty(basketLineKey(item), nextQty);
   };
 
   const stepQty = (delta) => {
@@ -75,15 +76,15 @@ function QuantityStepper({ item, updateQty, disabled = false }) {
         onClick={() => stepQty(-1)}
         type="button"
         disabled={disabled || Number(draftQty) <= minimumQty}
-        aria-label={`Decrease quantity for ${item.product.name}`}
+        aria-label={`Decrease quantity for ${item.product.name}${item.preference ? ` (${item.preference})` : ''}`}
       >
         -
       </button>
       <input
-        aria-label={`Quantity for ${item.product.code}`}
+        aria-label={`Quantity for ${item.product.code}${item.preference ? ` (${item.preference})` : ''}`}
         inputMode="numeric"
         min={minimumQty}
-        max="9999"
+        max={maxQty || item.qty}
         type="number"
         value={draftQty}
         disabled={disabled}
@@ -94,8 +95,8 @@ function QuantityStepper({ item, updateQty, disabled = false }) {
       <button
         onClick={() => stepQty(1)}
         type="button"
-        disabled={disabled}
-        aria-label={`Increase quantity for ${item.product.name}`}
+        disabled={disabled || Number(draftQty) >= maxQty}
+        aria-label={`Increase quantity for ${item.product.name}${item.preference ? ` (${item.preference})` : ''}`}
       >
         +
       </button>
@@ -108,6 +109,7 @@ export default function Drawer({
   cartTotal,
   removeFromCart,
   updateQty,
+  quantityCapForProduct = () => 9999,
   clearCart,
   sendOrderEmail,
   onCheckoutReview,
@@ -205,14 +207,15 @@ export default function Drawer({
 
   useEffect(() => {
     if (!revealItemRequest) return undefined;
-    const { productId, token } = revealItemRequest;
+    const { lineKey, token } = revealItemRequest;
     let highlightTimer;
     const revealFrame = window.requestAnimationFrame(() => {
-      const line = itemsRef.current?.querySelector(`[data-cart-product-id="${productId}"]`);
+      const line = Array.from(itemsRef.current?.querySelectorAll('[data-cart-line-key]') || [])
+        .find((element) => element.dataset.cartLineKey === lineKey);
       if (!line) return;
       const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       line.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
-      setHighlightedItemId(productId);
+      setHighlightedItemId(lineKey);
       highlightTimer = window.setTimeout(() => {
         setHighlightedItemId(null);
         onRevealItemHandled?.(token);
@@ -419,9 +422,10 @@ export default function Drawer({
         )}
         {cartItems.map((item) => (
           <div
-            className={`drawer-line${highlightedItemId === item.product.id ? ' drawer-line--just-added' : ''}`}
+            className={`drawer-line${highlightedItemId === basketLineKey(item) ? ' drawer-line--just-added' : ''}`}
             data-cart-product-id={item.product.id}
-            key={item.product.id}
+            data-cart-line-key={basketLineKey(item)}
+            key={basketLineKey(item)}
           >
             <BasketThumbnail key={item.product.image || ''} product={item.product} />
             <div className="drawer-line-body">
@@ -434,13 +438,13 @@ export default function Drawer({
               )}
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
-                <QuantityStepper item={item} updateQty={updateQty} disabled={basketLoading} />
-                <button className="remove-button" onClick={() => removeFromCart(item.product.id)} type="button" disabled={basketLoading} aria-label={`Remove ${item.product.name} from cart`}>
+                <QuantityStepper item={item} cartItems={cartItems} quantityCapForProduct={quantityCapForProduct} updateQty={updateQty} disabled={basketLoading} />
+                <button className="remove-button" onClick={() => removeFromCart(basketLineKey(item))} type="button" disabled={basketLoading} aria-label={`Remove ${item.product.name}${item.preference ? ` (${item.preference})` : ''} from cart`}>
                   <Trash2 size={14} />
                 </button>
               </div>
               {(() => {
-                const adv = stockAdvisoryForQty(item.product, item.qty);
+                const adv = stockAdvisoryForQty(item.product, basketProductQuantity(cartItems, item.product));
                 return adv.isOverOrder ? (
                   <p className="drawer-line-stock-note">{adv.availableStock} in stock &middot; reduce by {adv.shortfall}</p>
                 ) : null;
@@ -525,7 +529,7 @@ export default function Drawer({
           </div>
         ) : (
           cartItems.length > 0 && (
-            <button className="clear-button" onClick={() => { shouldFocusUndoRef.current = true; if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(item.product.id)); }} type="button" disabled={basketLoading}>
+            <button className="clear-button" onClick={() => { shouldFocusUndoRef.current = true; if (clearCart) clearCart(); else cartItems.forEach((item) => removeFromCart(basketLineKey(item))); }} type="button" disabled={basketLoading}>
               <Trash2 size={13} />
               Clear order
             </button>

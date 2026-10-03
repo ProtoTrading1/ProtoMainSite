@@ -6,6 +6,8 @@ import { X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
+import { requestJson, withDeadline } from './lib/requestDeadline.mjs';
+import { clearPendingCheckout, readPendingCheckout, submittedBasketStillCurrent, writePendingCheckout } from './lib/pendingCheckout.mjs';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
@@ -42,6 +44,7 @@ import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, sa
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
+import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
@@ -170,7 +173,7 @@ function normalizeCartQtyInput(qty) {
 }
 
 async function hydrateAccountCartItems(items) {
-  const savedItems = Array.isArray(items) ? items : [];
+  const savedItems = mergeBasketLines(items);
   if (!savedItems.length) return [];
   try {
     const bySku = await fetchProductsBySkus(savedItems.map((item) => (
@@ -275,6 +278,7 @@ export default function App({
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
   const [catalogResultQuery, setCatalogResultQuery] = useState('');
+  const [catalogError, setCatalogError] = useState(false);
   const visibleCatalogResults = useMemo(
     () => catalogueResultsForQuery(routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal),
     [routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal],
@@ -299,7 +303,7 @@ export default function App({
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (owner && owner !== customer?.id) return [];
       const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-      return Array.isArray(stored) ? stored : [];
+      return mergeBasketLines(stored);
     } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
@@ -345,20 +349,15 @@ export default function App({
   const cartClearActivityAtRef = useRef(null);
   const cartClearIntentRef = useRef('normal');
   const cartRestoreFingerprintRef = useRef(null);
-  // Idempotency key for the CURRENT cart's checkout. Persists across retries of
-  // the same cart (so a resubmit after an email/network error recovers the
-  // existing order instead of double-inserting) and resets when the cart
-  // changes (a genuinely different order) or after a successful submit clears it.
+  // An unresolved request survives basket edits and reloads. A new reference
+  // must never replace an outcome that may already have committed on the server.
   const checkoutRefRef = useRef(null);
   const lastCheckoutOptionsRef = useRef(null);
   const lastCheckoutSubmissionRef = useRef(null);
+  const pendingCheckoutRef = useRef(null);
+  const pendingCheckoutStorageErrorRef = useRef(null);
+  const checkoutSendingRef = useRef(false);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
-  useEffect(() => {
-    const submittedFingerprint = lastCheckoutSubmissionRef.current?.fingerprint;
-    if (!submittedFingerprint || cartFingerprint(cartItems) !== submittedFingerprint) {
-      checkoutRefRef.current = null;
-    }
-  }, [cartItems]);
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
@@ -662,7 +661,7 @@ export default function App({
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (!owner || owner === uid) {
         const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-        localItems = Array.isArray(stored) ? stored : [];
+        localItems = mergeBasketLines(stored);
         localActivityAt = readCartActivityAt();
         if (localItems.length && !localActivityAt) {
           localActivityAt = Date.now();
@@ -676,7 +675,7 @@ export default function App({
       localStorage.setItem(CART_OWNER_KEY, uid);
     } catch { /* use the in-memory fallback */ }
     if (pendingDraft) {
-      localItems = pendingDraft.items;
+      localItems = mergeBasketLines(pendingDraft.items);
       localActivityAt = pendingDraft.activityAt;
     }
 
@@ -1179,9 +1178,10 @@ export default function App({
 
     const load = async () => {
       setLoading(true);
+      setCatalogError(false);
       try {
         const specialIds = activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null;
-        const pageData = await fetchProductPage({
+        const pageData = await withDeadline(() => fetchProductPage({
           page,
           pageSize: CATALOG_PAGE_SIZE,
           searchQuery,
@@ -1190,7 +1190,7 @@ export default function App({
           sort,
           specialIds,
           inStockOnly,
-        });
+        }), { timeoutMs: 20_000 });
 
         if (cancelled) return;
         setUsingFallback(false);
@@ -1206,7 +1206,7 @@ export default function App({
         // If a deep subcategory returns nothing (e.g. out-of-stock leaf),
         // fall back to showing the top-level department so the page isn't empty.
         if (pageData.total === 0 && path.length > 1 && !searchQuery && activeCollection === 'all') {
-          const l1Data = await fetchProductPage({
+          const l1Data = await withDeadline(() => fetchProductPage({
             page: 1,
             pageSize: CATALOG_PAGE_SIZE,
             searchQuery: '',
@@ -1214,7 +1214,7 @@ export default function App({
             collection: 'all',
             sort,
             inStockOnly,
-          });
+          }), { timeoutMs: 20_000 });
           if (!cancelled && l1Data.total > 0) {
             setCatalogProducts(l1Data.products);
             setCatalogTotal(l1Data.total);
@@ -1232,6 +1232,7 @@ export default function App({
         // Never fall back to a public catalogue file: trade pricing and stock
         // are available only through the approved-customer API.
         if (cancelled) return;
+        setCatalogError(true);
         setUsingFallback(false);
         setCatalogTotal(0);
         setCatalogProducts([]);
@@ -1291,7 +1292,7 @@ export default function App({
       lastSearchLogKeyRef.current = '';
       return;
     }
-    if (catalogueResultsPending) return;
+    if (catalogueResultsPending || catalogError) return;
 
     const term = routeSearchQuery.trim();
     if (term.length < 3) return;
@@ -1324,7 +1325,7 @@ export default function App({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [routeSearchQuery, visibleCatalogResults.total, catalogueResultsPending, activeCollection, path, pathKey, customer?.id, customer?.email]);
+  }, [routeSearchQuery, visibleCatalogResults.total, catalogueResultsPending, catalogError, activeCollection, path, pathKey, customer?.id, customer?.email]);
 
   const rawBreadcrumb = buildBreadcrumb(categories, path);
   const breadcrumb = rawBreadcrumb.length > 0 ? rawBreadcrumb
@@ -1346,6 +1347,36 @@ export default function App({
   const [orderError, setOrderError] = useState('');
   const [orderChanges, setOrderChanges] = useState([]);
   const [submittedOrderNumber, setSubmittedOrderNumber] = useState('');
+  const [orderRecoveryNote, setOrderRecoveryNote] = useState('');
+
+  useEffect(() => {
+    pendingCheckoutRef.current = null;
+    pendingCheckoutStorageErrorRef.current = null;
+    checkoutRefRef.current = null;
+    lastCheckoutOptionsRef.current = null;
+    lastCheckoutSubmissionRef.current = null;
+    if (!customer?.id) return;
+    try {
+      const pending = readPendingCheckout(localStorage, customer.id);
+      if (!pending) return;
+      pendingCheckoutRef.current = pending;
+      checkoutRefRef.current = pending.payload.clientRef;
+      lastCheckoutOptionsRef.current = pending.options;
+      lastCheckoutSubmissionRef.current = pending;
+      setOrderStatus('error');
+      setOrderError(pending.result
+        ? 'Your earlier order was received. Use Try again to finish recovery without sending another order. Your current basket will be kept if it changed.'
+        : 'An earlier order request needs confirmation. Use Try again to recover that same request. Your current basket will be kept if it changed. Check My Orders or contact Proto if it cannot be recovered.');
+      setOrderChanges(pending.reviewChanges || []);
+      setModalOpen(true);
+    } catch (error) {
+      pendingCheckoutStorageErrorRef.current = error;
+      setOrderStatus('error');
+      setOrderError(error.message);
+      setOrderChanges([]);
+      setModalOpen(true);
+    }
+  }, [customer?.id]);
 
   useEffect(() => () => {
     if (drawerTimerRef.current) window.clearTimeout(drawerTimerRef.current);
@@ -1442,29 +1473,13 @@ export default function App({
     }
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
     const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
-    setCartItems((prev) => {
-      const sameProduct = prev.filter((i) => i.product.id === product.id);
-      // An Instore code can represent assorted colours/designs. Keep each
-      // customer preference as a separate basket line, but cap the combined
-      // quantity at the single live-stock balance for that code.
-      const existing = product.isExtendedRange === true
-        ? sameProduct.find((i) => (i.preference || '') === (requestedPreference || ''))
-        : sameProduct[0];
-      const alreadyRequested = product.isExtendedRange === true
-        ? sameProduct.reduce((total, i) => total + Number(i.qty || 0), 0)
-        : Number(existing?.qty || 0);
-      const availableToAdd = Math.max(0, maxQty - alreadyRequested);
-      if (existing) {
-        const nextQty = existing.qty + Math.min(availableToAdd, requestedQty);
-        if (nextQty === existing.qty && (requestedPreference === undefined || requestedPreference === (existing.preference || ''))) return prev;
-        return prev.map((i) => (i === existing ? { ...i, qty: nextQty, ...(requestedPreference !== undefined ? { preference: requestedPreference } : {}) } : i));
-      }
-      if (availableToAdd <= 0) return prev;
-      return [...prev, { product, qty: Math.min(availableToAdd, requestedQty), ...itemPreferenceFields({ preference: requestedPreference }) }];
-    });
+    const incomingLine = { product, qty: requestedQty, ...itemPreferenceFields({ preference: requestedPreference }) };
+    setCartItems((prev) => addBasketLine(prev, incomingLine, {
+      quantityCapForProduct: cartQtyCapForProduct, maxLines: MAX_CART_LINES,
+    }).items);
     markCartActivity();
     cartRevealSequenceRef.current += 1;
-    setCartRevealRequest({ productId: product.id, token: cartRevealSequenceRef.current });
+    setCartRevealRequest({ lineKey: basketLineKey(incomingLine), token: cartRevealSequenceRef.current });
 
     // Engagement capture for the admin dashboard. Privacy-safe by design: the
     // quantity is a number and nothing identifies the product, matching the
@@ -1497,29 +1512,27 @@ export default function App({
     setCartScrollTop(scrollTop);
   }, []);
 
-  const updateQty = useCallback((id, qty) => {
+  const updateQty = useCallback((lineKey, qty) => {
     if (!cartHydratedRef.current) return;
     const requestedQty = normalizeCartQtyInput(qty);
-    setCartItems((prev) => prev.flatMap((item) => {
-      if (item.product.id !== id) return [item];
-      const maxQty = cartQtyCapForProduct(item.product);
-      if (maxQty <= 0) return [];
-      const minimumQty = Math.max(1, Math.min(maxQty, Math.floor(Number(item.product?.minQty) || 1)));
-      const nextQty = Math.max(minimumQty, Math.min(maxQty, requestedQty));
-      return [{ ...item, qty: nextQty }];
-    }));
+    setCartItems((prev) => updateBasketLineQuantity(prev, lineKey, requestedQty, cartQtyCapForProduct));
     markCartActivity();
   }, [markCartActivity]);
 
-  const removeFromCart = useCallback((id) => {
+  const removeFromCart = useCallback((lineKey) => {
     if (!cartHydratedRef.current) return;
-    setCartItems((prev) => prev.filter((i) => i.product.id !== id));
+    setCartItems((prev) => removeBasketLine(prev, lineKey));
     markCartActivity();
   }, [markCartActivity]);
 
   const cartQtyMap = useMemo(() => {
     const map = {};
-    for (const item of cartItems) map[item.product.id] = item.qty;
+    const totals = new Map();
+    for (const item of cartItems) {
+      const key = basketProductKey(item.product);
+      totals.set(key, (totals.get(key) || 0) + item.qty);
+    }
+    for (const item of cartItems) map[item.product.id] = totals.get(basketProductKey(item.product));
     return map;
   }, [cartItems]);
 
@@ -1530,8 +1543,9 @@ export default function App({
   }, [cartItems]);
 
   const handleCartQtyChange = useCallback((product, newQty) => {
-    if (newQty <= 0) removeFromCart(product.id);
-    else updateQty(product.id, newQty);
+    const lineKey = basketLineKey({ product });
+    if (newQty <= 0) removeFromCart(lineKey);
+    else updateQty(lineKey, newQty);
   }, [removeFromCart, updateQty]);
 
   const handleShortcut = (id) => {
@@ -1747,20 +1761,45 @@ export default function App({
     prevCartSnapshotRef.current = next;
   }, [totalItemCount, cartTotal]);
 
-  const sendOrderEmail = async (opts = {}) => {
-    if (!cartHydratedRef.current || !cartItems.length) return { ok: false };
+  const sendOrderEmail = async (opts = {}, retryPending = false) => {
+    if (checkoutSendingRef.current || !cartHydratedRef.current) return { ok: false };
+    const accountId = customer?.id;
+    if (!accountId) return { ok: false };
+    let pending = pendingCheckoutRef.current;
+    try {
+      // Another tab may have started checkout since this tab hydrated.
+      pending = readPendingCheckout(localStorage, accountId);
+      pendingCheckoutRef.current = pending;
+      if (pending) checkoutRefRef.current = pending.payload.clientRef;
+    } catch (error) {
+      pendingCheckoutStorageErrorRef.current = error;
+    }
+    if (pendingCheckoutStorageErrorRef.current) {
+      setOrderStatus('error');
+      setOrderError(pendingCheckoutStorageErrorRef.current.message);
+      setModalOpen(true);
+      return { ok: false };
+    }
+    if (pending && !retryPending && !pending.reviewRequired) {
+      setOrderStatus('error');
+      setOrderError('Your earlier order request still needs confirmation. Use Try again to recover that same request, or check My Orders and contact Proto. A new order will not be sent.');
+      setOrderChanges([]);
+      setModalOpen(true);
+      return { ok: false, pending: true };
+    }
+    if (!pending && !cartItems.length) return { ok: false };
     if (cartPreviewModeRef.current) {
       setCartAnnouncement('Preview basket only — order requests are disabled here.');
       return { ok: false, preview: true };
     }
-    if (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
-      || cartSyncStatus !== 'saved' || cartFingerprint(cartItems) !== lastSavedCartRef.current) {
+    if (!retryPending && (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
+      || cartSyncStatus !== 'saved' || cartFingerprint(cartItems) !== lastSavedCartRef.current)) {
       setCartAnnouncement('Please confirm account basket sync before submitting this order. Your items are kept.');
       return { ok: false, syncRequired: true };
     }
-    const courierChoice = opts?.courierChoice || null;
-    const customerNotes = String(opts?.customerNotes || '').trim();
-    const promo = opts?.promo || null;
+    const checkoutOptions = retryPending && pending ? pending.options : opts;
+    const courierChoice = checkoutOptions?.courierChoice || null;
+    const customerNotes = String(checkoutOptions?.customerNotes || '').trim();
     const deliveryMethod = courierChoice === 'own'
       ? "Customer's own courier"
       : courierChoice === 'proto'
@@ -1782,24 +1821,11 @@ export default function App({
       return { ok: false };
     }
 
-    const liveFingerprint = cartFingerprint(cartItems);
-    const isRetry = Boolean(checkoutRefRef.current && lastCheckoutSubmissionRef.current);
-    if (isRetry && lastCheckoutSubmissionRef.current.fingerprint !== liveFingerprint) {
-      setOrderStatus('error');
-      setOrderError('Your basket changed after review. Close this message, review the current basket, and submit it as a new order request.');
-      checkoutRefRef.current = null;
-      lastCheckoutOptionsRef.current = null;
-      lastCheckoutSubmissionRef.current = null;
-      setModalOpen(true);
-      return { ok: false, cartChanged: true };
-    }
-    const checkoutOptions = isRetry
-      ? lastCheckoutOptionsRef.current
-      : { courierChoice, customerNotes, promo };
-    const submittedItems = isRetry
-      ? lastCheckoutSubmissionRef.current.items
+    const isRetry = Boolean(pending);
+    const submittedItems = retryPending && pending
+      ? pending.items
       : cartItems.map((item) => ({ ...item, product: { ...item.product } }));
-    const submittedTotal = isRetry ? lastCheckoutSubmissionRef.current.total : cartTotal;
+    const submittedTotal = retryPending && pending ? pending.total : cartTotal;
     lastCheckoutOptionsRef.current = checkoutOptions;
     lastCheckoutSubmissionRef.current = {
       items: submittedItems,
@@ -1820,7 +1846,9 @@ export default function App({
     setOrderError('');
     setOrderChanges([]);
     setSubmittedOrderNumber('');
+    setOrderRecoveryNote('');
     setModalOpen(true);
+    checkoutSendingRef.current = true;
 
     try {
       // Idempotency key for this checkout: generated once per cart and reused
@@ -1829,7 +1857,7 @@ export default function App({
       if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
       const clientRef = checkoutRefRef.current;
 
-      const payload = {
+      const payload = retryPending && pending ? pending.payload : {
         clientRef,
         promoCode: checkoutOptions.promo?.code || null,
         deliveryMethod,
@@ -1847,23 +1875,28 @@ export default function App({
         })),
       };
 
+      // Read-back verification is required before POST. Storage denial cannot
+      // leave a committed request whose reference disappears on a reload.
+      const intent = writePendingCheckout(localStorage, accountId, {
+        version: 1, customerId: accountId, payload,
+        items: submittedItems, total: submittedTotal,
+        fingerprint: cartFingerprint(submittedItems), options: checkoutOptions,
+        ...(retryPending && pending?.result ? { result: pending.result } : {}),
+      });
+      pendingCheckoutRef.current = intent;
+
       // The secure API resolves the signed-in customer and every product price
       // from server-side data, then saves the order before confirming success.
-      const sendHeaders = await authHeaders();
+      const sendHeaders = await withDeadline(() => authHeaders(), { timeoutMs: 10_000 });
+      if (cartAccountRef.current !== accountId) throw new Error('The signed-in account changed. Your earlier order request is kept for recovery on its original account.');
       const body = JSON.stringify(payload);
-      const submitOrder = () => fetch('/api/send-order', {
+      const submitOrder = () => requestJson('/api/send-order', {
         method: 'POST',
         headers: sendHeaders,
         body,
-      }).then(async (response) => {
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const error = new Error(result.error || 'Order could not be sent');
-          error.code = result.code || undefined;
-          error.changes = Array.isArray(result.changes) ? result.changes : [];
-          throw error;
-        }
-        return result;
+      }, {
+        timeoutMs: 65_000,
+        message: 'We could not confirm whether your order was received. Your basket is saved. Use Retry to check this same order request.',
       });
 
       const logConversion = (result) => {
@@ -1876,7 +1909,16 @@ export default function App({
         }
       };
 
-      const result = await submitOrder();
+      const result = intent.result || await submitOrder();
+      if (result?.success !== true || !result.orderId) {
+        const error = new Error('We could not confirm whether your order was received. Use Try again to recover this same request, or check My Orders.');
+        error.code = 'INVALID_RESPONSE';
+        throw error;
+      }
+      // Record acceptance before basket cleanup. A crash during cleanup can
+      // finish recovery from this result without making another API request.
+      pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, { ...intent, result });
+      if (cartAccountRef.current !== accountId) return { ok: true, result };
       setSubmittedOrderNumber(result.orderNumber || '');
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
       trackShoppingEvent('order_submitted', { orderId: result.orderId || null });
@@ -1890,13 +1932,21 @@ export default function App({
           delivery_method: courierChoice,
         },
       });
-      clearCart({ allowUndo: false, intent: 'submitted_clear' });
+      if (submittedBasketStillCurrent(intent, cartFingerprint(currentCartRef.current.items))) {
+        clearCart({ allowUndo: false, intent: 'submitted_clear' });
+      } else {
+        setOrderRecoveryNote('Your current basket was kept because it changed. Check this received order before submitting it again.');
+        setCartAnnouncement('Your earlier order was received. Your newer basket items have been kept. View the order before sending another request.');
+      }
       setMobileCartOpen(false);
       setCartDrawerOpen(false);
       logConversion(result);
       if (customer?.id) fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
       lastCheckoutOptionsRef.current = null;
       lastCheckoutSubmissionRef.current = null;
+      clearPendingCheckout(localStorage, accountId, intent.payload.clientRef);
+      pendingCheckoutRef.current = null;
+      checkoutRefRef.current = null;
       return { ok: true, result };
     } catch (err) {
       setOrderStatus('error');
@@ -1925,11 +1975,22 @@ export default function App({
             },
           };
         }));
-        // A review result is not a transient delivery error. Make the next
-        // submit a fresh customer action with a fresh idempotency key/snapshot.
-        checkoutRefRef.current = null;
-        lastCheckoutOptionsRef.current = null;
-        lastCheckoutSubmissionRef.current = null;
+        // A previous uncertain handler may still capture after this review.
+        // Explicitly amended checkout keeps the reference so the server can
+        // conflict with that earlier capture rather than create a second order.
+        if (pendingCheckoutRef.current) {
+          try {
+            pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, {
+              ...pendingCheckoutRef.current, reviewRequired: true, reviewChanges: changes,
+            });
+          } catch (storageError) {
+            pendingCheckoutStorageErrorRef.current = storageError;
+            setOrderError(storageError.message);
+          }
+        }
+      }
+      if (err?.code === 'ORDER_REFERENCE_CONFLICT') {
+        setOrderError(`${err.message} Check My Orders or contact Proto to resolve this request before placing another order.`);
       }
       trackJourneyEvent('order_submit_failed', {
         journey: 'checkout',
@@ -1943,23 +2004,14 @@ export default function App({
         },
       });
       return { ok: false };
+    } finally {
+      checkoutSendingRef.current = false;
     }
   };
 
   const retryLastOrderSubmission = () => {
-    if (!lastCheckoutOptionsRef.current || orderStatus === 'sending') return;
-    if (lastCheckoutSubmissionRef.current
-      && lastCheckoutSubmissionRef.current.fingerprint !== cartFingerprint(cartItems)) {
-      checkoutRefRef.current = null;
-      lastCheckoutOptionsRef.current = null;
-      lastCheckoutSubmissionRef.current = null;
-      setModalOpen(false);
-      setCartAnnouncement('Your basket changed after review. Review the current basket before sending a new order request.');
-      if (window.matchMedia?.('(max-width: 768px)').matches) setMobileCartOpen(true);
-      else setCartDrawerOpen(true);
-      return;
-    }
-    void sendOrderEmail(lastCheckoutOptionsRef.current);
+    if (!pendingCheckoutRef.current || orderStatus === 'sending') return;
+    void sendOrderEmail(pendingCheckoutRef.current.options, true);
   };
 
   const viewSubmittedOrder = () => {
@@ -1992,24 +2044,19 @@ export default function App({
     // it would be unreliable — React may run the updater later, or twice in
     // StrictMode, so `added`/`overflow` could be wrong or double-counted in the
     // message shown to the customer.
-    const nextCart = cartItems.map((entry) => ({ ...entry }));
+    let nextCart = mergeBasketLines(cartItems);
     let added = 0;
     let overflow = 0;
     for (const item of resolved) {
-      const existing = nextCart.find((entry) => entry.product.id === item.product.id);
-      if (existing) {
-        if (existing.preference && item.preference && existing.preference !== item.preference) { missing.push({ ...item, productId: item.product.id, reason: 'preference_conflict' }); continue; }
-        existing.qty += item.qty;
-        if (item.preference) existing.preference = item.preference;
-        added += 1;
-        continue;
-      }
-      // The server rejects an order over MAX_CART_LINES lines. Stopping here
-      // beats letting the cart grow past the limit and failing at checkout,
-      // after the customer has already spent the effort.
-      if (nextCart.length >= MAX_CART_LINES) { overflow += 1; continue; }
-      nextCart.push(item);
-      added += 1;
+      const result = addBasketLine(nextCart, item, {
+        quantityCapForProduct: cartQtyCapForProduct, maxLines: MAX_CART_LINES,
+      });
+      nextCart = result.items;
+      if (result.addedQty > 0) added += 1;
+      if (result.reason === 'line_limit') overflow += 1;
+      else if (result.addedQty < Number(item.qty)) missing.push({
+        ...item, productId: item.product.id, reason: 'stock_limit',
+      });
     }
 
     if (added) {
@@ -2138,7 +2185,7 @@ export default function App({
     const term = routeSearchQuery.trim();
     if (!term) { shoppingSearchKey.current = ''; clearShoppingSearch('main'); clearShoppingSearch('instore'); return; }
     // Count completed successful results, never loading or failed requests as zero results.
-    if (catalogueResultsPending || visibleInstoreSearch.loading || visibleInstoreSearch.error) return;
+    if (catalogueResultsPending || catalogError || visibleInstoreSearch.loading || visibleInstoreSearch.error) return;
     const key = JSON.stringify([term, pathKey, activeCollection]);
     if (shoppingSearchKey.current === key) return;
     const timer = window.setTimeout(() => {
@@ -2148,7 +2195,7 @@ export default function App({
         metadata: { department: path.join('/'), collection: activeCollection } });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [customer?.id, routeSearchQuery, pathKey, path, activeCollection, viewingInstoreProducts, catalogueResultsPending, visibleInstoreSearch.loading, visibleInstoreSearch.error, visibleCatalogResults.total, visibleInstoreSearch.total]);
+  }, [customer?.id, routeSearchQuery, pathKey, path, activeCollection, viewingInstoreProducts, catalogueResultsPending, catalogError, visibleInstoreSearch.loading, visibleInstoreSearch.error, visibleCatalogResults.total, visibleInstoreSearch.total]);
   useEffect(() => {
     if (!customer?.id || !cartHydrated) { previousShoppingBasket.current = null; return; }
     if (!cartItems.length || shoppingCheckoutBasket.current !== cartFingerprint(cartItems)) shoppingCheckoutBasket.current = null;
@@ -2312,6 +2359,8 @@ export default function App({
             collectionLabel={collectionLabel(activeCollection)}
             recommendationProducts={recommendationProducts}
             loading={catalogueResultsPending}
+            catalogueError={catalogError}
+            onRetryCatalogue={() => setCatalogRefreshKey((key) => key + 1)}
             page={page}
             totalPages={totalPages}
             onPageChange={handlePageChange}
@@ -2344,6 +2393,7 @@ export default function App({
             cartItems={cartItems}
             cartTotal={cartTotal}
             updateQty={updateQty}
+            quantityCapForProduct={cartQtyCapForProduct}
             removeFromCart={removeFromCart}
             clearCart={clearCart}
             onUndoClear={undoClearCart}
@@ -2382,6 +2432,7 @@ export default function App({
           orderError={orderError}
           orderChanges={orderChanges}
           orderNumber={submittedOrderNumber}
+          orderRecoveryNote={orderRecoveryNote}
           onRetry={retryLastOrderSubmission}
           onReview={() => {
             setModalOpen(false);
@@ -2462,6 +2513,7 @@ export default function App({
                 cartItems={cartItems}
                 cartTotal={cartTotal}
                 updateQty={updateQty}
+                quantityCapForProduct={cartQtyCapForProduct}
                 removeFromCart={removeFromCart}
                 clearCart={clearCart}
                 onUndoClear={undoClearCart}

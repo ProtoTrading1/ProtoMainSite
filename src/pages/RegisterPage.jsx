@@ -88,6 +88,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [showAccountRecovery, setShowAccountRecovery] = useState(false);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
   const [standaloneStep, setStandaloneStep] = useState(0);
 
@@ -342,6 +343,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       });
       setCustomerCode(result?.customerCode || result?.profile?.customerCode || '');
       setInstantAccess(Boolean(result?.instantAccess));
+      setVerificationRequired(result?.emailVerificationRequired === true);
       setDone(true);
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
@@ -356,9 +358,11 @@ export default function RegisterPage({ onLogin, standalone = false }) {
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
-                <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
+                <h3>{verificationRequired ? 'Confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
                 <p>
-                  {instantAccess
+                  {verificationRequired
+                    ? <>Thank you, {contactName.trim()}. Confirm your email using the link sent to {email.trim()} before signing in. If no link arrives, use Resend confirmation email on the sign-in screen.</>
+                    : instantAccess
                     ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — sign in with {email.trim()} to access the catalogue.</>
                     : <>Thank you, {contactName.trim()}. Proto is reviewing your application and we will notify {email.trim()} when you have been approved.</>}
                 </p>

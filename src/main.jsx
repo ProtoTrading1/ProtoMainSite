@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import Root from './Root.jsx'
+import SiteErrorBoundary from './components/SiteErrorBoundary.jsx'
 import { captureError, initMonitoring } from './lib/monitoring'
 
 initMonitoring();
@@ -18,9 +19,11 @@ window.addEventListener('unhandledrejection', (event) => {
     captureError(event?.reason, { source: 'unhandledrejection' });
     return;
   }
-  if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === '1') return;
+  try {
+    if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === '1') return;
+    window.sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+  } catch { return; }
   event.preventDefault();
-  try { window.sessionStorage.setItem(CHUNK_RELOAD_KEY, '1'); } catch { /* storage may be unavailable */ }
   window.location.reload();
 });
 
@@ -30,6 +33,6 @@ window.addEventListener('error', (event) => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Root />
+    <SiteErrorBoundary><Root /></SiteErrorBoundary>
   </StrictMode>,
 )
