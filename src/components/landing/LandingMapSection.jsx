@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { motion } from 'motion/react';
+import SiteErrorBoundary from '../SiteErrorBoundary';
 
 const SouthernAfricaMap = lazy(() => import('../SouthernAfricaMap'));
 
@@ -26,9 +27,11 @@ export default function LandingMapSection() {
         viewport={{ once: true, margin: '-60px' }}
         transition={{ duration: 0.55, ease: 'easeOut' }}
       >
+        <SiteErrorBoundary fallback={<p role="status">The interactive map is unavailable. We deliver across South Africa and the wider SADC region.</p>}>
         <Suspense fallback={<div style={{ width: '100%', height: '100%' }} />}>
           <SouthernAfricaMap />
         </Suspense>
+        </SiteErrorBoundary>
       </motion.div>
     </motion.section>
   );

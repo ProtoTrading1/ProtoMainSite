@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
@@ -8,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
-import { generateAndStoreOrderPdf } from './_order-pdf.js';
+import { buildOrderPdfBuffer } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
 import {
@@ -27,7 +28,6 @@ import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
   assertOrderCaptureSchemaReady,
-  enqueueFailedOrderDeliveries,
   isMissingClientRefSchema,
   OrderDeliverySchemaError,
 } from './_order-delivery-safety.js';
@@ -212,7 +212,7 @@ async function sendTeamEmailWithRetry(payload, orderNumber) {
       const body = await resp.json().catch(() => ({}));
       lastStatus = resp.status;
 
-      if (resp.ok) {
+      if (resp.ok || body.code === 'duplicate_parameter') {
         return {
           ok: true,
           attemptCount: attempt,
@@ -395,6 +395,7 @@ async function resolveStandardPrices(items) {
   }
 
   const reviewChanges = [];
+  const requestedBySku = new Map();
   const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
@@ -415,6 +416,10 @@ async function resolveStandardPrices(items) {
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
+    const aggregateKey = textId(row.sku);
+    const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
+    aggregate.qty += qty;
+    requestedBySku.set(aggregateKey, aggregate);
     const review = evaluateCheckoutSnapshot({
       sku: row.sku,
       name: cleanText(row.title, `Product on line ${index + 1}`),
@@ -465,6 +470,24 @@ async function resolveStandardPrices(items) {
       },
     };
   });
+
+  // Preferences form separate order lines but share the same physical SKU.
+  // Resolve identifiers first so SKU/barcode aliases cannot split the cap.
+  for (const { qty, row, availability, toOrder, submittedSnapshot } of requestedBySku.values()) {
+    if (toOrder) continue;
+    const stockQty = normaliseStockQty(availability.stockQty);
+    if (stockQty !== null && qty <= stockQty) continue;
+    const aggregateReview = evaluateCheckoutSnapshot({
+      sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
+      submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+    });
+    const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
+    if (existing.length) {
+      for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
+    } else if (aggregateReview) {
+      reviewChanges.push(aggregateReview);
+    }
+  }
 
   if (reviewChanges.length) {
     const error = new Error('Price or stock changed while you were shopping. Review the affected products before sending your order request.');
@@ -1083,7 +1106,7 @@ export function teamOrderSubject({ customer, orderNumber } = {}) {
   return `New order received from ${identity}${contactSuffix}${orderNumber ? ` — ${cleanText(orderNumber)}` : ''}`;
 }
 
-async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, totals, deliveryMethod, customerNotes, promo }) {
+async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, totals, deliveryMethod, customerNotes, promo, providerKey }) {
   // Recipient is the AUTHENTICATED account email, never the client-supplied
   // customer.email — otherwise a logged-in user could make Proto's Brevo send
   // "order received" mail to any address they type. Name is cosmetic only.
@@ -1105,6 +1128,7 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
           email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
         },
         to: [{ email: to, name: cleanText(customer?.name) || to }],
+        headers: { idempotencyKey: providerKey },
         subject: orderNumber
           ? `Order received ${orderNumber} — Proto Trading Online`
           : 'We have received your order — Proto Trading Online',
@@ -1124,6 +1148,7 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
     });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
+      if (body.code === 'duplicate_parameter') return { sent: true, recipient: to, deduplicated: true, at: new Date().toISOString() };
       console.error('send-order: customer ack email error:', resp.status, JSON.stringify(body));
       return {
         sent: false,
@@ -1147,7 +1172,7 @@ async function sendCustomerOrderAck({ customer, toEmail, orderNumber, items, tot
 }
 
 /** Persist a verified order. Idempotency is scoped to the authenticated user. */
-export async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef }) {
+export async function captureOrderRow({ supabase, userId, items, subtotal, deliveryMethod, customerNotes, promo, clientRef, requestHash, notificationSnapshot }) {
   try {
     if (clientRef) {
       const { data: existing, error: lookupError } = await supabase
@@ -1157,7 +1182,7 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
         .eq('customer_id', userId)
         .maybeSingle();
       if (lookupError) throw lookupError;
-      if (existing) return existing;
+      if (existing) return assertMatchingOrder(existing, requestHash);
     }
 
     const rows = items.map((item) => {
@@ -1181,6 +1206,8 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
 
     const insertRow = {
       customer_id: userId,
+      checkout_request_hash: requestHash,
+      checkout_notification_snapshot: notificationSnapshot,
       items: rows,
       original_items: rows,
       final_items: rows,
@@ -1205,7 +1232,7 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
         .eq('customer_id', userId)
         .maybeSingle();
       if (existingError) throw existingError;
-      if (existing) return existing;
+      if (existing) return assertMatchingOrder(existing, requestHash);
     }
     if (error) {
       console.error('send-order: server-side order capture failed:', error.message);
@@ -1213,6 +1240,7 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
     }
     return data;
   } catch (err) {
+    if (err instanceof OrderReplayError) throw err;
     if (isMissingClientRefSchema(err)) {
       throw new OrderDeliverySchemaError(
         'Ordering is temporarily unavailable while duplicate-order protection is restored. Your basket is safe — please try again shortly.',
@@ -1223,7 +1251,245 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
   }
 }
 
-export default async function handler(req, res) {
+const ORDER_HANDLER_DEPENDENCIES = { requireApprovedCustomer, getPortalAdminClient, resolveAuthoritativePrices, resolveOrderNotifyRecipients, prepareItems, buildPdfBuffer, buildOrderPdfBuffer, sendTeamEmailWithRetry, sendCustomerOrderAck, runOrderTeamNotify, readOrderNotifyLog, saveOrderNotifyLog, validatePromoCode, isCustomerEligibleForPromo, hasCustomerUsedPromo, claimPromoRedemption, finalisePromoRedemption, releasePromoRedemption };
+
+export function createSendOrderHandler(overrides = {}) {
+  const { requireApprovedCustomer, getPortalAdminClient, resolveAuthoritativePrices, resolveOrderNotifyRecipients, prepareItems, buildPdfBuffer, buildOrderPdfBuffer, sendTeamEmailWithRetry, sendCustomerOrderAck, runOrderTeamNotify, readOrderNotifyLog, saveOrderNotifyLog, validatePromoCode, isCustomerEligibleForPromo, hasCustomerUsedPromo, claimPromoRedemption, finalisePromoRedemption, releasePromoRedemption } = { ...ORDER_HANDLER_DEPENDENCIES, ...overrides };
+
+  async function deliverCapturedOrder(captured, portal, user, res) {
+    const { items: orderItems, customer, totals, deliveryMethod, customerNotes, promo, notifyEmails } = captured.checkout_notification_snapshot;
+  const orderId = String(captured.id);
+  const orderNumber = cleanText(captured.order_number);
+
+  // Attachment generation is pure. Both renderers use the protected checkout
+  // snapshot; storage and fulfilment handover run only inside their claim.
+  let pdfBuffer = null;
+  let pdfSource = 'order-email';
+  try {
+    const preparedItems = await prepareItems(orderItems);
+    pdfBuffer = await buildPdfBuffer({
+      items: preparedItems,
+      customer,
+      totals,
+      deliveryMethod,
+      customerNotes,
+      promo,
+      orderNumber,
+      orderDate: captured.created_at,
+    });
+  } catch (err) {
+    console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
+    try {
+      pdfBuffer = await buildOrderPdfBuffer({
+        order: { id: orderId, order_number: orderNumber, created_at: captured.created_at, delivery_method: deliveryMethod, customer_notes: customerNotes },
+        customer,
+        items: orderItems.map(item => ({
+          productId: item.product.id,
+          code: item.product.code,
+          name: item.preference ? `${item.product.name} — ${item.preference}` : item.product.name,
+          qty: item.qty,
+        })),
+      });
+      pdfSource = 'fulfilment-fallback';
+      console.warn('send-order: attached fulfilment PDF fallback:', orderNumber);
+    } catch (fallbackErr) {
+      console.error('send-order: fallback PDF generation failed:', fallbackErr?.stack || fallbackErr?.message || fallbackErr);
+    }
+  }
+
+  // Brevo caps a message at ~10 MB and `content` is base64, which inflates the
+  // PDF by ~33%. A large order (hundreds of lines, each with a product image)
+  // can blow past that; Brevo then rejects the whole send and the team receives
+  // NOTHING — the worst possible outcome, and it lands hardest on the biggest
+  // orders. Cap the attachment well under the limit and fall back to a signed
+  // download link rather than losing the notification.
+  const pdfTooLarge = Boolean(pdfBuffer) && pdfBuffer.length > MAX_ATTACHMENT_BYTES;
+  if (pdfTooLarge) {
+    console.warn('send-order: order PDF too large to attach, sending download link instead', {
+      orderNumber,
+      pdfBytes: pdfBuffer.length,
+      limitBytes: MAX_ATTACHMENT_BYTES,
+      lineCount: orderItems.length,
+    });
+  }
+
+  const attachment = pdfBuffer && !pdfTooLarge
+    ? [{
+        name: `proto-order-${cleanText(orderNumber, String(Date.now()))}.pdf`,
+        content: pdfBuffer.toString('base64'),
+      }]
+    : undefined;
+
+  // Signed, per-order link to the stored PDF. The route regenerates the file if
+  // it is missing, so this works even when PDF generation failed a moment ago.
+  const pdfLink = orderId && orderToken(orderId)
+    ? `${APP_ORIGIN}/api/orders/${orderId}/pdf?k=${orderToken(orderId)}`
+    : null;
+
+  // The email ALWAYS goes out. Previously a missing attachment skipped the send
+  // entirely, so a PDF failure silently cost the team the whole order.
+  const pdfNotice = attachment
+    ? ''
+    : `<p style="margin:0 0 18px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412;font-size:14px;line-height:1.6;">
+        <strong>${pdfTooLarge ? 'This order is too large to attach as a PDF.' : 'The order PDF could not be generated automatically.'}</strong><br/>
+        ${pdfLink
+          ? `Every line is listed below, and the full PDF is here: <a href="${pdfLink}" style="color:#c40000;font-weight:700;">Download order ${escapeHtml(cleanText(orderNumber, ''))}</a>`
+          : 'Every line is listed below — open the order in the admin portal for the PDF.'}
+      </p>`;
+
+  const teamEmailResult = await deliverOrderChannel(portal, orderId, 'team_email', async (providerKey) => ({
+    ...await sendTeamEmailWithRetry({
+      sender: {
+        name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
+        email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
+      },
+      to: notifyEmails.map((email) => ({ email })),
+      replyTo: customer.email ? { email: customer.email } : undefined,
+      // Reads as what it is — a new order from a customer — and carries the
+      // order number so the team can find it without opening the mail.
+      subject: teamOrderSubject({ customer, orderNumber }),
+      htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo, notice: pdfNotice }),
+      attachment,
+      // Brevo applies this key when a timed-out request is retried, preventing
+      // the same order email from being delivered twice.
+      headers: { idempotencyKey: providerKey },
+    }, orderNumber),
+    pdfAttached: Boolean(attachment),
+  }));
+
+  const emailDeliveryFailed = !teamEmailResult.ok;
+  const emailFailReason = teamEmailResult.error;
+  const emailMessageId = teamEmailResult.messageId;
+  const emailAttemptCount = teamEmailResult.attemptCount;
+  const emailProviderStatus = teamEmailResult.status;
+
+  if (teamEmailResult.ok) {
+    console.info('send-order: team email accepted by Brevo', {
+      orderNumber,
+      recipients: notifyEmails,
+      lineCount: orderItems.length,
+      pdfAttached: Boolean(attachment),
+      pdfBytes: pdfBuffer?.length ?? 0,
+      pdfTooLarge,
+      pdfLinkSent: !attachment && Boolean(pdfLink),
+      pdfSource,
+      attemptCount: emailAttemptCount,
+      providerStatus: emailProviderStatus,
+      messageId: emailMessageId || null,
+    });
+  }
+
+  let notifyResult = null;
+  let customerAckResult;
+  if (orderId) {
+    // The order is already durably saved at this point, and these three tasks
+    // are independent of one another. Running them CONCURRENTLY (instead of
+    // serially) cuts the time this function is held open from the sum of three
+    // network fan-outs to the slowest one — which is what protects serverless
+    // concurrency during a burst of checkouts. Each is individually best-effort:
+    // a failure is logged and never fails the order.
+    const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
+      // 1) Team WhatsApp notification (+ stored fulfilment PDF).
+      deliverOrderChannel(portal, orderId, 'pdf', () => runOrderTeamNotify(orderId, {
+        emailSent: !emailDeliveryFailed,
+        emailRecipients: notifyEmails,
+        emailMessageId,
+        emailFailReason,
+        emailAttemptCount,
+        emailProviderStatus,
+        pdfAttached: Boolean(attachment),
+        pdfSource,
+      })),
+
+      // 2) Premium tier upgrade — recomputed from the immutable, protected
+      //    checkout snapshot, never browser-editable order rows/client totals.
+      (async () => {
+        const supabase = getPortalAdminClient();
+        const storedItems = orderItems;
+        const serverTotal = storedItems.reduce(
+          (sum, it) => sum + Number(it.product?.price || 0) * Number(it.qty || 0),
+          0,
+        );
+        const qualifies = serverTotal > 4000 && storedItems.some((it) => Number(it.qty || 0) > 10);
+        if (qualifies && captured.customer_id) {
+          await supabase
+            .from('customers')
+            .update({ tier: 'premium' })
+            .eq('id', captured.customer_id)
+            .eq('tier', 'regular');
+        }
+      })(),
+
+      // 3) Customer acknowledgement email (to their verified account email).
+      deliverOrderChannel(portal, orderId, 'customer_email', (providerKey) => sendCustomerOrderAck({
+        customer,
+        toEmail: customer.email,
+        providerKey,
+        orderNumber,
+        items: orderItems,
+        totals,
+        deliveryMethod,
+        customerNotes,
+        promo,
+      })),
+    ]);
+
+    if (notifySettled.status === 'fulfilled') {
+      notifyResult = notifySettled.value;
+    } else {
+      console.error('send-order: team notify failed:', notifySettled.reason?.message || notifySettled.reason);
+    }
+    customerAckResult = ackSettled.status === 'fulfilled'
+      ? ackSettled.value
+      : { sent: false, error: ackSettled.reason?.message || 'Customer acknowledgement failed' };
+    // Keep a server-side trace for the other two as well — allSettled would
+    // otherwise swallow them, leaving a missing acknowledgement email or a
+    // silently-skipped tier upgrade with no evidence in the logs.
+    for (const [label, settled] of [['premium tier check', tierSettled], ['customer ack email', ackSettled]]) {
+      if (settled.status === 'rejected') {
+        console.error(`send-order: ${label} failed:`, settled.reason?.message || settled.reason);
+      }
+    }
+
+    // Complete the delivery audit only after the parallel send operations have
+    // settled. Merging with the notification log preserves the WhatsApp/PDF
+    // evidence written by runOrderTeamNotify while adding the independently
+    // delivered customer acknowledgement result.
+    try {
+      const customerAck = customerAckResult;
+      const currentLog = await readOrderNotifyLog(orderId) || { orderId };
+      if (!customerAck?.pending) await saveOrderNotifyLog(orderId, {
+        ...currentLog,
+        customerEmailSent: Boolean(customerAck?.sent),
+        customerEmailRecipient: customerAck?.recipient || cleanText(user?.email) || null,
+        customerEmailMessageId: customerAck?.messageId || null,
+        customerEmailProviderStatus: customerAck?.providerStatus ?? null,
+        customerEmailFailReason: customerAck?.error || null,
+        customerEmailAt: customerAck?.at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('send-order: failed to persist customer acknowledgement audit:', err?.message || err);
+    }
+
+  }
+
+  return res.status(200).json({
+    success: true,
+    orderId,
+    orderNumber,
+    dbCaptureFailed: false,
+    emailDeliveryFailed,
+    emailFailReason: emailDeliveryFailed ? emailFailReason : null,
+    pdfAttached: Boolean(teamEmailResult.pdfAttached),
+    emailMessageId,
+    notify: notifyResult,
+    notifyWarning: notifyResult && !notifyResult.ok
+      ? notifyResult.statusBlockedReason || 'Order notification is awaiting confirmation'
+      : null,
+  });
+  }
+
+  return async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -1276,6 +1542,7 @@ export default async function handler(req, res) {
   const portal = getPortalAdminClient();
   try {
     await assertOrderCaptureSchemaReady(portal);
+    await assertOrderReplaySchemaReady(portal);
   } catch (error) {
     console.error('send-order: order capture schema is not ready:', error?.message || error);
     return res.status(error?.status || 503).json({
@@ -1284,10 +1551,27 @@ export default async function handler(req, res) {
     });
   }
 
+  let requestHash;
+  try {
+    requestHash = checkoutRequestHash({ items, deliveryMethod, customerNotes, promoCode: rawPromoCode });
+    const existing = await findMatchingOrder(portal, user.id, clientRef, requestHash);
+    if (existing) return deliverCapturedOrder(existing, portal, user, res);
+  } catch (error) {
+    return res.status(error?.status || 503).json({ error: error.message, code: error.code });
+  }
+
   let orderItems;
   try {
     orderItems = await resolveAuthoritativePrices(items);
   } catch (err) {
+    // Another same-reference request may have captured while this one was
+    // validating stock. Recheck the saved intent before exposing a new review.
+    try {
+      const existing = await findMatchingOrder(portal, user.id, clientRef, requestHash);
+      if (existing) return deliverCapturedOrder(existing, portal, user, res);
+    } catch (error) {
+      return res.status(error?.status || 503).json({ error: error.message, code: error.code });
+    }
     return res.status(err?.status || 500).json({
       error: err?.message || 'Order items could not be verified.',
       code: err?.code || null,
@@ -1308,10 +1592,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'PROTO75 is available only to eligible 10,000 Club customers.' });
       }
       if (await hasCustomerUsedPromo(portal, user.id, promoResult.code)) {
+        const existing = await findMatchingOrder(portal, user.id, clientRef, requestHash);
+        if (existing) return deliverCapturedOrder(existing, portal, user, res);
         return res.status(400).json({ error: 'This promo code has already been used on a previous order.' });
       }
     } catch (err) {
-      return res.status(503).json({ error: err.message });
+      return res.status(err?.status || 503).json({ error: err.message, code: err?.code || null });
     }
     promo = {
       code: promoResult.code,
@@ -1382,10 +1668,12 @@ export default async function handler(req, res) {
     try {
       promoRedemptionId = await claimPromoRedemption(portal, { customerId: user.id, code: promo.code });
       if (!promoRedemptionId) {
-        return res.status(400).json({ error: 'This promo code has already been used on a previous order.' });
+        const existing = await findMatchingOrder(portal, user.id, clientRef, requestHash);
+        if (existing) return deliverCapturedOrder(existing, portal, user, res);
+        return res.status(409).json({ error: 'A checkout using this promo is still being captured. Please try this same checkout again shortly.', code: 'PROMO_REDEMPTION_IN_PROGRESS' });
       }
     } catch (error) {
-      return res.status(503).json({ error: error.message });
+      return res.status(error?.status || 503).json({ error: error.message, code: error?.code || null });
     }
   }
 
@@ -1400,10 +1688,12 @@ export default async function handler(req, res) {
       customerNotes,
       promo,
       clientRef,
+      requestHash,
+      notificationSnapshot: { version: 1, items: orderItems, customer, totals, deliveryMethod, customerNotes, promo, notifyEmails },
     });
   } catch (error) {
     await releasePromoRedemption(portal, promoRedemptionId);
-    if (error instanceof OrderDeliverySchemaError) {
+    if (error instanceof OrderDeliverySchemaError || error instanceof OrderReplayError) {
       return res.status(error.status).json({ error: error.message, code: error.code });
     }
     throw error;
@@ -1416,269 +1706,10 @@ export default async function handler(req, res) {
   }
   const orderId = String(captured.id);
   const orderNumber = cleanText(captured.order_number);
-
-  // The redemption was atomically reserved before order capture. Attach the
-  // resulting order without opening a race where two checkouts get one code.
   await finalisePromoRedemption(portal, { redemptionId: promoRedemptionId, orderId, orderNumber });
-
-  // Generate the polished order sheet first. If that renderer fails, fall back
-  // to the independently maintained fulfilment PDF so the operational email is
-  // never silently sent without an attachment.
-  let pdfBuffer = null;
-  let pdfSource = 'order-email';
-  try {
-    const preparedItems = await prepareItems(orderItems);
-    pdfBuffer = await buildPdfBuffer({
-      items: preparedItems,
-      customer,
-      totals,
-      deliveryMethod,
-      customerNotes,
-      promo,
-      orderNumber,
-      orderDate: captured.created_at,
-    });
-  } catch (err) {
-    console.error('send-order: PDF generation failed:', err?.stack || err?.message || err);
-    try {
-      const fallback = await generateAndStoreOrderPdf(orderId);
-      pdfBuffer = fallback?.buffer || null;
-      pdfSource = 'fulfilment-fallback';
-      console.warn('send-order: attached fulfilment PDF fallback:', orderNumber);
-    } catch (fallbackErr) {
-      console.error('send-order: fallback PDF generation failed:', fallbackErr?.stack || fallbackErr?.message || fallbackErr);
-    }
-  }
-
-  // Brevo caps a message at ~10 MB and `content` is base64, which inflates the
-  // PDF by ~33%. A large order (hundreds of lines, each with a product image)
-  // can blow past that; Brevo then rejects the whole send and the team receives
-  // NOTHING — the worst possible outcome, and it lands hardest on the biggest
-  // orders. Cap the attachment well under the limit and fall back to a signed
-  // download link rather than losing the notification.
-  const pdfTooLarge = Boolean(pdfBuffer) && pdfBuffer.length > MAX_ATTACHMENT_BYTES;
-  if (pdfTooLarge) {
-    console.warn('send-order: order PDF too large to attach, sending download link instead', {
-      orderNumber,
-      pdfBytes: pdfBuffer.length,
-      limitBytes: MAX_ATTACHMENT_BYTES,
-      lineCount: orderItems.length,
-    });
-  }
-
-  const attachment = pdfBuffer && !pdfTooLarge
-    ? [{
-        name: `proto-order-${cleanText(orderNumber, String(Date.now()))}.pdf`,
-        content: pdfBuffer.toString('base64'),
-      }]
-    : undefined;
-
-  // Signed, per-order link to the stored PDF. The route regenerates the file if
-  // it is missing, so this works even when PDF generation failed a moment ago.
-  const pdfLink = orderId && orderToken(orderId)
-    ? `${APP_ORIGIN}/api/orders/${orderId}/pdf?k=${orderToken(orderId)}`
-    : null;
-
-  // The email ALWAYS goes out. Previously a missing attachment skipped the send
-  // entirely, so a PDF failure silently cost the team the whole order.
-  const pdfNotice = attachment
-    ? ''
-    : `<p style="margin:0 0 18px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412;font-size:14px;line-height:1.6;">
-        <strong>${pdfTooLarge ? 'This order is too large to attach as a PDF.' : 'The order PDF could not be generated automatically.'}</strong><br/>
-        ${pdfLink
-          ? `Every line is listed below, and the full PDF is here: <a href="${pdfLink}" style="color:#c40000;font-weight:700;">Download order ${escapeHtml(cleanText(orderNumber, ''))}</a>`
-          : 'Every line is listed below — open the order in the admin portal for the PDF.'}
-      </p>`;
-
-  const teamEmailResult = await sendTeamEmailWithRetry({
-      sender: {
-        name: process.env.BREVO_SENDER_NAME || 'Proto Trading Portal',
-        email: process.env.BREVO_SENDER_EMAIL || 'online@proto.co.za',
-      },
-      to: notifyEmails.map((email) => ({ email })),
-      replyTo: customer.email ? { email: customer.email } : undefined,
-      // Reads as what it is — a new order from a customer — and carries the
-      // order number so the team can find it without opening the mail.
-      subject: teamOrderSubject({ customer, orderNumber }),
-      htmlContent: buildOrderEmailHtml({ audience: 'team', orderNumber, customer, items: orderItems, totals, deliveryMethod, customerNotes, promo, notice: pdfNotice }),
-      attachment,
-      // Brevo applies this key when a timed-out request is retried, preventing
-      // the same order email from being delivered twice.
-      headers: { 'Idempotency-Key': `proto-team-order-${orderNumber}` },
-  }, orderNumber);
-
-  const emailDeliveryFailed = !teamEmailResult.ok;
-  const emailFailReason = teamEmailResult.error;
-  const emailMessageId = teamEmailResult.messageId;
-  const emailAttemptCount = teamEmailResult.attemptCount;
-  const emailProviderStatus = teamEmailResult.status;
-
-  if (teamEmailResult.ok) {
-    console.info('send-order: team email accepted by Brevo', {
-      orderNumber,
-      recipients: notifyEmails,
-      lineCount: orderItems.length,
-      pdfAttached: Boolean(attachment),
-      pdfBytes: pdfBuffer?.length ?? 0,
-      pdfTooLarge,
-      pdfLinkSent: !attachment && Boolean(pdfLink),
-      pdfSource,
-      attemptCount: emailAttemptCount,
-      providerStatus: emailProviderStatus,
-      messageId: emailMessageId || null,
-    });
-  }
-
-  let notifyResult = null;
-  let customerAckResult;
-  if (orderId) {
-    try {
-      const supabase = getPortalAdminClient();
-      const patch = {
-        delivery_method: deliveryMethod,
-        ...(customerNotes ? { customer_notes: customerNotes } : {}),
-        ...(promo?.code ? {
-          promo_code: promo.code,
-          discount_pct: promo.discountPct,
-          discount_amount: promo.discountAmount,
-        } : {}),
-      };
-      const { error: patchErr } = await supabase.from('orders').update(patch).eq('id', orderId);
-      if (patchErr) console.error('send-order: delivery/notes update failed:', patchErr.message);
-    } catch (err) {
-      console.error('send-order: delivery/notes update failed:', err.message);
-    }
-
-    // The order is already durably saved at this point, and these three tasks
-    // are independent of one another. Running them CONCURRENTLY (instead of
-    // serially) cuts the time this function is held open from the sum of three
-    // network fan-outs to the slowest one — which is what protects serverless
-    // concurrency during a burst of checkouts. Each is individually best-effort:
-    // a failure is logged and never fails the order.
-    const [notifySettled, tierSettled, ackSettled] = await Promise.allSettled([
-      // 1) Team WhatsApp notification (+ stored fulfilment PDF).
-      runOrderTeamNotify(orderId, {
-        emailSent: !emailDeliveryFailed,
-        emailRecipients: notifyEmails,
-        emailMessageId,
-        emailFailReason,
-        emailAttemptCount,
-        emailProviderStatus,
-        pdfAttached: Boolean(attachment),
-        pdfSource,
-      }),
-
-      // 2) Premium tier upgrade — recomputed server-side from the stored order
-      //    row, never from client-sent totals.
-      (async () => {
-        const supabase = getPortalAdminClient();
-        const { data: order } = await supabase
-          .from('orders')
-          .select('customer_id, items')
-          .eq('id', orderId)
-          .maybeSingle();
-        const storedItems = Array.isArray(order?.items) ? order.items : [];
-        const serverTotal = storedItems.reduce(
-          (sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0),
-          0,
-        );
-        const qualifies = serverTotal > 4000 && storedItems.some((it) => Number(it.qty || 0) > 10);
-        if (qualifies && order?.customer_id) {
-          await supabase
-            .from('customers')
-            .update({ tier: 'premium' })
-            .eq('id', order.customer_id)
-            .eq('tier', 'regular');
-        }
-      })(),
-
-      // 3) Customer acknowledgement email (to their verified account email).
-      sendCustomerOrderAck({
-        customer,
-        toEmail: user?.email,
-        orderNumber,
-        items: orderItems,
-        totals,
-        deliveryMethod,
-        customerNotes,
-        promo,
-      }),
-    ]);
-
-    if (notifySettled.status === 'fulfilled') {
-      notifyResult = notifySettled.value;
-    } else {
-      console.error('send-order: team notify failed:', notifySettled.reason?.message || notifySettled.reason);
-    }
-    customerAckResult = ackSettled.status === 'fulfilled'
-      ? ackSettled.value
-      : { sent: false, error: ackSettled.reason?.message || 'Customer acknowledgement failed' };
-    // Keep a server-side trace for the other two as well — allSettled would
-    // otherwise swallow them, leaving a missing acknowledgement email or a
-    // silently-skipped tier upgrade with no evidence in the logs.
-    for (const [label, settled] of [['premium tier check', tierSettled], ['customer ack email', ackSettled]]) {
-      if (settled.status === 'rejected') {
-        console.error(`send-order: ${label} failed:`, settled.reason?.message || settled.reason);
-      }
-    }
-
-    // Complete the delivery audit only after the parallel send operations have
-    // settled. Merging with the notification log preserves the WhatsApp/PDF
-    // evidence written by runOrderTeamNotify while adding the independently
-    // delivered customer acknowledgement result.
-    try {
-      const customerAck = customerAckResult;
-      const currentLog = await readOrderNotifyLog(orderId) || { orderId };
-      await saveOrderNotifyLog(orderId, {
-        ...currentLog,
-        customerEmailSent: Boolean(customerAck?.sent),
-        customerEmailRecipient: customerAck?.recipient || cleanText(user?.email) || null,
-        customerEmailMessageId: customerAck?.messageId || null,
-        customerEmailProviderStatus: customerAck?.providerStatus ?? null,
-        customerEmailFailReason: customerAck?.error || null,
-        customerEmailAt: customerAck?.at || new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('send-order: failed to persist customer acknowledgement audit:', err?.message || err);
-    }
-
-    try {
-      const failures = [
-        emailDeliveryFailed ? { channel: 'team_email' } : null,
-        notifyResult?.pdfStored === true ? null : { channel: 'pdf' },
-        customerAckResult?.sent === true ? null : { channel: 'customer_email' },
-      ].filter(Boolean);
-      const queueResult = await enqueueFailedOrderDeliveries({
-        supabase: portal,
-        orderId,
-        orderCreatedAt: captured.created_at,
-        failures,
-      });
-      if (queueResult.queued) {
-        console.warn('send-order: delivery failures queued for durable retry', {
-          orderId,
-          count: queueResult.count,
-        });
-      }
-    } catch (err) {
-      // Queueing never changes the fact that the order itself was captured.
-      // The existing notify log remains the manual reconciliation source.
-      console.error('send-order: failed to enqueue durable delivery retry:', err?.message || err);
-    }
-  }
-
-  return res.status(200).json({
-    success: true,
-    orderId,
-    orderNumber,
-    dbCaptureFailed: false,
-    emailDeliveryFailed,
-    emailFailReason: emailDeliveryFailed ? emailFailReason : null,
-    pdfAttached: Boolean(attachment),
-    emailMessageId,
-    notify: notifyResult,
-    notifyWarning: notifyResult && !notifyResult.ok
-      ? notifyResult.statusBlockedReason || 'WhatsApp team notification did not reach everyone'
-      : null,
-  });
+  return deliverCapturedOrder(captured, portal, user, res);
 }
+
+}
+
+export default createSendOrderHandler();

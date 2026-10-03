@@ -86,7 +86,7 @@ function preloadCatalogImages(products, limit = 60) {
 
 /** Start catalogue fetch early (e.g. on login) so data is ready before App mounts. */
 export function prefetchCatalog() {
-  void getAllCached().then((products) => preloadCatalogImages(products));
+  void getAllCached().then((products) => preloadCatalogImages(products)).catch(() => {});
   // Category pages need the merchandising order as well as the product rows.
   // Start that independent request during portal boot instead of making the
   // customer's first department click wait for it.
@@ -249,7 +249,11 @@ function startCatalogFetch() {
 
 function getAllCached() {
   if (_cache) {
-    if (!_loadPromise) _loadPromise = startCatalogFetch();
+    if (!_loadPromise) {
+      _loadPromise = startCatalogFetch();
+      // A cached read remains usable if its optional background refresh fails.
+      void _loadPromise.catch(() => {});
+    }
     return Promise.resolve(_cache);
   }
 
@@ -258,6 +262,9 @@ function getAllCached() {
       if (stale?.length && !_cache) _cache = stale;
       if (!_loadPromise) _loadPromise = startCatalogFetch();
       return _cache ? Promise.resolve(_cache) : _loadPromise;
+    }).catch((error) => {
+      _persistentCachePromise = null;
+      throw error;
     });
   }
   return _persistentCachePromise;
@@ -682,6 +689,9 @@ async function fetchBrowseProducts(categoryPath) {
     .catch(async () => {
       const all = await getAllCached();
       return applyPathFilter(all, categoryPath);
+    }).catch((error) => {
+      if (_browseRequests.get(key) === request) _browseRequests.delete(key);
+      throw error;
     });
   _browseRequests.set(key, request);
   return request;

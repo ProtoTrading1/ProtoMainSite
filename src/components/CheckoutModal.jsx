@@ -9,6 +9,7 @@ import { validatePromoCode } from '../lib/promoCode';
 import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import { groupCartItemsByFulfilment } from '../../lib/cart-fulfilment.mjs';
+import { basketLineKey } from '../../lib/basket-lines.mjs';
 
 function CheckoutLine({ item, toOrder = false }) {
   return (
@@ -254,7 +255,7 @@ export default function CheckoutModal({
                     <span>{groupedItems.available.length} line{groupedItems.available.length === 1 ? '' : 's'}</span>
                   </div>
                   {groupedItems.available.map((item) => (
-                    <CheckoutLine item={item} key={item.product.id} />
+                    <CheckoutLine item={item} key={basketLineKey(item)} />
                   ))}
                 </section>
               )}
@@ -268,7 +269,7 @@ export default function CheckoutModal({
                     <span>{groupedItems.toOrder.length} line{groupedItems.toOrder.length === 1 ? '' : 's'}</span>
                   </div>
                   {groupedItems.toOrder.map((item) => (
-                    <CheckoutLine item={item} toOrder key={item.product.id} />
+                    <CheckoutLine item={item} toOrder key={basketLineKey(item)} />
                   ))}
                   <p className="checkout-to-order-note">
                     We’ll confirm the expected lead time before invoicing. No payment is taken now.

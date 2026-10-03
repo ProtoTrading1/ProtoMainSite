@@ -231,6 +231,10 @@ function Questionnaire({ onLogin }) {
   const [step, setStep] = useState(previewBusinessStep ? 3 : 0);
   const [done, setDone] = useState(false);
   const [instantAccess, setInstantAccess] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [showAccountRecovery, setShowAccountRecovery] = useState(false);
@@ -434,6 +438,8 @@ function Questionnaire({ onLogin }) {
         customerCode: customerCode.trim() || null,
       });
       setInstantAccess(Boolean(result?.instantAccess));
+      setVerificationRequired(result?.emailVerificationRequired === true);
+      setVerificationSent(result?.verificationEmailSent === true);
       setDone(true);
       trackJourneyEvent('registration_completed', {
         journey: 'registration',
@@ -461,12 +467,24 @@ function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success">
         <CheckCircle2 size={48} />
-        <h3>{instantAccess ? 'You\'re approved' : 'Application received'}</h3>
+        <h3>{verificationRequired ? 'Confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
         <p>
-          {instantAccess
+          {verificationRequired
+            ? `Thank you, ${contactName}. Your application has been saved. ${verificationSent ? 'Use the confirmation link sent to' : 'Request a confirmation link for'} ${email.trim()} before signing in. Existing trade customers receive access after email confirmation; new applications are reviewed by our team.`
+            : instantAccess
             ? `Welcome back, ${contactName}. Your email is on our active trade list — sign in with ${email.trim()} to access the catalogue.`
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
+        {verificationRequired && <button type="button" disabled={resending} onClick={async () => {
+          setResending(true); setVerificationNotice('');
+          try {
+            const { resendTradeVerification } = await import('../lib/auth');
+            await resendTradeVerification(email);
+            setVerificationNotice('If your application needs confirmation, we will send a new link. Check your inbox and spam folder.');
+          } catch (error) { setVerificationNotice(error.message); }
+          finally { setResending(false); }
+        }}>{resending ? 'Sending…' : 'Resend confirmation email'}</button>}
+        {verificationNotice && <p role="status">{verificationNotice}</p>}
         <button type="button" onClick={onLogin}>Go to sign in</button>
       </div>
     );

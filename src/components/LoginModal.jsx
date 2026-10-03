@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
-import { resetPassword, signIn } from '../lib/auth';
+import { resetPassword, resendTradeVerification, signIn } from '../lib/auth';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
 import ProtoLogo from './ProtoLogo';
 
@@ -68,13 +68,10 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
       }
     } catch (err) {
       const raw = err?.message || 'Authentication failed.';
-      // Email confirmation was removed — accounts are gated by ADMIN APPROVAL.
-      // Supabase can still answer "Email not confirmed" for an account created
-      // before that change, and a pending account is not an error the customer
-      // can act on, so both read as "we are still reviewing you".
-      setError(/email not confirmed|not confirmed|pending approval|not approved/i.test(raw)
-        ? 'Proto is still reviewing your application. We will notify you when you have been approved.'
-        : raw);
+      setError(/email not confirmed|not confirmed/i.test(raw)
+        ? 'Confirm your email using the link in your inbox before signing in. You can request another confirmation email below.'
+        : /pending approval|not approved/i.test(raw)
+          ? 'Proto is still reviewing your application. We will notify you when you have been approved.' : raw);
       trackJourneyEvent(mode === 'forgot' ? 'password_reset_failed' : 'login_failed', {
         journey: 'authentication',
         outcome: 'error',
@@ -191,6 +188,17 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
             <button type="button" className="lm-toggle" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
               ← Back to sign in
             </button>
+          )}
+
+          {mode === 'login' && (
+            <button type="button" className="lm-toggle" disabled={loading || !email.trim()} onClick={async () => {
+              setLoading(true); setError(''); setInfo('');
+              try {
+                await resendTradeVerification(email);
+                setInfo('If your application needs email confirmation, we will send a new link. Check your inbox and spam folder.');
+              } catch (resendError) { setError(resendError.message); }
+              finally { setLoading(false); }
+            }}>Resend confirmation email</button>
           )}
 
           {/* Apply link */}

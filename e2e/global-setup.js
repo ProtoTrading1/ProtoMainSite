@@ -11,6 +11,7 @@ export default async function globalSetup() {
   process.env.VITE_INTERCOM_APP_ID = '';
 
   const server = await createServer({
+    configLoader: 'runner',
     server: {
       host: '127.0.0.1',
       port,

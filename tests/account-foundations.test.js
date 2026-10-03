@@ -27,7 +27,7 @@ test('reset form stays unavailable until the one-time link is validated', async 
     readSource('api/validate-reset-token.js'),
   ]);
 
-  assert.match(page, /fetch\('\/api\/validate-reset-token'/);
+  assert.match(page, /requestJson\('\/api\/validate-reset-token'/);
   assert.match(page, /tokenState === 'valid'/);
   assert.match(page, /Checking your reset link/);
   assert.match(endpoint, /getResetTokenVersion\(user\) !== claim\.v/);

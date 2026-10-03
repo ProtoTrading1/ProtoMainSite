@@ -8,6 +8,7 @@ export default function OrderConfirmModal({
   orderError = '',
   orderChanges = [],
   orderNumber = '',
+  orderRecoveryNote = '',
   onRetry,
   onReview,
   onViewOrder,
@@ -120,6 +121,10 @@ export default function OrderConfirmModal({
           </div>
         )}
 
+        {isSuccess && orderRecoveryNote && (
+          <p className="ocm-subtitle" role="status">{orderRecoveryNote}</p>
+        )}
+
         {requiresReview && (
           <div className="ocm-change-list" role="alert" aria-live="assertive">
             {orderChanges.map((change) => (
@@ -144,9 +149,9 @@ export default function OrderConfirmModal({
 
         {(isSuccess || isError) && (
           <div className="ocm-actions ocm-actions--simple">
-            {isSuccess && onViewOrder && (
+            {(isSuccess || isError) && onViewOrder && (
               <button className="ocm-copy-btn ocm-done-btn" onClick={onViewOrder} type="button">
-                View order
+                {isSuccess ? 'View order' : 'Check My Orders'}
               </button>
             )}
             <button

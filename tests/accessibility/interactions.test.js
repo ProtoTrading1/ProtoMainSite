@@ -32,7 +32,8 @@ describe('catalogue interaction accessibility', () => {
   it('gives cart icon controls contextual accessible names', async () => {
     const source = await readSource('src/components/Drawer.jsx');
     assert.match(source, /aria-label="Close cart"/);
-    assert.match(source, /aria-label=\{`Remove \$\{item\.product\.name\} from cart`\}/);
+    assert.match(source, /aria-label=\{`Remove \$\{item\.product\.name\}\$\{item\.preference/);
+    assert.match(source, /from cart`\}/);
   });
 
   it('keeps the basket preview open while the customer is using it', async () => {

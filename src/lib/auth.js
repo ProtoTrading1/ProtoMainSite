@@ -1,29 +1,36 @@
 import { supabase } from './supabase';
+import { requestJson, withDeadline } from './requestDeadline.mjs';
+import { loadCustomerProfile } from './customerProfileClient.mjs';
 
 export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await withDeadline(() => supabase.auth.signInWithPassword({ email, password }), {
+    timeoutMs: 15000,
+    message: 'Sign-in is taking longer than expected. If it completes, your account will open automatically. Otherwise, try again.',
+  });
   if (error) throw error;
   return data;
 }
 
-// There is deliberately NO signUp() here. Creating an account from the client
-// would fire Supabase's own "confirm your email" mail — the step we removed —
-// and would create an account without a trade application, skipping the
-// approval queue. Accounts are created server-side by api/register-trade.js
-// (email_confirm: true, is_approved decided by the allowlist) and nowhere else.
+// Self-service applications use the server registration endpoint so the trade
+// profile and one-time mailbox verification are created together. Direct Auth
+// signups remain unapproved and cannot bypass trade application review.
 
 // Trade applications go through src/lib/tradeApplication.js (includes WhatsApp opt-in).
 export { submitTradeApplication } from './tradeApplication';
 
 export async function resetPassword(email) {
   const trimmed = email.trim();
-  const res = await fetch('/api/send-reset-email', {
+  return requestJson('/api/send-reset-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: trimmed }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to send reset email');
+  }, { timeoutMs: 15000, message: 'We could not confirm whether the reset email was sent. Check your inbox and spam folder before requesting another.' });
+}
+
+export function resendTradeVerification(email) {
+  return requestJson('/api/resend-trade-verification', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: String(email || '').trim() }),
+  }, { timeoutMs: 15000, message: 'We could not confirm whether the email was sent. Check your inbox and spam folder before requesting another.' });
 }
 
 export async function signOut() {
@@ -41,32 +48,10 @@ export async function getSession() {
 }
 
 export async function getCustomerProfile(userId, sessionOrToken = null) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
+  return loadCustomerProfile(userId, { headers: async () => {
     const { authHeaders } = await import('./authHeaders');
-    const res = await fetch(`/api/customer-profile?userId=${encodeURIComponent(userId)}`, {
-      headers: await authHeaders(sessionOrToken),
-      signal: controller.signal,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.profile) {
-      const error = new Error(json.error || 'Your trade account could not be loaded.');
-      error.status = res.status;
-      error.code = json.code || 'CUSTOMER_PROFILE_LOOKUP_FAILED';
-      throw error;
-    }
-    return json.profile;
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      const timeoutError = new Error('Your trade account is taking too long to load.');
-      timeoutError.code = 'CUSTOMER_PROFILE_TIMEOUT';
-      throw timeoutError;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+    return authHeaders(sessionOrToken);
+  } });
 }
 
 // Update WhatsApp opt-in for the logged-in user (writes accept_whatsapp + whatsapp_opt_in_at)

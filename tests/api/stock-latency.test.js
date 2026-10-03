@@ -42,8 +42,9 @@ test('live stock keeps authentication first and overlaps approval with the stock
 test('shared approved-customer checks retain the trade-account gate', async () => {
   const source = await readSource('api/_auth.js');
 
-  assert.match(source, /export async function getApprovedCustomer\(user, res\)/);
+  assert.match(source, /export async function getApprovedCustomer\(user, res[,)]/);
   assert.match(source, /customer\.role !== 'admin' && customer\.is_approved !== true/);
+  assert.match(source, /customer\.trade_email_verification_required === true && !customer\.trade_email_verified_at/);
   assert.match(source, /return getApprovedCustomer\(user, res\)/);
 });
 

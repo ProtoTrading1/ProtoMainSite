@@ -31,7 +31,8 @@ test('reorder reports what it could not add instead of dropping it', () => {
 
 test('the cart cannot be pushed past the server line limit', () => {
   assert.match(appSrc, /const MAX_CART_LINES = 250/, 'client mirrors MAX_ORDER_LINES');
-  assert.match(appSrc, /if \(nextCart\.length >= MAX_CART_LINES\) \{ overflow \+= 1; continue; \}/, 'overflow is counted, not silently added');
+  assert.match(appSrc, /maxLines: MAX_CART_LINES/, 'the shared line resolver receives the server limit');
+  assert.match(appSrc, /if \(result.reason === 'line_limit'\) overflow \+= 1/, 'overflow is counted, not silently added');
 });
 
 test('sku lookup batches, tolerates a failed batch, and is bounded server-side', () => {

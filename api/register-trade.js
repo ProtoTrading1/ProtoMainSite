@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
-import {
-  isVerifiedProtoActiveMatch,
-  lookupProtoActiveCustomer,
-} from './_customer-onboard.js';
-import { PUBLIC_SITE_URL } from './_public-site-url.js';
+import { sendTradeVerificationEmail } from './_trade-email-verification.js';
 import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
 
 const BREVO_SENDER = {
@@ -200,85 +196,13 @@ export function validateEmail(rawEmail) {
   return { ok: true, email };
 }
 
-const WELCOME_HTML = (name) => `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Welcome to Proto Trading Online</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;">
-<tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;box-shadow:0 18px 50px rgba(0,0,0,0.55);">
-<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
-  <div style="display:inline-block;background:#ffffff;padding:14px 22px;border-radius:8px;margin-bottom:26px;">
-    <span style="font-size:30px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:20px;font-weight:800;color:#222222;letter-spacing:0.5px;"> TRADING</span>
-  </div>
-  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;letter-spacing:-0.4px;">Application received</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account application is under review</p>
-</td></tr>
-<tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Thank you for applying for a trade account with Proto Trading Online. We have received your application and our team will review and approve your request within 24 hours.</p>
-  <p style="margin:0 0 30px;color:#444444;font-size:16px;line-height:1.7;">Once your account is approved we'll email you to confirm — from that moment you can log in and access our full wholesale catalogue, live stock availability, and trade pricing.</p>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;border-left:5px solid #c40000;margin-bottom:32px;">
-    <tr><td style="padding:22px 24px;">
-      <p style="margin:0 0 14px;color:#111111;font-size:15px;font-weight:800;">What you get as a trade account holder:</p>
-      <p style="margin:0 0 8px;color:#444444;font-size:14px;line-height:1.7;">&#10003; &nbsp;Access to our full wholesale catalogue</p>
-      <p style="margin:0 0 8px;color:#444444;font-size:14px;line-height:1.7;">&#10003; &nbsp;Live stock availability on every product</p>
-      <p style="margin:0 0 8px;color:#444444;font-size:14px;line-height:1.7;">&#10003; &nbsp;Trade pricing exclusive to account holders</p>
-      <p style="margin:0;color:#444444;font-size:14px;line-height:1.7;">&#10003; &nbsp;Fast order requests directly from the portal</p>
-    </td></tr>
-  </table>
-  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">If you have any questions, please contact us at <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> or call <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a>.</p>
-</td></tr>
-<tr><td align="center" style="padding:30px 34px;background:#181818;border-top:1px solid #292929;">
-  <p style="margin:0 0 8px;color:#ffffff;font-size:18px;font-weight:900;">Proto Trading Online</p>
-  <p style="margin:0 0 12px;color:#cfcfcf;font-size:14px;line-height:1.7;">
-    <a href="tel:+27214615883" style="color:#ff3333;text-decoration:none;font-weight:700;">+27 21 461 5883</a>
-    <span style="color:#777777;"> &nbsp;|&nbsp; </span>
-    <a href="mailto:online@proto.co.za" style="color:#ff3333;text-decoration:none;font-weight:700;">online@proto.co.za</a>
-  </p>
-  <p style="margin:0;color:#a9a9a9;font-size:13px;line-height:1.6;">De Roos Street, off Sir Lowry Road, District Six, Cape Town, South Africa</p>
-</td></tr>
-<tr><td style="background:#c40000;padding:34px;">
-  <div style="display:inline-block;background:#ffffff;padding:12px 18px;border-radius:6px;margin-bottom:24px;">
-    <span style="font-size:25px;font-weight:900;color:#c40000;letter-spacing:1px;">PROTO</span>
-    <span style="font-size:17px;font-weight:800;color:#222222;"> TRADING</span>
-  </div>
-  <p style="margin:0 0 22px;color:#ffffff;font-size:14px;font-weight:800;line-height:1.5;">🌲 Before printing, please think about the Environment</p>
-  <p style="margin:0;color:#ffffff;font-size:12.5px;line-height:1.8;">Please note that Internet communications are not secure and therefore Proto Trading does not accept legal responsibility for the contents of this message.</p>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>`;
-
-const APPROVED_HTML = (name) => `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Your Proto Trading account is ready</title></head>
-<body style="margin:0;padding:0;background:#0b0b0b;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b0b;padding:40px 12px;">
-<tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;background:#111111;border-radius:18px;overflow:hidden;border:1px solid #2a2a2a;">
-<tr><td style="height:6px;background:#c40000;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td align="center" style="padding:38px 34px 30px;background:#141414;">
-  <h1 style="margin:0;color:#ffffff;font-size:30px;line-height:1.2;font-weight:900;">You're approved</h1>
-  <p style="margin:12px 0 0;color:#cfcfcf;font-size:15px;line-height:1.6;">Your trade account is approved</p>
-</td></tr>
-<tr><td style="padding:42px 38px 34px;background:#ffffff;">
-  <p style="margin:0 0 18px;color:#111111;font-size:18px;line-height:1.6;font-weight:700;">Hi ${escapeHtml(name, 'there')},</p>
-  <p style="margin:0 0 18px;color:#444444;font-size:16px;line-height:1.7;">Great news — your Proto Trading Online trade account has been approved. You can log in now to browse the full wholesale catalogue, live stock and trade pricing, and place orders online.</p>
-  <p style="margin:0 0 24px;">
-    <a href="${PUBLIC_SITE_URL}" style="display:inline-block;background:#c40000;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px;">Log in to the trade portal</a>
-  </p>
-  <p style="margin:0;color:#666666;font-size:13px;line-height:1.6;">Questions? <a href="mailto:online@proto.co.za" style="color:#c40000;">online@proto.co.za</a> · <a href="tel:+27214615883" style="color:#c40000;">+27 21 461 5883</a></p>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>`;
-
-export default async function handler(req, res) {
+export function createRegisterTradeHandler({
+  createServiceClient = () => createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } }),
+  rateLimit = checkRateLimit,
+  sendVerification = sendTradeVerificationEmail,
+  sendAdmin = sendAdminSignupEmail,
+} = {}) {
+return async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const {
@@ -347,14 +271,14 @@ export default async function handler(req, res) {
   // put THOUSANDS of customers behind one CGNAT IP, so a tight per-IP cap
   // rejects real signups on a busy day. Per-IP stays generous; the per-EMAIL
   // bucket below is what stops someone hammering a single address.
-  const rl = await checkRateLimit({ bucket: `register-trade:${clientIp(req)}`, max: 30, windowSeconds: 3600 });
+  const rl = await rateLimit({ bucket: `register-trade:${clientIp(req)}`, max: 30, windowSeconds: 3600 });
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter || 60));
     return res.status(429).json({ error: 'Too many registration attempts. Please try again later.' });
   }
   const emailForLimit = String(email || '').trim().toLowerCase();
   if (emailForLimit) {
-    const rlEmail = await checkRateLimit({ bucket: `register-trade-email:${emailForLimit}`, max: 3, windowSeconds: 3600 });
+    const rlEmail = await rateLimit({ bucket: `register-trade-email:${emailForLimit}`, max: 3, windowSeconds: 3600 });
     if (!rlEmail.allowed) {
       res.setHeader('Retry-After', String(rlEmail.retryAfter || 60));
       return res.status(429).json({ error: 'Too many registration attempts for this email. Please try again later.' });
@@ -372,14 +296,16 @@ export default async function handler(req, res) {
 
   const passwordError = passwordPolicyError(password);
   if (passwordError) return res.status(400).json({ error: passwordError });
+  if (!process.env.BREVO_API_KEY) return res.status(503).json({ error: 'Registration email is temporarily unavailable. Please try again later.' });
 
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const supabase = createServiceClient();
 
   const normalizedEmail = emailCheck.email;
+  // Fail before creating an Auth account if the matching security migration
+  // has not been applied. Never fall back to an unguarded legacy schema.
+  const securitySchema = await supabase.from('customers')
+    .select('trade_email_verification_required, trade_email_verified_at').limit(0);
+  if (securitySchema.error) return res.status(503).json({ error: 'Registration is temporarily unavailable. Please try again later.' });
   const normalizedContactName = contactName.trim();
   const normalizedBusinessName = businessName.trim();
   const normalizedPhone = phone.trim();
@@ -396,24 +322,13 @@ export default async function handler(req, res) {
   // must never grant access or become the account's live customer_code.
   const claimedCustomerCode = caps(customerCode) || null;
 
-  let protoActiveMatch = null;
-  let protoActive = null;
-  try {
-    protoActiveMatch = await lookupProtoActiveCustomer(supabase, normalizedEmail, customerCode);
-    protoActive = protoActiveMatch.row;
-  } catch (lookupErr) {
-    console.warn('proto_active_customers lookup:', lookupErr?.message || lookupErr);
-  }
-  const isProtoActive = isVerifiedProtoActiveMatch(protoActiveMatch);
-
-  // No email-confirmation step: accounts are created with the address already
-  // marked confirmed. Access is gated by ADMIN APPROVAL instead — an applicant
-  // lands in trade requests and cannot reach the catalogue until an admin
-  // approves them, so the mailbox round-trip adds nothing here.
+  // A legacy email match is eligibility, not identity. The mailbox must be
+  // confirmed through the one-time verification callback before access.
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
     password,
-    email_confirm: true,
+    email_confirm: false,
+    app_metadata: { trade_email_verification_required: true },
     user_metadata: {
       name: normalizedContactName,
       phone: normalizedPhone,
@@ -448,10 +363,7 @@ export default async function handler(req, res) {
   let profileVerification = null;
   let allocatedCustomerCode = null;
 
-  // Immediate access is a server decision: only a customer's registered email
-  // may match the historic Proto customer register. A submitted customer code
-  // can support later reconciliation but cannot grant access by itself.
-  const shouldApprove = isProtoActive;
+  const shouldApprove = false;
 
   if (userId) {
     // Customer codes are NEVER auto-generated — they are allocated manually in
@@ -464,10 +376,10 @@ export default async function handler(req, res) {
       id: userId,
       email: normalizedEmail,
       name: normalizedContactName,
-      contact_name: protoActive?.contact_name || normalizedContactName,
-      first_name: protoActive?.first_name || normalizedContactName.split(/\s+/)[0] || null,
+      contact_name: normalizedContactName,
+      first_name: normalizedContactName.split(/\s+/)[0] || null,
       phone: normalizedPhone,
-      business_name: (isProtoActive && protoActive?.name) ? protoActive.name : normalizedBusinessName,
+      business_name: normalizedBusinessName,
       company_address: normalizedCompanyAddress,
       delivery_address: normalizedDeliveryAddress,
       street_name: normalizedStreetName || null,
@@ -489,10 +401,11 @@ export default async function handler(req, res) {
       accept_whatsapp: typeof acceptWhatsapp === 'boolean' ? acceptWhatsapp : null,
       whatsapp_opt_in_at: acceptWhatsapp === true ? new Date().toISOString() : null,
       is_approved: shouldApprove,
+      trade_email_verification_required: true,
       customer_code: allocatedCustomerCode,
-      sales_last_12_months: isProtoActive ? Number(protoActive.sales_last_12_months) || 0 : null,
-      invoice_count: isProtoActive ? Number(protoActive.invoice_count) || 0 : null,
-      last_purchase_date: isProtoActive ? protoActive.last_purchase_date : null,
+      sales_last_12_months: null,
+      invoice_count: null,
+      last_purchase_date: null,
       tier: 'regular',
     };
 
@@ -602,10 +515,9 @@ export default async function handler(req, res) {
       allocatedCustomerCode = savedProfile.customer_code;
     }
 
-    // (No verification email — see the createUser call above. Access is gated by
-    // admin approval, not by an email round-trip.)
+    // Verification is sent below after the profile is safely persisted.
 
-    await sendAdminSignupEmail({
+    await sendAdmin({
       contactName: normalizedContactName,
       businessName: normalizedBusinessName,
       email: normalizedEmail,
@@ -632,36 +544,13 @@ export default async function handler(req, res) {
     });
   }
 
-  if (process.env.BREVO_API_KEY) {
+  let verificationEmailSent = false;
+  if (process.env.BREVO_API_KEY && userId) {
     try {
-      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
-          'api-key': process.env.BREVO_API_KEY,
-        },
-        // Bounded: a slow Brevo must never hold a registration open.
-        signal: AbortSignal.timeout(8000),
-        body: JSON.stringify({
-          sender: BREVO_SENDER,
-          to: [{ email: normalizedEmail }],
-          subject: shouldApprove
-            // No "verify your email" — email confirmation was removed; the
-            // account is usable the moment it is approved.
-            ? 'Your trade account is approved — Proto Trading'
-            : 'We have received your request — you will hear from us within 24 hours',
-          htmlContent: shouldApprove
-            ? APPROVED_HTML(normalizedContactName || normalizedBusinessName || '')
-            : WELCOME_HTML(normalizedContactName || normalizedBusinessName || ''),
-        }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        console.error('Welcome email Brevo error:', resp.status, JSON.stringify(body));
-      }
-    } catch (emailErr) {
-      console.error('Welcome email error:', emailErr.message);
+      const verification = await sendVerification({ client: supabase, userId, email: normalizedEmail, name: normalizedContactName });
+      verificationEmailSent = verification.sent;
+    } catch {
+      console.error('Registration verification email could not be sent');
     }
   }
 
@@ -669,6 +558,7 @@ export default async function handler(req, res) {
     ok: true,
     instantAccess: shouldApprove,
     emailVerificationRequired: true,
+    verificationEmailSent,
     customerCode: allocatedCustomerCode || null,
     profile: profileVerification
       ? {
@@ -678,4 +568,7 @@ export default async function handler(req, res) {
       }
       : null,
   });
+};
 }
+
+export default createRegisterTradeHandler();

@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import PortalErrorBoundary from './components/PortalErrorBoundary';
+import ProtoLogo from './components/ProtoLogo';
 import LandingPage from './pages/LandingPage';
 import lazyWithRetry from './lib/lazyWithRetry';
 import { isAdminHost } from './lib/isAdminHost';
@@ -9,12 +10,15 @@ import { setMonitoringUser } from './lib/monitoring';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 import { rememberAuthSession } from './lib/authHeaders';
 import { createProfileRequestCache } from './lib/profileRequestCache';
+import './pages/ResetPasswordPage.css';
+import './pages/TradeEmailVerification.css';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-policies-page');
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'), 'root-reset-password-page');
+const VerifyEmailPage = lazyWithRetry(() => import('./pages/VerifyEmailPage'), 'root-verify-email-page');
 const WorldClassPortal = lazyWithRetry(() => import('./worldclass/WorldClassPortal'), 'root-worldclass-portal');
 
 const PORTAL_URL = getPortalUrl();
@@ -30,6 +34,7 @@ export default function Root() {
   const [route, setRoute] = useState(window.location.hash);
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [verificationResending, setVerificationResending] = useState(false);
   const [requestedReorder, setRequestedReorder] = useState(null);
   const [loginOptions, setLoginOptions] = useState({ initialEmail: '', initialMode: 'login' });
   const authBootstrapped = useRef(false);
@@ -47,7 +52,7 @@ export default function Root() {
 
   useEffect(() => {
     if (!preRegisterHost) return;
-    if (window.location.hash) {
+    if (window.location.hash && !window.location.hash.startsWith('#/verify-email')) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       setRoute('');
     }
@@ -78,11 +83,12 @@ export default function Root() {
       if (!hash) return true;
       return hash.startsWith('#/policies')
         || hash.startsWith('#/worldclass')
+        || hash.startsWith('#/verify-email')
         || hash.startsWith('#/reset-password');
     };
 
     const onHashChange = () => {
-      if (preRegisterHost && window.location.hash) {
+      if (preRegisterHost && window.location.hash && !window.location.hash.startsWith('#/verify-email')) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         return;
       }
@@ -165,7 +171,7 @@ export default function Root() {
             return profile;
           }
 
-          if (profile.is_approved || profile.role === 'admin') {
+          if ((profile.is_approved && (!profile.trade_email_verification_required || profile.trade_email_verified_at)) || profile.role === 'admin') {
             void import('./lib/products').then((m) => m.prefetchCatalog());
             setSurface('portal');
             return profile;
@@ -356,6 +362,36 @@ export default function Root() {
       )}
     </>
   );
+
+  if (!adminHost && route.startsWith('#/verify-email')) {
+    const parameters = new URLSearchParams(route.replace('#/verify-email?', '').replace('#/verify-email', ''));
+    return <Suspense fallback={authSurfaceFallback}><VerifyEmailPage key={parameters.get('token_hash') || 'confirmed'} tokenHash={parameters.get('token_hash')} onSignIn={() => {
+      window.location.hash = ''; openLogin();
+    }} /></Suspense>;
+  }
+
+  if (session && customer && customer.role !== 'admin' && customer.trade_email_verification_required && !customer.trade_email_verified_at) {
+    return (
+      <main className="reset-password-page">
+        <section className="reset-password-card" aria-labelledby="pending-email-heading">
+          <div className="reset-password-accent" /><div className="reset-password-body">
+          <ProtoLogo variant="full" size="md" tagline={false} className="reset-password-logo" />
+          <h1 id="pending-email-heading">Confirm your email</h1><p className="reset-password-intro">Use the confirmation link in your inbox before opening your trade account.</p>
+          <button type="button" className="reset-password-primary" disabled={verificationResending} onClick={async () => {
+            setVerificationResending(true);
+            try {
+              const { resendTradeVerification } = await import('./lib/auth');
+              await resendTradeVerification(customer.email); setCustomerLoadError({ code: 'VERIFICATION_EMAIL_REQUESTED', message: 'If your application needs confirmation, a link will arrive in your inbox.' });
+            } catch (error) { setCustomerLoadError({ code: 'VERIFICATION_EMAIL_FAILED', message: error.message }); }
+            finally { setVerificationResending(false); }
+          }}>{verificationResending ? 'Sending…' : 'Resend confirmation email'}</button>
+          {customerLoadError && <p className="reset-password-status trade-email-status" role="status">{customerLoadError.message}</p>}
+          <button type="button" className="trade-email-secondary" onClick={handleLogout}>Log out</button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (preRegisterHost) {
     if (session === undefined) return authSurfaceFallback;
