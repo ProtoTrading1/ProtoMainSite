@@ -3,7 +3,10 @@ export function cartSyncFailure(error) {
   const message = String(error?.message || '');
   let code = 'cart_connection';
   let detail = 'We cannot confirm this basket on your account. Retry before switching devices.';
-  if (status === 409) {
+  if (error?.code === 'cart_device_storage') {
+    code = 'cart_device_storage';
+    detail = 'Your device basket could not be preserved. Keep this page open and contact Proto before clearing it.';
+  } else if (status === 409) {
     code = 'cart_conflict';
     detail = 'Another device saved a different basket. Your unsaved copy is kept on this device. Contact Proto before replacing either basket.';
   } else if (error?.code === 'cart_timeout') {

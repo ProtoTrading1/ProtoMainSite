@@ -1,10 +1,21 @@
 import { supabase } from './supabase';
+import { loginTransport } from './loginTransport.mjs';
+import { createClient } from '@supabase/supabase-js';
+import { createPasswordSignIn } from './passwordSignIn.mjs';
 
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
+let provisionalId = 0;
+export const signIn = createPasswordSignIn({
+  createProvisional: signal => createClient(
+    import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY,
+    { global: { fetch: (input, init) => fetch(input, { ...init, signal }) },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false,
+        storageKey: `proto-signin-provisional-${++provisionalId}` } },
+  ),
+  prepareCommit: () => supabase.auth.initialize(),
+  commitSession: session => loginTransport.commit(() => supabase.auth.setSession({
+    access_token: session.access_token, refresh_token: session.refresh_token,
+  })),
+});
 
 // There is deliberately NO signUp() here. Creating an account from the client
 // would fire Supabase's own "confirm your email" mail — the step we removed —

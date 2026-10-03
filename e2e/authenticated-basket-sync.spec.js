@@ -70,6 +70,9 @@ function installSyntheticServices(context, accountCart, safety, products = catal
       });
     }
 
+    if (pathname.endsWith('/mock-supabase/auth/v1/user')) {
+      return json(route, { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' });
+    }
     if (!pathname.startsWith('/api/')) return route.continue();
 
     if (/send-order|order-notify|send-reset-email|register-trade/.test(pathname)) {

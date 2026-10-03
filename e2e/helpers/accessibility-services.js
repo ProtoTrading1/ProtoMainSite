@@ -17,7 +17,7 @@ export function syntheticSession() {
   const user = { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' };
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return {
-    access_token: `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.synthetic`,
+    access_token: `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.${encode('synthetic-signature')}`,
     token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600,
     refresh_token: 'synthetic-refresh-token', user,
   };

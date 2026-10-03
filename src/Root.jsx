@@ -9,6 +9,7 @@ import { setMonitoringUser } from './lib/monitoring';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 import { rememberAuthSession } from './lib/authHeaders';
 import { createProfileRequestCache } from './lib/profileRequestCache';
+import { createAuthBootstrapGuard, createAuthIdentityGuard } from './lib/authBootstrapGuard.mjs';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
@@ -33,6 +34,8 @@ export default function Root() {
   const [requestedReorder, setRequestedReorder] = useState(null);
   const [loginOptions, setLoginOptions] = useState({ initialEmail: '', initialMode: 'login' });
   const authBootstrapped = useRef(false);
+  const authBootstrapGuard = useRef(createAuthBootstrapGuard());
+  const authIdentityGuard = useRef(createAuthIdentityGuard());
   const loadNonce = useRef(0);
   const customerLoadRequest = useRef(createProfileRequestCache());
 
@@ -135,7 +138,18 @@ export default function Root() {
     scrollToTop();
   }, [view]);
 
+  const rememberActiveAuthUser = useCallback((sess) => {
+    if (!authIdentityGuard.current.acceptUser(sess?.user?.id ?? null)) return;
+    loadNonce.current += 1;
+    customerLoadRequest.current.clear();
+    setCustomer(null);
+    setCustomerLoadError(null);
+    setCustomerLoading(Boolean(sess?.user));
+    setMonitoringUser(null);
+  }, []);
+
   const loadCustomer = useCallback((userId, sessionOrToken = null) => {
+    const identityCheckpoint = authIdentityGuard.current.checkpoint();
     const accessToken = typeof sessionOrToken === 'string'
       ? sessionOrToken
       : sessionOrToken?.access_token ?? null;
@@ -144,13 +158,15 @@ export default function Root() {
       userId,
       accessToken,
       request: async () => {
+        if (!authIdentityGuard.current.acceptsProfile(identityCheckpoint, userId)) return null;
         const nonce = ++loadNonce.current;
         setCustomerLoading(true);
         setCustomerLoadError(null);
         try {
           const { getCustomerProfile } = await import('./lib/auth');
+          if (!authIdentityGuard.current.acceptsProfile(identityCheckpoint, userId)) return null;
           const profile = await getCustomerProfile(userId, sessionOrToken);
-          if (nonce !== loadNonce.current) return null;
+          if (nonce !== loadNonce.current || !authIdentityGuard.current.acceptsProfile(identityCheckpoint, userId)) return null;
           setCustomer(profile);
           setMonitoringUser(profile);
 
@@ -173,7 +189,7 @@ export default function Root() {
           setView('pending');
           return profile;
         } catch (error) {
-          if (nonce !== loadNonce.current) return null;
+          if (nonce !== loadNonce.current || !authIdentityGuard.current.acceptsProfile(identityCheckpoint, userId)) return null;
           setCustomer(null);
           setMonitoringUser(null);
           setCustomerLoadError({
@@ -182,7 +198,7 @@ export default function Root() {
           });
           return null;
         } finally {
-          if (nonce === loadNonce.current) {
+          if (nonce === loadNonce.current && authIdentityGuard.current.acceptsProfile(identityCheckpoint, userId)) {
             setCustomerLoading(false);
           }
         }
@@ -193,8 +209,11 @@ export default function Root() {
   useEffect(() => {
     let cancelled = false;
     let unsubscribe = () => {};
+    const bootstrapCheckpoint = authBootstrapGuard.current.checkpoint();
     const finishBootstrap = (sess) => {
+      if (cancelled || !authBootstrapGuard.current.acceptsBootstrap(bootstrapCheckpoint)) return;
       authBootstrapped.current = true;
+      rememberActiveAuthUser(sess);
       rememberAuthSession(sess);
       setSession(sess ?? null);
       if (sess?.user) {
@@ -232,13 +251,16 @@ export default function Root() {
 
         supabase.auth.getSession()
           .then(({ data }) => {
-            if (!cancelled) finishBootstrap(withinPolicy(data.session));
+            if (!cancelled && authBootstrapGuard.current.acceptsBootstrap(bootstrapCheckpoint)) {
+              finishBootstrap(withinPolicy(data.session));
+            }
           })
           .catch(() => {
             if (!cancelled) finishBootstrap(null);
           });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, rawSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, rawSession) => {
+          if (cancelled || !authBootstrapGuard.current.acceptEvent(event, bootstrapCheckpoint)) return;
           if (event === 'PASSWORD_RECOVERY') {
             setPasswordRecovery(true);
             return;
@@ -246,11 +268,15 @@ export default function Root() {
           const sess = withinPolicy(rawSession);
           authBootstrapped.current = true;
           clearTimeout(bootstrapTimer);
+          rememberActiveAuthUser(sess);
           rememberAuthSession(sess);
           setSession(sess);
           if (sess?.user) {
-            await loadCustomer(sess.user.id, sess);
+            void loadCustomer(sess.user.id, sess);
           } else {
+            loadNonce.current += 1;
+            customerLoadRequest.current.clear();
+            setMonitoringUser(null);
             setCustomerLoading(false);
             setCustomer(null);
             setCustomerLoadError(null);
@@ -268,9 +294,11 @@ export default function Root() {
       clearTimeout(bootstrapTimer);
       unsubscribe();
     };
-  }, [loadCustomer]);
+  }, [loadCustomer, rememberActiveAuthUser]);
 
   const handleLogin = async (sess) => {
+    authBootstrapGuard.current.markLogin();
+    rememberActiveAuthUser(sess);
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
     rememberAuthSession(sess);
     setSession(sess);

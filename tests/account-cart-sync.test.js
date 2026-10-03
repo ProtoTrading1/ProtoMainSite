@@ -255,12 +255,12 @@ describe('whole-basket conflict semantics', () => {
 });
 
 describe('account basket client orchestration contract', () => {
-  it('refreshes an expired bearer token once for any account basket request', async () => {
+  it('refreshes an expired bearer token once while the basket account identity is unchanged', async () => {
     const client = await readFile(new URL('../src/lib/accountCart.js', import.meta.url), 'utf8');
     const auth = await readFile(new URL('../src/lib/authHeaders.js', import.meta.url), 'utf8');
 
     assert.match(client, /response\.status === 401/);
-    assert.match(client, /refreshAuthHeaders\(\)/);
+    assert.match(client, /refreshAuthHeaders\(\{\}, identity\)/);
     assert.match(client, /credentials: 'same-origin'/);
     assert.match(auth, /export async function refreshAuthHeaders/);
     assert.match(auth, /readAccessToken\(\{ refresh: true \}\)/);

@@ -40,7 +40,9 @@ import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
-import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
+import { readPendingCart, writePendingCart, clearPendingCart, encodePendingCart } from './lib/cartSyncJournal.mjs';
+import { readLegacyCartCopy, preserveLegacyCartCopy, discardLegacyCartCopy } from './lib/legacyCartCopy.mjs';
+import { browserCartStorage as localStorage, readStoredCart, archiveUnreadableCart } from './lib/cartStorage.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
@@ -109,6 +111,17 @@ function isExplicitFirstPortalLogin(customer) {
   return Boolean(customer)
     && Object.prototype.hasOwnProperty.call(customer, 'portal_welcome_seen_at')
     && customer.portal_welcome_seen_at === null;
+}
+
+function readPendingBytes(accountId) {
+  try { return localStorage.getItem(`proto_cart_pending_${accountId}`); } catch { return null; }
+}
+
+function assertPendingSnapshot(accountId, expectedRaw) {
+  if (readPendingBytes(accountId) === expectedRaw) return;
+  const error = new Error('Another tab changed the pending basket during recovery');
+  error.status = 409;
+  throw error;
 }
 
 function readCartActivityAt() {
@@ -298,8 +311,7 @@ export default function App({
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (owner && owner !== customer?.id) return [];
-      const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-      return Array.isArray(stored) ? stored : [];
+      return readStoredCart(localStorage, CART_STORAGE_KEY).items;
     } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
@@ -310,6 +322,8 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartSyncIssue, setCartSyncIssue] = useState(null);
+  const [cartStorageIssue, setCartStorageIssue] = useState(null);
+  const [deviceBasketCopy, setDeviceBasketCopy] = useState(() => readLegacyCartCopy(localStorage, customer?.id));
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -334,6 +348,7 @@ export default function App({
   const cartAccountRef = useRef(customer?.id || null);
   const currentCartRef = useRef({ items: cartItems, activityAt: cartLastActivityAt });
   const pendingCartSyncRef = useRef(null);
+  const pendingJournalRef = useRef({ accountId: customer?.id || null, raw: null });
   const cartSyncInFlightRef = useRef(false);
   const cartConflictRef = useRef(false);
   const cartAutomaticRetryBlockedRef = useRef(false);
@@ -353,6 +368,78 @@ export default function App({
   const lastCheckoutOptionsRef = useRef(null);
   const lastCheckoutSubmissionRef = useRef(null);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
+  const keepPendingCart = useCallback((accountId, operation, revision) => {
+    try {
+      if (localStorage.getItem(`proto_cart_pending_${accountId}`) !== pendingJournalRef.current.raw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* the verified write below reports unavailable storage */ }
+    const encoded = encodePendingCart(accountId, operation, revision);
+    const kept = writePendingCart(localStorage, accountId, operation, revision);
+    if (kept) pendingJournalRef.current = { accountId, raw: encoded };
+    setCartStorageIssue(kept ? null : {
+      code: 'cart_device_storage',
+      detail: 'This browser could not keep pending basket changes. Keep this page open and do not sign out until account sync succeeds. Your basket cannot be cleared safely yet.',
+    });
+    return kept;
+  }, []);
+  const removePendingCart = useCallback((accountId, expectedRaw = pendingJournalRef.current.accountId === accountId ? pendingJournalRef.current.raw : null) => {
+    try {
+      const current = localStorage.getItem(`proto_cart_pending_${accountId}`);
+      if (current !== null && current !== expectedRaw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* verified cleanup reports unavailable storage */ }
+    const removed = clearPendingCart(localStorage, accountId, expectedRaw);
+    if (removed && pendingJournalRef.current.accountId === accountId
+      && pendingJournalRef.current.raw === expectedRaw) pendingJournalRef.current = { accountId, raw: null };
+    setCartStorageIssue(removed ? null : {
+      code: 'cart_device_storage',
+      detail: 'The account basket was confirmed, but this browser could not remove its older pending copy. Retry sync before leaving or changing this basket.',
+    });
+    return removed;
+  }, []);
+  const canChangeBasket = useCallback(() => {
+    if (!cartHydratedRef.current) return false;
+    if (cartPreviewModeRef.current) return true;
+    const accountId = cartAccountRef.current;
+    try {
+      if (localStorage.getItem(`proto_cart_pending_${accountId}`) !== pendingJournalRef.current.raw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* pending writes/cleanup expose unavailable storage */ }
+    return true;
+  }, []);
+  useEffect(() => {
+    if (!cartStorageIssue) return undefined;
+    const warn = event => {
+      if (!pendingCartSyncRef.current && !cartSyncInFlightRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [cartStorageIssue]);
+  const discardDeviceBasketCopy = useCallback(async expectedCopy => {
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    const removed = await discardLegacyCartCopy(localStorage, customer?.id, expectedCopy,
+      () => cartAccountRef.current === expectedCopy?.accountId);
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    if (removed) setDeviceBasketCopy(null);
+    else {
+      setDeviceBasketCopy(readLegacyCartCopy(localStorage, customer?.id));
+      setCartAnnouncement('The device copy changed or could not be discarded. Review the latest copy before trying again.');
+    }
+  }, [customer?.id]);
   useEffect(() => {
     const submittedFingerprint = lastCheckoutSubmissionRef.current?.fingerprint;
     if (!submittedFingerprint || cartFingerprint(cartItems) !== submittedFingerprint) {
@@ -448,11 +535,17 @@ export default function App({
   }, [hashNavigate]);
 
   useEffect(() => {
+    if (!cartHydratedRef.current) return;
+    const accountId = cartAccountRef.current;
+    if (readPendingBytes(accountId) !== pendingJournalRef.current.raw) {
+      setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+      return;
+    }
     try {
       if (cartItems.length) localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
       else localStorage.removeItem(CART_STORAGE_KEY);
     } catch { /* ignore */ }
-  }, [cartItems]);
+  }, [cartItems, cartHydrated]);
 
   useEffect(() => {
     if (!cartItems.length) {
@@ -485,7 +578,13 @@ export default function App({
     const dispatchedItems = currentCartRef.current.items;
     const dispatchedActivityAt = currentCartRef.current.activityAt;
     operation.baseRevision ??= cartRevisionRef.current;
-    writePendingCart(localStorage, accountId, operation, operation.baseRevision);
+    keepPendingCart(accountId, operation, operation.baseRevision);
+    if (cartConflictRef.current) {
+      pendingCartSyncRef.current ||= operation;
+      cartSyncInFlightRef.current = false;
+      return;
+    }
+    const dispatchedJournalRaw = pendingJournalRef.current.raw;
     setCartSyncStatus('saving');
     let acknowledged = false;
     let automaticRetryAllowed = true;
@@ -601,7 +700,7 @@ export default function App({
         } else if (pendingCartSyncRef.current) {
           if (acknowledged) {
             pendingCartSyncRef.current.baseRevision = cartRevisionRef.current;
-            writePendingCart(localStorage, accountId, pendingCartSyncRef.current, cartRevisionRef.current);
+            keepPendingCart(accountId, pendingCartSyncRef.current, cartRevisionRef.current);
           }
           const retryDelay = cartSyncRetryCountRef.current
             ? Math.min(30_000, 1000 * (2 ** Math.min(5, cartSyncRetryCountRef.current - 1)))
@@ -613,12 +712,12 @@ export default function App({
             setCartSyncStatus('error');
           }
         } else {
-          clearPendingCart(localStorage, accountId);
+          removePendingCart(accountId, dispatchedJournalRaw);
           setCartSyncStatus('saved');
         }
       }
     }
-  }, [scheduleCartSync]);
+  }, [scheduleCartSync, keepPendingCart, removePendingCart]);
   useEffect(() => {
     cartSyncDrainRef.current = drainCartSyncQueue;
   }, [drainCartSyncQueue]);
@@ -657,12 +756,17 @@ export default function App({
 
     let localItems = [];
     let localActivityAt = null;
+    let unreadableCanonical = null;
+    const pendingRaw = readPendingBytes(uid);
+    pendingJournalRef.current = { accountId: uid, raw: pendingRaw };
     const pendingDraft = readPendingCart(localStorage, uid);
+    setDeviceBasketCopy(readLegacyCartCopy(localStorage, uid));
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (!owner || owner === uid) {
-        const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-        localItems = Array.isArray(stored) ? stored : [];
+        const stored = readStoredCart(localStorage, CART_STORAGE_KEY);
+        localItems = stored.items;
+        unreadableCanonical = stored.unreadableRaw;
         localActivityAt = readCartActivityAt();
         if (localItems.length && !localActivityAt) {
           localActivityAt = Date.now();
@@ -693,10 +797,33 @@ export default function App({
       hydrationInFlight = true;
       setCartSyncStatus('loading');
       try {
+        if (unreadableCanonical !== null) {
+          archiveUnreadableCart(localStorage, CART_STORAGE_KEY, unreadableCanonical);
+          unreadableCanonical = null;
+        }
+        // A rejected journal may contain recoverable customer work. Archive its
+        // exact bytes before normal hydration is allowed to remove the slot.
+        if (!pendingDraft) {
+          let raw = null;
+          try { raw = localStorage.getItem(`proto_cart_pending_${uid}`); } catch { /* unavailable storage */ }
+          if (raw !== null) archiveUnreadableCart(localStorage, `proto_cart_pending_${uid}`, raw);
+        }
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
+        if (cancelled || cartAccountRef.current !== uid) return;
+        assertPendingSnapshot(uid, pendingRaw);
+        if (!pendingDraft && localItems.length && cartFingerprint(localItems) !== cartFingerprint(accountCart.items)) {
+          // Keep legacy unsaved work before adopting the authoritative account
+          // basket. Storage failure must stop recovery, not erase the device.
+          const copy = await preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt,
+            () => !cancelled && cartAccountRef.current === uid && readPendingBytes(uid) === pendingRaw);
+          if (cancelled || cartAccountRef.current !== uid) return;
+          assertPendingSnapshot(uid, pendingRaw);
+          setDeviceBasketCopy(copy);
+        }
         if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
           const draftItems = await hydrateAccountCartItems(pendingDraft.items);
           if (cancelled || cartAccountRef.current !== uid) return;
+          assertPendingSnapshot(uid, pendingRaw);
           cartRevisionRef.current = pendingDraft.baseRevision;
           lastSavedCartRef.current = cartFingerprint(accountCart.items);
           setCartItems(draftItems);
@@ -717,6 +844,7 @@ export default function App({
         }
         const hydratedItems = await hydrateAccountCartItems(accountCart.items);
         if (cancelled || cartAccountRef.current !== uid) return;
+        assertPendingSnapshot(uid, pendingRaw);
         cartRevisionRef.current = Number(accountCart.revision || 0);
         lastSavedCartRef.current = cartFingerprint(hydratedItems);
         setLoginBasketSnapshot({
@@ -741,7 +869,7 @@ export default function App({
         cartHydratedRef.current = true;
         setCartHydrated(true);
         setCartSyncStatus('saved');
-        clearPendingCart(localStorage, uid);
+        removePendingCart(uid, pendingRaw);
       } catch (error) {
         if (cancelled || cartAccountRef.current !== uid) return;
         // Preview deployments intentionally return 403 for account-cart so a
@@ -793,7 +921,7 @@ export default function App({
         const retryDelay = Math.min(30_000, 3000 * (2 ** Math.min(4, hydrationFailures - 1)));
         // Repeating an unchanged invalid basket or permission failure cannot
         // recover it. Leave the local basket intact and offer an explicit retry.
-        if (![400, 401, 403, 413, 422].includes(error?.status)) {
+        if (![400, 401, 403, 409, 413, 422].includes(error?.status)) {
           hydrationRetryTimer = window.setTimeout(hydrate, retryDelay);
         }
       } finally {
@@ -809,10 +937,11 @@ export default function App({
 
     return () => {
       cancelled = true;
+      if (cartAccountRef.current === uid) cartAccountRef.current = null;
       if (hydrationRetryTimer) window.clearTimeout(hydrationRetryTimer);
       cartHydrateRetryRef.current = null;
     };
-  }, [customer?.id]);
+  }, [customer?.id, removePendingCart]);
 
   useEffect(() => {
     if (!customer?.id || !cartHydratedRef.current || cartPreviewModeRef.current) return undefined;
@@ -824,7 +953,7 @@ export default function App({
       cartClearActivityAtRef.current = null;
       cartClearIntentRef.current = 'normal';
       cartRestoreFingerprintRef.current = null;
-      clearPendingCart(localStorage, customer.id);
+      removePendingCart(customer.id);
       setCartSyncStatus('saved');
       return undefined;
     }
@@ -837,23 +966,25 @@ export default function App({
     );
     if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
     const existingDraft = readPendingCart(localStorage, customer.id);
-    writePendingCart(localStorage, customer.id, nextOperation, existingDraft?.baseRevision ?? cartRevisionRef.current);
+    keepPendingCart(customer.id, nextOperation, existingDraft?.baseRevision ?? cartRevisionRef.current);
     pendingCartSyncRef.current = nextOperation;
     if (cartConflictRef.current) return undefined;
     cartAutomaticRetryBlockedRef.current = false;
     setCartSyncStatus('saving');
     scheduleCartSync(450);
     return undefined;
-  }, [cartItems, cartLastActivityAt, customer?.id, scheduleCartSync]);
+  }, [cartItems, cartLastActivityAt, customer?.id, scheduleCartSync, keepPendingCart, removePendingCart]);
 
   const refreshAccountCart = useCallback(async () => {
     const accountId = cartAccountRef.current;
     if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
     const beforeFingerprint = cartFingerprint(currentCartRef.current.items);
+    const beforeJournal = pendingJournalRef.current.raw;
     if (beforeFingerprint !== lastSavedCartRef.current) return;
     try {
       const remote = await getAccountCart();
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      assertPendingSnapshot(accountId, beforeJournal);
       if (Number(remote.revision || 0) <= cartRevisionRef.current) {
         setCartSyncStatus('saved');
         return;
@@ -861,6 +992,7 @@ export default function App({
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
       const hydratedItems = await hydrateAccountCartItems(remote.items);
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      assertPendingSnapshot(accountId, beforeJournal);
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
       if (Number(remote.revision || 0) <= cartRevisionRef.current) return;
       cartUndoTokenRef.current = null;
@@ -887,6 +1019,10 @@ export default function App({
 
   const retryCartSync = useCallback(() => {
     if (!customer?.id) return;
+    if (cartStorageIssue && !pendingCartSyncRef.current && !cartSyncInFlightRef.current
+      && cartFingerprint(currentCartRef.current.items) === lastSavedCartRef.current) {
+      if (!removePendingCart(customer.id)) return;
+    }
     if (cartConflictRef.current) {
       setCartSyncStatus('error');
       setCartSyncIssue(cartSyncFailure({ status: 409 }));
@@ -905,7 +1041,7 @@ export default function App({
     setCartSyncStatus('saving');
     if (pendingCartSyncRef.current) scheduleCartSync(0);
     else void refreshAccountCart();
-  }, [customer?.id, refreshAccountCart, scheduleCartSync]);
+  }, [customer, refreshAccountCart, scheduleCartSync, cartStorageIssue, removePendingCart]);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
@@ -1362,9 +1498,18 @@ export default function App({
   }, []);
 
   const clearCart = useCallback(({ allowUndo = true, intent = 'normal' } = {}) => {
-    if (!cartHydratedRef.current) return;
-    shoppingCartIntent.current = intent === 'normal';
+    if (!cartHydratedRef.current || (intent === 'normal' && !canChangeBasket())) return;
     const clearedAt = Date.now();
+    if (intent === 'normal' && !cartPreviewModeRef.current) {
+      const accountId = cartAccountRef.current;
+      const existing = readPendingCart(localStorage, accountId);
+      const operation = makeCartSyncOperation(accountId, [], clearedAt, clearedAt, intent);
+      if (!keepPendingCart(accountId, operation, existing?.baseRevision ?? cartRevisionRef.current)) {
+        setCartAnnouncement('Your basket was kept because this browser could not safely save the clear request. Restore browser storage, then try Clear again.');
+        return false;
+      }
+    }
+    shoppingCartIntent.current = intent === 'normal';
     if (allowUndo && cartItems.length) {
       setClearedCartSnapshot({
         accountId: cartAccountRef.current,
@@ -1390,9 +1535,10 @@ export default function App({
       localStorage.removeItem(CART_STORAGE_KEY);
       localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
     } catch { /* ignore */ }
-  }, [cartItems]);
+  }, [cartItems, keepPendingCart, canChangeBasket]);
 
   const undoClearCart = useCallback(() => {
+    if (!canChangeBasket()) return false;
     const snapshot = clearedCartSnapshot;
     const belongsToAccount = snapshot?.accountId === cartAccountRef.current;
     const stillSameClear = snapshot?.clearedAt === cartUndoTokenRef.current;
@@ -1420,7 +1566,7 @@ export default function App({
       metadata: { line_count: restoredItems.length },
     });
     return true;
-  }, [clearedCartSnapshot]);
+  }, [clearedCartSnapshot, canChangeBasket]);
 
   useEffect(() => {
     if (!clearedCartSnapshot) return undefined;
@@ -1429,7 +1575,7 @@ export default function App({
   }, [clearedCartSnapshot]);
 
   const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
-    if (!cartHydratedRef.current) {
+    if (!canChangeBasket()) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
       return;
     }
@@ -1487,7 +1633,7 @@ export default function App({
       setDrawerPeek(false);
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
-  }, [markCartActivity, searchQuery]);
+  }, [markCartActivity, searchQuery, canChangeBasket]);
 
   const handleCartRevealHandled = useCallback((token) => {
     setCartRevealRequest((current) => (current?.token === token ? null : current));
@@ -1498,7 +1644,7 @@ export default function App({
   }, []);
 
   const updateQty = useCallback((id, qty) => {
-    if (!cartHydratedRef.current) return;
+    if (!canChangeBasket()) return;
     const requestedQty = normalizeCartQtyInput(qty);
     setCartItems((prev) => prev.flatMap((item) => {
       if (item.product.id !== id) return [item];
@@ -1509,13 +1655,13 @@ export default function App({
       return [{ ...item, qty: nextQty }];
     }));
     markCartActivity();
-  }, [markCartActivity]);
+  }, [markCartActivity, canChangeBasket]);
 
   const removeFromCart = useCallback((id) => {
-    if (!cartHydratedRef.current) return;
+    if (!canChangeBasket()) return;
     setCartItems((prev) => prev.filter((i) => i.product.id !== id));
     markCartActivity();
-  }, [markCartActivity]);
+  }, [markCartActivity, canChangeBasket]);
 
   const cartQtyMap = useMemo(() => {
     const map = {};
@@ -2355,8 +2501,10 @@ export default function App({
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
-            cartSyncStatus={cartSyncStatus}
-            cartSyncIssue={cartSyncIssue}
+            cartSyncStatus={cartStorageIssue ? 'error' : cartSyncStatus}
+            cartSyncIssue={cartStorageIssue || cartSyncIssue}
+            deviceBasketCopy={deviceBasketCopy}
+            onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
             cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
@@ -2473,8 +2621,10 @@ export default function App({
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
-                cartSyncStatus={cartSyncStatus}
-                cartSyncIssue={cartSyncIssue}
+                cartSyncStatus={cartStorageIssue ? 'error' : cartSyncStatus}
+                cartSyncIssue={cartStorageIssue || cartSyncIssue}
+                deviceBasketCopy={deviceBasketCopy}
+                onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
                 cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { cloneElement, useEffect, useId, useState } from 'react';
 import {
   ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail, MessageCircle,
   MapPin, Phone, ShieldCheck, Store, User,
@@ -53,10 +53,11 @@ const focusProps = {
 };
 
 function Field({ label, hint, children, full = false }) {
+  const id = useId();
   return (
     <div style={full ? { gridColumn: '1 / -1' } : undefined}>
-      <label style={LABEL_STYLE}>{label}</label>
-      {children}
+      <label htmlFor={id} style={LABEL_STYLE}>{label}</label>
+      {cloneElement(children, { id })}
       {hint && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 5 }}>{hint}</div>}
     </div>
   );

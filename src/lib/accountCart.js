@@ -1,21 +1,31 @@
-import { authHeaders, refreshAuthHeaders } from './authHeaders';
+import { authHeaders, refreshAuthHeaders, captureAuthIdentity, bindInitialAuthIdentity, assertAuthIdentity } from './authHeaders';
 import { boundedCartRequest } from './accountCartRequest.mjs';
 
 async function requestAccountCart(method, body) {
+  let identity = captureAuthIdentity();
   return boundedCartRequest(async (signal) => {
-    const request = (headers) => fetch('/api/account-cart', {
-      method,
-      headers,
-      credentials: 'same-origin',
-      signal,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    const request = async (headers) => {
+      assertAuthIdentity(identity);
+      const response = await fetch('/api/account-cart', {
+        method,
+        headers,
+        credentials: 'same-origin',
+        signal,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      assertAuthIdentity(identity);
+      return response;
+    };
 
-    let response = await request(await authHeaders());
+    const firstHeaders = await authHeaders();
+    identity = bindInitialAuthIdentity(identity, firstHeaders);
+    let response = await request(firstHeaders);
     if (response.status === 401) {
-      response = await request(await refreshAuthHeaders());
+      assertAuthIdentity(identity);
+      response = await request(await refreshAuthHeaders({}, identity));
     }
     const data = await response.json().catch(() => ({}));
+    assertAuthIdentity(identity);
     if (!response.ok) {
       const error = new Error(data.error || 'Account basket could not be saved');
       error.status = response.status;
