@@ -1,15 +1,29 @@
 import { supabase } from './supabase';
-import { requestJson, withDeadline } from './requestDeadline.mjs';
+import { createClient } from '@supabase/supabase-js';
+import { requestJson } from './requestDeadline.mjs';
 import { loadCustomerProfile } from './customerProfileClient.mjs';
+import { createPasswordSignIn } from './passwordSignIn.mjs';
+import { loginTransport } from './loginTransport.mjs';
+import { assertAuthIdentity, captureAuthIdentity } from './authHeaders';
 
-export async function signIn(email, password) {
-  const { data, error } = await withDeadline(() => supabase.auth.signInWithPassword({ email, password }), {
-    timeoutMs: 15000,
-    message: 'Sign-in is taking longer than expected. If it completes, your account will open automatically. Otherwise, try again.',
-  });
-  if (error) throw error;
-  return data;
-}
+let provisionalId = 0;
+export const signIn = createPasswordSignIn({
+  createProvisional: signal => createClient(
+    import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY,
+    { global: { fetch: (input, init) => fetch(input, { ...init, signal }) },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false,
+        storageKey: `proto-signin-provisional-${++provisionalId}` } },
+  ),
+  captureOwnership: captureAuthIdentity,
+  assertOwnership: assertAuthIdentity,
+  prepareCommit: () => supabase.auth.initialize(),
+  commitSession: session => {
+    const identity = captureAuthIdentity();
+    return loginTransport.commit(() => supabase.auth.setSession({
+      access_token: session.access_token, refresh_token: session.refresh_token,
+    }), { assertOwnership: () => assertAuthIdentity(identity) });
+  },
+});
 
 // Self-service applications use the server registration endpoint so the trade
 // profile and one-time mailbox verification are created together. Direct Auth

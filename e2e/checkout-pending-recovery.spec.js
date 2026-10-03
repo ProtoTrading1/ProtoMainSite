@@ -42,11 +42,11 @@ test('reload makes no automatic POST; explicit retry restores exact request and 
   await expect(dialog.getByRole('button', { name: 'Check My Orders' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Try again' }).click();
   await expect(page.getByRole('heading', { name: 'Order request received. Thank you.' })).toBeVisible();
-  await expect(page.getByText('Your current basket was kept because it changed. Check this received order before submitting it again.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Your current basket was kept because it changed. Review the received order, then use Review current basket before submitting another order.', { exact: true })).toBeVisible();
   expect(posts).toEqual([record.payload]);
-  expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();
-  await page.locator('[data-cart-trigger]').filter({ visible: true }).first().click();
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), key)).toMatchObject({ status: 'accepted', payload: record.payload });
+  await page.getByRole('dialog').getByRole('button', { name: 'Review current basket', exact: true }).click();
+  await expect.poll(() => page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
   await expect(page.locator('.order-drawer').filter({ visible: true }).first().getByRole('spinbutton', { name: `Quantity for ${newer.product.code} (Pink)`, exact: true })).toHaveValue('21');
 });
 
@@ -97,7 +97,7 @@ test('an uncertain first submit saves intent before POST and explicit reload ret
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Order request received. Thank you.' })).toBeVisible();
   expect(posts[1]).toEqual(posts[0]);
-  expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
+  await expect.poll(() => page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
 });
 
 test('fresh checkout stays blocked while an earlier request is unresolved', async ({ page, context }) => {
@@ -111,13 +111,14 @@ test('fresh checkout stays blocked while an earlier request is unresolved', asyn
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)).payload.clientRef, key)).toBe(pending().payload.clientRef);
 });
 
-test('explicitly amended review keeps the reference and conflicts direct the customer to My Orders', async ({ page, context }) => {
+test('confirmed first-dispatch rejection permits amendment with the original reference and conflicts direct the customer to My Orders', async ({ page, context }) => {
   await installAccessibilityServices(context, { cartItems: [newer] });
   const posts = []; await context.route('**/api/send-order', route => {
     posts.push(route.request().postDataJSON());
     return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'Earlier payload was captured.', code: 'ORDER_REFERENCE_CONFLICT' }) });
   });
-  await signInCatalogue(page); await seedAndReload(page, { ...pending(), reviewRequired: true });
+  await signInCatalogue(page); await seedAndReload(page, { ...pending(), status: 'pending', dispatchCount: 1,
+    confirmedRejectedBeforeCapture: true, reviewRequired: true });
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await submitBasket(page);
   await expect(page.getByText(/Check My Orders or contact Proto to resolve this request/)).toBeVisible();

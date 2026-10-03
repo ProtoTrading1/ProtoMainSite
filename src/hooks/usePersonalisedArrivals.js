@@ -1,6 +1,7 @@
 import { useCallback,useEffect,useRef,useState } from 'react';
 import { authHeaders } from '../lib/authHeaders';
 import { trackShoppingEvent } from '../lib/shoppingAnalytics';
+import { browserCartStorage as localStorage } from '../lib/cartStorage.mjs';
 const memory=new Map();
 const WAIT=60000;const COOLDOWN=7*24*60*60*1000;
 function read(store,key){try{return JSON.parse(store.getItem(key)||'null') ?? memory.get(key);}catch{return memory.get(key);}}

@@ -503,7 +503,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
       openOptions();
       return;
     }
-    if (!cardCanOrder) return;
+    if (!cardCanOrder || cardAdvisory.isOverOrder) return;
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
     addToCart(activeProduct, qty, pos);
@@ -715,7 +715,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   className="add-button"
                   onClick={handleAdd}
                   type="button"
-                  disabled={!cardCanOrder}
+                  disabled={!cardCanOrder || cardAdvisory.isOverOrder}
                 >
                   <ShoppingCart size={16} />
                   Add to Cart
@@ -724,7 +724,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             )}
           </div>
           {!isVariantGroup && cardAdvisory.isOverOrder && (
-            <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
+            <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; reduce the quantity before adding.</p>
           )}
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
             {inCart ? `In Your Order: ${cartQty}` : '\u00A0'}
@@ -953,13 +953,13 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                       </div>
                     </div>
                     {modalAdvisory.isOverOrder && (
-                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; reduce the quantity before ordering.</p>
+                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; reduce the quantity before adding.</p>
                     )}
                     <button
                       className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
-                      disabled={!modalCanOrder}
+                      disabled={!modalCanOrder || modalAdvisory.isOverOrder}
                       onClick={() => {
-                        if (!modalCanOrder) return;
+                        if (!modalCanOrder || modalAdvisory.isOverOrder) return;
                         addToCart(activeProduct, qty, null, true);
                         setJustAdded(true);
                         setTimeout(() => setJustAdded(false), 1800);

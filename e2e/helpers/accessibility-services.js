@@ -11,13 +11,13 @@ export const catalogueProducts = [
   { id: 'E2E-BLUE', sku: 'E2E-BLUE', code: 'E2E-BLUE', barcode: 'E2E-1001', name: 'NOTEBOOK | A5 | BLUE', title: 'NOTEBOOK | A5 | BLUE', price: 79.5, unitsOfIssue: 'Each' },
   { id: 'E2E-PINK', sku: 'E2E-PINK', code: 'E2E-PINK', barcode: 'E2E-1002', name: 'NOTEBOOK | A5 | PINK', title: 'NOTEBOOK | A5 | PINK', price: 79.5, unitsOfIssue: 'Each' },
   { id: 'E2E-PACK', sku: 'E2E-PACK', code: 'E2E-PACK', name: 'PENCILS | PACK OF 12', title: 'PENCILS | PACK OF 12', price: 24, unitsOfIssue: 'Pack of 12' },
-].map((product) => ({ ...product, image: '/bag_black.png', stockOnHand: 100, stockQty: 100, inStock: true, minQty: 1, categoryLabel: 'Synthetic Accessibility', categoryPath: [] }));
+].map((product) => ({ ...product, source: 'main', isExtendedRange: false, image: '/bag_black.png', stockOnHand: 100, stockQty: 100, inStock: true, minQty: 1, categoryLabel: 'Synthetic Accessibility', categoryPath: [] }));
 
 export function syntheticSession() {
   const user = { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' };
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return {
-    access_token: `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.synthetic`,
+    access_token: `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 3600 })}.${encode('synthetic-signature')}`,
     token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600,
     refresh_token: 'synthetic-refresh-token', user,
   };

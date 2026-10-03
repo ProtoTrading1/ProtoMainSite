@@ -51,6 +51,10 @@ function installSyntheticServices(context, accountCart, safety, products = catal
     const url = new URL(request.url());
     const { pathname } = url;
 
+    if (pathname.endsWith('/mock-supabase/auth/v1/user')) {
+      return json(route, { id: ACCOUNT_ID, email: TEST_EMAIL, role: 'authenticated', aud: 'authenticated' });
+    }
+
     if (pathname.endsWith('/mock-supabase/auth/v1/token')) {
       safety.authRequests += 1;
       const user = {

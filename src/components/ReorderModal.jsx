@@ -83,8 +83,13 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
       if (missing.length || overflow) {
         setUnavailable(missing);
         const parts = [`${result.added} item${result.added === 1 ? '' : 's'} added.`];
-        if (missing.length) {
-          parts.push(`${missing.length} requested ${missing.length === 1 ? 'line could' : 'lines could'} not be added in full. Review the highlighted quantities.`);
+        const sourceReviewCount = missing.filter(item => item.reason === 'source_review_required').length;
+        const quantityReviewCount = missing.length - sourceReviewCount;
+        if (sourceReviewCount) {
+          parts.push(`${sourceReviewCount} saved ${sourceReviewCount === 1 ? 'product needs' : 'products need'} source review. Find and select the current product in the catalogue, or contact Proto before reordering it.`);
+        }
+        if (quantityReviewCount) {
+          parts.push(`${quantityReviewCount} requested ${quantityReviewCount === 1 ? 'line could' : 'lines could'} not be added in full. Review the highlighted quantities.`);
         }
         if (overflow) {
           parts.push(`${overflow} could not fit — an order can hold at most 250 different products.`);
@@ -147,7 +152,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
                   {item.code} · qty {item.qty} · R{Number(item.unitPrice).toFixed(2)} each
                   {item.preference && <span> · Preferred: {item.preference}</span>}
                   {unavailableLines.has(orderLineKey(item)) && (
-                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · {unavailableLines.get(orderLineKey(item)).reason === 'stock_limit' ? 'requested quantity unavailable' : 'no longer available'}</span>
+                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · {unavailableLines.get(orderLineKey(item)).reason === 'source_review_required' ? 'source review required' : unavailableLines.get(orderLineKey(item)).reason === 'stock_limit' ? 'requested quantity unavailable' : 'no longer available'}</span>
                   )}
                 </div>
               </div>
