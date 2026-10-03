@@ -260,7 +260,12 @@ describe('account basket client orchestration contract', () => {
     const auth = await readFile(new URL('../src/lib/authHeaders.js', import.meta.url), 'utf8');
 
     assert.match(client, /response\.status === 401/);
-    assert.match(client, /refreshAuthHeaders\(\)/);
+    assert.match(client, /refreshAuthHeaders\(\{\}, identity\)/);
+    assert.match(client, /identity = bindInitialAuthIdentity\(identity, firstHeaders\)/);
+    assert.match(client, /assertAuthIdentity\(identity\);\s*response = await request\(await refreshAuthHeaders/,
+      'a late unauthorized response cannot refresh a different account');
+    assert.match(client, /response\.json\(\)\.catch\(\(\) => \(\{\}\)\);\s*assertAuthIdentity\(identity\)/,
+      'response decoding remains owned by the original account');
     assert.match(client, /credentials: 'same-origin'/);
     assert.match(auth, /export async function refreshAuthHeaders/);
     assert.match(auth, /readAccessToken\(\{ refresh: true \}\)/);

@@ -9,6 +9,9 @@ export default function OrderConfirmModal({
   orderChanges = [],
   orderNumber = '',
   orderRecoveryNote = '',
+  cleanupWarning = false,
+  onRetryCleanup,
+  onReviewCurrentBasket,
   onRetry,
   onReview,
   onViewOrder,
@@ -145,6 +148,23 @@ export default function OrderConfirmModal({
               </div>
             ))}
           </div>
+        )}
+
+        {isSuccess && cleanupWarning && (
+          <div className="ocm-payment-notice" role="alert">
+            <ShieldAlert size={19} aria-hidden />
+            <div>
+              <strong>{orderNumber ? `Order ${orderNumber} was received. Do not resubmit it.` : 'Your order was received. Do not resubmit it.'}</strong>
+              <span>Basket cleanup could not be confirmed. Keep this page open and retry basket cleanup before leaving or signing out. If the old basket returns, contact Proto with this order reference.</span>
+              <button className="ocm-copy-btn" type="button" onClick={onRetryCleanup}>Retry basket cleanup</button>
+            </div>
+          </div>
+        )}
+
+        {isSuccess && orderRecoveryNote && onReviewCurrentBasket && (
+          <button className="ocm-copy-btn" type="button" onClick={onReviewCurrentBasket}>
+            Review current basket
+          </button>
         )}
 
         {(isSuccess || isError) && (

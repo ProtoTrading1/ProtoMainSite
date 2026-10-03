@@ -1,5 +1,6 @@
 import { trackShoppingEvent } from '../lib/shoppingAnalytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { browserCartStorage as localStorage } from '../lib/cartStorage.mjs';
 
 const SEEN = 'proto_search_tip_seen_v1';
 const DISMISSED = 'proto_search_tip_dismissed_v1';

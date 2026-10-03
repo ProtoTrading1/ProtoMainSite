@@ -12,9 +12,34 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const backdropRef = useRef(null);
   const cardRef = useRef(null);
   const mouseDownOrigin = useRef(null);
+  const requestRef = useRef(null);
+  const attemptRef = useRef(0);
+  const committingRef = useRef(false);
+  const submittingRef = useRef(false);
+
+  const cancelAttempt = () => {
+    attemptRef.current += 1;
+    requestRef.current?.abort();
+  };
+  const closeLogin = () => {
+    if (committingRef.current) return;
+    cancelAttempt();
+    onClose();
+  };
+  const changeMode = (next) => {
+    if (committingRef.current) return;
+    cancelAttempt();
+    setMode(next); setError(''); setInfo(''); setLoading(false);
+  };
+
+  useEffect(() => () => {
+    attemptRef.current += 1;
+    requestRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement;
@@ -22,6 +47,9 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (committingRef.current) return;
+        attemptRef.current += 1;
+        requestRef.current?.abort();
         onClose();
         return;
       }
@@ -51,22 +79,34 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    const attempt = ++attemptRef.current;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setError(''); setInfo(''); setLoading(true);
     try {
       if (mode === 'forgot') {
         if (!email) { setError('Enter your email address.'); setLoading(false); return; }
         await resetPassword(email);
+        if (controller.signal.aborted || attempt !== attemptRef.current) return;
         setInfo('If an online account exists for that email, we’ll send a reset link. Check your inbox and spam folder.');
         trackJourneyEvent('password_reset_requested', { journey: 'authentication', outcome: 'accepted' });
       } else {
         if (!email || !password) { setError('Please enter your email and password.'); setLoading(false); return; }
-        const { session } = await signIn(email, password);
+        const { session } = await signIn(email, password, {
+          signal: controller.signal,
+          onCommit: () => { committingRef.current = true; setCommitting(true); },
+        });
+        if (controller.signal.aborted || attempt !== attemptRef.current) return;
         if (session) {
           trackJourneyEvent('login_succeeded', { journey: 'authentication', outcome: 'success' });
           await onLogin(session);
         }
       }
     } catch (err) {
+      if (controller.signal.aborted || attempt !== attemptRef.current) return;
       const raw = err?.message || 'Authentication failed.';
       setError(/email not confirmed|not confirmed/i.test(raw)
         ? 'Confirm your email using the link in your inbox before signing in. You can request another confirmation email below.'
@@ -77,7 +117,9 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         outcome: 'error',
       });
     } finally {
-      setLoading(false);
+      submittingRef.current = false;
+      committingRef.current = false;
+      if (attempt === attemptRef.current) { setCommitting(false); setLoading(false); }
     }
   };
 
@@ -86,7 +128,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
       className="lm-backdrop"
       ref={backdropRef}
       onMouseDown={(e) => { mouseDownOrigin.current = e.target; }}
-      onClick={() => { if (mouseDownOrigin.current === backdropRef.current) onClose(); }}
+      onClick={() => { if (mouseDownOrigin.current === backdropRef.current) closeLogin(); }}
     >
       <div
         className="lm-card"
@@ -97,7 +139,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
         onClick={(event) => event.stopPropagation()}
       >
           {/* Close */}
-          <button className="lm-close" type="button" onClick={onClose} aria-label="Close sign-in">
+          <button className="lm-close" type="button" onClick={closeLogin} aria-label="Close sign-in" disabled={committing}>
             <X size={18} aria-hidden="true" />
           </button>
 
@@ -143,7 +185,7 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
                 <div className="lm-label-row">
                   <label htmlFor="login-password">Password</label>
                   {mode === 'login' && (
-                    <button type="button" className="lm-forgot-link" onClick={() => { setMode('forgot'); setError(''); setInfo(''); }}>
+                    <button type="button" className="lm-forgot-link" disabled={committing} onClick={() => changeMode('forgot')}>
                       Forgot password?
                     </button>
                   )}
@@ -185,19 +227,26 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
 
           {/* Back to login link when in forgot mode */}
           {mode === 'forgot' && (
-            <button type="button" className="lm-toggle" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>
+            <button type="button" className="lm-toggle" disabled={committing} onClick={() => changeMode('login')}>
               ← Back to sign in
             </button>
           )}
 
           {mode === 'login' && (
             <button type="button" className="lm-toggle" disabled={loading || !email.trim()} onClick={async () => {
+              const attempt = ++attemptRef.current;
+              requestRef.current?.abort();
+              const controller = new AbortController();
+              requestRef.current = controller;
               setLoading(true); setError(''); setInfo('');
               try {
                 await resendTradeVerification(email);
+                if (controller.signal.aborted || attempt !== attemptRef.current) return;
                 setInfo('If your application needs email confirmation, we will send a new link. Check your inbox and spam folder.');
-              } catch (resendError) { setError(resendError.message); }
-              finally { setLoading(false); }
+              } catch (resendError) {
+                if (!controller.signal.aborted && attempt === attemptRef.current) setError(resendError.message);
+              }
+              finally { if (attempt === attemptRef.current) setLoading(false); }
             }}>Resend confirmation email</button>
           )}
 
@@ -206,7 +255,10 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
             <div className="lm-account-options" aria-label="Other account options">
               <p><strong>Bought from Proto before, but not online?</strong> Re-register for the new website.</p>
               <p><strong>New trade customer?</strong> Apply for online trade access.</p>
-              <button type="button" className="lm-apply-link" onClick={onApply}>
+              <button type="button" className="lm-apply-link" disabled={committing} onClick={() => {
+                if (committingRef.current) return;
+                cancelAttempt(); onApply();
+              }}>
                 Re-register or apply
               </button>
             </div>
