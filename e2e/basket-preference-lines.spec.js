@@ -84,8 +84,8 @@ test('legacy merged quantity above 9999 stays visible until the customer explici
 test('reorder caps all same-SKU preferences and flags only the shortfall line', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile-chromium', 'Desktop reorder control; shared mutation behavior covered on mobile by sibling edit tests.');
   const lastOrder = { id: 'synthetic-order', created_at: new Date().toISOString(), items: [
-    { productId: product.id, code: product.code, name: product.name, preference: 'red', qty: 4, unitPrice: 250 },
-    { productId: product.id, code: product.code, name: product.name, preference: 'green', qty: 4, unitPrice: 250 },
+    { productId: product.id, code: product.code, name: product.name, preference: 'red', qty: 4, unitPrice: 250, source: 'main', isExtendedRange: false },
+    { productId: product.id, code: product.code, name: product.name, preference: 'green', qty: 4, unitPrice: 250, source: 'main', isExtendedRange: false },
   ] };
   const { writes, safety } = await setup(context, [line('Red', 2), line('blue', 3)], lastOrder);
   await signInCatalogue(page);

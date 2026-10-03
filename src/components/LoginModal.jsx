@@ -69,8 +69,17 @@ export default function LoginModal({ onLogin, onClose, onApply, initialEmail = '
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    window.requestAnimationFrame(() => cardRef.current?.querySelector('input')?.focus());
+    let active = true;
+    const initialFocusFrame = window.requestAnimationFrame(() => {
+      const card = cardRef.current;
+      const focused = document.activeElement;
+      if (!active || !card || card.contains(focused)) return;
+      if (focused !== previouslyFocused && focused !== document.body) return;
+      card.querySelector('input')?.focus();
+    });
     return () => {
+      active = false;
+      window.cancelAnimationFrame(initialFocusFrame);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();

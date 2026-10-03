@@ -994,7 +994,11 @@ export default function App({
           return;
         }
         hydrationFailures += 1;
-        setCartSyncIssue(cartSyncFailure(error));
+        setCartSyncIssue(error?.code === 'cart_device_storage' ? {
+          code: 'cart_device_storage',
+          detail: 'This browser could not safely preserve unreadable basket data. Your original device copy is kept. Restore browser storage and retry account basket sync before changing this basket.',
+          retryable: false,
+        } : cartSyncFailure(error));
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };

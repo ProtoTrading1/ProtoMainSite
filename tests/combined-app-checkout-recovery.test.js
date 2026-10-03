@@ -7,12 +7,16 @@ import { basketLineKey, mergeBasketLines } from '../lib/basket-lines.mjs';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
 import { checkoutSnapshotForProduct } from '../lib/order-stock-guard.mjs';
 import { cartProductsNeedReview } from '../src/lib/cartProductRecovery.mjs';
+import { archiveUnreadableCart } from '../src/lib/cartStorage.mjs';
+import { cartSyncFailure } from '../src/lib/cartSyncRecovery.mjs';
 
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const sendSource = app.slice(app.indexOf('  const sendOrderEmail =') + '  const sendOrderEmail ='.length,
   app.indexOf('  const reviewCurrentBasket =')).trim().replace(/;$/, '');
 const cleanupSource = app.slice(app.indexOf('  const finishConfirmedCheckoutCleanup =') + '  const finishConfirmedCheckoutCleanup ='.length,
   app.indexOf('  const canChangeBasket =')).trim().replace(/;$/, '');
+const hydrationSource = app.slice(app.indexOf('    const hydrate = async () =>') + '    const hydrate ='.length,
+  app.indexOf('    cartHydrateRetryRef.current =')).trim().replace(/;$/, '');
 const fingerprint = items => JSON.stringify(mergeBasketLines(items).map(item => [basketLineKey(item), Number(item.qty || 0)]));
 const ref = current => ({ current });
 const line = (qty = 2, price = 10) => ({ qty, preference: 'Blue', product: {
@@ -185,4 +189,31 @@ test('an acknowledged accepted clear cannot retire its anchor while an immutable
   const cleanup = vm.runInNewContext(`(${cleanupSource})`, h.context);
   assert.equal(await cleanup('buyer'), false);
   assert.equal(pendingHelpers.readPendingCheckout(h.context.localStorage, 'buyer').status, 'accepted');
+});
+
+test('actual App hydration preserves denied archive bytes and their device-storage diagnosis before any account request', async () => {
+  const h = harness([]);
+  h.entries.set('proto_cart', '[null]');
+  h.context.localStorage.setItem = () => { throw new Error('Archive quota denied'); };
+  let accountRequests = 0;
+  let automaticRetries = 0;
+  Object.assign(h.context, {
+    archiveUnreadableCart, cartSyncFailure, CART_STORAGE_KEY: 'proto_cart', unreadableCanonical: '[null]',
+    ownsHydration: () => true, cancelled: false, hydrationInFlight: false, hydrationFailures: 0,
+    localItems: [], localActivityAt: null, uid: 'buyer',
+    window: { location: { hostname: 'localhost' }, setTimeout: () => { automaticRetries++; } },
+    mergeAccountCart: async () => { accountRequests++; return { items: [], revision: 0 }; },
+    setCartSyncIssue: issue => { h.state.CartSyncIssue = issue; },
+    setCartSyncStatus: status => { h.state.CartSyncStatus = status; },
+    setCartLastActivityAt: () => {}, setCartItems: () => {},
+  });
+  const hydrate = vm.runInNewContext(`(${hydrationSource})`, h.context);
+  await hydrate();
+  await hydrate();
+  assert.equal(h.state.CartSyncIssue.code, 'cart_device_storage');
+  assert.equal(h.state.CartSyncIssue.retryable, false);
+  assert.equal(h.state.CartSyncStatus, 'error');
+  assert.equal(h.context.localStorage.getItem('proto_cart'), '[null]');
+  assert.equal(accountRequests, 0);
+  assert.equal(automaticRetries, 0);
 });

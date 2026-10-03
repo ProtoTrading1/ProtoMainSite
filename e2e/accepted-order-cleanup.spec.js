@@ -30,7 +30,7 @@ test('accepted receipt warns on storage and clear failure; cleanup retry never r
   await context.route('**/api/send-order', async route => {
     accepted.push(route.request().postDataJSON());
     await page.evaluate(() => { window.__denyReceiptStorage = true; });
-    return route.fulfill({ json: { orderId: 'SYNTHETIC-RECEIPT', orderNumber: 'SYNTHETIC-RECEIPT' } });
+    return route.fulfill({ json: { success: true, orderId: 'SYNTHETIC-RECEIPT', orderNumber: 'SYNTHETIC-RECEIPT' } });
   });
   await signInCatalogue(page);
   await page.locator('[data-cart-trigger]').filter({ visible: true }).first().click();

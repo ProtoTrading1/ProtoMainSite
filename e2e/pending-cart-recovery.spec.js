@@ -47,7 +47,7 @@ test('foreign pending copy is reviewed and explicitly restored with real revisio
   expect(fixture.writes).toEqual([]);
   await drawer.getByRole('button', { name: 'Restore this copy', exact: true }).click();
   await expect.poll(() => fixture.snapshot().items[0].qty).toBe(24);
-  await expect(drawer.getByRole('spinbutton', { name: `Quantity for ${catalogueProducts[0].code}`, exact: true })).toHaveValue('24');
+  await expect(drawer.getByRole('spinbutton', { name: `Quantity for ${catalogueProducts[0].code} (Blue)`, exact: true })).toHaveValue('24');
   await expect(drawer.getByText('Pending basket copies need review', { exact: true })).toHaveCount(0);
   await expect(drawer.getByRole('button', { name: 'Review order request', exact: true })).toBeEnabled();
   expect(fixture.writes).toHaveLength(1);

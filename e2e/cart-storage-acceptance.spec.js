@@ -57,6 +57,10 @@ async function stored(page, key) {
 test('denied storage property leaves catalogue and confirmed account basket usable with a warning', async ({ page, context }) => {
   const safety = await installAccessibilityServices(context, { products, cartItems: account });
   await mountIsolatedApp(page, { denyGetter: true });
+  const recovery = page.getByRole('dialog', { name: 'Could not send order', exact: true });
+  await expect(recovery).toContainText('cannot safely save or recover this order request');
+  await expect(recovery.getByRole('button', { name: 'Check My Orders', exact: true })).toBeVisible();
+  await recovery.getByRole('button', { name: 'Close', exact: true }).click();
   await openBasket(page);
   await expect(basket(page).locator('[data-cart-product-id]')).toHaveCount(1);
   await expect(basket(page).getByRole('alert')).toContainText('cart_device_storage');
