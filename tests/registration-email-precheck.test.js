@@ -5,34 +5,30 @@ import { checkRegistrationEmail } from '../src/lib/registrationEmailCheck.js';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('email precheck client returns structured availability', async (t) => {
-  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ available: false, exists: true, recovery: 'SIGN_IN_OR_RESET_PASSWORD' }), {
+test('email precheck client returns structured syntax-only receipt', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ ok: true, validationOnly: true }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   }));
   const result = await checkRegistrationEmail(' Existing@Business.co.za ');
-  assert.equal(result.exists, true);
+  assert.equal(result.validationOnly, true);
   const [, request] = globalThis.fetch.mock.calls[0].arguments;
   assert.deepEqual(JSON.parse(request.body), { email: 'existing@business.co.za' });
 });
 
-test('server precheck is rate limited, server-side and returns no customer details', () => {
+test('server precheck is rate limited and makes no account lookup', () => {
   const source = read('api/check-registration-email.js');
-  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(source, /registration-email-check:/);
-  assert.match(source, /\.select\('id'\)/);
-  assert.doesNotMatch(source, /is_approved|business_name|customer_code|phone/);
-  assert.match(source, /available: !exists/);
+  assert.match(source, /validationOnly: true/);
+  assert.doesNotMatch(source, /createClient|SUPABASE_SERVICE_ROLE_KEY|\.from\(|available:|exists:/);
 });
 
-test('both registration forms check on email blur and block existing accounts', () => {
+test('both registration forms keep sequence guards and neutral continuation guidance', () => {
   for (const path of ['src/pages/RegisterPage.jsx', 'src/pages/LandingPage.jsx']) {
     const source = read(path);
-    assert.match(source, /onBlur=\{\(\) => \{ if \(email\.trim\(\)\) void checkEmailAvailability\(\); \}\}/);
-    assert.match(source, /This email is already registered\./);
-    assert.match(source, />Sign in</);
-    assert.match(source, />Reset password</);
-    assert.match(source, /emailCheck\.status === 'existing'/);
+    assert.match(source, /validationOnly !== true/);
+    assert.match(source, /Email format checked/);
+    assert.doesNotMatch(source, /This email is already registered\./);
     assert.match(source, /sequence !== emailCheckSequence\.current/);
   }
 });

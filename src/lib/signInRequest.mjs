@@ -39,10 +39,15 @@ export async function boundedSignInRequest(run, { signal, timeoutMs = 15000 } = 
 // The shared SDK verifies the supplied token using /user before storing it.
 // Bound the complete body and keep ownership checks in that transport so a
 // stalled lock/body cannot write a session after an abandoned commit.
-export function createSignInCommitTransport(fetchImpl, { timeoutMs = 15000 } = {}) {
+export function createSignInCommitTransport(fetchImpl, { timeoutMs = 15000, refreshTimeoutMs = 4000, captureOwnership, assertOwnership } = {}) {
   let active = null;
   const owners = new Map();
+  const refreshOwners = new Map();
   return {
+    setAuthOwnership(guards) {
+      captureOwnership = guards.captureOwnership;
+      assertOwnership = guards.assertOwnership;
+    },
     async commit(session, saveSession, assertOwnership) {
       if (active) throw signInError('SIGN_IN_COMMIT_FAILED');
       const owner = { token: session.access_token, assertOwnership, active: true, failure: null };
@@ -60,6 +65,29 @@ export function createSignInCommitTransport(fetchImpl, { timeoutMs = 15000 } = {
     },
     async fetch(input, init = {}) {
       const url = typeof input === 'string' ? input : input?.url || String(input);
+      const refreshRequest = /\/auth\/v1\/token(?:\?|$)/.test(url) && /[?&]grant_type=refresh_token(?:&|$)/.test(url);
+      if (refreshRequest) {
+        let key = null;
+        try { key = JSON.parse(init.body)?.refresh_token || null; } catch { /* Provider validates malformed requests. */ }
+        if (key && !refreshOwners.has(key)) {
+          refreshOwners.set(key, captureOwnership?.());
+          // Bind SDK retries to their first identity rather than adopting a
+          // later account. The shared SDK serializes refresh requests.
+          if (refreshOwners.size > 16) refreshOwners.delete(refreshOwners.keys().next().value);
+        }
+        const ownership = key ? refreshOwners.get(key) : captureOwnership?.();
+        return boundedSignInRequest(async signal => {
+          assertOwnership?.(ownership);
+          const response = await fetchImpl(input, { ...init, signal });
+          const body = await response.arrayBuffer();
+          if (signal.aborted) throw signInError('REQUEST_CANCELLED');
+          assertOwnership?.(ownership);
+          if (key && response.ok) refreshOwners.delete(key);
+          // The SDK receives no session payload until identity and complete
+          // body checks pass, preventing an obsolete refresh from persisting.
+          return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+        }, { timeoutMs: refreshTimeoutMs, signal: init.signal });
+      }
       if (!/\/auth\/v1\/user(?:\?|$)/.test(url)) return fetchImpl(input, init);
       const token = new Headers(init.headers || {}).get('Authorization')?.replace(/^Bearer\s+/i, '');
       const owner = owners.get(token);

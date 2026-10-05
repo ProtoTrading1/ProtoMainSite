@@ -7,10 +7,10 @@ import { validateRegistrationStep } from '../src/lib/registrationValidation.mjs'
 
 const readSource = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('registration and password reset share one eight-character password policy', async () => {
-  assert.equal(MIN_PASSWORD_LENGTH, 8);
-  assert.equal(passwordPolicyError('1234567'), 'Password must be at least 8 characters.');
-  assert.equal(passwordPolicyError('12345678'), '');
+test('registration and password reset share one ten-character password policy', async () => {
+  assert.equal(MIN_PASSWORD_LENGTH, 10);
+  assert.equal(passwordPolicyError('123456789'), 'Password must be at least 10 characters.');
+  assert.equal(passwordPolicyError('1234567890'), '');
 
   const [registrationApi, resetApi, resetPage] = await Promise.all([
     readSource('api/register-trade.js'),

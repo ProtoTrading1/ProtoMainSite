@@ -1,4 +1,6 @@
 import { submitTradeApplication } from './tradeApplication.js';
+import { MIN_PASSWORD_LENGTH } from './passwordPolicy.js';
+import { safeServerRegistrationFields } from './registrationServerGuidance.mjs';
 
 const ATTEMPT_KEY = 'proto.trade-application-attempt.v1';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -10,7 +12,7 @@ const SAFE_VALIDATION = new Map([
   ['Please name the other product category.', { otherProductCategory: 'Name the other product category that you sell.' }],
   ['Please describe your business in at least 20 characters.', { businessDescription: 'Describe your business using at least 20 characters.' }],
   ['Passwords do not match.', { password: 'Enter matching passwords.' }],
-  ['Password must be at least 8 characters.', { password: 'Create a password of at least 8 characters.' }],
+  [`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, { password: `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` }],
   ['Please enter your email address.', { email: 'Enter your email address.' }],
   ['Please enter a valid email address (e.g. name@company.co.za).', { email: 'Enter a valid email address.' }],
   ['Please use your real business email address - temporary or test addresses are not accepted.', { email: 'Use your real business email address.' }],
@@ -22,6 +24,11 @@ function attemptError(message, code, { retrySafe = false, fieldErrors = {} } = {
 }
 
 export function isConfirmedTradeApplication(result) {
+  if (result?.receipt === 'CHECK_EMAIL_OR_SIGN_IN') {
+    return result.ok === true && result.instantAccess === false && result.emailVerificationRequired === true;
+  }
+  // Accept the previous endpoint envelope during a rolling release. The UI
+  // uses neutral guidance for both versions, never account/mail delivery claims.
   return result?.ok === true && result.instantAccess === false
     && result.emailVerificationRequired === true && typeof result.verificationEmailSent === 'boolean'
     && typeof result.profile?.id === 'string' && UUID.test(result.profile.id);
@@ -32,6 +39,11 @@ export function isConfirmedTradeApplication(result) {
 // envelopes cannot establish whether an account was already created.
 export function applicationFailure(error) {
   const status = Number(error?.status);
+  if (status === 400 && error?.code === 'REGISTRATION_VALIDATION_FAILED'
+      && error?.data?.error === 'Check the highlighted application details.') {
+    const fieldErrors = safeServerRegistrationFields(error.data.fieldErrors);
+    if (fieldErrors) return attemptError('Check the highlighted details before submitting again. Your other entries are still here; enter your password again.', 'REGISTRATION_VALIDATION_FAILED', { retrySafe: true, fieldErrors });
+  }
   if (status === 409 && error?.code === 'EMAIL_ALREADY_REGISTERED') {
     return Object.assign(attemptError('An online account may already use these details. Use Sign in or Forgot password to continue.', 'EMAIL_ALREADY_REGISTERED', { retrySafe: true }), { recovery: 'SIGN_IN_OR_RESET_PASSWORD' });
   }

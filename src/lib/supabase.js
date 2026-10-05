@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { signInCommitTransport } from './signInRequest.mjs';
+import { assertAuthIdentity, captureAuthIdentity } from './authHeaders';
+
+// These callbacks read identity only when the asynchronous SDK transport runs.
+signInCommitTransport.setAuthOwnership({
+  captureOwnership: () => captureAuthIdentity(),
+  assertOwnership: identity => assertAuthIdentity(identity),
+});
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,

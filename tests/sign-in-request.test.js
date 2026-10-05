@@ -5,6 +5,38 @@ import { createIsolatedSignIn, createSignInCommitTransport, hasFreshSignInSessio
 const id = '00000000-0000-4000-8000-000000000001';
 const session = () => ({ access_token: `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: id, exp: Date.now() / 1000 + 3600 })).toString('base64url')}.synthetic`, refresh_token: 'inert-refresh', user: { id } });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+const refreshUrl = 'http://localhost/auth/v1/token?grant_type=refresh_token';
+
+test('refresh response ownership rejects an old identity after headers or body and binds retries', async () => {
+  for (const stage of ['headers', 'body']) {
+    let identity = { userId: 'A', epoch: 1 }, calls = 0;
+    const gate = deferred(), started = deferred();
+    const transport = createSignInCommitTransport(async () => {
+      calls++;started.resolve();
+      if(stage === 'headers') await gate.promise;
+      return { status:200, statusText:'OK', headers:{}, arrayBuffer:async()=>{if(stage === 'body') await gate.promise;return new TextEncoder().encode('{}').buffer;} };
+    }, { captureOwnership:()=>identity, assertOwnership:owner=>{if(owner!==identity)throw Object.assign(Error('Changed'),{code:'AUTH_ACCOUNT_CHANGED'});} });
+    const request={body:JSON.stringify({refresh_token:'refresh-A'})};
+    const pending=transport.fetch(refreshUrl,request);
+    await started.promise;identity={userId:'B',epoch:2};gate.resolve();
+    await assert.rejects(pending,{code:'AUTH_ACCOUNT_CHANGED'});
+    identity={userId:'A',epoch:3};
+    await assert.rejects(transport.fetch(refreshUrl,request),{code:'AUTH_ACCOUNT_CHANGED'});
+    assert.equal(calls,1);
+  }
+});
+
+test('same-identity refresh and initial cold restore can pass while full-body timeout refuses a late payload', async () => {
+  const identity={userId:null,epoch:0};let token='old';
+  const transport=createSignInCommitTransport(async()=>{token='new';return new Response('{}');}, {captureOwnership:()=>identity,assertOwnership:owner=>assert.equal(owner,identity)});
+  assert.equal((await transport.fetch(refreshUrl,{body:JSON.stringify({refresh_token:'cold'})})).status,200);
+  assert.equal(token,'new');
+  const body=deferred(),started=deferred();
+  const slow=createSignInCommitTransport(async()=>{started.resolve();return {status:200,statusText:'OK',headers:{},arrayBuffer:()=>body.promise};},{refreshTimeoutMs:8,captureOwnership:()=>identity,assertOwnership:owner=>assert.equal(owner,identity)});
+  const pending=slow.fetch(refreshUrl,{body:JSON.stringify({refresh_token:'slow'})});
+  await started.promise;await assert.rejects(pending,{code:'REQUEST_TIMEOUT'});
+  body.resolve(new ArrayBuffer(0));await new Promise(r=>setImmediate(r));
+});
 function harness(overrides = {}) {
   const counters = { provider: 0, commit: 0, stopped: 0, epoch: 0 };
   const signIn = createIsolatedSignIn({

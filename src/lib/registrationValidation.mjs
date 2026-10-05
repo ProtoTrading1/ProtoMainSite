@@ -1,4 +1,4 @@
-import { passwordPolicyError } from './passwordPolicy.js';
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from './passwordPolicy.js';
 
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const BLOCKED_DOMAINS = new Set(['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com']);
@@ -65,7 +65,7 @@ export function validateRegistrationStep(step, values = {}) {
     if (emailError) errors.email = emailError;
     if (!text(values.phone)) errors.phone = 'Enter your phone number.';
     else if (String(values.phone).replace(/\D/g, '').length < 8) errors.phone = 'Enter a phone number with at least 8 digits, including your area or country code.';
-    if (!values.password) errors.password = 'Create a password of at least 8 characters.';
+    if (!values.password) errors.password = `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.`;
     else {
       const passwordError = passwordPolicyError(values.password);
       if (passwordError) errors.password = passwordError;

@@ -10,7 +10,7 @@ for (const country of ['Kenya', 'Uganda']) {
         status: path === '/api/check-registration-email' ? 200 : 503,
         contentType: 'application/json',
         body: JSON.stringify(path === '/api/check-registration-email'
-          ? { available: true, exists: false }
+          ? { ok: true, validationOnly: true }
           : { error: 'Test application intercepted; no account created.' }),
       });
     });
@@ -21,7 +21,7 @@ for (const country of ['Kenya', 'Uganda']) {
     await page.getByPlaceholder('name@business.co.za').fill('international@protoe2e.co.za');
     await page.getByPlaceholder('+27').fill('+254712345678');
     await page.getByRole('button', { name: 'No WhatsApp updates', exact: true }).click();
-    await page.getByPlaceholder('At least 8 characters').fill('SafeTest123!');
+    await page.getByPlaceholder('At least 10 characters').fill('SafeTest123!');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page.getByRole('button', { name: 'Change country', exact: true }).click();
     if (country === 'Kenya') {
@@ -52,7 +52,9 @@ for (const country of ['Kenya', 'Uganda']) {
     await page.getByRole('button', { name: 'Art, craft & beads', exact: true }).click();
     await page.getByPlaceholder(/Gifts and party supplies sold/).fill('We distribute craft supplies to retail businesses.');
     await page.getByRole('button', { name: 'Submit application', exact: true }).click();
-    await expect(page.getByRole('alert')).toContainText('Test application intercepted');
+    await expect(page.getByRole('alert')).toContainText('We could not confirm whether your application was received.');
+    await expect(page.getByRole('button', { name: 'Submit application', exact: true })).toBeDisabled();
+    await expect(page.getByText('Test application intercepted')).toHaveCount(0);
     expect(application.country).toBe(country);
     expect(application.city).toBe('Nairobi');
     expect(application.province).toBeNull();
@@ -64,7 +66,7 @@ for (const country of ['Kenya', 'Uganda']) {
 }
 
 test('country can switch from Other back to South Africa', async ({ page }) => {
-  await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"available":true,"exists":false}' }));
+  await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"validationOnly":true}' }));
   await page.goto('/');
   await page.getByPlaceholder('Name', { exact: true }).fill('Switch Test');
   await page.getByPlaceholder('Full contact name').fill('Browser Test');
@@ -72,7 +74,7 @@ test('country can switch from Other back to South Africa', async ({ page }) => {
   await page.getByPlaceholder('name@business.co.za').fill('switch@protoe2e.co.za');
   await page.getByPlaceholder('+27').fill('0821234567');
   await page.getByRole('button', { name: 'No WhatsApp updates', exact: true }).click();
-  await page.getByPlaceholder('At least 8 characters').fill('SafeTest123!');
+  await page.getByPlaceholder('At least 10 characters').fill('SafeTest123!');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Change country', exact: true }).click();
   await page.getByRole('button', { name: 'Other country', exact: true }).click();

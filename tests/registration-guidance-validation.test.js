@@ -105,12 +105,12 @@ test('phone feedback distinguishes missing and too few digits without changing t
   assert.equal(validateRegistrationStep(1, { ...valid(), phone: '0123 4567' }).phone, undefined);
 });
 
-test('password boundary is unchanged and the helper neither trims nor persists passwords', () => {
+test('password boundary follows the intended ten characters and the helper neither trims nor persists passwords', () => {
   assert.match(validateRegistrationStep(1, { ...valid(), password: '' }).password, /Create a password/);
-  assert.match(validateRegistrationStep(1, { ...valid(), password: '1234567' }).password, /at least 8/);
-  assert.equal(validateRegistrationStep(1, { ...valid(), password: '12345678' }).password, undefined);
+  assert.match(validateRegistrationStep(1, { ...valid(), password: '123456789' }).password, /at least 10/);
+  assert.equal(validateRegistrationStep(1, { ...valid(), password: '1234567890' }).password, undefined);
   // Existing policy counts characters; changing complexity or whitespace policy is outside this fix.
-  assert.equal(validateRegistrationStep(1, { ...valid(), password: '        ' }).password, undefined);
+  assert.equal(validateRegistrationStep(1, { ...valid(), password: '          ' }).password, undefined);
 });
 
 test('WhatsApp requires an explicit decision and accepts a decline', () => {

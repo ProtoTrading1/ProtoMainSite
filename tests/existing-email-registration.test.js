@@ -21,23 +21,19 @@ test('account creation failures provide a generic recovery response', () => {
   assert.doesNotMatch(JSON.stringify(response), /already registered|user exists|duplicate/i);
 });
 
-test('Supabase email_exists failures provide a clear existing-account response', () => {
+test('known duplicate response shares the neutral request receipt', () => {
   assert.equal(isExistingEmailError({ code: 'email_exists' }), true);
   assert.equal(isExistingEmailError({ code: 'unexpected_failure' }), false);
-  assert.equal(isExistingEmailError({ message: 'Email address already exists in the system.' }), false);
-
   assert.deepEqual(existingEmailResponse(), {
-    error: 'This email is already registered. Sign in, or reset your password if you have forgotten it.',
-    code: 'EMAIL_ALREADY_REGISTERED',
-    recovery: 'SIGN_IN_OR_RESET_PASSWORD',
+    ok: true, receipt: 'CHECK_EMAIL_OR_SIGN_IN', instantAccess: false, emailVerificationRequired: true,
   });
+  assert.doesNotMatch(JSON.stringify(existingEmailResponse()), /already registered|EMAIL_ALREADY|profile|verificationEmailSent/);
 });
 
-test('registration handler reserves HTTP 409 for confirmed duplicate-email failures', () => {
+test('registration source exposes no duplicate-email status or body', () => {
   const source = read('api/register-trade.js');
-
-  assert.match(source, /if \(isExistingEmailError\(error\)\) \{\s*return res\.status\(409\)\.json\(existingEmailResponse\(\)\);/);
-  assert.match(source, /return res\.status\(400\)\.json\(accountCreationFailureResponse\(\)\);/);
+  assert.doesNotMatch(source, /status\(409\)|EMAIL_ALREADY_REGISTERED/);
+  assert.match(source, /return publicReceipt\(\)/);
 });
 
 test('registration client preserves structured recovery details', async (t) => {

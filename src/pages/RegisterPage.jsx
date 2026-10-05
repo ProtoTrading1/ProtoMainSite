@@ -87,9 +87,6 @@ export default function RegisterPage({ onLogin, standalone = false }) {
   const [submitError, setSubmitError] = useState('');
   const [showAccountRecovery, setShowAccountRecovery] = useState(false);
   const [done, setDone] = useState(false);
-  const [instantAccess, setInstantAccess] = useState(false);
-  const [verificationRequired, setVerificationRequired] = useState(false);
-  const [customerCode, setCustomerCode] = useState('');
   const [standaloneStep, setStandaloneStep] = useState(0);
 
   const toggleTradingChannel = (value) =>
@@ -217,17 +214,16 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       return false;
     }
     if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return true;
-    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'existing') return false;
     const sequence = ++emailCheckSequence.current;
     setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
     try {
       const result = await checkRegistrationEmail(normalized);
       if (sequence !== emailCheckSequence.current) return false;
-      if (result.exists) {
-        setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
+      if (result?.ok !== true || result.validationOnly !== true) {
+        setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email format check. Try again before continuing.' });
         return false;
       }
-      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
+      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email format checked. Continue your application, or sign in if you already have an online account.' });
       return true;
     } catch (error) {
       if (sequence !== emailCheckSequence.current) return false;
@@ -310,7 +306,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     setShowAccountRecovery(false);
     try {
       const deliveryLine = resolvedDeliveryAddress();
-      const result = await submitTradeApplication({
+      await submitTradeApplication({
         email: email.trim(),
         password,
         confirmPassword,
@@ -341,9 +337,6 @@ export default function RegisterPage({ onLogin, standalone = false }) {
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         company_fax: companyFax,
       });
-      setCustomerCode(result?.customerCode || result?.profile?.customerCode || '');
-      setInstantAccess(Boolean(result?.instantAccess));
-      setVerificationRequired(result?.emailVerificationRequired === true);
       setDone(true);
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
@@ -358,14 +351,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
-                <h3>{verificationRequired ? 'Confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
-                <p>
-                  {verificationRequired
-                    ? <>Thank you, {contactName.trim()}. Confirm your email using the link sent to {email.trim()} before signing in. If no link arrives, use Resend confirmation email on the sign-in screen.</>
-                    : instantAccess
-                    ? <>Welcome back, {contactName.trim()}. Your trade account is approved{customerCode ? ` (customer code ${customerCode})` : ''} — sign in with {email.trim()} to access the catalogue.</>
-                    : <>Thank you, {contactName.trim()}. Proto is reviewing your application and we will notify {email.trim()} when you have been approved.</>}
-                </p>
+                  <h3>Check your email or sign in</h3>
+                  <p>Thank you, {contactName.trim()}. Your request has been checked. If this is a new application, use any confirmation email you receive before signing in. If you already have an online account, sign in or reset your password. Check your spam folder or contact Proto if you cannot confirm the result.</p>
                 {!standalone && (
                   <button type="button" onClick={onLogin}>
                     Go to sign in
@@ -448,7 +435,7 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                       {!emailError && emailCheck.status !== 'idle' && (
                         <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
                           <span>{emailCheck.message}</span>
-                          {emailCheck.status === 'existing' && onLogin && (
+                          {onLogin && (
                             <div className="lp-register-recovery-actions">
                               <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'login' })}>Sign in</button>
                               <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'forgot' })}>Reset password</button>

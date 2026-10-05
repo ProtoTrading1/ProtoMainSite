@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import BillingDeliveryFields from '../components/register/BillingDeliveryFields';
 import { useBillingDeliveryAddresses } from '../hooks/useBillingDeliveryAddresses';
 import AboutModal from '../components/AboutModal';
@@ -233,9 +233,6 @@ function Questionnaire({ onLogin }) {
     && new URLSearchParams(window.location.search).get('previewStep') === 'business';
   const [step, setStep] = useState(previewBusinessStep ? 3 : 0);
   const [done, setDone] = useState(false);
-  const [instantAccess, setInstantAccess] = useState(false);
-  const [verificationRequired, setVerificationRequired] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -312,10 +309,14 @@ function Questionnaire({ onLogin }) {
   const [emailError, setEmailError] = useState('');
   const [emailCheck, setEmailCheck] = useState({ status: 'idle', checkedEmail: '', message: '' });
   const emailCheckSequence = useRef(0);
+  const pendingEmailCheck = useRef(null);
+  const emailInputValue = useRef('');
 
   const formValues = { companyName, contactName, email, phone, password, whatsappOptIn, country,
     billingStreet, billingSuburb, billingCity, billingPostalCode, streetName, suburb, city, postalCode,
     buildingType, otherBuildingType, unitNumber, tradingChannels, productCategories, otherProductCategory, businessDescription };
+  const latestForm = useRef({ step, values: formValues });
+  useLayoutEffect(() => { latestForm.current = { step, values: formValues }; });
   const currentValidation = validateRegistrationStep(step, formValues);
   const activeServerErrors = Object.fromEntries(Object.entries(serverFields)
     .filter(([key, detail]) => REGISTRATION_FIELD_STEPS[key] === step && detail.value === formValues[key])
@@ -361,38 +362,53 @@ function Questionnaire({ onLogin }) {
     trackJourneyEvent('registration_started', { journey: 'registration', step: 'company' });
   }, []);
 
-  const checkEmailAvailability = async () => {
+  const updateEmail = (event) => {
+    const value = event.currentTarget.value;
+    // Native autofill/input and React change can report the same edit.
+    if (emailInputValue.current === value) return;
+    emailInputValue.current = value;
+    emailCheckSequence.current += 1;
+    setEmail(value);
+    setEmailError('');
+    setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+  };
+
+  const checkEmailAvailability = () => {
     const normalized = email.trim().toLowerCase();
     const validationError = validateRegistrationEmail(normalized);
     setEmailError(validationError);
     if (validationError) {
       setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
-      return false;
+      return Promise.resolve(false);
     }
-    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return true;
-    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'existing') return false;
+    if (emailCheck.checkedEmail === normalized && emailCheck.status === 'available') return Promise.resolve(true);
+    const existing = pendingEmailCheck.current;
+    if (existing?.email === normalized && existing.sequence === emailCheckSequence.current) return existing.promise;
     const sequence = ++emailCheckSequence.current;
-    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
-    try {
-      const result = await checkRegistrationEmail(normalized);
-      if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
-      if (typeof result?.exists !== 'boolean' || result.available !== !result.exists) {
-        setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email check. Your application has not been submitted. Please try the check again.' });
+    const entry = { email: normalized, sequence, promise: null };
+    pendingEmailCheck.current = entry;
+    setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email.' });
+    entry.promise = (async () => {
+      try {
+        const result = await checkRegistrationEmail(normalized);
+        if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
+        if (result?.ok !== true || result.validationOnly !== true) {
+          setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email check. Your application has not been submitted. Please try the check again.' });
+          return false;
+        }
+        setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email format checked. Continue your application, or sign in if you already have an online account.' });
+        return true;
+      } catch (error) {
+        if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
+        const guidance = registrationEmailCheckFailure(error);
+        setEmailError(guidance.fieldError);
+        setEmailCheck({ status: 'error', checkedEmail: normalized, message: guidance.message });
         return false;
+      } finally {
+        if (pendingEmailCheck.current === entry) pendingEmailCheck.current = null;
       }
-      if (result.exists) {
-        setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
-        return false;
-      }
-      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
-      return true;
-    } catch (error) {
-      if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
-      const guidance = registrationEmailCheckFailure(error);
-      setEmailError(guidance.fieldError);
-      setEmailCheck({ status: 'error', checkedEmail: normalized, message: guidance.message });
-      return false;
-    }
+    })();
+    return entry.promise;
   };
 
   const advance = async () => {
@@ -410,8 +426,19 @@ function Questionnaire({ onLogin }) {
         return;
       }
       setFieldErrors({});
-      if (step === 1 && !(await checkEmailAvailability())) {
-        setFieldErrors({ email: 'Check the email message below before continuing.' });
+      if (step === 1) {
+        const emailAccepted = await checkEmailAvailability();
+        if (!mountedRef.current || latestForm.current.step !== step
+            || latestForm.current.values.email !== formValues.email) return;
+        if (!emailAccepted) {
+          setFieldErrors({ email: 'Check the email message below before continuing.' });
+          return;
+        }
+      }
+      if (!mountedRef.current || latestForm.current.step !== step) return;
+      const latestErrors = validateRegistrationStep(step, latestForm.current.values);
+      if (Object.keys(latestErrors).length) {
+        setFieldErrors(latestErrors);
         return;
       }
       if (step < STEP_LABELS.length - 1) {
@@ -434,7 +461,7 @@ function Questionnaire({ onLogin }) {
       setServerFields({});
       setShowAccountRecovery(false);
       const deliveryLine = buildStructuredDeliveryAddress();
-      const result = await attemptRef.current.submit({
+      await attemptRef.current.submit({
         email: email.trim(),
         password,
         contactName: contactName.trim(),
@@ -465,16 +492,13 @@ function Questionnaire({ onLogin }) {
         customerCode: customerCode.trim() || null,
       });
       if (!mountedRef.current) return;
-      setInstantAccess(Boolean(result?.instantAccess));
-      setVerificationRequired(result?.emailVerificationRequired === true);
-      setVerificationSent(result?.verificationEmailSent === true);
       setPassword('');
       setShowPw(false);
       setDone(true);
       trackJourneyEvent('registration_completed', {
         journey: 'registration',
         step: 'submitted',
-        outcome: result?.instantAccess ? 'instant_access' : 'pending_review',
+        outcome: 'request_processed',
       });
     } catch (err) {
       if (!mountedRef.current) return;
@@ -498,7 +522,7 @@ function Questionnaire({ onLogin }) {
         // clears its server feedback. A failed password is always cleared.
         setServerFields(Object.fromEntries(knownFields.filter(([key]) => key !== 'password')
           .map(([key, message]) => [key, { message, value: formValues[key] }])));
-        setFieldErrors({ password: 'Create a password of at least 8 characters.' });
+        setFieldErrors({ password: `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` });
       }
       trackJourneyEvent('registration_failed', {
         journey: 'registration',
@@ -528,15 +552,10 @@ function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success" ref={successRef} tabIndex={-1} role="region" aria-labelledby="trade-application-success">
         <CheckCircle2 size={48} />
-        <h3 id="trade-application-success">{verificationRequired ? 'Application saved — confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
-        <p>
-          {verificationRequired
-            ? `Thank you, ${contactName}. Your application has been saved. ${verificationSent ? 'Use the confirmation link sent to' : 'Request a confirmation link for'} ${email.trim()} before signing in. Existing trade customers receive access after email confirmation; new applications are reviewed by our team.`
-            : instantAccess
-            ? `Welcome back, ${contactName}. Your email is on our active trade list — sign in with ${email.trim()} to access the catalogue.`
-            : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
-        </p>
-        {verificationRequired && <button type="button" disabled={resending} onClick={async () => {
+        <h3 id="trade-application-success">Check your email or sign in</h3>
+        <p>Thank you, {contactName}. Your request has been checked. If this is a new application, use any confirmation email you receive at {email.trim()} before signing in. If you already have an online account, sign in or reset your password. New trade applications still need review by our team.</p>
+        <p>If no email arrives, check your spam folder, request a confirmation link, or contact Proto so we can help you confirm the result.</p>
+        {<button type="button" disabled={resending} onClick={async () => {
           if (resendLockRef.current) return;
           resendLockRef.current = true;
           resendControllerRef.current = new AbortController();
@@ -550,9 +569,10 @@ function Questionnaire({ onLogin }) {
               : 'We could not confirm that your request was received. Check your inbox and spam folder before requesting another link.');
           } catch { if (mountedRef.current) setVerificationNotice('We could not confirm that a new link was sent. Check your inbox and spam folder before requesting another link.'); }
           finally { resendLockRef.current = false; resendControllerRef.current = null; if (mountedRef.current) setResending(false); }
-        }}>{resending ? 'Requesting confirmation…' : verificationSent ? 'Request another confirmation email' : 'Request confirmation email'}</button>}
+        }}>{resending ? 'Requesting confirmation…' : 'Request confirmation email'}</button>}
         {verificationNotice && <p role="status">{verificationNotice}</p>}
         <button type="button" onClick={() => goToLogin()}>Go to sign in</button>
+        <button type="button" onClick={() => goToLogin('forgot')}>Reset password</button>
       </div>
     );
   }
@@ -686,12 +706,8 @@ function Questionnaire({ onLogin }) {
                   autoComplete="email"
                   inputMode="email"
                   value={email}
-                  onChange={(e) => {
-                    emailCheckSequence.current += 1;
-                    setEmail(e.target.value);
-                    if (emailError) setEmailError('');
-                    setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
-                  }}
+                  onInput={updateEmail}
+                  onChange={updateEmail}
                   onBlur={() => { if (email.trim()) void checkEmailAvailability(); }}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
@@ -703,7 +719,7 @@ function Questionnaire({ onLogin }) {
                 {!emailError && emailCheck.status !== 'idle' && (
                   <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
                     <span>{emailCheck.message}</span>
-                    {emailCheck.status === 'existing' && onLogin && (
+                    {onLogin && (
                       <div className="lp-register-recovery-actions">
                         <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin()}>Sign in</button>
                         <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin('forgot')}>Reset password</button>
@@ -724,6 +740,7 @@ function Questionnaire({ onLogin }) {
                   autoComplete="tel"
                   inputMode="tel"
                   value={phone}
+                  onInput={(e) => setPhone(e.currentTarget.value)}
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder="+27"
@@ -798,7 +815,7 @@ function Questionnaire({ onLogin }) {
               )}
 
               <div className="lp-quiz-field lp-quiz-field--full">
-                <label htmlFor="trade-new-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. 8 characters)</span></label>
+                <label htmlFor="trade-new-password">Password <span style={{ opacity: 0.55, fontWeight: 500 }}>(min. {MIN_PASSWORD_LENGTH} characters)</span></label>
                 <div className="lp-quiz-pw-wrap">
                   <input
                     id="trade-new-password"
@@ -806,6 +823,7 @@ function Questionnaire({ onLogin }) {
                     type={showPw ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={password}
+                    onInput={(e) => setPassword(e.currentTarget.value)}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKey}
                     placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
@@ -987,7 +1005,7 @@ function Questionnaire({ onLogin }) {
 
       <div className="lp-quiz-nav">
         {step > 0 ? (
-          <button type="button" className="lp-quiz-back" onClick={() => { setFieldErrors({}); stepFocusRef.current = true; setStep(step - 1); }} disabled={submitting || emailCheck.status === 'checking'}>
+          <button type="button" className="lp-quiz-back" onClick={() => { emailCheckSequence.current += 1; if (emailCheck.status === 'checking') setEmailCheck({ status: 'idle', checkedEmail: '', message: '' }); setFieldErrors({}); stepFocusRef.current = true; setStep(step - 1); }} disabled={submitting}>
             ← Back
           </button>
         ) : <span />}
