@@ -23,6 +23,38 @@ async function capture(page,testInfo,name) {
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 }
 
+test('a valid email check is silent and has no account-recovery buttons beside the field',async({page},testInfo)=>{
+  await contact(page);await fields(page);
+  const checked=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/check-registration-email');
+  await page.locator('#trade-email').press('Tab');await checked;
+  const emailField=page.locator('.lp-quiz-field').filter({has:page.locator('#trade-email')});
+  await expect(emailField.locator('.lp-register-email-status')).toHaveCount(0);
+  await expect(page.getByText(/Email format checked/)).toHaveCount(0);
+  await expect(emailField.getByRole('button',{name:/Sign in|Reset password/})).toHaveCount(0);
+  await capture(page,testInfo,'contact-email-quiet');
+  await page.getByRole('button',{name:'Next',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Billing and delivery addresses'})).toBeVisible();
+});
+
+test('an email-check failure keeps inline retry guidance and becomes silent after retry',async({page},testInfo)=>{
+  let requests=0;
+  await page.route('**/api/check-registration-email',route=>{
+    requests++;
+    return route.fulfill({status:requests===1?503:200,contentType:'application/json',body:JSON.stringify(requests===1?{error:'Synthetic unavailable'}:{ok:true,validationOnly:true})});
+  });
+  await contact(page);await fields(page);
+  await page.locator('#trade-email').press('Tab');
+  const emailField=page.locator('.lp-quiz-field').filter({has:page.locator('#trade-email')});
+  await expect(emailField.locator('.lp-register-email-status')).toContainText('temporarily unavailable');
+  await expect(emailField.getByRole('button',{name:/Sign in|Reset password/})).toHaveCount(0);
+  await capture(page,testInfo,'contact-email-check-error');
+  await emailField.getByRole('button',{name:'Try again',exact:true}).click();
+  await expect(emailField.locator('.lp-register-email-status')).toHaveCount(0);
+  expect(requests).toBe(2);
+  await page.getByRole('button',{name:'Next',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Billing and delivery addresses'})).toBeVisible();
+});
+
 test('native autofill input events update Contact state before continuing',async({page},testInfo)=>{
   await contact(page);
   await page.evaluate(()=>{

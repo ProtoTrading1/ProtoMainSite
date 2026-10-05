@@ -220,10 +220,10 @@ export default function RegisterPage({ onLogin, standalone = false }) {
       const result = await checkRegistrationEmail(normalized);
       if (sequence !== emailCheckSequence.current) return false;
       if (result?.ok !== true || result.validationOnly !== true) {
-        setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email format check. Try again before continuing.' });
+        setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not check your email. Try again before continuing.' });
         return false;
       }
-      setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email format checked. Continue your application, or sign in if you already have an online account.' });
+      setEmailCheck({ status: 'available', checkedEmail: normalized, message: '' });
       return true;
     } catch (error) {
       if (sequence !== emailCheckSequence.current) return false;
@@ -432,15 +432,9 @@ export default function RegisterPage({ onLogin, standalone = false }) {
                         aria-required="true"
                       />
                       {emailError && <span id="register-email-error" className="lp-register-field-error">{emailError}</span>}
-                      {!emailError && emailCheck.status !== 'idle' && (
+                      {!emailError && ['checking', 'error'].includes(emailCheck.status) && (
                         <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
                           <span>{emailCheck.message}</span>
-                          {onLogin && (
-                            <div className="lp-register-recovery-actions">
-                              <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'login' })}>Sign in</button>
-                              <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'forgot' })}>Reset password</button>
-                            </div>
-                          )}
                           {emailCheck.status === 'error' && (
                             <button type="button" className="lp-register-email-retry" onClick={() => void checkEmailAvailability()}>Try again</button>
                           )}

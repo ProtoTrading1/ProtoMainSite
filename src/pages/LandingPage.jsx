@@ -396,7 +396,7 @@ function Questionnaire({ onLogin }) {
           setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email check. Your application has not been submitted. Please try the check again.' });
           return false;
         }
-        setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email format checked. Continue your application, or sign in if you already have an online account.' });
+        setEmailCheck({ status: 'available', checkedEmail: normalized, message: '' });
         return true;
       } catch (error) {
         if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
@@ -716,15 +716,9 @@ function Questionnaire({ onLogin }) {
                   aria-required="true"
                 />
                 {errorText('email')}
-                {!emailError && emailCheck.status !== 'idle' && (
+                {!emailError && ['checking', 'error'].includes(emailCheck.status) && (
                   <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
                     <span>{emailCheck.message}</span>
-                    {onLogin && (
-                      <div className="lp-register-recovery-actions">
-                        <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin()}>Sign in</button>
-                        <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin('forgot')}>Reset password</button>
-                      </div>
-                    )}
                     {emailCheck.status === 'error' && (
                       <button type="button" className="lp-register-email-retry" onClick={() => void checkEmailAvailability()}>Try again</button>
                     )}

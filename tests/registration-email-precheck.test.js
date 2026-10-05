@@ -23,11 +23,13 @@ test('server precheck is rate limited and makes no account lookup', () => {
   assert.doesNotMatch(source, /createClient|SUPABASE_SERVICE_ROLE_KEY|\.from\(|available:|exists:/);
 });
 
-test('both registration forms keep sequence guards and neutral continuation guidance', () => {
+test('both registration forms keep sequence guards and make successful email checks silent', () => {
   for (const path of ['src/pages/RegisterPage.jsx', 'src/pages/LandingPage.jsx']) {
     const source = read(path);
     assert.match(source, /validationOnly !== true/);
-    assert.match(source, /Email format checked/);
+    assert.doesNotMatch(source, /Email format checked/);
+    assert.match(source, /status: 'available', checkedEmail: normalized, message: ''/);
+    assert.match(source, /\['checking', 'error'\]\.includes\(emailCheck\.status\)/);
     assert.doesNotMatch(source, /This email is already registered\./);
     assert.match(source, /sequence !== emailCheckSequence\.current/);
   }
