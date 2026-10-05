@@ -29,9 +29,10 @@ export async function submitTradeApplication({
   acceptWhatsapp,
   customerCode,
   company_fax,
-}) {
+}, { signal } = {}) {
   return requestJson('/api/register-trade', {
     method: 'POST',
+    signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,

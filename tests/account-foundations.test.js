@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../src/lib/passwordPolicy.js';
+import { confirmedRecoveryMessage } from '../src/lib/signInGuidance.mjs';
+import { validateRegistrationStep } from '../src/lib/registrationValidation.mjs';
 
 const readSource = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -56,10 +58,12 @@ test('account recovery is honest, preserves email and does not reveal account ex
   ]);
 
   assert.match(modal, /initialEmail = '', initialMode = 'login'/);
-  assert.match(modal, /If an online account exists for that email/);
+  assert.match(modal, /confirmedRecoveryMessage\(result, operation\)/);
+  assert.match(confirmedRecoveryMessage({ ok: true }, 'forgot'), /If an online account exists for this email/);
   assert.doesNotMatch(modal, /Password reset email sent/);
-  assert.match(landing, /initialEmail: email\.trim\(\), initialMode: 'login'/);
-  assert.match(landing, /initialEmail: email\.trim\(\), initialMode: 'forgot'/);
+  assert.match(landing, /initialEmail: email\.trim\(\), initialMode: mode/);
+  assert.match(landing, /goToLogin\(\)/);
+  assert.match(landing, /goToLogin\('forgot'\)/);
 });
 
 test('active registration journey starts directly with the form and requires business nature', async () => {
@@ -70,8 +74,9 @@ test('active registration journey starts directly with the form and requires bus
   assert.match(landing, /Step \{step \+ 1\} of \{STEP_LABELS\.length\}/);
   assert.match(landing, /aria-labelledby="landing-trading-channel-label" aria-required="true"/);
   assert.match(landing, /aria-labelledby="landing-product-category-label" aria-required="true"/);
-  assert.match(landing, /tradingChannels\.length > 0/);
-  assert.match(landing, /productCategories\.length > 0/);
+  assert.match(landing, /firstInvalidRegistrationStep\(formValues\)/);
+  assert.ok(validateRegistrationStep(3, {}).tradingChannels);
+  assert.ok(validateRegistrationStep(3, {}).productCategories);
 });
 
 test('registration address controls have names, labels and accessible selection state', async () => {

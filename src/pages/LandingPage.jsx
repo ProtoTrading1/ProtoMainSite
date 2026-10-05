@@ -8,8 +8,10 @@ import LandingMapSection from '../components/landing/LandingMapSection';
 import LandingDepartmentsSection from '../components/landing/LandingDepartmentsSection';
 import LandingApplySection from '../components/landing/LandingApplySection';
 import { trackJourneyEvent } from '../lib/journeyAnalytics';
-import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../lib/passwordPolicy';
+import { MIN_PASSWORD_LENGTH } from '../lib/passwordPolicy';
 import { checkRegistrationEmail } from '../lib/registrationEmailCheck';
+import { createTradeApplicationAttempt } from '../lib/tradeApplicationAttempt.mjs';
+import { firstInvalidRegistrationStep, REGISTRATION_FIELD_IDS, REGISTRATION_FIELD_STEPS, registrationEmailCheckFailure, registrationErrorId, validateRegistrationEmail, validateRegistrationStep } from '../lib/registrationValidation.mjs';
 import { PRODUCT_CATEGORIES, TRADING_CHANNELS } from '../lib/businessTypes';
 import { motion } from 'motion/react';
 import {
@@ -21,6 +23,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import '../landing.css';
+import '../components/register/RegistrationFeedback.css';
 
 const MONTHLY_SPEND_BANDS = [
   'R0 – R5,000',
@@ -237,7 +240,21 @@ function Questionnaire({ onLogin }) {
   const [verificationNotice, setVerificationNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [submitCode, setSubmitCode] = useState('');
   const [showAccountRecovery, setShowAccountRecovery] = useState(false);
+  const [outcomeUnknown, setOutcomeUnknown] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [serverFields, setServerFields] = useState({});
+  const summaryRef = useRef(null);
+  const submitNoticeRef = useRef(null);
+  const stepHeadingRef = useRef(null);
+  const successRef = useRef(null);
+  const submissionLockRef = useRef(false);
+  const resendLockRef = useRef(false);
+  const resendControllerRef = useRef(null);
+  const mountedRef = useRef(true);
+  const attemptRef = useRef(null);
+  const stepFocusRef = useRef(false);
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [vatNumber, setVatNumber] = useState('');
@@ -295,27 +312,58 @@ function Questionnaire({ onLogin }) {
   const [emailError, setEmailError] = useState('');
   const [emailCheck, setEmailCheck] = useState({ status: 'idle', checkedEmail: '', message: '' });
   const emailCheckSequence = useRef(0);
-  const [stepError, setStepError] = useState('');
+
+  const formValues = { companyName, contactName, email, phone, password, whatsappOptIn, country,
+    billingStreet, billingSuburb, billingCity, billingPostalCode, streetName, suburb, city, postalCode,
+    buildingType, otherBuildingType, unitNumber, tradingChannels, productCategories, otherProductCategory, businessDescription };
+  const currentValidation = validateRegistrationStep(step, formValues);
+  const activeServerErrors = Object.fromEntries(Object.entries(serverFields)
+    .filter(([key, detail]) => REGISTRATION_FIELD_STEPS[key] === step && detail.value === formValues[key])
+    .map(([key, detail]) => [key, detail.message]));
+  const visibleErrors = Object.fromEntries(Object.entries({ ...fieldErrors, ...activeServerErrors }).filter(([key]) => (
+    currentValidation[key] || activeServerErrors[key] || (key === 'email' && ['existing', 'error'].includes(emailCheck.status))
+  )).map(([key, message]) => [key, currentValidation[key] || (key === 'email' ? emailError : '') || message]));
+  const fieldError = (key) => visibleErrors[key] || (key === 'email' ? emailError : '') || '';
+  const fieldFeedback = (key, helpId) => ({
+    'aria-invalid': Boolean(fieldError(key)),
+    'aria-describedby': [helpId, fieldError(key) ? registrationErrorId(key) : ''].filter(Boolean).join(' ') || undefined,
+  });
+  const errorText = (key) => fieldError(key) && (
+    <span id={registrationErrorId(key)} className="lp-register-field-error">{fieldError(key)}</span>
+  );
+  const focusField = (key) => {
+    const target = document.getElementById(REGISTRATION_FIELD_IDS[key]);
+    target?.focus();
+  };
+
+  useEffect(() => {
+    if (done) successRef.current?.focus();
+    else if (Object.keys(fieldErrors).length) summaryRef.current?.focus();
+    else if (stepFocusRef.current) {
+      stepHeadingRef.current?.focus();
+      stepFocusRef.current = false;
+    }
+    else if (submitError) submitNoticeRef.current?.focus();
+  }, [done, fieldErrors, submitError, step]);
+
+  useEffect(() => {
+    if (!attemptRef.current) attemptRef.current = createTradeApplicationAttempt();
+    mountedRef.current = true;
+    if (attemptRef.current.state === 'unknown') {
+      setOutcomeUnknown(true);
+      setShowAccountRecovery(true);
+      setSubmitError('We cannot confirm the result of your earlier application. It may already have been saved. Check your inbox and spam folder for confirmation before applying again.');
+    }
+    return () => { mountedRef.current = false; emailCheckSequence.current += 1; attemptRef.current?.cancel(); resendControllerRef.current?.abort(); };
+  }, []);
 
   useEffect(() => {
     trackJourneyEvent('registration_started', { journey: 'registration', step: 'company' });
   }, []);
 
-  const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-  const BLOCKED_DOMAINS = ['test.com', 'test.co.za', 'example.com', 'example.org', 'mailinator.com', 'tempmail.com', 'temp-mail.org', 'yopmail.com', '10minutemail.com', 'guerrillamail.com'];
-
-  const validateEmailField = (value) => {
-    const v = value.trim().toLowerCase();
-    if (!v) return 'Please enter your email address.';
-    if (!EMAIL_RE.test(v)) return 'Please enter a valid email address (e.g. name@company.co.za).';
-    const domain = v.split('@')[1];
-    if (BLOCKED_DOMAINS.includes(domain)) return 'Please use your real business email address.';
-    return '';
-  };
-
   const checkEmailAvailability = async () => {
     const normalized = email.trim().toLowerCase();
-    const validationError = validateEmailField(normalized);
+    const validationError = validateRegistrationEmail(normalized);
     setEmailError(validationError);
     if (validationError) {
       setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
@@ -327,7 +375,11 @@ function Questionnaire({ onLogin }) {
     setEmailCheck({ status: 'checking', checkedEmail: normalized, message: 'Checking your email…' });
     try {
       const result = await checkRegistrationEmail(normalized);
-      if (sequence !== emailCheckSequence.current) return false;
+      if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
+      if (typeof result?.exists !== 'boolean' || result.available !== !result.exists) {
+        setEmailCheck({ status: 'error', checkedEmail: normalized, message: 'We could not confirm the email check. Your application has not been submitted. Please try the check again.' });
+        return false;
+      }
       if (result.exists) {
         setEmailCheck({ status: 'existing', checkedEmail: normalized, message: 'This email is already registered.' });
         return false;
@@ -335,79 +387,54 @@ function Questionnaire({ onLogin }) {
       setEmailCheck({ status: 'available', checkedEmail: normalized, message: 'Email available — continue your application.' });
       return true;
     } catch (error) {
-      if (sequence !== emailCheckSequence.current) return false;
-      setEmailCheck({ status: 'error', checkedEmail: normalized, message: error.message });
+      if (sequence !== emailCheckSequence.current || !mountedRef.current) return false;
+      const guidance = registrationEmailCheckFailure(error);
+      setEmailError(guidance.fieldError);
+      setEmailCheck({ status: 'error', checkedEmail: normalized, message: guidance.message });
       return false;
     }
   };
 
-  const canNext = () => {
-    if (step === 0) return companyName.trim() && contactName.trim();
-    if (step === 1) {
-      const phoneOk = phone.replace(/\D/g, '').length >= 8;
-      const whatsappAnswered = typeof whatsappOptIn === 'boolean';
-      return email.trim() && !validateEmailField(email) && phoneOk && !passwordPolicyError(password) && whatsappAnswered;
-    }
-    if (step === 2) {
-      const billingOk = billingStreet.trim()
-        && billingSuburb.trim()
-        && billingCity.trim()
-        && billingPostalCode.trim();
-      const deliveryOk = streetName.trim()
-        && suburb.trim()
-        && city.trim()
-        && postalCode.trim()
-        && buildingType
-        && (buildingType !== 'Other' || otherBuildingType.trim())
-        && (buildingType !== 'Apartments' || unitNumber.trim());
-      return country.trim() && billingOk && deliveryOk;
-    }
-    if (step === 3) {
-      return tradingChannels.length > 0
-        && productCategories.length > 0
-        && businessDescription.trim().length >= 20
-        && (!productCategories.includes('Other') || otherProductCategory.trim());
-    }
-    return false;
-  };
-
   const advance = async () => {
-    if (step === 1) {
-      if (!(await checkEmailAvailability())) return;
-    }
-    if (!canNext()) {
-      const messages = [
-        'Enter your company name and the contact person’s full name.',
-        `Enter a valid email and phone number, choose Yes or No for WhatsApp, and use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
-        'Complete the required billing and delivery address fields, including building type.',
-        'Select at least one way you trade, at least one product category, and describe your business in at least 20 characters.',
-      ];
-      setStepError(messages[step]);
-      trackJourneyEvent('registration_validation_failed', {
-        journey: 'registration',
-        step: STEP_LABELS[step].toLowerCase(),
-        outcome: 'blocked',
-      });
-      return;
-    }
-    setStepError('');
-    if (step < STEP_LABELS.length - 1) {
-      trackJourneyEvent('registration_step_completed', {
-        journey: 'registration',
-        step: STEP_LABELS[step].toLowerCase(),
-        outcome: 'success',
-      });
-      setStep(step + 1);
-      return;
-    }
-    // Final step — submit
-    setSubmitting(true);
-    setSubmitError('');
-    setShowAccountRecovery(false);
+    if (submissionLockRef.current || outcomeUnknown) return;
+    if (!attemptRef.current) attemptRef.current = createTradeApplicationAttempt();
+    if (attemptRef.current.state === 'unknown' || attemptRef.current.state === 'confirmed') return;
+    submissionLockRef.current = true;
     try {
-      const { submitTradeApplication } = await import('../lib/tradeApplication');
+      const errors = { ...activeServerErrors, ...validateRegistrationStep(step, formValues) };
+      if (Object.keys(errors).length) {
+        setFieldErrors(errors);
+        trackJourneyEvent('registration_validation_failed', {
+          journey: 'registration', step: STEP_LABELS[step].toLowerCase(), outcome: 'blocked',
+        });
+        return;
+      }
+      setFieldErrors({});
+      if (step === 1 && !(await checkEmailAvailability())) {
+        setFieldErrors({ email: 'Check the email message below before continuing.' });
+        return;
+      }
+      if (step < STEP_LABELS.length - 1) {
+        trackJourneyEvent('registration_step_completed', {
+          journey: 'registration', step: STEP_LABELS[step].toLowerCase(), outcome: 'success',
+        });
+        stepFocusRef.current = true;
+        setStep(step + 1);
+        return;
+      }
+      const invalid = firstInvalidRegistrationStep(formValues);
+      if (invalid) {
+        setStep(invalid.step);
+        setFieldErrors(invalid.errors);
+        return;
+      }
+      setSubmitting(true);
+      setSubmitError('');
+      setSubmitCode('');
+      setServerFields({});
+      setShowAccountRecovery(false);
       const deliveryLine = buildStructuredDeliveryAddress();
-      const result = await submitTradeApplication({
+      const result = await attemptRef.current.submit({
         email: email.trim(),
         password,
         contactName: contactName.trim(),
@@ -437,9 +464,12 @@ function Questionnaire({ onLogin }) {
         acceptWhatsapp: typeof whatsappOptIn === 'boolean' ? whatsappOptIn : null,
         customerCode: customerCode.trim() || null,
       });
+      if (!mountedRef.current) return;
       setInstantAccess(Boolean(result?.instantAccess));
       setVerificationRequired(result?.emailVerificationRequired === true);
       setVerificationSent(result?.verificationEmailSent === true);
+      setPassword('');
+      setShowPw(false);
       setDone(true);
       trackJourneyEvent('registration_completed', {
         journey: 'registration',
@@ -447,27 +477,58 @@ function Questionnaire({ onLogin }) {
         outcome: result?.instantAccess ? 'instant_access' : 'pending_review',
       });
     } catch (err) {
-      setSubmitError(err.message || 'Something went wrong. Please try again.');
-      setShowAccountRecovery(err.recovery === 'SIGN_IN_OR_RESET_PASSWORD');
+      if (!mountedRef.current) return;
+      const storageBlocked = err.code === 'REGISTRATION_STORAGE_UNAVAILABLE';
+      const unknown = err.outcomeUnknown === true || err.retrySafe !== true;
+      setPassword('');
+      setShowPw(false);
+      setOutcomeUnknown(unknown);
+      setSubmitCode(err.code || 'REGISTRATION_OUTCOME_UNKNOWN');
+      setShowAccountRecovery(!storageBlocked && (unknown || err.recovery === 'SIGN_IN_OR_RESET_PASSWORD'));
+      const knownCodes = ['REGISTRATION_STORAGE_UNAVAILABLE', 'REGISTRATION_OUTCOME_UNKNOWN', 'REGISTRATION_VALIDATION_FAILED', 'REGISTRATION_RATE_LIMITED', 'REGISTRATION_UNAVAILABLE', 'EMAIL_ALREADY_REGISTERED'];
+      setSubmitError(knownCodes.includes(err.code) ? err.message : unknown
+        ? 'We cannot confirm whether your application was saved. Check your inbox and spam folder for confirmation. Please do not submit another application while the result is uncertain.'
+        : err.code === 'EMAIL_ALREADY_REGISTERED'
+          ? 'We could not create a new account with these details. If you have applied before, sign in or reset your password.'
+          : 'Your application was not submitted. Your other details are still here. Check your connection and details, then re-enter your password to try again.');
+      if (!unknown) {
+        setStep(1);
+        const knownFields = Object.entries(err.fieldErrors || {}).filter(([key]) => REGISTRATION_FIELD_IDS[key]);
+        // Keep only nonsecret field values in memory so editing a rejected field
+        // clears its server feedback. A failed password is always cleared.
+        setServerFields(Object.fromEntries(knownFields.filter(([key]) => key !== 'password')
+          .map(([key, message]) => [key, { message, value: formValues[key] }])));
+        setFieldErrors({ password: 'Create a password of at least 8 characters.' });
+      }
       trackJourneyEvent('registration_failed', {
         journey: 'registration',
         step: 'submitted',
-        outcome: err.code === 'EMAIL_ALREADY_REGISTERED' ? 'existing_email' : 'error',
+        outcome: unknown ? 'unknown' : 'error',
       });
     } finally {
-      setSubmitting(false);
+      submissionLockRef.current = false;
+      if (mountedRef.current) setSubmitting(false);
     }
   };
 
   const handleKey = (e) => {
-    if (e.key === 'Enter') void advance();
+    if (e.key === 'Enter' && !e.repeat && !e.nativeEvent?.isComposing) {
+      e.preventDefault();
+      void advance();
+    }
+  };
+
+  const goToLogin = (mode = 'login') => {
+    if (submitting) return;
+    setPassword(''); setShowPw(false);
+    onLogin?.({ initialEmail: email.trim(), initialMode: mode });
   };
 
   if (done) {
     return (
-      <div className="lp-quiz-success">
+      <div className="lp-quiz-success" ref={successRef} tabIndex={-1} role="region" aria-labelledby="trade-application-success">
         <CheckCircle2 size={48} />
-        <h3>{verificationRequired ? 'Confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
+        <h3 id="trade-application-success">{verificationRequired ? 'Application saved — confirm your email' : instantAccess ? 'You\'re approved' : 'Application received'}</h3>
         <p>
           {verificationRequired
             ? `Thank you, ${contactName}. Your application has been saved. ${verificationSent ? 'Use the confirmation link sent to' : 'Request a confirmation link for'} ${email.trim()} before signing in. Existing trade customers receive access after email confirmation; new applications are reviewed by our team.`
@@ -476,28 +537,65 @@ function Questionnaire({ onLogin }) {
             : `Thank you, ${contactName}. Proto is reviewing your application and we will notify ${email.trim()} when you have been approved.`}
         </p>
         {verificationRequired && <button type="button" disabled={resending} onClick={async () => {
+          if (resendLockRef.current) return;
+          resendLockRef.current = true;
+          resendControllerRef.current = new AbortController();
           setResending(true); setVerificationNotice('');
           try {
             const { resendTradeVerification } = await import('../lib/auth');
-            await resendTradeVerification(email);
-            setVerificationNotice('If your application needs confirmation, we will send a new link. Check your inbox and spam folder.');
-          } catch (error) { setVerificationNotice(error.message); }
-          finally { setResending(false); }
-        }}>{resending ? 'Sending…' : 'Resend confirmation email'}</button>}
+            const result = await resendTradeVerification(email, { signal: resendControllerRef.current.signal });
+            if (!mountedRef.current) return;
+            setVerificationNotice(result?.ok === true
+              ? 'Your confirmation-link request was received. If your application needs confirmation, check your inbox and spam folder.'
+              : 'We could not confirm that your request was received. Check your inbox and spam folder before requesting another link.');
+          } catch { if (mountedRef.current) setVerificationNotice('We could not confirm that a new link was sent. Check your inbox and spam folder before requesting another link.'); }
+          finally { resendLockRef.current = false; resendControllerRef.current = null; if (mountedRef.current) setResending(false); }
+        }}>{resending ? 'Requesting confirmation…' : verificationSent ? 'Request another confirmation email' : 'Request confirmation email'}</button>}
         {verificationNotice && <p role="status">{verificationNotice}</p>}
-        <button type="button" onClick={onLogin}>Go to sign in</button>
+        <button type="button" onClick={() => goToLogin()}>Go to sign in</button>
       </div>
     );
   }
 
   return (
-    <div className="lp-quiz">
+    <div className="lp-quiz" aria-busy={submitting}>
       <div className="lp-quiz-progress">
         {STEP_LABELS.map((label, i) => (
           <div key={label} className={`lp-quiz-prog-seg ${i <= step ? 'active' : ''}`} />
         ))}
       </div>
-      <p className="lp-quiz-step-label">Step {step + 1} of {STEP_LABELS.length} — {STEP_LABELS[step]}</p>
+      <p className="lp-quiz-step-label">Step {step + 1} of {STEP_LABELS.length} - {STEP_LABELS[step]}</p>
+
+      {Object.keys(visibleErrors).length > 0 && (
+        <div ref={summaryRef} className="lp-register-error-summary" role="alert" tabIndex={-1} aria-labelledby="trade-error-summary-title">
+          <h4 id="trade-error-summary-title">Please check these details</h4>
+          <ul>
+            {Object.entries(visibleErrors).map(([key, message]) => (
+              <li key={key}><a href={`#${REGISTRATION_FIELD_IDS[key]}`} onClick={(event) => { event.preventDefault(); focusField(key); }}>{message}</a></li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {submitError && (
+        <div ref={submitNoticeRef} className="lp-register-submit-notice" role="alert" tabIndex={-1} aria-labelledby="trade-submit-notice-title">
+          <h4 id="trade-submit-notice-title">{submitCode === 'REGISTRATION_STORAGE_UNAVAILABLE' ? 'Application not sent — browser storage needed' : outcomeUnknown ? 'Application result not confirmed' : 'Application not submitted'}</h4>
+          <p>{submitError}</p>
+          {outcomeUnknown && submitCode !== 'REGISTRATION_STORAGE_UNAVAILABLE' && <p>You can try signing in if you have already completed email confirmation, or use password recovery. Contact Proto if you still cannot confirm the result.</p>}
+          {showAccountRecovery && onLogin && (
+            <div className="lp-register-recovery-actions">
+              <button type="button" className="lp-register-recovery-action" disabled={submitting} onClick={() => {
+                goToLogin();
+              }}>Sign in</button>
+              <button type="button" className="lp-register-recovery-action" disabled={submitting} onClick={() => {
+                goToLogin('forgot');
+              }}>Reset password</button>
+            </div>
+          )}
+        </div>
+      )}
+      {submitting && <p className="lp-register-pending" role="status">Submitting your application. Keep this page open until the result is confirmed.</p>}
+
+      <fieldset className="lp-register-fields" disabled={submitting} aria-label={`${STEP_LABELS[step]} registration details`}>
 
       <motion.div
         key={step}
@@ -507,7 +605,7 @@ function Questionnaire({ onLogin }) {
       >
         {step === 0 && (
           <div className="lp-quiz-step">
-            <h3>Start with the core company details.</h3>
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="lp-register-step-heading">Start with the core company details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
                 <label htmlFor="trade-company-name">Company name</label>
@@ -521,7 +619,9 @@ function Questionnaire({ onLogin }) {
                   placeholder="Name"
                   required
                   aria-required="true"
+                  {...fieldFeedback('companyName')}
                 />
+                {errorText('companyName')}
               </div>
               <div className="lp-quiz-field">
                 <label htmlFor="trade-contact-name">Contact person name and surname</label>
@@ -535,7 +635,9 @@ function Questionnaire({ onLogin }) {
                   placeholder="Full contact name"
                   required
                   aria-required="true"
+                  {...fieldFeedback('contactName')}
                 />
+                {errorText('contactName')}
               </div>
               <div className="lp-quiz-field lp-quiz-field--full">
                 <label htmlFor="trade-vat-number">VAT number <span style={{ opacity: 0.55, fontWeight: 500 }}>(optional)</span></label>
@@ -573,7 +675,7 @@ function Questionnaire({ onLogin }) {
 
         {step === 1 && (
           <div className="lp-quiz-step">
-            <h3>Add the account and contact details.</h3>
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="lp-register-step-heading">Add the account and contact details.</h3>
             <div className="lp-quiz-fields">
               <div className="lp-quiz-field">
                 <label htmlFor="trade-email">Email address</label>
@@ -593,23 +695,18 @@ function Questionnaire({ onLogin }) {
                   onBlur={() => { if (email.trim()) void checkEmailAvailability(); }}
                   onKeyDown={handleKey}
                   placeholder="name@business.co.za"
-                  aria-invalid={!!emailError}
-                  aria-describedby={emailError ? 'trade-email-error' : undefined}
+                  {...fieldFeedback('email')}
                   required
                   aria-required="true"
                 />
-                {emailError && (
-                  <span id="trade-email-error" style={{ color: '#f87171', fontSize: '12.5px', marginTop: '6px', display: 'block', fontWeight: 600 }}>
-                    {emailError}
-                  </span>
-                )}
+                {errorText('email')}
                 {!emailError && emailCheck.status !== 'idle' && (
                   <div className={`lp-register-email-status lp-register-email-status--${emailCheck.status}`} role="status" aria-live="polite">
                     <span>{emailCheck.message}</span>
                     {emailCheck.status === 'existing' && onLogin && (
                       <div className="lp-register-recovery-actions">
-                        <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'login' })}>Sign in</button>
-                        <button type="button" className="lp-register-recovery-action" onClick={() => onLogin({ initialEmail: email.trim(), initialMode: 'forgot' })}>Reset password</button>
+                        <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin()}>Sign in</button>
+                        <button type="button" className="lp-register-recovery-action" onClick={() => goToLogin('forgot')}>Reset password</button>
                       </div>
                     )}
                     {emailCheck.status === 'error' && (
@@ -632,13 +729,20 @@ function Questionnaire({ onLogin }) {
                   placeholder="+27"
                   required
                   aria-required="true"
+                  {...fieldFeedback('phone')}
                 />
+                {errorText('phone')}
               </div>
 
               {/* WhatsApp opt-in CTA — appears once phone is filled */}
-              {phone.replace(/\D/g, '').length >= 8 && (
+              {(phone.replace(/\D/g, '').length >= 8 || fieldError('whatsappOptIn')) && (
                 <motion.div
                   className="lp-quiz-field lp-quiz-field--full"
+                  id="trade-whatsapp-choice"
+                  role="group"
+                  tabIndex={-1}
+                  aria-labelledby="trade-whatsapp-choice-label"
+                  {...fieldFeedback('whatsappOptIn')}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.16, ease: 'easeOut' }}
@@ -652,7 +756,7 @@ function Questionnaire({ onLogin }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                       <MessageCircle size={18} color="#4ade80" style={{ flexShrink: 0 }} />
                       <div>
-                        <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Can we contact you via WhatsApp?</div>
+                        <div id="trade-whatsapp-choice-label" style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Can we contact you via WhatsApp? (required)</div>
                         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', marginTop: '2px' }}>Get specials, stock alerts and order updates straight to your phone.</div>
                       </div>
                     </div>
@@ -689,6 +793,7 @@ function Questionnaire({ onLogin }) {
                       </button>
                     </div>
                   </div>
+                  {errorText('whatsappOptIn')}
                 </motion.div>
               )}
 
@@ -707,6 +812,7 @@ function Questionnaire({ onLogin }) {
                     minLength={MIN_PASSWORD_LENGTH}
                     required
                     aria-required="true"
+                    {...fieldFeedback('password')}
                   />
                   <button
                     type="button"
@@ -718,6 +824,7 @@ function Questionnaire({ onLogin }) {
                     {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                   </button>
                 </div>
+                {errorText('password')}
               </div>
             </div>
           </div>
@@ -725,7 +832,7 @@ function Questionnaire({ onLogin }) {
 
         {step === 2 && (
           <div className="lp-quiz-step">
-            <h3>Billing and delivery addresses</h3>
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="lp-register-step-heading">Billing and delivery addresses</h3>
             <BillingDeliveryFields
               country={country}
               setCountry={setCountry}
@@ -757,6 +864,8 @@ function Questionnaire({ onLogin }) {
               otherBuildingType={otherBuildingType}
               setOtherBuildingType={setOtherBuildingType}
               deliveryFieldsLocked={deliveryFieldsLocked}
+              fieldHasIssue={(key) => Boolean(fieldError(key))}
+              fieldError={fieldError}
               onKeyDown={handleKey}
               buildingTypesClassName="lp-quiz-types"
             />
@@ -765,14 +874,14 @@ function Questionnaire({ onLogin }) {
 
         {step === 3 && (
           <div className="lp-quiz-step">
-            <h3>Tell us about your business.</h3>
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="lp-register-step-heading">Tell us about your business.</h3>
             <p style={{ color: 'rgba(255,255,255,0.58)', fontSize: '13px', lineHeight: 1.6, margin: '-4px 0 18px' }}>
               Three quick details are required. Monthly spend and website are optional.
             </p>
             <div id="landing-trading-channel-label" className="lp-quiz-question-label">
               1. How do you trade? <span>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-trading-channel-label" aria-required="true">
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-trading-channel-label" aria-required="true" id="landing-trading-channels" tabIndex={-1} {...fieldFeedback('tradingChannels')}>
               {TRADING_CHANNELS.map((channel) => {
                 const selected = tradingChannels.includes(channel);
                 return (
@@ -787,10 +896,11 @@ function Questionnaire({ onLogin }) {
                 </button>
               );})}
             </div>
+            {errorText('tradingChannels')}
             <div id="landing-product-category-label" className="lp-quiz-question-label lp-quiz-question-label--second">
               2. What do you mainly sell? <span>(required — select all that apply)</span>
             </div>
-            <div className="lp-quiz-types" role="group" aria-labelledby="landing-product-category-label" aria-required="true">
+            <div className="lp-quiz-types" role="group" aria-labelledby="landing-product-category-label" aria-required="true" id="landing-product-categories" tabIndex={-1} {...fieldFeedback('productCategories')}>
               {PRODUCT_CATEGORIES.map((category) => {
                 const selected = productCategories.includes(category);
                 return (
@@ -805,6 +915,7 @@ function Questionnaire({ onLogin }) {
                   </button>
                 );})}
             </div>
+            {errorText('productCategories')}
             {productCategories.includes('Other') && (
               <motion.div
                 className="lp-quiz-field lp-quiz-other-field"
@@ -820,7 +931,9 @@ function Questionnaire({ onLogin }) {
                   onKeyDown={handleKey}
                   placeholder="For example: Florist supplies"
                   required
+                  {...fieldFeedback('otherProductCategory')}
                 />
+                {errorText('otherProductCategory')}
               </motion.div>
             )}
             <div className="lp-quiz-field" style={{ marginTop: 18 }}>
@@ -835,11 +948,12 @@ function Questionnaire({ onLogin }) {
                 minLength={20}
                 maxLength={400}
                 required
-                aria-describedby="landing-business-description-help"
+                {...fieldFeedback('businessDescription', 'landing-business-description-help')}
               />
               <span id="landing-business-description-help" className="lp-quiz-field-help">
                 Tell us what you sell, where you sell — store, online or market — and who your typical customers are. {businessDescription.length}/400
               </span>
+              {errorText('businessDescription')}
             </div>
             <div style={{ height: '18px' }} />
             <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>
@@ -869,41 +983,18 @@ function Questionnaire({ onLogin }) {
           </div>
         )}
       </motion.div>
-
-      {submitError && (
-        <div className="lp-quiz-error" role="alert">
-          <span>{submitError}</span>
-          {showAccountRecovery && onLogin && (
-            <div className="lp-register-recovery-actions">
-              <button type="button" className="lp-register-recovery-action" onClick={() => {
-                trackJourneyEvent('existing_email_recovery_selected', { journey: 'registration', step: 'submitted', outcome: 'sign_in' });
-                onLogin({ initialEmail: email.trim(), initialMode: 'login' });
-              }}>
-                Sign in
-              </button>
-              <button type="button" className="lp-register-recovery-action" onClick={() => {
-                trackJourneyEvent('existing_email_recovery_selected', { journey: 'registration', step: 'submitted', outcome: 'reset_password' });
-                onLogin({ initialEmail: email.trim(), initialMode: 'forgot' });
-              }}>
-                Reset password
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {stepError && <div className="lp-quiz-error" role="alert">{stepError}</div>}
+      </fieldset>
 
       <div className="lp-quiz-nav">
         {step > 0 ? (
-          <button type="button" className="lp-quiz-back" onClick={() => setStep(step - 1)} disabled={submitting}>
+          <button type="button" className="lp-quiz-back" onClick={() => { setFieldErrors({}); stepFocusRef.current = true; setStep(step - 1); }} disabled={submitting || emailCheck.status === 'checking'}>
             ← Back
           </button>
         ) : <span />}
         <button
           type="button"
           className="lp-quiz-next"
-          disabled={submitting || emailCheck.status === 'checking' || (step === 1 && emailCheck.status === 'existing')}
+          disabled={submitting || outcomeUnknown || emailCheck.status === 'checking'}
           onClick={() => void advance()}
         >
           {submitting ? 'Submitting…' : step < STEP_LABELS.length - 1 ? 'Next' : 'Submit application'}

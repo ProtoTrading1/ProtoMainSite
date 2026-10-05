@@ -61,10 +61,11 @@ test('active registration journey offers a direct account-recovery action', () =
   assert.match(source, /err\.recovery === 'SIGN_IN_OR_RESET_PASSWORD'/);
   assert.match(source, />Sign in</);
   assert.match(source, /Reset password/);
-  assert.match(source, /className="lp-register-recovery-action" onClick=\{\(\) => \{/);
-  assert.match(source, /onLogin\(\{ initialEmail: email\.trim\(\), initialMode: 'login' \}\)/);
-  assert.match(source, /onLogin\(\{ initialEmail: email\.trim\(\), initialMode: 'forgot' \}\)/);
-  assert.match(source, /className="lp-quiz-error" role="alert"/);
+  assert.match(source, /className="lp-register-recovery-action" disabled=\{submitting\} onClick=\{\(\) => \{/);
+  assert.match(source, /goToLogin\(\)/);
+  assert.match(source, /goToLogin\('forgot'\)/);
+  assert.match(source, /onLogin\?\.\(\{ initialEmail: email\.trim\(\), initialMode: mode \}\)/);
+  assert.match(source, /className="lp-register-submit-notice" role="alert" tabIndex=\{-1\}/);
 
   const styles = read('src/landing.css');
   assert.match(styles, /\.lp-register-recovery-action[\s\S]*min-height: 44px/);

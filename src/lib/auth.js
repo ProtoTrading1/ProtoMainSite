@@ -1,15 +1,25 @@
 import { supabase } from './supabase';
-import { requestJson, withDeadline } from './requestDeadline.mjs';
+import { createClient } from '@supabase/supabase-js';
+import { requestJson } from './requestDeadline.mjs';
 import { loadCustomerProfile } from './customerProfileClient.mjs';
+import { createIsolatedSignIn, signInCommitTransport } from './signInRequest.mjs';
 
-export async function signIn(email, password) {
-  const { data, error } = await withDeadline(() => supabase.auth.signInWithPassword({ email, password }), {
-    timeoutMs: 15000,
-    message: 'Sign-in is taking longer than expected. If it completes, your account will open automatically. Otherwise, try again.',
-  });
-  if (error) throw error;
-  return data;
-}
+let authRevision = 0;
+supabase.auth.onAuthStateChange((event) => { if (event !== 'INITIAL_SESSION') authRevision += 1; });
+
+export const signIn = createIsolatedSignIn({
+  prepare: () => supabase.auth.initialize(),
+  captureOwnership: () => authRevision,
+  assertOwnership: (revision) => {
+    if (revision !== authRevision) throw Object.assign(new Error('The current session changed.'), { code: 'SIGN_IN_SESSION_CHANGED' });
+  },
+  createProvisional: (signal) => createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'proto-provisional-sign-in' },
+    global: { fetch: (input, init = {}) => fetch(input, { ...init, signal }) },
+  }),
+  commitSession: (session, assertOwnership) => signInCommitTransport.commit(session,
+    () => supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token }), assertOwnership),
+});
 
 // Self-service applications use the server registration endpoint so the trade
 // profile and one-time mailbox verification are created together. Direct Auth
@@ -18,18 +28,19 @@ export async function signIn(email, password) {
 // Trade applications go through src/lib/tradeApplication.js (includes WhatsApp opt-in).
 export { submitTradeApplication } from './tradeApplication';
 
-export async function resetPassword(email) {
+export async function resetPassword(email, { signal } = {}) {
   const trimmed = email.trim();
   return requestJson('/api/send-reset-email', {
     method: 'POST',
+    signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: trimmed }),
   }, { timeoutMs: 15000, message: 'We could not confirm whether the reset email was sent. Check your inbox and spam folder before requesting another.' });
 }
 
-export function resendTradeVerification(email) {
+export function resendTradeVerification(email, { signal } = {}) {
   return requestJson('/api/resend-trade-verification', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: String(email || '').trim() }),
+    method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: String(email || '').trim() }),
   }, { timeoutMs: 15000, message: 'We could not confirm whether the email was sent. Check your inbox and spam folder before requesting another.' });
 }
 

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { validateRegistrationStep } from '../src/lib/registrationValidation.mjs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('all customer registration screens require trading channel and product selections', () => {
   for (const path of [
-    'src/pages/LandingPage.jsx',
     'src/components/Questionnaire.jsx',
   ]) {
     const source = read(path);
@@ -14,6 +14,16 @@ test('all customer registration screens require trading channel and product sele
     assert.match(source, /productCategories\.length > 0/);
     assert.match(source, /!productCategories\.includes\('Other'\) \|\| otherProductCategory\.trim\(\)/);
   }
+
+  const activePage = read('src/pages/LandingPage.jsx');
+  assert.match(activePage, /validateRegistrationStep\(step, formValues\)/);
+  assert.match(activePage, /firstInvalidRegistrationStep\(formValues\)/);
+  assert.ok(validateRegistrationStep(3, {}).tradingChannels);
+  assert.ok(validateRegistrationStep(3, {}).productCategories);
+  assert.ok(validateRegistrationStep(3, { productCategories: ['Other'] }).otherProductCategory);
+  const valid = validateRegistrationStep(3, { tradingChannels: ['Retail store'], productCategories: ['Gifts'], businessDescription: 'Wholesale gifts sold to local shops.' });
+  assert.equal(valid.tradingChannels, undefined);
+  assert.equal(valid.productCategories, undefined);
 
   const registerPage = read('src/pages/RegisterPage.jsx');
   assert.match(registerPage, /tradingChannels\.length === 0/);

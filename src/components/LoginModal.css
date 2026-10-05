@@ -1,0 +1,56 @@
+.lm-card {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.lm-field-error {
+  margin: 6px 0 0;
+  color: #ffb7bb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lm-field input[aria-invalid="true"] {
+  border-color: #ffb7bb;
+}
+
+.lm-alert p { margin: 6px 0 0; }
+.lm-alert ul { margin: 8px 0 0; padding-left: 18px; }
+.lm-alert:focus { outline: 2px solid #f3c76f; outline-offset: 3px; }
+.lm-alert-link {
+  min-height: 44px;
+  padding: 5px 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.lm-alert-link:focus-visible { outline: 2px solid #f3c76f; outline-offset: 3px; }
+
+.lm-account-options .lm-apply-link {
+  padding: 12px;
+  border: 1px solid rgba(243, 199, 111, 0.6);
+  border-radius: 11px;
+  background: rgba(243, 199, 111, 0.08);
+  color: #f3c76f;
+  font-size: 14px;
+}
+.lm-account-options p { color: #c5c9d0; }
+.lm-note { color: #aeb5bf; line-height: 1.5; text-align: center; }
+.lm-note svg { color: #aeb5bf; }
+.lm-close:disabled, .lm-apply-link:disabled, .lm-forgot-link:disabled,
+.lm-toggle:disabled, .lm-eye:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 560px) {
+  .lm-backdrop { padding: 12px; align-items: flex-start; overflow-y: auto; }
+  .lm-card { max-height: calc(100dvh - 24px); padding: 32px 22px 22px; margin: auto 0; }
+  .lm-field input { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-backdrop, .lm-card { animation: none; }
+}
