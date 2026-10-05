@@ -413,7 +413,7 @@ export default function Root() {
             setVerificationResending(true);
             try {
               const { resendTradeVerification } = await import('./lib/auth');
-              await resendTradeVerification(customer.email); setCustomerLoadError({ code: 'VERIFICATION_EMAIL_REQUESTED', message: 'If your application needs confirmation, a link will arrive in your inbox.' });
+              await resendTradeVerification(customer.email); setCustomerLoadError({ code: 'VERIFICATION_EMAIL_REQUESTED', message: 'Your confirmation-link request was received. Check your inbox and spam folder for the newest email. If no email arrives, contact Proto.' });
             } catch (error) { setCustomerLoadError({ code: 'VERIFICATION_EMAIL_FAILED', message: error.message }); }
             finally { setVerificationResending(false); }
           }}>{verificationResending ? 'Sending…' : 'Resend confirmation email'}</button>
