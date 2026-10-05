@@ -15,11 +15,13 @@ import {
   X,
 } from 'lucide-react';
 import CheckoutModal from './CheckoutModal';
+import DeviceBasketCopy from './DeviceBasketCopy';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import { basketLineKey, basketLineQuantityLimit, basketProductQuantity } from '../../lib/basket-lines.mjs';
+import { CART_PRODUCT_REVIEW_MESSAGE } from '../lib/cartProductRecovery.mjs';
 
 const MIN_ORDER = 1000;
 
@@ -120,6 +122,12 @@ export default function Drawer({
   cartExpiryTone = 'ok',
   cartSyncStatus = 'local',
   cartSyncIssue = null,
+  productReviewRequired = false,
+  pendingRecoveryCopies = [],
+  onRestorePendingCopy,
+  onDiscardPendingCopy,
+  deviceBasketCopy = null,
+  onDiscardDeviceBasketCopy,
   cartPreviewMode = false,
   priceChanges = [],
   onDismissPriceChanges,
@@ -228,6 +236,7 @@ export default function Drawer({
   }, [revealItemRequest, onRevealItemHandled]);
 
   const handleSubmitClick = () => {
+    if (productReviewRequired || pendingRecoveryCopies.length) return;
     onCheckoutReview?.();
     setShowCheckoutModal(true);
   };
@@ -246,6 +255,8 @@ export default function Drawer({
 
   const handleConfirmCourier = async () => {
     setSubmitting(true);
+    // Hand focus and actions to the order result, including failed submissions.
+    setShowCourierPicker(false);
     try {
       const result = await sendOrderEmail({
         courierChoice,
@@ -253,7 +264,6 @@ export default function Drawer({
         promo: appliedPromo,
       });
       if (result?.ok) {
-        setShowCourierPicker(false);
         setCourierChoice(null);
         setCustomerNotes('');
         setAppliedPromo(null);
@@ -350,7 +360,7 @@ export default function Drawer({
           )}
         </div>
         <div className="drawer-header-actions">
-          {isReady && cartReady && cartSyncStatus === 'saved' && <span className="ready-pill">Ready</span>}
+          {isReady && cartReady && !productReviewRequired && !pendingRecoveryCopies.length && cartSyncStatus === 'saved' && <span className="ready-pill">Ready</span>}
           {hasExpiry && (
             <>
               <span className="cart-saved-pill">{syncLabel}</span>
@@ -384,15 +394,51 @@ export default function Drawer({
         </div>
       )}
 
+      <DeviceBasketCopy copy={deviceBasketCopy} currentItems={cartItems} onDiscard={onDiscardDeviceBasketCopy} />
+
       {syncFailed && (
         <div className="cart-sync-alert" role="alert">
           <ShieldAlert size={18} aria-hidden="true" />
           <div>
             <strong>Basket sync needs attention</strong>
+            <span>{cartItems.length} product {cartItems.length === 1 ? 'line is' : 'lines are'} visible on this device. Account sync is not confirmed.</span>
             <span>{cartSyncIssue?.detail || 'We cannot confirm this basket on your account. Retry before switching devices.'}</span>
             {cartSyncIssue?.code && <span>Support code: {cartSyncIssue.code}</span>}
           </div>
           <button type="button" onClick={onRetryCartSync}>Retry sync</button>
+        </div>
+      )}
+
+      {productReviewRequired && (
+        <div className="cart-sync-alert" role="alert">
+          <ShieldAlert size={18} aria-hidden="true" />
+          <div>
+            <strong>Saved products need review</strong>
+            <span>{CART_PRODUCT_REVIEW_MESSAGE}</span>
+          </div>
+          <button type="button" onClick={() => window.location.reload()}>Reload product details</button>
+        </div>
+      )}
+
+      {pendingRecoveryCopies.length > 0 && (
+        <div className="cart-sync-alert" role="status">
+          <ShieldAlert size={18} aria-hidden="true" />
+          <div>
+            <strong>Pending basket copies need review</strong>
+            <span>Another saved change was kept separately. Review it before ordering. Restoring a copy replaces this basket; keeping this account basket discards only the reviewed copy.</span>
+            {pendingRecoveryCopies.map(copy => (
+              <div key={copy.key}>
+                {copy.draft ? (
+                  <>
+                    <strong>{copy.draft.type === 'clear' ? 'Pending empty basket' : `Pending basket: ${copy.draft.items.length} products`}</strong>
+                    {copy.draft.items.map((item, index) => <span key={index}>{item.product.name || item.product.code || item.product.id}: {item.qty}{item.preference ? ` (${item.preference})` : ''}</span>)}
+                    <button type="button" onClick={() => onRestorePendingCopy?.(copy)} disabled={basketLoading || cartSyncStatus !== 'saved'}>Restore this copy</button>
+                    <button type="button" onClick={() => onDiscardPendingCopy?.(copy)}>Keep account basket</button>
+                  </>
+                ) : <span>A pending copy could not be read. It has been kept; contact Proto before ordering.</span>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -486,7 +532,7 @@ export default function Drawer({
         <div className="minimum-card">
           <div className="minimum-copy">
             <span>{isReady ? 'Minimum reached' : 'Minimum order'}</span>
-            <strong>{isReady ? (cartSyncStatus === 'saved' ? 'Ready to submit' : 'Account sync required') : `R${remaining.toFixed(2)} remaining`}</strong>
+            <strong>{pendingRecoveryCopies.length ? 'Pending copies need review' : productReviewRequired ? 'Product review required' : isReady ? (cartSyncStatus === 'saved' ? 'Ready to submit' : 'Account sync required') : `R${remaining.toFixed(2)} remaining`}</strong>
           </div>
           <div className="progress-track" role="progressbar" aria-label="Minimum order progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(progress)}>
             <div style={{ width: `${progress}%` }} />
@@ -511,6 +557,10 @@ export default function Drawer({
             <Loader2 size={17} className="spin" />
             Saving account basket…
           </button>
+        ) : pendingRecoveryCopies.length ? (
+          <button className="primary-order-button" type="button" disabled>Pending copies need review</button>
+        ) : productReviewRequired ? (
+          <button className="primary-order-button" type="button" disabled>Product review required</button>
         ) : isReady ? (
           <button className="primary-order-button" onClick={handleSubmitClick} type="button">
             <ShoppingCart size={17} />

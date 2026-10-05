@@ -9,15 +9,22 @@ export default function OrderConfirmModal({
   orderChanges = [],
   orderNumber = '',
   orderRecoveryNote = '',
-  onRetry,
+  pendingRequestSummary = null,
+  currentBasketSummary = null,
+  cleanupWarning = false,
+  onRetryCleanup,
+  onReviewCurrentBasket,
+  onCheckSavedRequest,
   onReview,
   onViewOrder,
 }) {
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
   const onCloseRef = useRef(onClose);
-  const isSending = orderStatus === 'sending';
-  const isSuccess = orderStatus === 'sent' || orderStatus === 'saved';
+  const isChecking = orderStatus === 'checking';
+  const isSending = orderStatus === 'sending' || isChecking;
+  const isRecovered = orderStatus === 'received';
+  const isSuccess = orderStatus === 'sent' || orderStatus === 'saved' || isRecovered;
   const isError = orderStatus === 'error';
   const requiresReview = isError && orderChanges.length > 0;
   useEffect(() => {
@@ -32,6 +39,7 @@ export default function OrderConfirmModal({
         ? dialogRef.current
         : dialogRef.current?.querySelector('.ocm-close');
       target?.focus();
+      if (dialogRef.current) dialogRef.current.scrollTop = 0;
     });
     const handler = (event) => {
       if (event.key === 'Escape') {
@@ -87,7 +95,7 @@ export default function OrderConfirmModal({
           <div>
             {isSuccess && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">Order request received. Thank you.</h2>
+                <h2 id="order-confirm-title" className="ocm-title">{isRecovered ? 'Saved request received' : 'Order request received. Thank you.'}</h2>
                 <p className="ocm-subtitle">
                   {orderNumber ? `${orderNumber} · ` : ''}
                   Proto Trading will confirm stock, final pricing and delivery.
@@ -96,13 +104,13 @@ export default function OrderConfirmModal({
             )}
             {isSending && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">Sending your order…</h2>
-                <p className="ocm-subtitle">Please wait a moment.</p>
+                <h2 id="order-confirm-title" className="ocm-title">{isChecking ? 'Checking saved request' : 'Sending your order.'}</h2>
+                <p className="ocm-subtitle" role="status">{isChecking ? 'Checking the earlier request. Your current basket is kept.' : 'Please wait a moment.'}</p>
               </>
             )}
             {isError && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">{requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
+                <h2 id="order-confirm-title" className="ocm-title">{pendingRequestSummary && !requiresReview ? 'Saved request needs confirmation' : requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
                 <p className="ocm-subtitle">
                   {orderError || 'Something went wrong. Please try again.'}
                 </p>
@@ -110,6 +118,18 @@ export default function OrderConfirmModal({
             )}
           </div>
         </div>
+
+        {pendingRequestSummary && currentBasketSummary && (
+          <section className="ocm-request-summary" aria-label="Saved request and current basket">
+            <dl>
+              <div><dt>Saved request</dt><dd>{pendingRequestSummary.lineCount} product lines · R{pendingRequestSummary.total.toFixed(2)}</dd></div>
+              <div><dt>Current basket</dt><dd>{currentBasketSummary.lineCount} product lines · R{currentBasketSummary.total.toFixed(2)}</dd></div>
+            </dl>
+            <p>Items totals include VAT, before any promotion.</p>
+            {pendingRequestSummary.fingerprint !== currentBasketSummary.fingerprint && <p className="ocm-request-difference">These contain different items or quantities. Checking the saved request does not submit your current basket.</p>}
+            <p>Saved request reference: <span className="ocm-request-reference">{pendingRequestSummary.clientRef}</span></p>
+          </section>
+        )}
 
         {isSuccess && (
           <div className="ocm-payment-notice" role="note" aria-label="Payment instruction">
@@ -147,6 +167,23 @@ export default function OrderConfirmModal({
           </div>
         )}
 
+        {isSuccess && cleanupWarning && (
+          <div className="ocm-payment-notice" role="alert">
+            <ShieldAlert size={19} aria-hidden />
+            <div>
+              <strong>{orderNumber ? `Order ${orderNumber} was received. Do not resubmit it.` : 'Your order was received. Do not resubmit it.'}</strong>
+              <span>Basket cleanup could not be confirmed. Keep this page open and retry basket cleanup before leaving or signing out. If the old basket returns, contact Proto with this order reference.</span>
+              <button className="ocm-copy-btn" type="button" onClick={onRetryCleanup}>Retry basket cleanup</button>
+            </div>
+          </div>
+        )}
+
+        {isSuccess && orderRecoveryNote && onReviewCurrentBasket && (
+          <button className="ocm-copy-btn" type="button" onClick={onReviewCurrentBasket}>
+            Review current basket
+          </button>
+        )}
+
         {(isSuccess || isError) && (
           <div className="ocm-actions ocm-actions--simple">
             {(isSuccess || isError) && onViewOrder && (
@@ -154,13 +191,9 @@ export default function OrderConfirmModal({
                 {isSuccess ? 'View order' : 'Check My Orders'}
               </button>
             )}
-            <button
-              className={`ocm-copy-btn ${isError ? 'ocm-done-btn' : ''}`}
-              onClick={isError ? (requiresReview ? onReview : onRetry) : onClose}
-              type="button"
-            >
-              {isSuccess ? 'Close' : requiresReview ? 'Review basket' : 'Try again'}
-            </button>
+            {isError && onCheckSavedRequest && <button className="ocm-copy-btn ocm-done-btn" onClick={onCheckSavedRequest} type="button">Check saved request</button>}
+            {isError && requiresReview && <button className="ocm-copy-btn" onClick={onReview} type="button">Review current basket</button>}
+            <button className="ocm-copy-btn" onClick={onClose} type="button">Close</button>
           </div>
         )}
       </section>

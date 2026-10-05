@@ -214,3 +214,20 @@ test('rapid retry clicks keep only one account import in flight', async ({ page,
     retryResponse.release();
   }
 });
+
+// A malformed 200 must not become a silently filtered/empty account basket.
+test('incomplete account receipt keeps every device line and gives a precise recovery code', async ({ page, context }) => {
+  let recovering = false;
+  const { drawer, requests, safety } = await openSyntheticBasket(page, context, async route => {
+    if (recovering) return recovered(route);
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ items: [items[0], { product: {}, qty: 0 }], activityAt: Date.now(), revision: 2 }) });
+  });
+  await expectRecoverableFailure(page, drawer);
+  await expect(drawer.getByText('Support code: cart_response_unverified', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('2 product lines are visible on this device. Account sync is not confirmed.', { exact: true })).toBeVisible();
+  const before = requests.length;
+  recovering = true;
+  await drawer.getByRole('button', { name: 'Retry account basket sync', exact: true }).click();
+  await expectRecovered(page, drawer, requests, safety, before);
+});

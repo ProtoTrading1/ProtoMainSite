@@ -600,6 +600,8 @@ export default function Root() {
                 productId: item.productId,
                 code: item.code,
                 qty: item.qty,
+                ...(['main', 'instore'].includes(item.source) ? { source: item.source } : {}),
+                ...(typeof item.isExtendedRange === 'boolean' ? { isExtendedRange: item.isExtendedRange } : {}),
               })),
             });
             setSurface('portal');

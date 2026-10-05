@@ -8,15 +8,20 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export default function MyOrdersCentre({ orders = [], onReorderOrder }) {
+export default function MyOrdersCentre({ orders = [], onReorderOrder, loading = false, error = null, onRetry }) {
   const [openOrderId, setOpenOrderId] = useState(null);
   return (
-    <section aria-labelledby="my-orders-title" style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+    <section aria-labelledby="my-orders-title" aria-busy={loading} style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
       <div style={{ marginBottom: 20 }}>
         <h2 id="my-orders-title" style={{ margin: 0, fontSize: 22, fontWeight: 800, fontFamily: 'Outfit, sans-serif', color: '#0f172a', display: 'flex', gap: 8, alignItems: 'center' }}><Package size={20} color="#8B1A1A" /> My orders</h2>
         <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: 13 }}>Track requests, view order details and review previous products before reordering.</p>
       </div>
-      {orders.length === 0 ? <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>No orders placed yet.</p> : (
+      {loading ? <p role="status" style={{ color: '#475569', fontSize: 14, margin: 0 }}>Loading your orders.</p> : error ? (
+        <div role="alert">
+          <p style={{ color: '#475569', fontSize: 14, margin: '0 0 12px' }}>{error}</p>
+          {onRetry && <button type="button" onClick={onRetry} style={buttonStyle}>Retry order history</button>}
+        </div>
+      ) : orders.length === 0 ? <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>No orders placed yet.</p> : (
         <div style={{ border: '1px solid #e8eaed', borderRadius: 12, overflow: 'hidden' }}>
           {orders.map((order, index) => {
             const open = order.id === openOrderId;

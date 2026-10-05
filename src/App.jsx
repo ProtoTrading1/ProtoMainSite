@@ -7,7 +7,8 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import { requestJson, withDeadline } from './lib/requestDeadline.mjs';
-import { clearPendingCheckout, readPendingCheckout, submittedBasketStillCurrent, writePendingCheckout } from './lib/pendingCheckout.mjs';
+import { checkSavedCheckout, savedCheckoutSummary } from './lib/checkoutRecoveryClient.mjs';
+import { readPendingCheckout, submittedBasketStillCurrent, writePendingCheckout, withPendingCheckoutLock, verifyPendingCheckout, recordPendingCheckoutDispatch, recordPendingCheckoutReview, acceptPendingCheckout, finishPendingCheckout } from './lib/pendingCheckout.mjs';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
@@ -35,14 +36,17 @@ import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
 import PopupSpecialModal from './components/PopupSpecialModal';
-import { authHeaders } from './lib/authHeaders';
+import { authHeaders, captureAuthIdentity, assertAuthIdentity } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
+import { CART_PRODUCT_REVIEW_MESSAGE, cartProductsNeedReview, freshCartProduct, recoverCartProducts, verifiedReorderProduct } from './lib/cartProductRecovery.mjs';
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
-import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
+import { readPendingCart, clearPendingCart, writeRecoverablePendingCart, readPendingCartRecoveryCopies, acknowledgePendingCartRecoveryCopies, retireSupersededPendingCartRecoveryCopy } from './lib/cartSyncJournal.mjs';
+import { readLegacyCartCopy, preserveLegacyCartCopy, discardLegacyCartCopy } from './lib/legacyCartCopy.mjs';
+import { browserCartStorage as localStorage, readStoredCart, archiveUnreadableCart } from './lib/cartStorage.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
@@ -114,6 +118,17 @@ function isExplicitFirstPortalLogin(customer) {
     && customer.portal_welcome_seen_at === null;
 }
 
+function readPendingBytes(accountId) {
+  try { return localStorage.getItem(`proto_cart_pending_${accountId}`); } catch { return null; }
+}
+
+function assertPendingSnapshot(accountId, expectedRaw) {
+  if (readPendingBytes(accountId) === expectedRaw) return;
+  const error = new Error('Another tab changed the pending basket during recovery');
+  error.status = 409;
+  throw error;
+}
+
 function readCartActivityAt() {
   try {
     const raw = Number(localStorage.getItem(CART_LAST_ACTIVITY_KEY));
@@ -179,14 +194,9 @@ async function hydrateAccountCartItems(items) {
     const bySku = await fetchProductsBySkus(savedItems.map((item) => (
       item.product?.id || item.product?.sku || item.product?.code
     )));
-    return savedItems.map((item) => {
-      const keys = [item.product?.id, item.product?.sku, item.product?.code]
-        .map((value) => String(value || '').toUpperCase());
-      const live = keys.map((key) => bySku.get(key)).find(Boolean);
-      return live ? { ...item, product: live } : item;
-    });
+    return mergeBasketLines(recoverCartProducts(savedItems, bySku));
   } catch {
-    return savedItems;
+    return recoverCartProducts(savedItems);
   }
 }
 
@@ -302,8 +312,7 @@ export default function App({
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (owner && owner !== customer?.id) return [];
-      const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-      return mergeBasketLines(stored);
+      return mergeBasketLines(readStoredCart(localStorage, CART_STORAGE_KEY).items);
     } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
@@ -314,6 +323,9 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartSyncIssue, setCartSyncIssue] = useState(null);
+  const [cartStorageIssue, setCartStorageIssue] = useState(null);
+  const [pendingRecoveryCopies, setPendingRecoveryCopies] = useState([]);
+  const [deviceBasketCopy, setDeviceBasketCopy] = useState(() => readLegacyCartCopy(localStorage, customer?.id));
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -338,6 +350,9 @@ export default function App({
   const cartAccountRef = useRef(customer?.id || null);
   const currentCartRef = useRef({ items: cartItems, activityAt: cartLastActivityAt });
   const pendingCartSyncRef = useRef(null);
+  const pendingJournalRef = useRef({ accountId: customer?.id || null, raw: null });
+  const ownedRecoveryCopyRef = useRef(null);
+  const restoredRecoveryCopyRef = useRef(null);
   const cartSyncInFlightRef = useRef(false);
   const cartConflictRef = useRef(false);
   const cartAutomaticRetryBlockedRef = useRef(false);
@@ -357,7 +372,162 @@ export default function App({
   const pendingCheckoutRef = useRef(null);
   const pendingCheckoutStorageErrorRef = useRef(null);
   const checkoutSendingRef = useRef(false);
+  const acceptedCheckoutAttemptRef = useRef(null);
+  const confirmedCheckoutCleanupRef = useRef(null);
+  const [orderRecoveryNote, setOrderRecoveryNote] = useState('');
+  const [pendingRequestSummary, setPendingRequestSummary] = useState(null);
+  const [recoveryReceiptDurable, setRecoveryReceiptDurable] = useState(true);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
+  const refreshPendingRecoveryCopies = useCallback(accountId => {
+    if (cartAccountRef.current !== accountId) return;
+    try {
+      setPendingRecoveryCopies(readPendingCartRecoveryCopies(localStorage, accountId).filter(copy => (
+        copy.raw !== pendingJournalRef.current.raw && copy.key !== ownedRecoveryCopyRef.current?.copyKey
+      )));
+    } catch {
+      setCartStorageIssue({ code: 'cart_device_storage', detail: 'Pending basket recovery copies could not be checked. Keep this page open and retry sync before leaving.' });
+    }
+  }, []);
+  const keepPendingCart = useCallback((accountId, operation, revision) => {
+    try {
+      if (localStorage.getItem(`proto_cart_pending_${accountId}`) !== pendingJournalRef.current.raw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* the verified write below reports unavailable storage */ }
+    const previousCopy = ownedRecoveryCopyRef.current;
+    const successor = writeRecoverablePendingCart(localStorage, accountId, operation, revision);
+    const kept = successor.kept;
+    if (successor.copyKey) ownedRecoveryCopyRef.current = { accountId, ...successor };
+    if (kept) {
+      pendingJournalRef.current = { accountId, raw: successor.raw };
+      if (previousCopy?.accountId === accountId && previousCopy.copyKey !== successor.copyKey) {
+        retireSupersededPendingCartRecoveryCopy(localStorage, accountId, previousCopy.copyKey, previousCopy.raw, successor);
+      }
+    }
+    setCartStorageIssue(kept ? null : {
+      code: 'cart_device_storage',
+      detail: 'This browser could not keep pending basket changes. Keep this page open and do not sign out until account sync succeeds. Your basket cannot be cleared safely yet.',
+    });
+    refreshPendingRecoveryCopies(accountId);
+    return kept;
+  }, [refreshPendingRecoveryCopies]);
+  const removePendingCart = useCallback((accountId, expectedRaw = pendingJournalRef.current.accountId === accountId ? pendingJournalRef.current.raw : null) => {
+    try {
+      const current = localStorage.getItem(`proto_cart_pending_${accountId}`);
+      if (current !== null && current !== expectedRaw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* verified cleanup reports unavailable storage */ }
+    let removed = clearPendingCart(localStorage, accountId, expectedRaw);
+    if (removed && expectedRaw !== null) removed = acknowledgePendingCartRecoveryCopies(localStorage, accountId, expectedRaw);
+    const restored = restoredRecoveryCopyRef.current;
+    if (removed && restored?.accountId === accountId && restored.fingerprint === lastSavedCartRef.current) {
+      removed = acknowledgePendingCartRecoveryCopies(localStorage, accountId, restored.raw);
+      if (removed) restoredRecoveryCopyRef.current = null;
+    }
+    if (removed && pendingJournalRef.current.accountId === accountId
+      && pendingJournalRef.current.raw === expectedRaw) pendingJournalRef.current = { accountId, raw: null };
+    setCartStorageIssue(removed ? null : {
+      code: 'cart_device_storage',
+      detail: 'The account basket was confirmed, but this browser could not remove its older pending copy. Retry sync before leaving or changing this basket.',
+    });
+    refreshPendingRecoveryCopies(accountId);
+    return removed;
+  }, [refreshPendingRecoveryCopies]);
+  const finishConfirmedCheckoutCleanup = useCallback(async accountId => {
+    const identity = captureAuthIdentity();
+    const ownsAccount = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
+    try {
+      return await withPendingCheckoutLock(navigator.locks, accountId, async () => {
+        assertAuthIdentity(identity);
+        if (!ownsAccount()) return false;
+        let attempt = readPendingCheckout(localStorage, accountId);
+        if (!attempt) return true;
+        const accepted = acceptedCheckoutAttemptRef.current;
+        if (attempt.status === 'pending' && accepted?.customerId === accountId
+          && accepted.payload.clientRef === attempt.payload.clientRef && accepted.raw === attempt.raw) {
+          attempt = acceptPendingCheckout(localStorage, attempt, accepted.result);
+          pendingCheckoutRef.current = attempt;
+          setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+        }
+        if (attempt.status !== 'accepted') return false;
+        const confirmed = confirmedCheckoutCleanupRef.current;
+        let acknowledged = confirmed?.accountId === accountId
+          && confirmed.clientRef === attempt.payload.clientRef && confirmed.fingerprint === attempt.fingerprint;
+        if (!acknowledged) {
+          // A reload needs a fresh, locked read and an acknowledged conditional
+          // DELETE. An empty UI alone never proves accepted-basket cleanup.
+          if (currentCartRef.current.items.length || pendingCartSyncRef.current || cartSyncInFlightRef.current) return false;
+          const remote = await getAccountCart();
+          assertAuthIdentity(identity);
+          if (!ownsAccount() || remote.items.length || currentCartRef.current.items.length
+            || pendingCartSyncRef.current || cartSyncInFlightRef.current) return false;
+          verifyPendingCheckout(localStorage, attempt);
+          const cleared = await clearAccountCart(remote.revision, Date.now());
+          assertAuthIdentity(identity);
+          if (!ownsAccount() || cleared.items.length || currentCartRef.current.items.length
+            || pendingCartSyncRef.current || cartSyncInFlightRef.current) return false;
+          acknowledged = true;
+          cartRevisionRef.current = cleared.revision;
+        }
+        if (localStorage.getItem(`proto_cart_pending_${accountId}`) !== null
+          || readPendingCartRecoveryCopies(localStorage, accountId).length) return false;
+        if (!finishPendingCheckout(localStorage, accountId, attempt.payload.clientRef,
+          { acknowledgedSubmittedClear: acknowledged })) throw new Error('Reference cleanup failed');
+        confirmedCheckoutCleanupRef.current = null;
+        acceptedCheckoutAttemptRef.current = null;
+        pendingCheckoutRef.current = null;
+        setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+        pendingCheckoutStorageErrorRef.current = null;
+        checkoutRefRef.current = null;
+        return true;
+      });
+    } catch {
+      if (ownsAccount()) setCartStorageIssue({ code: 'checkout_cleanup', detail: 'Your order was received, but its recovery reference could not be cleaned up. Do not resubmit. Keep this page open and retry basket cleanup.' });
+      return false;
+    }
+  }, []);
+  const canChangeBasket = useCallback(() => {
+    if (!cartHydratedRef.current) return false;
+    if (cartPreviewModeRef.current) return true;
+    const accountId = cartAccountRef.current;
+    try {
+      if (localStorage.getItem(`proto_cart_pending_${accountId}`) !== pendingJournalRef.current.raw) {
+        cartConflictRef.current = true;
+        setCartSyncStatus('error');
+        setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+        return false;
+      }
+    } catch { /* pending writes/cleanup expose unavailable storage */ }
+    return true;
+  }, []);
+  useEffect(() => {
+    if (!cartStorageIssue) return undefined;
+    const warn = event => {
+      if (!pendingCartSyncRef.current && !cartSyncInFlightRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [cartStorageIssue]);
+  const discardDeviceBasketCopy = useCallback(async expectedCopy => {
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    const removed = await discardLegacyCartCopy(localStorage, customer?.id, expectedCopy,
+      () => cartAccountRef.current === expectedCopy?.accountId);
+    if (cartAccountRef.current !== expectedCopy?.accountId) return;
+    if (removed) setDeviceBasketCopy(null);
+    else {
+      setDeviceBasketCopy(readLegacyCartCopy(localStorage, customer?.id));
+      setCartAnnouncement('The device copy changed or could not be discarded. Review the latest copy before trying again.');
+    }
+  }, [customer?.id]);
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
@@ -447,11 +617,17 @@ export default function App({
   }, [hashNavigate]);
 
   useEffect(() => {
+    if (!cartHydratedRef.current) return;
+    const accountId = cartAccountRef.current;
+    if (readPendingBytes(accountId) !== pendingJournalRef.current.raw) {
+      setCartStorageIssue({ code: 'cart_conflict', detail: 'Another tab has pending basket changes. Its copy was kept. Reload to review it before changing this basket.' });
+      return;
+    }
     try {
       if (cartItems.length) localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
       else localStorage.removeItem(CART_STORAGE_KEY);
     } catch { /* ignore */ }
-  }, [cartItems]);
+  }, [cartItems, cartHydrated]);
 
   useEffect(() => {
     if (!cartItems.length) {
@@ -479,12 +655,24 @@ export default function App({
     const accountId = cartAccountRef.current;
     if (!operation || !accountId || operation.accountId !== accountId) return;
 
+    const identity = captureAuthIdentity();
+    const ownsOperation = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
     pendingCartSyncRef.current = null;
     cartSyncInFlightRef.current = true;
     const dispatchedItems = currentCartRef.current.items;
     const dispatchedActivityAt = currentCartRef.current.activityAt;
     operation.baseRevision ??= cartRevisionRef.current;
-    writePendingCart(localStorage, accountId, operation, operation.baseRevision);
+    keepPendingCart(accountId, operation, operation.baseRevision);
+    if (cartConflictRef.current) {
+      pendingCartSyncRef.current ||= operation;
+      cartSyncInFlightRef.current = false;
+      return;
+    }
+    const dispatchedJournalRaw = pendingJournalRef.current.raw;
+    let dispatchedCheckoutAttempt = null;
+    if (operation.intent === 'submitted_clear') {
+      try { dispatchedCheckoutAttempt = readPendingCheckout(localStorage, accountId); } catch { dispatchedCheckoutAttempt = acceptedCheckoutAttemptRef.current; }
+    }
     setCartSyncStatus('saving');
     let acknowledged = false;
     let automaticRetryAllowed = true;
@@ -492,7 +680,7 @@ export default function App({
       const saved = operation.type === 'clear'
         ? await clearAccountCart(operation.baseRevision, operation.activityAt)
         : await saveAccountCart(operation.items, operation.activityAt, operation.baseRevision);
-      if (cartAccountRef.current !== accountId) return;
+      if (!ownsOperation()) return;
       cartRevisionRef.current = Number(saved.revision || 0);
       lastSavedCartRef.current = cartFingerprint(saved.items);
       if (operation.type === 'clear') {
@@ -503,7 +691,7 @@ export default function App({
       cartSyncRetryCountRef.current = 0;
       acknowledged = true;
     } catch (error) {
-      if (cartAccountRef.current !== accountId) return;
+      if (!ownsOperation()) return;
       const restoreConflict = operation.intent === 'restore'
         && error.status === 409
         && Array.isArray(error.data?.items);
@@ -520,7 +708,7 @@ export default function App({
           return;
         }
         const remoteItems = await hydrateAccountCartItems(error.data.items);
-        if (cartAccountRef.current !== accountId) return;
+        if (!ownsOperation()) return;
         if (hasNewerLocalIntent()) {
           cartConflictRef.current = true;
           setCartSyncIssue(cartSyncFailure(error));
@@ -536,6 +724,7 @@ export default function App({
         setCartLastActivityAt(remoteActivityAt);
         currentCartRef.current = { items: remoteItems, activityAt: remoteActivityAt };
         setClearedCartSnapshot(null);
+        if (submittedClearConflict) setOrderRecoveryNote('A newer saved basket was kept. Review the received order, then use Review current basket before submitting another order.');
         setCartAnnouncement(submittedClearConflict
           ? 'Your order was received. A newer basket from another device has been kept.'
           : 'A newer basket was saved on another device, so the older cleared basket was not restored.');
@@ -580,8 +769,8 @@ export default function App({
         pendingCartSyncRef.current = nextOperation;
       }
     } finally {
-      cartSyncInFlightRef.current = false;
-      if (cartAccountRef.current === accountId) {
+      if (ownsOperation()) cartSyncInFlightRef.current = false;
+      if (ownsOperation()) {
         const latest = currentCartRef.current;
         const latestFingerprint = cartFingerprint(latest.items);
         if (latestFingerprint !== lastSavedCartRef.current && !pendingCartSyncRef.current) {
@@ -600,7 +789,7 @@ export default function App({
         } else if (pendingCartSyncRef.current) {
           if (acknowledged) {
             pendingCartSyncRef.current.baseRevision = cartRevisionRef.current;
-            writePendingCart(localStorage, accountId, pendingCartSyncRef.current, cartRevisionRef.current);
+            keepPendingCart(accountId, pendingCartSyncRef.current, cartRevisionRef.current);
           }
           const retryDelay = cartSyncRetryCountRef.current
             ? Math.min(30_000, 1000 * (2 ** Math.min(5, cartSyncRetryCountRef.current - 1)))
@@ -612,12 +801,16 @@ export default function App({
             setCartSyncStatus('error');
           }
         } else {
-          clearPendingCart(localStorage, accountId);
-          setCartSyncStatus('saved');
+          const removed = removePendingCart(accountId, dispatchedJournalRaw);
+          if (acknowledged && dispatchedCheckoutAttempt && operation.intent === 'submitted_clear') {
+            confirmedCheckoutCleanupRef.current = { accountId, clientRef: dispatchedCheckoutAttempt.payload.clientRef, fingerprint: dispatchedCheckoutAttempt.fingerprint };
+            if (removed) await finishConfirmedCheckoutCleanup(accountId);
+          }
+          if (ownsOperation()) setCartSyncStatus('saved');
         }
       }
     }
-  }, [scheduleCartSync]);
+  }, [scheduleCartSync, keepPendingCart, removePendingCart, finishConfirmedCheckoutCleanup]);
   useEffect(() => {
     cartSyncDrainRef.current = drainCartSyncQueue;
   }, [drainCartSyncQueue]);
@@ -635,7 +828,9 @@ export default function App({
   useEffect(() => {
     const uid = customer?.id || null;
     if (!uid) return;
+    const identity = captureAuthIdentity();
     let cancelled = false;
+    const ownsHydration = () => !cancelled && captureAuthIdentity() === identity && identity.userId === uid && cartAccountRef.current === uid;
     let hydrationRetryTimer = null;
     let hydrationFailures = 0;
     let hydrationInFlight = false;
@@ -644,6 +839,7 @@ export default function App({
     cartHydratedRef.current = false;
     cartConflictRef.current = false;
     cartAutomaticRetryBlockedRef.current = false;
+    cartSyncInFlightRef.current = false;
     cartPreviewModeRef.current = false;
     setCartPreviewMode(false);
     setCartHydrated(false);
@@ -656,12 +852,20 @@ export default function App({
 
     let localItems = [];
     let localActivityAt = null;
+    let unreadableCanonical = null;
+    const pendingRaw = readPendingBytes(uid);
+    pendingJournalRef.current = { accountId: uid, raw: pendingRaw };
+    ownedRecoveryCopyRef.current = null;
+    restoredRecoveryCopyRef.current = null;
+    refreshPendingRecoveryCopies(uid);
     const pendingDraft = readPendingCart(localStorage, uid);
+    setDeviceBasketCopy(readLegacyCartCopy(localStorage, uid));
     try {
       const owner = localStorage.getItem(CART_OWNER_KEY);
       if (!owner || owner === uid) {
-        const stored = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
-        localItems = mergeBasketLines(stored);
+        const stored = readStoredCart(localStorage, CART_STORAGE_KEY);
+        localItems = mergeBasketLines(stored.items);
+        unreadableCanonical = stored.unreadableRaw;
         localActivityAt = readCartActivityAt();
         if (localItems.length && !localActivityAt) {
           localActivityAt = Date.now();
@@ -689,13 +893,37 @@ export default function App({
     const hydrate = async () => {
       // Manual retry and the backoff timer must not race account imports.
       if (cancelled || hydrationInFlight) return;
+      if (!ownsHydration()) return;
       hydrationInFlight = true;
       setCartSyncStatus('loading');
       try {
+        if (unreadableCanonical !== null) {
+          archiveUnreadableCart(localStorage, CART_STORAGE_KEY, unreadableCanonical);
+          unreadableCanonical = null;
+        }
+        // A rejected journal may contain recoverable customer work. Archive its
+        // exact bytes before normal hydration is allowed to remove the slot.
+        if (!pendingDraft) {
+          let raw = null;
+          try { raw = localStorage.getItem(`proto_cart_pending_${uid}`); } catch { /* unavailable storage */ }
+          if (raw !== null) archiveUnreadableCart(localStorage, `proto_cart_pending_${uid}`, raw);
+        }
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
+        if (!ownsHydration()) return;
+        assertPendingSnapshot(uid, pendingRaw);
+        if (!pendingDraft && localItems.length && cartFingerprint(localItems) !== cartFingerprint(accountCart.items)) {
+          // Keep legacy unsaved work before adopting the authoritative account
+          // basket. Storage failure must stop recovery, not erase the device.
+          const copy = await preserveLegacyCartCopy(localStorage, uid, localItems, localActivityAt,
+            () => ownsHydration() && readPendingBytes(uid) === pendingRaw);
+          if (!ownsHydration()) return;
+          assertPendingSnapshot(uid, pendingRaw);
+          setDeviceBasketCopy(copy);
+        }
         if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
           const draftItems = await hydrateAccountCartItems(pendingDraft.items);
-          if (cancelled || cartAccountRef.current !== uid) return;
+          if (!ownsHydration()) return;
+          assertPendingSnapshot(uid, pendingRaw);
           cartRevisionRef.current = pendingDraft.baseRevision;
           lastSavedCartRef.current = cartFingerprint(accountCart.items);
           setCartItems(draftItems);
@@ -715,7 +943,8 @@ export default function App({
           return;
         }
         const hydratedItems = await hydrateAccountCartItems(accountCart.items);
-        if (cancelled || cartAccountRef.current !== uid) return;
+        if (!ownsHydration()) return;
+        assertPendingSnapshot(uid, pendingRaw);
         cartRevisionRef.current = Number(accountCart.revision || 0);
         lastSavedCartRef.current = cartFingerprint(hydratedItems);
         setLoginBasketSnapshot({
@@ -740,9 +969,9 @@ export default function App({
         cartHydratedRef.current = true;
         setCartHydrated(true);
         setCartSyncStatus('saved');
-        clearPendingCart(localStorage, uid);
+        removePendingCart(uid, pendingRaw);
       } catch (error) {
-        if (cancelled || cartAccountRef.current !== uid) return;
+        if (!ownsHydration()) return;
         // Preview deployments intentionally return 403 for account-cart so a
         // reviewer cannot read or alter a real customer's saved basket. Some
         // Vercel edge responses omit the JSON message, therefore the preview
@@ -770,7 +999,11 @@ export default function App({
           return;
         }
         hydrationFailures += 1;
-        setCartSyncIssue(cartSyncFailure(error));
+        setCartSyncIssue(error?.code === 'cart_device_storage' ? {
+          code: 'cart_device_storage',
+          detail: 'This browser could not safely preserve unreadable basket data. Your original device copy is kept. Restore browser storage and retry account basket sync before changing this basket.',
+          retryable: false,
+        } : cartSyncFailure(error));
         setCartItems(localItems);
         setCartLastActivityAt(localActivityAt);
         currentCartRef.current = { items: localItems, activityAt: localActivityAt };
@@ -792,7 +1025,7 @@ export default function App({
         const retryDelay = Math.min(30_000, 3000 * (2 ** Math.min(4, hydrationFailures - 1)));
         // Repeating an unchanged invalid basket or permission failure cannot
         // recover it. Leave the local basket intact and offer an explicit retry.
-        if (![400, 401, 403, 413, 422].includes(error?.status)) {
+        if (![400, 401, 403, 409, 413, 422].includes(error?.status)) {
           hydrationRetryTimer = window.setTimeout(hydrate, retryDelay);
         }
       } finally {
@@ -808,10 +1041,11 @@ export default function App({
 
     return () => {
       cancelled = true;
+      if (cartAccountRef.current === uid) cartAccountRef.current = null;
       if (hydrationRetryTimer) window.clearTimeout(hydrationRetryTimer);
       cartHydrateRetryRef.current = null;
     };
-  }, [customer?.id]);
+  }, [customer?.id, removePendingCart, refreshPendingRecoveryCopies]);
 
   useEffect(() => {
     if (!customer?.id || !cartHydratedRef.current || cartPreviewModeRef.current) return undefined;
@@ -823,7 +1057,7 @@ export default function App({
       cartClearActivityAtRef.current = null;
       cartClearIntentRef.current = 'normal';
       cartRestoreFingerprintRef.current = null;
-      clearPendingCart(localStorage, customer.id);
+      removePendingCart(customer.id);
       setCartSyncStatus('saved');
       return undefined;
     }
@@ -836,30 +1070,35 @@ export default function App({
     );
     if (nextOperation.type === 'clear') cartClearActivityAtRef.current = nextOperation.activityAt;
     const existingDraft = readPendingCart(localStorage, customer.id);
-    writePendingCart(localStorage, customer.id, nextOperation, existingDraft?.baseRevision ?? cartRevisionRef.current);
+    keepPendingCart(customer.id, nextOperation, existingDraft?.baseRevision ?? cartRevisionRef.current);
     pendingCartSyncRef.current = nextOperation;
     if (cartConflictRef.current) return undefined;
     cartAutomaticRetryBlockedRef.current = false;
     setCartSyncStatus('saving');
     scheduleCartSync(450);
     return undefined;
-  }, [cartItems, cartLastActivityAt, customer?.id, scheduleCartSync]);
+  }, [cartItems, cartLastActivityAt, customer?.id, scheduleCartSync, keepPendingCart, removePendingCart]);
 
   const refreshAccountCart = useCallback(async () => {
     const accountId = cartAccountRef.current;
     if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+    const identity = captureAuthIdentity();
+    const ownsAccount = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
     const beforeFingerprint = cartFingerprint(currentCartRef.current.items);
+    const beforeJournal = pendingJournalRef.current.raw;
     if (beforeFingerprint !== lastSavedCartRef.current) return;
     try {
       const remote = await getAccountCart();
-      if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      if (!ownsAccount() || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      assertPendingSnapshot(accountId, beforeJournal);
       if (Number(remote.revision || 0) <= cartRevisionRef.current) {
         setCartSyncStatus('saved');
         return;
       }
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
       const hydratedItems = await hydrateAccountCartItems(remote.items);
-      if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      if (!ownsAccount() || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+      assertPendingSnapshot(accountId, beforeJournal);
       if (cartFingerprint(currentCartRef.current.items) !== beforeFingerprint) return;
       if (Number(remote.revision || 0) <= cartRevisionRef.current) return;
       cartUndoTokenRef.current = null;
@@ -873,6 +1112,7 @@ export default function App({
       setCartClock(Date.now());
       setCartSyncStatus('saved');
     } catch (error) {
+      if (!ownsAccount()) return;
       // Keep the device copy, but make the failed account sync visible.
       setCartSyncIssue(cartSyncFailure(error));
       setCartSyncStatus('error');
@@ -884,8 +1124,13 @@ export default function App({
     }
   }, []);
 
-  const retryCartSync = useCallback(() => {
+  const retryCartSync = useCallback(async () => {
     if (!customer?.id) return;
+    if (cartStorageIssue && !pendingCartSyncRef.current && !cartSyncInFlightRef.current
+      && cartFingerprint(currentCartRef.current.items) === lastSavedCartRef.current) {
+      if (!removePendingCart(customer.id)) return;
+      if (!await finishConfirmedCheckoutCleanup(customer.id)) return;
+    }
     if (cartConflictRef.current) {
       setCartSyncStatus('error');
       setCartSyncIssue(cartSyncFailure({ status: 409 }));
@@ -904,7 +1149,62 @@ export default function App({
     setCartSyncStatus('saving');
     if (pendingCartSyncRef.current) scheduleCartSync(0);
     else void refreshAccountCart();
-  }, [customer?.id, refreshAccountCart, scheduleCartSync]);
+  }, [customer, refreshAccountCart, scheduleCartSync, cartStorageIssue, removePendingCart, finishConfirmedCheckoutCleanup]);
+
+  useEffect(() => {
+    if (!cartHydrated || cartItems.length || cartSyncStatus !== 'saved' || !customer?.id
+      || pendingCartSyncRef.current || cartSyncInFlightRef.current) return;
+    // Only accepted references can be retired after reload. Pending/uncertain
+    // attempts stay intact even when the current basket is empty.
+    void finishConfirmedCheckoutCleanup(customer.id);
+  }, [cartHydrated, cartItems.length, cartSyncStatus, customer?.id, finishConfirmedCheckoutCleanup]);
+
+  const discardPendingRecoveryCopy = useCallback(copy => {
+    const accountId = cartAccountRef.current;
+    try {
+      if (!copy?.draft || copy.draft.accountId !== accountId || localStorage.getItem(copy.key) !== copy.raw) return;
+      localStorage.removeItem(copy.key);
+      if (localStorage.getItem(copy.key) !== null) throw new Error('Recovery copy removal failed');
+      refreshPendingRecoveryCopies(accountId);
+    } catch {
+      setCartStorageIssue({ code: 'cart_device_storage', detail: 'The reviewed pending copy could not be removed. It has been kept. Retry after browser storage is available.' });
+    }
+  }, [refreshPendingRecoveryCopies]);
+
+  const restorePendingRecoveryCopy = useCallback(async copy => {
+    const accountId = cartAccountRef.current;
+    if (!copy?.draft || copy.draft.accountId !== accountId || !cartHydratedRef.current
+      || pendingCartSyncRef.current || cartSyncInFlightRef.current || cartConflictRef.current) return;
+    const before = cartFingerprint(currentCartRef.current.items);
+    const expectedPending = pendingJournalRef.current.raw;
+    const items = await hydrateAccountCartItems(copy.draft.items);
+    if (cartAccountRef.current !== accountId || cartFingerprint(currentCartRef.current.items) !== before
+      || readPendingBytes(accountId) !== expectedPending) return;
+    try { if (localStorage.getItem(copy.key) !== copy.raw) return; } catch { return; }
+    const activityAt = Date.now();
+    const intent = copy.draft.type === 'clear' ? copy.draft.intent : 'restore';
+    const operation = makeCartSyncOperation(accountId, items, activityAt, items.length ? null : activityAt, intent);
+    if (!keepPendingCart(accountId, operation, cartRevisionRef.current)) return;
+    restoredRecoveryCopyRef.current = { accountId, raw: copy.raw, fingerprint: cartFingerprint(items) };
+    cartRestoreFingerprintRef.current = items.length ? cartFingerprint(items) : null;
+    cartClearIntentRef.current = intent;
+    cartClearActivityAtRef.current = items.length ? null : activityAt;
+    currentCartRef.current = { items, activityAt };
+    setCartItems(items);
+    setCartLastActivityAt(items.length ? activityAt : null);
+    pendingCartSyncRef.current = { ...operation, baseRevision: cartRevisionRef.current };
+    setCartSyncStatus('saving');
+    // The existing cart effect schedules this intent after React commits it.
+    // Dispatching here could race that effect and queue the same restore twice.
+  }, [keepPendingCart]);
+
+  useEffect(() => {
+    const onStorage = event => {
+      if (event.key === null || event.key?.startsWith('proto_cart_recovery:')) refreshPendingRecoveryCopies(cartAccountRef.current);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [refreshPendingRecoveryCopies]);
 
   useEffect(() => {
     if (!customer?.id) return undefined;
@@ -1347,26 +1647,33 @@ export default function App({
   const [orderError, setOrderError] = useState('');
   const [orderChanges, setOrderChanges] = useState([]);
   const [submittedOrderNumber, setSubmittedOrderNumber] = useState('');
-  const [orderRecoveryNote, setOrderRecoveryNote] = useState('');
 
   useEffect(() => {
     pendingCheckoutRef.current = null;
+    setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
     pendingCheckoutStorageErrorRef.current = null;
     checkoutRefRef.current = null;
     lastCheckoutOptionsRef.current = null;
     lastCheckoutSubmissionRef.current = null;
+    checkoutSendingRef.current = false;
+    acceptedCheckoutAttemptRef.current = null;
+    confirmedCheckoutCleanupRef.current = null;
+    setPendingRequestSummary(null);
+    setRecoveryReceiptDurable(true);
+    setOrderRecoveryNote('');
     if (!customer?.id) return;
     try {
       const pending = readPendingCheckout(localStorage, customer.id);
       if (!pending) return;
       pendingCheckoutRef.current = pending;
+      setPendingRequestSummary(savedCheckoutSummary(pending));
       checkoutRefRef.current = pending.payload.clientRef;
       lastCheckoutOptionsRef.current = pending.options;
       lastCheckoutSubmissionRef.current = pending;
       setOrderStatus('error');
       setOrderError(pending.result
-        ? 'Your earlier order was received. Use Try again to finish recovery without sending another order. Your current basket will be kept if it changed.'
-        : 'An earlier order request needs confirmation. Use Try again to recover that same request. Your current basket will be kept if it changed. Check My Orders or contact Proto if it cannot be recovered.');
+        ? 'Your saved request has a receipt. Check the saved request to confirm it on your account. Your current basket will be kept.'
+        : 'An earlier order request needs confirmation. Check the saved request before ordering again. Your current basket will be kept.');
       setOrderChanges(pending.reviewChanges || []);
       setModalOpen(true);
     } catch (error) {
@@ -1393,9 +1700,18 @@ export default function App({
   }, []);
 
   const clearCart = useCallback(({ allowUndo = true, intent = 'normal' } = {}) => {
-    if (!cartHydratedRef.current) return;
-    shoppingCartIntent.current = intent === 'normal';
+    if (!cartHydratedRef.current || (intent === 'normal' && !canChangeBasket())) return;
     const clearedAt = Date.now();
+    if (intent === 'normal' && !cartPreviewModeRef.current) {
+      const accountId = cartAccountRef.current;
+      const existing = readPendingCart(localStorage, accountId);
+      const operation = makeCartSyncOperation(accountId, [], clearedAt, clearedAt, intent);
+      if (!keepPendingCart(accountId, operation, existing?.baseRevision ?? cartRevisionRef.current)) {
+        setCartAnnouncement('Your basket was kept because this browser could not safely save the clear request. Restore browser storage, then try Clear again.');
+        return false;
+      }
+    }
+    shoppingCartIntent.current = intent === 'normal';
     if (allowUndo && cartItems.length) {
       setClearedCartSnapshot({
         accountId: cartAccountRef.current,
@@ -1421,9 +1737,10 @@ export default function App({
       localStorage.removeItem(CART_STORAGE_KEY);
       localStorage.removeItem(CART_LAST_ACTIVITY_KEY);
     } catch { /* ignore */ }
-  }, [cartItems]);
+  }, [cartItems, keepPendingCart, canChangeBasket]);
 
   const undoClearCart = useCallback(() => {
+    if (!canChangeBasket()) return false;
     const snapshot = clearedCartSnapshot;
     const belongsToAccount = snapshot?.accountId === cartAccountRef.current;
     const stillSameClear = snapshot?.clearedAt === cartUndoTokenRef.current;
@@ -1451,7 +1768,7 @@ export default function App({
       metadata: { line_count: restoredItems.length },
     });
     return true;
-  }, [clearedCartSnapshot]);
+  }, [clearedCartSnapshot, canChangeBasket]);
 
   useEffect(() => {
     if (!clearedCartSnapshot) return undefined;
@@ -1459,8 +1776,9 @@ export default function App({
     return () => window.clearTimeout(timeout);
   }, [clearedCartSnapshot]);
 
-  const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
-    if (!cartHydratedRef.current) {
+  const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined, sourceHint = null) => {
+    product = freshCartProduct(product, sourceHint || (product.isExtendedRange === true ? 'instore' : 'main'));
+    if (!canChangeBasket()) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
       return;
     }
@@ -1502,7 +1820,7 @@ export default function App({
       setDrawerPeek(false);
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
-  }, [markCartActivity, searchQuery]);
+  }, [markCartActivity, searchQuery, canChangeBasket]);
 
   const handleCartRevealHandled = useCallback((token) => {
     setCartRevealRequest((current) => (current?.token === token ? null : current));
@@ -1513,17 +1831,17 @@ export default function App({
   }, []);
 
   const updateQty = useCallback((lineKey, qty) => {
-    if (!cartHydratedRef.current) return;
+    if (!canChangeBasket()) return;
     const requestedQty = normalizeCartQtyInput(qty);
     setCartItems((prev) => updateBasketLineQuantity(prev, lineKey, requestedQty, cartQtyCapForProduct));
     markCartActivity();
-  }, [markCartActivity]);
+  }, [markCartActivity, canChangeBasket]);
 
   const removeFromCart = useCallback((lineKey) => {
-    if (!cartHydratedRef.current) return;
+    if (!canChangeBasket()) return;
     setCartItems((prev) => removeBasketLine(prev, lineKey));
     markCartActivity();
-  }, [markCartActivity]);
+  }, [markCartActivity, canChangeBasket]);
 
   const cartQtyMap = useMemo(() => {
     const map = {};
@@ -1764,254 +2082,288 @@ export default function App({
   const sendOrderEmail = async (opts = {}, retryPending = false) => {
     if (checkoutSendingRef.current || !cartHydratedRef.current) return { ok: false };
     const accountId = customer?.id;
-    if (!accountId) return { ok: false };
-    let pending = pendingCheckoutRef.current;
-    try {
-      // Another tab may have started checkout since this tab hydrated.
-      pending = readPendingCheckout(localStorage, accountId);
-      pendingCheckoutRef.current = pending;
-      if (pending) checkoutRefRef.current = pending.payload.clientRef;
-    } catch (error) {
-      pendingCheckoutStorageErrorRef.current = error;
-    }
-    if (pendingCheckoutStorageErrorRef.current) {
-      setOrderStatus('error');
-      setOrderError(pendingCheckoutStorageErrorRef.current.message);
-      setModalOpen(true);
-      return { ok: false };
-    }
-    if (pending && !retryPending && !pending.reviewRequired) {
-      setOrderStatus('error');
-      setOrderError('Your earlier order request still needs confirmation. Use Try again to recover that same request, or check My Orders and contact Proto. A new order will not be sent.');
-      setOrderChanges([]);
-      setModalOpen(true);
-      return { ok: false, pending: true };
-    }
-    if (!pending && !cartItems.length) return { ok: false };
+    const identity = captureAuthIdentity();
+    const ownsAccount = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
+    if (!accountId || !ownsAccount()) return { ok: false };
     if (cartPreviewModeRef.current) {
-      setCartAnnouncement('Preview basket only — order requests are disabled here.');
+      setCartAnnouncement('Preview basket only - order requests are disabled here.');
       return { ok: false, preview: true };
     }
-    if (!retryPending && (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
-      || cartSyncStatus !== 'saved' || cartFingerprint(cartItems) !== lastSavedCartRef.current)) {
-      setCartAnnouncement('Please confirm account basket sync before submitting this order. Your items are kept.');
-      return { ok: false, syncRequired: true };
-    }
-    const checkoutOptions = retryPending && pending ? pending.options : opts;
-    const courierChoice = checkoutOptions?.courierChoice || null;
-    const customerNotes = String(checkoutOptions?.customerNotes || '').trim();
-    const deliveryMethod = courierChoice === 'own'
-      ? "Customer's own courier"
-      : courierChoice === 'proto'
-        ? 'Proto Trading delivers'
-        : courierChoice === 'pickup'
-          ? 'In store pick up'
-          : null;
-
-    if (!deliveryMethod) {
-      trackJourneyEvent('checkout_validation_failed', {
-        journey: 'checkout',
-        step: 'delivery',
-        outcome: 'error',
-        metadata: { error_code: 'delivery_required' },
-      });
-      setOrderError('Please choose a delivery option before submitting.');
-      setOrderStatus('error');
-      setModalOpen(true);
-      return { ok: false };
-    }
-
-    const isRetry = Boolean(pending);
-    const submittedItems = retryPending && pending
-      ? pending.items
-      : cartItems.map((item) => ({ ...item, product: { ...item.product } }));
-    const submittedTotal = retryPending && pending ? pending.total : cartTotal;
-    lastCheckoutOptionsRef.current = checkoutOptions;
-    lastCheckoutSubmissionRef.current = {
-      items: submittedItems,
-      total: submittedTotal,
-      fingerprint: cartFingerprint(submittedItems),
-    };
-    trackJourneyEvent('checkout_started', {
-      journey: 'checkout',
-      step: 'submit',
-      outcome: 'started',
-      metadata: {
-        line_count: submittedItems.length,
-        retry: isRetry,
-        delivery_method: courierChoice,
-      },
-    });
-    setOrderStatus('sending');
-    setOrderError('');
-    setOrderChanges([]);
-    setSubmittedOrderNumber('');
-    setOrderRecoveryNote('');
-    setModalOpen(true);
     checkoutSendingRef.current = true;
-
     try {
-      // Idempotency key for this checkout: generated once per cart and reused
-      // across retries, so a human "try again" after an error recovers the
-      // customer's existing server-side order rather than inserting a duplicate.
-      if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
-      const clientRef = checkoutRefRef.current;
-
-      const payload = retryPending && pending ? pending.payload : {
-        clientRef,
-        promoCode: checkoutOptions.promo?.code || null,
-        deliveryMethod,
-        customerNotes,
-        items: submittedItems.map((item) => ({
-          qty: item.qty,
-          ...itemPreferenceFields(item),
-          product: {
-            id: item.product.id,
-            sku: item.product.sku,
-            code: item.product.code,
-            name: item.product.name,
-            checkoutSnapshot: checkoutSnapshotForProduct(item.product),
-          },
-        })),
-      };
-
-      // Read-back verification is required before POST. Storage denial cannot
-      // leave a committed request whose reference disappears on a reload.
-      const intent = writePendingCheckout(localStorage, accountId, {
-        version: 1, customerId: accountId, payload,
-        items: submittedItems, total: submittedTotal,
-        fingerprint: cartFingerprint(submittedItems), options: checkoutOptions,
-        ...(retryPending && pending?.result ? { result: pending.result } : {}),
-      });
-      pendingCheckoutRef.current = intent;
-
-      // The secure API resolves the signed-in customer and every product price
-      // from server-side data, then saves the order before confirming success.
-      const sendHeaders = await withDeadline(() => authHeaders(), { timeoutMs: 10_000 });
-      if (cartAccountRef.current !== accountId) throw new Error('The signed-in account changed. Your earlier order request is kept for recovery on its original account.');
-      const body = JSON.stringify(payload);
-      const submitOrder = () => requestJson('/api/send-order', {
-        method: 'POST',
-        headers: sendHeaders,
-        body,
-      }, {
-        timeoutMs: 65_000,
-        message: 'We could not confirm whether your order was received. Your basket is saved. Use Retry to check this same order request.',
-      });
-
-      const logConversion = (result) => {
-        if (searchTrackRef.current.rowId) {
-          void logSearchOrder({
-            searchRowId: searchTrackRef.current.rowId,
-            orderNumber: result?.orderId || '',
-            orderValue: submittedTotal,
-          });
+      return await withPendingCheckoutLock(navigator.locks, accountId, async () => {
+        assertAuthIdentity(identity);
+        if (!ownsAccount()) return { ok: false };
+        let pending = readPendingCheckout(localStorage, accountId);
+        pendingCheckoutRef.current = pending;
+        setPendingRequestSummary(savedCheckoutSummary(pending));
+        pendingCheckoutStorageErrorRef.current = null;
+        const amendment = pending?.confirmedRejectedBeforeCapture === true && !retryPending;
+        if (pending && !retryPending && !amendment) {
+          const error = new Error('Your earlier order request still needs confirmation. Check the saved request, or check My Orders and contact Proto before sending another order.');
+          throw error;
         }
-      };
-
-      const result = intent.result || await submitOrder();
-      if (result?.success !== true || !result.orderId) {
-        const error = new Error('We could not confirm whether your order was received. Use Try again to recover this same request, or check My Orders.');
-        error.code = 'INVALID_RESPONSE';
-        throw error;
-      }
-      // Record acceptance before basket cleanup. A crash during cleanup can
-      // finish recovery from this result without making another API request.
-      pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, { ...intent, result });
-      if (cartAccountRef.current !== accountId) return { ok: true, result };
-      setSubmittedOrderNumber(result.orderNumber || '');
-      setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
-      trackShoppingEvent('order_submitted', { orderId: result.orderId || null });
-      trackJourneyEvent('order_submit_succeeded', {
-        journey: 'checkout',
-        step: 'submit',
-        outcome: result.emailDeliveryFailed ? 'saved_delivery_pending' : 'success',
-        metadata: {
-          line_count: submittedItems.length,
-          retry: isRetry,
-          delivery_method: courierChoice,
-        },
-      });
-      if (submittedBasketStillCurrent(intent, cartFingerprint(currentCartRef.current.items))) {
-        clearCart({ allowUndo: false, intent: 'submitted_clear' });
-      } else {
-        setOrderRecoveryNote('Your current basket was kept because it changed. Check this received order before submitting it again.');
-        setCartAnnouncement('Your earlier order was received. Your newer basket items have been kept. View the order before sending another request.');
-      }
-      setMobileCartOpen(false);
-      setCartDrawerOpen(false);
-      logConversion(result);
-      if (customer?.id) fetchLastOrder(customer.id).then(setLastOrder).catch(() => {});
-      lastCheckoutOptionsRef.current = null;
-      lastCheckoutSubmissionRef.current = null;
-      clearPendingCheckout(localStorage, accountId, intent.payload.clientRef);
-      pendingCheckoutRef.current = null;
-      checkoutRefRef.current = null;
-      return { ok: true, result };
-    } catch (err) {
-      setOrderStatus('error');
-      setOrderError(err.message || 'Order could not be sent');
-      if (err?.code === 'ORDER_REVIEW_REQUIRED') {
-        const changes = Array.isArray(err.changes) ? err.changes : [];
-        setOrderChanges(changes);
-        // Refresh only the price/stock snapshots returned by the authoritative
-        // checkout check. We never auto-reduce a quantity: the customer must
-        // explicitly decide which line to amend before resubmitting.
-        setCartItems((previous) => previous.map((item) => {
-          const change = changes.find((candidate) => {
-            const key = String(candidate?.sku || '').toUpperCase();
-            return key && [item.product.id, item.product.sku, item.product.code]
-              .some((value) => String(value || '').toUpperCase() === key);
-          });
-          if (!change) return item;
-          return {
-            ...item,
-            product: {
-              ...item.product,
-              ...(Number.isFinite(change.currentPrice) ? { price: change.currentPrice } : {}),
-              ...(Number.isFinite(change.currentStockQty)
-                ? { stockOnHand: change.currentStockQty, stockQty: change.currentStockQty }
-                : {}),
-            },
-          };
-        }));
-        // A previous uncertain handler may still capture after this review.
-        // Explicitly amended checkout keeps the reference so the server can
-        // conflict with that earlier capture rather than create a second order.
-        if (pendingCheckoutRef.current) {
-          try {
-            pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, {
-              ...pendingCheckoutRef.current, reviewRequired: true, reviewChanges: changes,
-            });
-          } catch (storageError) {
-            pendingCheckoutStorageErrorRef.current = storageError;
-            setOrderError(storageError.message);
+        const replay = Boolean(pending && !amendment);
+        const checkoutOptions = pending ? pending.options : opts;
+        const courierChoice = checkoutOptions?.courierChoice || null;
+        const customerNotes = String(checkoutOptions?.customerNotes || '').trim();
+        const deliveryMethod = courierChoice === 'own' ? "Customer's own courier"
+          : courierChoice === 'proto' ? 'Proto Trading delivers'
+            : courierChoice === 'pickup' ? 'In store pick up' : null;
+        if (!deliveryMethod) {
+          trackJourneyEvent('checkout_validation_failed', { journey: 'checkout', step: 'delivery', outcome: 'error',
+            metadata: { error_code: 'delivery_required' } });
+          const error = new Error('Please choose a delivery option before submitting.');
+          error.code = 'delivery_required';
+          throw error;
+        }
+        const submittedItems = replay ? pending.items
+          : currentCartRef.current.items.map(item => ({ ...item, product: { ...item.product } }));
+        if (!submittedItems.length) return { ok: false };
+        if (!replay && cartProductsNeedReview(submittedItems)) throw new Error(CART_PRODUCT_REVIEW_MESSAGE);
+        const submittedTotal = replay ? pending.total
+          : submittedItems.reduce((sum, item) => sum + Number(item.product.price) * item.qty, 0);
+        const submittedFingerprint = cartFingerprint(submittedItems);
+        if (!replay) {
+          if (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
+            || cartSyncStatus !== 'saved' || submittedFingerprint !== lastSavedCartRef.current) {
+            throw new Error('Please confirm account basket sync before submitting this order. Your items are kept.');
+          }
+          const beforeJournal = pendingJournalRef.current.raw;
+          const remote = await getAccountCart();
+          assertAuthIdentity(identity);
+          if (!ownsAccount()) return { ok: false };
+          assertPendingSnapshot(accountId, beforeJournal);
+          if (cartSyncInFlightRef.current || pendingCartSyncRef.current
+            || cartFingerprint(currentCartRef.current.items) !== submittedFingerprint
+            || remote.revision !== cartRevisionRef.current || cartFingerprint(remote.items) !== submittedFingerprint) {
+            throw new Error('Your saved account basket changed. Refresh and review it before submitting. Your items are kept.');
           }
         }
-      }
-      if (err?.code === 'ORDER_REFERENCE_CONFLICT') {
-        setOrderError(`${err.message} Check My Orders or contact Proto to resolve this request before placing another order.`);
-      }
-      trackJourneyEvent('order_submit_failed', {
-        journey: 'checkout',
-        step: 'submit',
-        outcome: 'error',
-        metadata: {
-          line_count: submittedItems.length,
-          retry: isRetry,
-          delivery_method: courierChoice,
-          error_code: err?.code || 'request_failed',
-        },
+        checkoutRefRef.current = pending?.payload.clientRef || null;
+        if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
+        const payload = replay ? pending.payload : {
+          clientRef: checkoutRefRef.current,
+          promoCode: checkoutOptions.promo?.code || null,
+          deliveryMethod,
+          customerNotes,
+          items: submittedItems.map(item => ({
+            qty: item.qty, ...itemPreferenceFields(item),
+            product: {
+              id: item.product.id, sku: item.product.sku, code: item.product.code,
+              name: item.product.name, source: item.product.source,
+              isExtendedRange: item.product.isExtendedRange === true,
+              checkoutSnapshot: checkoutSnapshotForProduct(item.product),
+            },
+          })),
+        };
+        let intent = replay ? verifyPendingCheckout(localStorage, pending)
+          : writePendingCheckout(localStorage, accountId, {
+            ...(pending || {}), version: 1, customerId: accountId, payload,
+            items: submittedItems, total: submittedTotal, fingerprint: submittedFingerprint, options: checkoutOptions,
+          });
+        pendingCheckoutRef.current = intent;
+        setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+        lastCheckoutOptionsRef.current = checkoutOptions;
+        lastCheckoutSubmissionRef.current = { items: submittedItems, total: submittedTotal, fingerprint: submittedFingerprint };
+        setOrderStatus('sending');
+        setOrderError('');
+        setOrderChanges([]);
+        setSubmittedOrderNumber('');
+        setOrderRecoveryNote('');
+        setModalOpen(true);
+        trackJourneyEvent('checkout_started', { journey: 'checkout', step: 'submit', outcome: 'started',
+          metadata: { line_count: submittedItems.length, retry: Boolean(pending), delivery_method: courierChoice } });
+        let result = intent.result;
+        if (!result) {
+          const sendHeaders = await withDeadline(() => authHeaders(), { timeoutMs: 10_000 });
+          assertAuthIdentity(identity);
+          if (!ownsAccount()) return { ok: false };
+          intent = recordPendingCheckoutDispatch(localStorage, intent);
+          pendingCheckoutRef.current = intent;
+          setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+          verifyPendingCheckout(localStorage, intent);
+          try {
+            result = await requestJson('/api/send-order', {
+              method: 'POST', headers: sendHeaders, body: JSON.stringify(intent.payload),
+            }, { timeoutMs: 65_000,
+              message: 'We could not confirm whether your order was received. Your basket is saved. Use Retry to check this same order request.' });
+          } catch (error) {
+            assertAuthIdentity(identity);
+            if (!ownsAccount()) return { ok: false };
+            if (error.code === 'ORDER_REVIEW_REQUIRED') {
+              const changes = Array.isArray(error.changes) ? error.changes : [];
+              pendingCheckoutRef.current = recordPendingCheckoutReview(localStorage, intent, changes);
+              setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+              // Only the first definitive rejection can authorize an amendment.
+              // A later review after an uncertain dispatch keeps exact replay.
+              if (pendingCheckoutRef.current.confirmedRejectedBeforeCapture
+                && submittedBasketStillCurrent(intent, cartFingerprint(currentCartRef.current.items))) {
+                setCartItems(previous => previous.map(item => {
+                  const change = changes.find(candidate => {
+                    const key = String(candidate?.sku || '').toUpperCase();
+                    return key && [item.product.id, item.product.sku, item.product.code]
+                      .some(value => String(value || '').toUpperCase() === key);
+                  });
+                  if (!change) return item;
+                  return { ...item, product: { ...item.product,
+                    ...(Number.isFinite(change.currentPrice) ? { price: change.currentPrice } : {}),
+                    ...(Number.isFinite(change.currentStockQty)
+                      ? { stockOnHand: change.currentStockQty, stockQty: change.currentStockQty } : {}),
+                  } };
+                }));
+                setOrderChanges(changes);
+              } else {
+                error.message = 'This earlier request has an uncertain outcome. Its original basket and reference are kept. Check My Orders or contact Proto before changing the request.';
+                setOrderChanges([]);
+              }
+            }
+            throw error;
+          }
+        }
+        assertAuthIdentity(identity);
+        if (!ownsAccount()) return { ok: false };
+        if (result?.success !== true || !result.orderId) {
+          const error = new Error('We could not confirm whether your order was received. Check the saved request, or check My Orders before sending another order.');
+          error.code = 'INVALID_RESPONSE';
+          throw error;
+        }
+        acceptedCheckoutAttemptRef.current = { ...intent, result, raw: intent.raw };
+        let acceptanceStored = true;
+        try {
+          intent = acceptPendingCheckout(localStorage, intent, result);
+          pendingCheckoutRef.current = intent;
+          setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+          acceptedCheckoutAttemptRef.current = intent;
+        } catch {
+          // The POST succeeded. A denied promotion must never turn its receipt
+          // into a retryable failure or replace the original durable reference.
+          acceptanceStored = false;
+          pendingCheckoutRef.current = { ...intent, result };
+          setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+          setCartStorageIssue({ code: 'checkout_cleanup', detail: 'Your order was received. This browser could not save its receipt. Keep this page open and retry basket cleanup; do not resubmit.' });
+        }
+        setSubmittedOrderNumber(result.orderNumber || '');
+        setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
+        trackShoppingEvent('order_submitted', { orderId: result.orderId || null });
+        trackJourneyEvent('order_submit_succeeded', { journey: 'checkout', step: 'submit',
+          outcome: result.emailDeliveryFailed ? 'saved_delivery_pending' : 'success',
+          metadata: { line_count: submittedItems.length, retry: Boolean(pending), delivery_method: courierChoice } });
+        if (submittedBasketStillCurrent(intent, cartFingerprint(currentCartRef.current.items))) {
+          clearCart({ allowUndo: false, intent: 'submitted_clear' });
+          if (!acceptanceStored) setOrderRecoveryNote('Your order was received. Keep this page open and retry basket cleanup before ordering again.');
+        } else {
+          setOrderRecoveryNote('Your current basket was kept because it changed. Review the received order, then use Review current basket before submitting another order.');
+          setCartAnnouncement('Your earlier order was received. Your newer basket items have been kept. View the order before sending another request.');
+        }
+        setMobileCartOpen(false);
+        setCartDrawerOpen(false);
+        if (searchTrackRef.current.rowId) void logSearchOrder({ searchRowId: searchTrackRef.current.rowId,
+          orderNumber: result.orderId || '', orderValue: submittedTotal });
+        void fetchLastOrder(accountId).then(order => { if (ownsAccount()) setLastOrder(order); }).catch(() => {});
+        return { ok: true, result };
       });
+    } catch (error) {
+      if (!ownsAccount()) return { ok: false };
+      setOrderStatus('error');
+      setOrderError(error.code === 'ORDER_REFERENCE_CONFLICT'
+        ? `${error.message} Check My Orders or contact Proto to resolve this request before placing another order.`
+        : error.message || 'Order could not be sent');
+      if (error.code !== 'ORDER_REVIEW_REQUIRED') setOrderChanges([]);
+      setModalOpen(true);
+      trackJourneyEvent('order_submit_failed', { journey: 'checkout', step: 'submit', outcome: 'error',
+        metadata: { error_code: error?.code || 'request_failed' } });
       return { ok: false };
     } finally {
-      checkoutSendingRef.current = false;
+      if (ownsAccount()) checkoutSendingRef.current = false;
     }
   };
 
-  const retryLastOrderSubmission = () => {
-    if (!pendingCheckoutRef.current || orderStatus === 'sending') return;
-    void sendOrderEmail(pendingCheckoutRef.current.options, true);
+  const reviewCurrentBasket = async () => {
+    const accountId = customer?.id;
+    const identity = captureAuthIdentity();
+    const ownsAccount = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
+    try {
+      await withPendingCheckoutLock(navigator.locks, accountId, async () => {
+        assertAuthIdentity(identity);
+        if (!ownsAccount()) return;
+        const attempt = readPendingCheckout(localStorage, accountId);
+        if (!attempt || attempt.status !== 'accepted' || !attempt.result
+          || cartSyncInFlightRef.current || pendingCartSyncRef.current || cartConflictRef.current
+          || localStorage.getItem(`proto_cart_pending_${accountId}`) !== null
+          || readPendingCartRecoveryCopies(localStorage, accountId).length) throw new Error('Confirm basket sync and cleanup before reviewing your current basket.');
+        const currentFingerprint = cartFingerprint(currentCartRef.current.items);
+        if (currentFingerprint === attempt.fingerprint || currentFingerprint !== lastSavedCartRef.current) throw new Error('Finish cleanup of the received order before submitting another request.');
+        const remote = await getAccountCart();
+        assertAuthIdentity(identity);
+        if (!ownsAccount()) return;
+        verifyPendingCheckout(localStorage, attempt);
+        if (remote.revision !== cartRevisionRef.current || cartFingerprint(remote.items) !== currentFingerprint
+          || cartFingerprint(currentCartRef.current.items) !== currentFingerprint || cartSyncInFlightRef.current
+          || pendingCartSyncRef.current || localStorage.getItem(`proto_cart_pending_${accountId}`) !== null
+          || readPendingCartRecoveryCopies(localStorage, accountId).length) throw new Error('Your saved basket changed. Refresh and review it before continuing.');
+        if (!finishPendingCheckout(localStorage, accountId, attempt.payload.clientRef,
+          { acknowledgedBasketPreserved: true, currentFingerprint, remoteRevision: remote.revision })) throw new Error('The received order reference could not be cleaned up. Retry cleanup before continuing.');
+        pendingCheckoutRef.current = null;
+        setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
+        acceptedCheckoutAttemptRef.current = null;
+        confirmedCheckoutCleanupRef.current = null;
+        checkoutRefRef.current = null;
+        setOrderRecoveryNote('');
+        setModalOpen(false);
+        if (window.matchMedia?.('(max-width: 768px)').matches) setMobileCartOpen(true);
+        else setCartDrawerOpen(true);
+      });
+    } catch (error) {
+      if (ownsAccount()) setOrderRecoveryNote(error.message);
+    }
+  };
+
+  const checkSavedRequest = async () => {
+    if (checkoutSendingRef.current) return;
+    const accountId = customer?.id;
+    const identity = captureAuthIdentity();
+    const ownsAccount = () => captureAuthIdentity() === identity && identity.userId === accountId && cartAccountRef.current === accountId;
+    if (!accountId || !ownsAccount() || cartPreviewModeRef.current) return;
+    checkoutSendingRef.current = true;
+    setOrderStatus('checking');
+    setOrderError('');
+    setOrderChanges([]);
+    setModalOpen(true);
+    try {
+      const recovered = await checkSavedCheckout({ storage: localStorage, locks: navigator.locks, accountId, ownsAccount,
+        request: async payload => {
+          const headers = await withDeadline(() => authHeaders(), { timeoutMs: 10000 });
+          assertAuthIdentity(identity);
+          if (!ownsAccount()) throw new Error('Your signed-in account changed.');
+          return requestJson('/api/checkout-recovery', {
+            method: 'POST', headers, body: JSON.stringify(payload),
+          }, { timeoutMs: 15000, message: 'The saved request could not be confirmed in time. Your saved request and current basket have been kept.' });
+        },
+      });
+      if (!ownsAccount()) return;
+      pendingCheckoutRef.current = recovered.pending;
+      setPendingRequestSummary(savedCheckoutSummary(recovered.pending));
+      if (recovered.state === 'not_found') {
+        setOrderStatus('error');
+        setOrderError('No matching received order was found. This does not confirm that it is safe to send again. Your saved request and current basket are kept. Contact Proto with the saved request reference.');
+        return;
+      }
+      acceptedCheckoutAttemptRef.current = recovered.promotionFailed ? null : recovered.pending;
+      setRecoveryReceiptDurable(!recovered.promotionFailed);
+      setSubmittedOrderNumber(recovered.result.orderNumber);
+      setOrderStatus('received');
+      setOrderRecoveryNote(recovered.promotionFailed
+        ? 'The saved request was received, but this browser could not save the receipt. Your current basket is kept. Do not resubmit. Keep this order reference and contact Proto before continuing. Email and WhatsApp delivery were not checked.'
+        : 'Only the saved request was confirmed. Your current basket has been kept. Email and WhatsApp delivery were not checked. Review the received order before continuing.');
+      setCartAnnouncement('Your saved request was confirmed. Your current basket has been kept.');
+    } catch (error) {
+      if (!ownsAccount()) return;
+      setOrderStatus('error');
+      setOrderError(`${error.message || 'The saved request could not be confirmed.'} Your saved request and current basket have been kept.`);
+    } finally {
+      if (ownsAccount()) checkoutSendingRef.current = false;
+    }
   };
 
   const viewSubmittedOrder = () => {
@@ -2020,6 +2372,8 @@ export default function App({
   };
 
   const handleReorder = async (items) => {
+    const identity = captureAuthIdentity();
+    const accountId = customer?.id;
     if (!cartHydratedRef.current) {
       return { added: 0, missing: items, overflow: 0 };
     }
@@ -2030,14 +2384,16 @@ export default function App({
     // rest: a 160-line order added a handful of items with no error shown.
     const bySku = await fetchProductsBySkus(items.map((item) => item.productId || item.code));
 
+    if (captureAuthIdentity() !== identity || cartAccountRef.current !== accountId) return { added: 0, missing: items, overflow: 0 };
     const resolved = [];
     const missing = [];
     for (const item of items) {
       const product = bySku.get(String(item.productId || '').toUpperCase())
         || bySku.get(String(item.code || '').toUpperCase())
         || catalogProducts.find((p) => p.id === item.productId || p.code === item.code);
-      if (product) resolved.push({ product, qty: item.qty, ...itemPreferenceFields(item) });
-      else missing.push(item);
+      const verified = verifiedReorderProduct(item, product, 'main');
+      if (verified) resolved.push({ product: verified, qty: item.qty, ...itemPreferenceFields(item) });
+      else missing.push(product ? { ...item, reason: 'source_review_required' } : item);
     }
 
     // Build the next cart OUTSIDE the state updater. Deriving the counts inside
@@ -2329,7 +2685,7 @@ export default function App({
             initialQuery={instoreRouteQuery}
             initialPage={instoreRoutePage}
             searchInputRef={instoreSearchInputRef}
-            addToCart={addToCart}
+            addToCart={(product, qty, position, preference) => addToCart(product, qty, position, preference, 'instore')}
             cartQtyMap={cartQtyMap}
             cartPreferenceMap={cartPreferenceMap}
             specialsMap={specialsMap}
@@ -2405,8 +2761,14 @@ export default function App({
             showAutoCloseBar={cartExpiryRemainingMs !== null}
             cartExpiryRemainingMs={cartExpiryRemainingMs}
             cartExpiryTone={cartExpiryTone}
-            cartSyncStatus={cartSyncStatus}
-            cartSyncIssue={cartSyncIssue}
+            cartSyncStatus={cartStorageIssue ? 'error' : cartSyncStatus}
+            cartSyncIssue={cartStorageIssue || cartSyncIssue}
+            productReviewRequired={cartProductsNeedReview(cartItems)}
+            pendingRecoveryCopies={pendingRecoveryCopies}
+            onRestorePendingCopy={restorePendingRecoveryCopy}
+            onDiscardPendingCopy={discardPendingRecoveryCopy}
+            deviceBasketCopy={deviceBasketCopy}
+            onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
             cartPreviewMode={cartPreviewMode}
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
@@ -2433,7 +2795,12 @@ export default function App({
           orderChanges={orderChanges}
           orderNumber={submittedOrderNumber}
           orderRecoveryNote={orderRecoveryNote}
-          onRetry={retryLastOrderSubmission}
+          pendingRequestSummary={pendingRequestSummary}
+          currentBasketSummary={{ lineCount: cartItems.length, total: cartTotal, fingerprint: cartFingerprint(cartItems) }}
+          cleanupWarning={['sent', 'saved'].includes(orderStatus) && (Boolean(cartStorageIssue) || cartSyncStatus === 'error')}
+          onRetryCleanup={retryCartSync}
+          onReviewCurrentBasket={recoveryReceiptDurable ? reviewCurrentBasket : undefined}
+          onCheckSavedRequest={pendingRequestSummary ? checkSavedRequest : undefined}
           onReview={() => {
             setModalOpen(false);
             setOrderChanges([]);
@@ -2525,8 +2892,14 @@ export default function App({
                 showAutoCloseBar={cartExpiryRemainingMs !== null}
                 cartExpiryRemainingMs={cartExpiryRemainingMs}
                 cartExpiryTone={cartExpiryTone}
-                cartSyncStatus={cartSyncStatus}
-                cartSyncIssue={cartSyncIssue}
+                cartSyncStatus={cartStorageIssue ? 'error' : cartSyncStatus}
+            cartSyncIssue={cartStorageIssue || cartSyncIssue}
+                productReviewRequired={cartProductsNeedReview(cartItems)}
+                pendingRecoveryCopies={pendingRecoveryCopies}
+                onRestorePendingCopy={restorePendingRecoveryCopy}
+                onDiscardPendingCopy={discardPendingRecoveryCopy}
+                deviceBasketCopy={deviceBasketCopy}
+                onDiscardDeviceBasketCopy={discardDeviceBasketCopy}
                 cartPreviewMode={cartPreviewMode}
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}

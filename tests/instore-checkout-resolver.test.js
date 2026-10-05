@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveAuthoritativePrices, resolveInstoreOrderLine } from '../api/send-order.js';
 
-const item = { qty: 2, preference: 'Dark brown if available', product: { id: '8618100133', sku: '8618100133', isExtendedRange: true, price: 0.01 } };
+const item = { qty: 2, preference: 'Dark brown if available', product: { id: '8618100133', sku: '8618100133', isExtendedRange: true, price: 0.01, checkoutSnapshot: { unitPrice: 13.5, stockQty: 11 } } };
 const indexRow = { sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS', image_url: 'https://images.example.test/a.jpg', image_review_status: 'verified', visibility_status: 'search_only', is_active: true };
 const bridgeRow = { CODE: '8618100133', DESCR: 'BRACELET WOODEN BEADS', PRICE_A: 11.74, ONHAND: 12, BOOKED: 1 };
 
@@ -16,7 +16,7 @@ test('Instore checkout rejects missing SKU identities before any stock lookup', 
 test('Instore checkout keeps separate preference lines but aggregates their stock cap', async () => {
   const source = await readFile(new URL('../api/send-order.js', import.meta.url), 'utf8');
   assert.match(source, /requestedBySku/);
-  assert.match(source, /requested > available/);
+  assert.match(source, /requested <= available/);
   assert.doesNotMatch(source, /Duplicate or invalid Instore order lines/);
 });
 
