@@ -63,6 +63,7 @@ test('network, timeout, server and rate-limit failures have distinct fixed retry
   assert.match(signInFailureMessage({ code: 'REQUEST_TIMEOUT' }), /took too long/);
   assert.match(signInFailureMessage({ name: 'RequestTimeoutError' }), /took too long/);
   assert.match(signInFailureMessage({ status: 503 }), /temporarily unavailable/);
+  assert.match(signInFailureMessage({ name: 'AuthRetryableFetchError', status: 503 }), /temporarily unavailable/);
   assert.match(signInFailureMessage({ status: 429 }), /wait a few minutes/);
   assert.match(signInFailureMessage({ code: 'over_request_rate_limit' }), /wait a few minutes/);
 });

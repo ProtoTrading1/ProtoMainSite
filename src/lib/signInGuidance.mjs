@@ -33,8 +33,8 @@ export function signInFailureMessage(error, { operation = 'login' } = {}) {
     return `We could not confirm your ${request} request. Please try again later. If you already requested a link, check your inbox and spam folder first.`;
   }
   if (timeout) return 'Sign-in took too long. Check your connection, then try again.';
-  if (network) return 'We could not connect to sign in. Check your connection, then try again.';
   if (status >= 500) return 'Sign-in is temporarily unavailable. Please try again later.';
+  if (network) return 'We could not connect to sign in. Check your connection, then try again.';
   if (['sign_in_session_changed', 'sign_in_commit_failed', 'sign_in_invalid_session', 'auth_identity_changed'].includes(code)) {
     return 'We could not finish sign-in safely. Reload this page before trying again.';
   }
