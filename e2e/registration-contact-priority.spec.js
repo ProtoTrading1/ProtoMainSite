@@ -25,13 +25,13 @@ async function capture(page,testInfo,name) {
 
 test('native autofill input events update Contact state before continuing',async({page},testInfo)=>{
   await contact(page);
-  await page.getByRole('button',{name:'No WhatsApp updates',exact:true}).click();
   await page.evaluate(()=>{
     for(const [id,value] of [['trade-phone','+27825550123'],['trade-new-password','1234567890'],['trade-email','synthetic@fixture.invalid']]) {
       const input=document.getElementById(id);input.value=value;
       input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertReplacementText'}));
     }
   });
+  await page.getByRole('button',{name:'No WhatsApp updates',exact:true}).click();
   await capture(page,testInfo,'contact-autofill');
   await page.getByRole('button',{name:'Next',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Billing and delivery addresses'})).toBeVisible();

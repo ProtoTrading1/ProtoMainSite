@@ -8,9 +8,11 @@ Nonsecret form entries stay in component memory across failures and Back;
 passwords clear after submission outcomes, sign-in failures and cancellation.
 Entries are not promised to survive a page reload.
 
-Registration success requires the current server verification flags and a valid
-profile id. Only the explicit verificationEmailSent flag permits saying a link
-was sent; it does not prove inbox delivery. A lost, interrupted or malformed response holds submission as unknown.
+Registration recognizes the fixed neutral CHECK_EMAIL_OR_SIGN_IN receipt. The
+previous strict profile/verification envelope remains accepted during a rolling
+release, but the interface uses neutral next-step guidance for either version.
+Neither receipt establishes account creation, approval or email delivery. A lost,
+interrupted or malformed response holds submission as unknown.
 A tab-scoped status marker contains no email, password, token or payload. It
 blocks blind resubmission after reload. Known pre-account rejections permit
 correction/retry. Storage refusal sends no application.
