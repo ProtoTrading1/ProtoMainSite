@@ -1,7 +1,8 @@
 import usePersonalisedArrivals from './hooks/usePersonalisedArrivals';
 import PersonalisedArrivalTip from './components/PersonalisedArrivalTip';
 import { trackShoppingEvent, trackShoppingSearch, trackShoppingProduct, basketQuantityChanges, clearShoppingSearch, trackCatalogueVisit, shoppingSource } from './lib/shoppingAnalytics';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { X } from 'lucide-react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -551,7 +552,7 @@ export default function App({
     setLoginBasketSnapshot(null);
   }, [customer?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     currentCartRef.current = { items: cartItems, activityAt: cartLastActivityAt };
   }, [cartItems, cartLastActivityAt]);
 
@@ -2371,12 +2372,24 @@ export default function App({
     onViewProfile?.();
   };
 
-  const handleReorder = async (items) => {
+  const handleReorder = async (items, { signal } = {}) => {
     const identity = captureAuthIdentity();
     const accountId = customer?.id;
-    if (!cartHydratedRef.current) {
-      return { added: 0, missing: items, overflow: 0 };
-    }
+    const held = () => ({ added: 0, missing: [], overflow: 0, held: true,
+      message: 'Your basket or account changed while products were loading. No reorder items were added. Review your basket before trying again.' });
+    const ownsAction = () => !signal?.aborted && captureAuthIdentity() === identity
+      && identity?.userId === accountId && cartAccountRef.current === accountId && cartHydratedRef.current;
+    if (!ownsAction() || !canChangeBasket() || cartConflictRef.current || cartSyncInFlightRef.current) return held();
+    // Explicit UI completion only: flush queued edits before taking a snapshot.
+    // The updater below is pure; acknowledgement happens after React commits.
+    flushSync(() => {});
+    if (!ownsAction() || !canChangeBasket() || cartConflictRef.current || cartSyncInFlightRef.current) return held();
+    const basketBytes = JSON.stringify(currentCartRef.current.items);
+    const revision = cartRevisionRef.current;
+    const journalRaw = pendingJournalRef.current.raw;
+    const checkoutRaw = pendingCheckoutRef.current?.raw;
+    const optionsBytes = JSON.stringify(lastCheckoutOptionsRef.current);
+    const activityAt = currentCartRef.current.activityAt;
     // Look products up by SKU through the API, NOT in catalogProducts — that is
     // only the current 60-product page, narrowed further by the active
     // category/search/in-stock filter. Matching against it meant a large
@@ -2384,7 +2397,13 @@ export default function App({
     // rest: a 160-line order added a handful of items with no error shown.
     const bySku = await fetchProductsBySkus(items.map((item) => item.productId || item.code));
 
-    if (captureAuthIdentity() !== identity || cartAccountRef.current !== accountId) return { added: 0, missing: items, overflow: 0 };
+    flushSync(() => {});
+    if (!ownsAction() || !canChangeBasket() || cartRevisionRef.current !== revision
+      || cartConflictRef.current || cartSyncInFlightRef.current
+      || pendingJournalRef.current.raw !== journalRaw || pendingCheckoutRef.current?.raw !== checkoutRaw
+      || JSON.stringify(lastCheckoutOptionsRef.current) !== optionsBytes
+      || currentCartRef.current.activityAt !== activityAt
+      || JSON.stringify(currentCartRef.current.items) !== basketBytes) return held();
     const resolved = [];
     const missing = [];
     for (const item of items) {
@@ -2400,7 +2419,7 @@ export default function App({
     // it would be unreliable — React may run the updater later, or twice in
     // StrictMode, so `added`/`overflow` could be wrong or double-counted in the
     // message shown to the customer.
-    let nextCart = mergeBasketLines(cartItems);
+    let nextCart = mergeBasketLines(currentCartRef.current.items);
     let added = 0;
     let overflow = 0;
     for (const item of resolved) {
@@ -2416,7 +2435,10 @@ export default function App({
     }
 
     if (added) {
-      setCartItems(nextCart);
+      // A queued edit may reach React before this update even if the live ref
+      // has not published it. Compare actual previous state, never overwrite it.
+      flushSync(() => setCartItems(previous => JSON.stringify(previous) === basketBytes ? nextCart : previous));
+      if (!ownsAction() || currentCartRef.current.items !== nextCart) return held();
       markCartActivity();
     }
 
@@ -2812,7 +2834,7 @@ export default function App({
         />
       </Suspense>
 
-      {reorderModal && <Suspense fallback={null}><ReorderModal lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
+      {reorderModal && <Suspense fallback={null}><ReorderModal key={lastOrder?.id || 'last-order'} lastOrder={lastOrder} onReorder={handleReorder} onClose={() => setReorderModal(false)} /></Suspense>}
 
       {flyAnim && <CartFlyAnimation from={flyAnim} onDone={() => setFlyAnim(null)} />}
 

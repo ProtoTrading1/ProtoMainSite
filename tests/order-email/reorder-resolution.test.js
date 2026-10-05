@@ -13,19 +13,25 @@ const productsLibSrc = readFileSync(join(root, 'src/lib/products.js'), 'utf8');
 const productsApiSrc = readFileSync(join(root, 'api/products.js'), 'utf8');
 
 function reorderHarness({ cartItems = [], products = new Map() } = {}) {
-  const handler = appSrc.match(/const handleReorder = (async \(items\) => \{[\s\S]*?\r?\n {2}});/);
+  const handler = appSrc.match(/const handleReorder = (async \(items[^\n]*\) => \{[\s\S]*?\r?\n {2}});/);
   assert.ok(handler, 'the actual App reorder handler can be checked independently');
-  const identity = {};
+  const identity = { userId: 'synthetic-account' };
+  const currentCartRef = { current: { items: cartItems, activityAt: 1 } };
   const changes = { basket: [], activity: 0, modal: [], lookups: [] };
   const reorder = runInNewContext(`(${handler[1]})`, {
     captureAuthIdentity: () => identity,
     customer: { id: 'synthetic-account' }, cartAccountRef: { current: 'synthetic-account' },
     cartHydratedRef: { current: true },
+    canChangeBasket: () => true, flushSync: action => action(), currentCartRef,
+    cartRevisionRef: { current: 7 }, pendingJournalRef: { current: { raw: null } },
+    pendingCheckoutRef: { current: null }, lastCheckoutOptionsRef: { current: null },
+    cartConflictRef: { current: false }, cartSyncInFlightRef: { current: false },
     fetchProductsBySkus: async keys => { changes.lookups.push(Array.from(keys)); return products; },
     catalogProducts: [], cartItems, verifiedReorderProduct, mergeBasketLines, addBasketLine, itemPreferenceFields,
     cartQtyCapForProduct: product => product.stockQty ?? 9999,
     MAX_CART_LINES: 250,
-    setCartItems: next => { changes.basket.push(next); },
+    setCartItems: updater => { const next = updater(currentCartRef.current.items);
+      currentCartRef.current = { ...currentCartRef.current, items: next }; changes.basket.push(next); },
     markCartActivity: () => { changes.activity++; },
     setReorderModal: value => { changes.modal.push(value); },
   });
@@ -40,7 +46,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 // dropped the rest silently via .filter(Boolean).
 
 test('reorder resolves products through the API, not the current catalogue page', () => {
-  assert.match(appSrc, /const handleReorder = async \(items\)/, 'reorder is async so it can look products up');
+  assert.match(appSrc, /const handleReorder = async \(items,/, 'reorder is async so it can look products up');
   assert.match(appSrc, /fetchProductsBySkus\(items\.map/, 'reorder resolves every requested sku');
   assert.doesNotMatch(
     appSrc,

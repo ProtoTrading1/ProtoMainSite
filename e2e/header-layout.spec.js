@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { catalogueProducts, installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
+import { ACCOUNT_ID, catalogueProducts, installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
 
 const desktopWidths = [901, 999, 1000, 1001, 1024, 1100, 1101, 1150, 1199, 1200, 1201, 1279, 1280, 1281, 1300, 1301, 1440, 1441, 1600, 1601, 1749, 1750, 1751, 1920];
 
@@ -8,7 +8,7 @@ test('header controls stay within the viewport and keyboard reachable across des
   await installAccessibilityServices(context, {
     cartItems: [{ product: catalogueProducts[0], qty: 99 }],
     lastOrder: {
-      id: 'E2E-ORDER', order_number: 'E2E-1',
+      id: 'E2E-ORDER', customer_id: ACCOUNT_ID, order_number: 'E2E-1',
       items: [{ productId: catalogueProducts[0].id, code: catalogueProducts[0].code, qty: 1 }],
       created_at: new Date().toISOString(),
     },

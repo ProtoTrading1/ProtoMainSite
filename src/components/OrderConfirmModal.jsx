@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, ShieldAlert, X } from 'lucide-react';
 
 export default function OrderConfirmModal({
@@ -21,6 +21,8 @@ export default function OrderConfirmModal({
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
   const isChecking = orderStatus === 'checking';
   const isSending = orderStatus === 'sending' || isChecking;
   const isRecovered = orderStatus === 'received';
@@ -34,6 +36,14 @@ export default function OrderConfirmModal({
   useEffect(() => {
     if (!isOpen) return undefined;
     returnFocusRef.current = document.activeElement;
+    return () => {
+      const returnTarget = returnFocusRef.current;
+      window.requestAnimationFrame(() => returnTarget?.focus());
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
     window.requestAnimationFrame(() => {
       const target = isSending
         ? dialogRef.current
@@ -52,7 +62,11 @@ export default function OrderConfirmModal({
       const focusable = Array.from(dialogRef.current.querySelectorAll(
         'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
       ));
-      if (!focusable.length) return;
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) {
@@ -61,13 +75,14 @@ export default function OrderConfirmModal({
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
         first.focus();
+      } else if (!dialogRef.current.contains(document.activeElement) || document.activeElement === dialogRef.current) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
       }
     };
     window.addEventListener('keydown', handler);
     return () => {
       window.removeEventListener('keydown', handler);
-      const returnTarget = returnFocusRef.current;
-      window.requestAnimationFrame(() => returnTarget?.focus());
     };
   }, [isOpen, isSending]);
 
@@ -81,7 +96,8 @@ export default function OrderConfirmModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="order-confirm-title"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         tabIndex={-1}
       >
         <button className="ocm-close" onClick={onClose} type="button" aria-label="Close" disabled={isSending}><X size={18} /></button>
@@ -95,8 +111,8 @@ export default function OrderConfirmModal({
           <div>
             {isSuccess && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">{isRecovered ? 'Saved request received' : 'Order request received. Thank you.'}</h2>
-                <p className="ocm-subtitle">
+                <h2 id={titleId} className="ocm-title">{isRecovered ? 'Saved request received' : 'Order request received. Thank you.'}</h2>
+                <p id={descriptionId} className="ocm-subtitle" role="status" aria-live="polite">
                   {orderNumber ? `${orderNumber} · ` : ''}
                   Proto Trading will confirm stock, final pricing and delivery.
                 </p>
@@ -104,14 +120,14 @@ export default function OrderConfirmModal({
             )}
             {isSending && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">{isChecking ? 'Checking saved request' : 'Sending your order.'}</h2>
-                <p className="ocm-subtitle" role="status">{isChecking ? 'Checking the earlier request. Your current basket is kept.' : 'Please wait a moment.'}</p>
+                <h2 id={titleId} className="ocm-title">{isChecking ? 'Checking saved request' : 'Sending your order.'}</h2>
+                <p id={descriptionId} className="ocm-subtitle" role="status" aria-live="polite">{isChecking ? 'Checking the earlier request. Your current basket is kept.' : 'Please wait a moment.'}</p>
               </>
             )}
             {isError && (
               <>
-                <h2 id="order-confirm-title" className="ocm-title">{pendingRequestSummary && !requiresReview ? 'Saved request needs confirmation' : requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
-                <p className="ocm-subtitle">
+                <h2 id={titleId} className="ocm-title">{pendingRequestSummary && !requiresReview ? 'Saved request needs confirmation' : requiresReview ? 'Your basket needs review' : 'Could not send order'}</h2>
+                <p id={descriptionId} className="ocm-subtitle" role="status" aria-live="polite">
                   {orderError || 'Something went wrong. Please try again.'}
                 </p>
               </>
