@@ -3,6 +3,8 @@ import { escapeHtml } from './_escape-html.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
 import { sendTradeVerificationEmail } from './_trade-email-verification.js';
 import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
+import { registrationFieldErrors } from './_registration-validation.js';
+import { registrationReceipt } from './_registration-receipt.js';
 
 const BREVO_SENDER = {
   name: process.env.BREVO_SENDER_NAME || 'Proto Trading Online',
@@ -39,7 +41,8 @@ const VALID_PRODUCT_CATEGORIES = new Set([
 function normalizeSelections(value, allowed) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value
-    .map((item) => String(item || '').trim().slice(0, 80))
+    .filter((item) => typeof item === 'string')
+    .map((item) => item.trim().slice(0, 80))
     .filter((item) => item && allowed.has(item)))]
     .slice(0, 20);
 }
@@ -57,11 +60,7 @@ export function isExistingEmailError(error) {
 }
 
 export function existingEmailResponse() {
-  return {
-    error: 'This email is already registered. Sign in, or reset your password if you have forgotten it.',
-    code: 'EMAIL_ALREADY_REGISTERED',
-    recovery: 'SIGN_IN_OR_RESET_PASSWORD',
-  };
+  return registrationReceipt();
 }
 
 // New-signup notifications go to the Proto team. The old default pointed at
@@ -183,7 +182,7 @@ const BLOCKED_EMAIL_DOMAINS = new Set([
 const BLOCKED_LOCAL_PARTS = new Set(['test', 'asdf', 'abc', 'fake', 'dummy', 'noreply', 'no-reply']);
 
 export function validateEmail(rawEmail) {
-  const email = String(rawEmail || '').trim().toLowerCase();
+  const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
   if (!email) return { ok: false, error: 'Please enter your email address.' };
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please enter a valid email address (e.g. name@company.co.za).' };
   const [local, domain] = email.split('@');
@@ -201,9 +200,18 @@ export function createRegisterTradeHandler({
   rateLimit = checkRateLimit,
   sendVerification = sendTradeVerificationEmail,
   sendAdmin = sendAdminSignupEmail,
+  now = () => performance.now(),
+  wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)),
 } = {}) {
 return async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  const started = now();
+  const publicReceipt = async () => {
+    // Hide the fast duplicate path. This floor does not establish constant
+    // provider timing or a durable once-only registration workflow.
+    await wait(Math.max(0, 1400 - (now() - started)));
+    return res.status(200).json(registrationReceipt());
+  };
 
   const {
     email,
@@ -237,11 +245,12 @@ return async function handler(req, res) {
 
   // Honeypot — bots that fill hidden fields get a fake success response.
   if (company_fax) {
-    return res.status(200).json({ ok: true, instantAccess: true, customerCode: 'XXXXXX' });
+    return publicReceipt();
   }
 
-  if (!email || !password || !contactName || !businessName || !phone || !companyAddress || !deliveryAddress) {
-    return res.status(400).json({ error: 'Please complete all required fields' });
+  const fieldErrors = registrationFieldErrors(req.body);
+  if (Object.keys(fieldErrors).length) {
+    return res.status(400).json({ error: 'Check the highlighted application details.', code: 'REGISTRATION_VALIDATION_FAILED', fieldErrors });
   }
 
   const normalizedSalesChannels = normalizeSelections(salesChannels, VALID_TRADING_CHANNELS);
@@ -324,6 +333,7 @@ return async function handler(req, res) {
 
   // A legacy email match is eligibility, not identity. The mailbox must be
   // confirmed through the one-time verification callback before access.
+  try {
   const { data, error } = await supabase.auth.admin.createUser({
     email: normalizedEmail,
     password,
@@ -349,19 +359,15 @@ return async function handler(req, res) {
   });
 
   if (error) {
-    console.error('createUser error:', error);
-    // Supabase exposes the stable `email_exists` Auth error code. Customers
-    // expect a clear answer for this ordinary registration case; keep every
-    // other account-creation failure generic and never echo provider messages.
-    if (isExistingEmailError(error)) {
-      return res.status(409).json(existingEmailResponse());
-    }
-    return res.status(400).json(accountCreationFailureResponse());
+    console.error('Registration account creation did not complete');
+    // Never reset, resend to or update an existing account here. Provider
+    // outcomes share the same public receipt as a new application.
+    return publicReceipt();
   }
 
-  const userId = data.user?.id;
-  let profileVerification = null;
-  let allocatedCustomerCode = null;
+  const userId = data?.user?.id;
+  if (!userId) return publicReceipt();
+  const allocatedCustomerCode = null;
 
   const shouldApprove = false;
 
@@ -370,7 +376,6 @@ return async function handler(req, res) {
     // the admin dashboard, whenever the admin is ready. Approval does not
     // require a code. (Was: allocateCustomerCode for approved/10000-club
     // signups, which contradicted that rule.)
-    allocatedCustomerCode = null;
 
     const fullPayload = {
       id: userId,
@@ -492,14 +497,14 @@ return async function handler(req, res) {
       }
       custError = upsertError;
       if (i < upsertAttempts.length - 1) {
-        console.warn(`customers upsert attempt ${i + 1} failed, retrying with reduced payload:`, upsertError.message);
+        console.warn(`Registration profile write attempt ${i + 1} did not complete`);
       }
     }
 
     if (custError) {
-      console.error('customers upsert error:', custError.message, '| userId:', userId, '| email:', normalizedEmail);
+      console.error('Registration profile write did not complete');
       await supabase.auth.admin.deleteUser(userId);
-      return res.status(500).json({ error: 'Failed to create customer profile. Please try again.' });
+      return publicReceipt();
     }
 
     const { data: savedProfile } = await supabase
@@ -508,11 +513,7 @@ return async function handler(req, res) {
       .eq('id', userId)
       .single();
     if (!savedProfile) {
-      console.error('customer profile verification failed — row missing after upsert | userId:', userId);
-    }
-    profileVerification = savedProfile || null;
-    if (savedProfile?.customer_code) {
-      allocatedCustomerCode = savedProfile.customer_code;
+      console.error('Registration profile confirmation did not complete');
     }
 
     // Verification is sent below after the profile is safely persisted.
@@ -544,30 +545,20 @@ return async function handler(req, res) {
     });
   }
 
-  let verificationEmailSent = false;
   if (process.env.BREVO_API_KEY && userId) {
     try {
-      const verification = await sendVerification({ client: supabase, userId, email: normalizedEmail, name: normalizedContactName });
-      verificationEmailSent = verification.sent;
+      await sendVerification({ client: supabase, userId, email: normalizedEmail, name: normalizedContactName });
     } catch {
       console.error('Registration verification email could not be sent');
     }
   }
 
-  return res.status(200).json({
-    ok: true,
-    instantAccess: shouldApprove,
-    emailVerificationRequired: true,
-    verificationEmailSent,
-    customerCode: allocatedCustomerCode || null,
-    profile: profileVerification
-      ? {
-        id: profileVerification.id,
-        acceptWhatsapp: profileVerification.accept_whatsapp,
-        customerCode: profileVerification.customer_code || allocatedCustomerCode,
-      }
-      : null,
-  });
+  } catch {
+    // Provider/transport exceptions carry no public account-existence facts.
+    // Never retry, reset or mutate an existing account after an uncertain result.
+    console.error('Registration processing did not complete');
+  }
+  return publicReceipt();
 };
 }
 

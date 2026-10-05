@@ -1,7 +1,44 @@
 import { expect, test } from '@playwright/test';
 import { ACCOUNT_ID, installAccessibilityServices, TEST_EMAIL, TEST_PASSWORD } from './helpers/accessibility-services.js';
+import { verifyTradeEmail } from '../api/_trade-email-verification.js';
 
 const TOKEN_HASH = 'synthetic-mailbox-proof-token-only';
+
+test('a replaced link explains how to recover and only the current proof completes confirmation', async ({ page, context }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await installAccessibilityServices(context);
+  const replacement = 'synthetic-replacement-mailbox-proof';
+  let completed = 0;
+  await context.route('**/api/verify-trade-email', async (route) => {
+    try {
+      const result = await verifyTradeEmail({
+        tokenHash: route.request().postDataJSON().tokenHash,
+        verifyClient: { auth: { verifyOtp: async ({ token_hash }) => token_hash === replacement
+          ? { data: { user: { id: ACCOUNT_ID, email_confirmed_at: '2026-10-05T12:00:00Z' } } }
+          : { data: null, error: { code: 'otp_expired', message: 'One-time token not found' } } } },
+        serviceClient: { rpc: async () => { completed++; return { data: { verified: true, approved: false } }; } },
+      });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
+    } catch (error) {
+      await route.fulfill({ status: error.status || 503, contentType: 'application/json', body: JSON.stringify({ error: error.message }) });
+    }
+  });
+  await page.goto(`/#/verify-email?token_hash=${TOKEN_HASH}`);
+  await page.getByRole('button', { name: 'Confirm my email', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('newest confirmation email');
+  expect(completed).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('replaced-confirmation-link.png'), fullPage: false });
+  await page.goto(`/#/verify-email?token_hash=${replacement}`);
+  await page.getByRole('button', { name: 'Confirm my email', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your email is confirmed' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Your application is with the Proto team');
+  await expect(page).toHaveURL(/\/#\/verify-email$/);
+  expect(completed).toBe(1);
+  await expect(page.locator('.product-card')).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});
 
 test('confirmation waits for a click, recovers from an outage, and clears the consumed token', async ({ page, context }) => {
   await installAccessibilityServices(context);
@@ -92,7 +129,9 @@ test('a pending mailbox confirmation stays closed and its resend can recover', a
   await expect(resend).toBeEnabled();
   fail = false;
   await resend.click();
-  await expect(page.getByRole('status')).toContainText('If your application needs confirmation');
+  await expect(page.getByRole('status')).toContainText('Your confirmation-link request was received');
+  await expect(page.getByRole('status')).toContainText('newest email');
+  await expect(page.getByRole('status')).toContainText('contact Proto');
   expect(resends).toEqual([{ email: TEST_EMAIL }, { email: TEST_EMAIL }]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('pending-email-confirmation.png'), fullPage: false });

@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ available: true, exists: false, recovery: null }),
+        body: JSON.stringify({ ok: true, validationOnly: true }),
       });
       return;
     }
@@ -46,7 +46,8 @@ test('sign-in validates locally and reset mail is safely intercepted', async ({ 
   await expect(dialog.getByRole('heading', { name: 'Reset password.' })).toBeVisible();
   await dialog.getByPlaceholder('name@business.co.za').fill('safe-e2e@example.com');
   await dialog.getByRole('button', { name: 'Send reset link' }).click();
-  await expect(dialog.getByText('Blocked by non-destructive E2E suite')).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText('We could not confirm your password reset request. Please try again later.');
+  await expect(dialog.getByText('Blocked by non-destructive E2E suite')).toHaveCount(0);
 });
 
 test('registration cannot advance without required contact details', async ({ page }) => {
@@ -54,9 +55,12 @@ test('registration cannot advance without required contact details', async ({ pa
 
   await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText(
-    'Enter your company name and the contact person’s full name.',
-  );
+  const summary = page.getByRole('alert');
+  await expect(summary).toBeFocused();
+  await expect(summary).toContainText('Enter your company name.');
+  await expect(summary.locator('a[href="#trade-contact-name"]')).toContainText('name and surname');
+  await expect(page.locator('#trade-company-name')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#trade-contact-name')).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByRole('heading', { name: 'Start with the core company details.' })).toBeVisible();
 });
 
@@ -70,7 +74,7 @@ test('registration requires structured business details', async ({ page }) => {
   await page.getByPlaceholder('name@business.co.za').fill('safe-e2e@protoe2e.co.za');
   await page.getByPlaceholder('+27').fill('0821234567');
   await page.getByRole('button', { name: 'No WhatsApp updates', exact: true }).click();
-  await page.getByPlaceholder('At least 8 characters').fill('SafeTest123!');
+  await page.getByPlaceholder('At least 10 characters').fill('SafeTest123!');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
   const addressesStep = page.getByRole('heading', { name: 'Billing and delivery addresses' })
@@ -86,12 +90,13 @@ test('registration requires structured business details', async ({ page }) => {
   await page.getByRole('button', { name: 'House', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
-  await expect(page.getByText('Step 4 of 4 — Business')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Business registration details', exact: true })).toBeVisible();
   const submitApplication = page.getByRole('button', { name: 'Submit application' });
   await submitApplication.click();
-  await expect(page.getByRole('alert')).toContainText(
-    'Select at least one way you trade, at least one product category, and describe your business in at least 20 characters.',
-  );
+  const summary = page.getByRole('alert');
+  await expect(summary).toContainText('Select at least one way that you trade.');
+  await expect(summary).toContainText('Select at least one product category that you sell.');
+  await expect(summary).toContainText('Describe what you sell and who you sell to, using at least 20 characters.');
 
   await page.getByRole('button', { name: 'Physical retail store', exact: true }).click();
   await page.getByRole('button', { name: 'Art, craft & beads', exact: true }).click();
@@ -99,7 +104,10 @@ test('registration requires structured business details', async ({ page }) => {
     'We sell gifts and craft supplies to walk-in retail customers.',
   );
   await submitApplication.click();
-  await expect(page.getByRole('alert')).toContainText('Blocked by non-destructive E2E suite');
+  await expect(page.getByRole('alert')).toContainText('We could not confirm whether your application was received.');
+  await expect(page.getByRole('alert')).toContainText('To avoid submitting twice, this page will not send another application.');
+  await expect(submitApplication).toBeDisabled();
+  await expect(page.getByText('Blocked by non-destructive E2E suite')).toHaveCount(0);
 });
 
 test('policy route renders and returns to the public home', async ({ page }) => {

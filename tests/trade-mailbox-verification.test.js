@@ -72,13 +72,13 @@ test('registration never auto-approves an unverified legacy email, and sends no 
     }};
     const handler=createRegisterTradeHandler({createServiceClient:()=>client,rateLimit:allowed,sendAdmin:async()=>{},sendVerification:async(args)=>{verification++;assert.equal(args.userId,id);return {sent:true};}});
     const res=response();
-    await handler({method:'POST',headers:{},body:{email:user.email,password:'LongStrongPassword7!',contactName:'Buyer',businessName:'Buyer business',phone:'synthetic-phone',companyAddress:'Synthetic address',deliveryAddress:'Synthetic address',salesChannels:['Physical retail store'],productCategories:['Gifts & novelty products'],businessDescription:'A synthetic registered trading business.',customerCode:'ABC123'}},res);
+    await handler({method:'POST',headers:{},body:{email:user.email,password:'LongStrongPassword7!',contactName:'Buyer',businessName:'Buyer business',phone:'0825550123',country:'South Africa',streetName:'1 Synthetic Road',suburb:'Fixture Suburb',city:'Fixture City',postalCode:'0001',buildingType:'House',acceptWhatsapp:false,companyAddress:'Synthetic address',deliveryAddress:'Synthetic address',salesChannels:['Physical retail store'],productCategories:['Gifts & novelty products'],businessDescription:'A synthetic registered trading business.',customerCode:'ABC123'}},res);
     assert.equal(res.statusCode,200);assert.equal(created.email_confirm,false);
     assert.deepEqual(created.app_metadata,{trade_email_verification_required:true});
     assert.equal(profile.is_approved,false);assert.equal(profile.trade_email_verification_required,true);
     assert.equal(profile.sales_last_12_months,null);assert.equal(profile.customer_code,null);
     assert.equal(res.body.instantAccess,false);assert.equal(res.body.emailVerificationRequired,true);
-    assert.equal(res.body.verificationEmailSent,true);assert.equal(verification,1);
+    assert.equal(res.body.receipt,'CHECK_EMAIL_OR_SIGN_IN');assert.equal(verification,1);assert.equal(res.body.verificationEmailSent,undefined);
     assert.doesNotMatch(JSON.stringify(res.body),/token_hash|access_token|synthetic-key/);
   }finally{if(prior===undefined)delete process.env.BREVO_API_KEY;else process.env.BREVO_API_KEY=prior;}
 });

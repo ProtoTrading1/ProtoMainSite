@@ -35,6 +35,7 @@ export default function AddressAutocomplete({
   autoComplete = 'street-address',
   ariaRequired,
   ariaInvalid,
+  ariaDescribedBy,
 }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
@@ -82,6 +83,7 @@ export default function AddressAutocomplete({
       required={required}
       aria-required={ariaRequired}
       aria-invalid={ariaInvalid}
+      aria-describedby={ariaDescribedBy}
       autoComplete={autoComplete}
       style={style}
       onKeyDown={onKeyDown}

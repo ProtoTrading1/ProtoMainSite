@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import AddressAutocomplete from '../AddressAutocomplete';
 import { REGISTRATION_COUNTRIES, SA_PROVINCES } from '../../lib/sadcCountries';
+import { registrationErrorId } from '../../lib/registrationValidation.mjs';
 
 const BUILDING_TYPES = ['Office Building', 'Apartments', 'House'];
 
@@ -15,6 +16,7 @@ function StructuredAddressFields({
   setCity,
   fieldKeys,
   fieldHasIssue,
+  fieldError,
   onKeyDown,
   locked = false,
   streetUsesAutocomplete = false,
@@ -25,6 +27,10 @@ function StructuredAddressFields({
     `lp-quiz-field${fieldHasIssue(key) ? ' lp-quiz-field--error' : ''}${locked ? ' lp-quiz-field--locked' : ''}`
   );
   const inputId = (key) => `trade-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+  const errorProps = (key) => ({ 'aria-describedby': fieldError(key) ? registrationErrorId(key) : undefined });
+  const errorText = (key) => fieldError(key) && (
+    <span id={registrationErrorId(key)} className="lp-register-field-error">{fieldError(key)}</span>
+  );
 
   return (
     <>
@@ -42,6 +48,7 @@ function StructuredAddressFields({
             required
             ariaRequired="true"
             ariaInvalid={fieldHasIssue(fieldKeys.street)}
+            ariaDescribedBy={errorProps(fieldKeys.street)['aria-describedby']}
           />
         ) : (
           <input
@@ -55,9 +62,11 @@ function StructuredAddressFields({
             required
             aria-required="true"
             aria-invalid={fieldHasIssue(fieldKeys.street)}
+            {...errorProps(fieldKeys.street)}
             {...lockProps}
           />
         )}
+        {errorText(fieldKeys.street)}
       </div>
       <div className={fieldClass(fieldKeys.suburb)}>
         <label htmlFor={inputId(fieldKeys.suburb)}>Suburb</label>
@@ -72,8 +81,10 @@ function StructuredAddressFields({
           required
           aria-required="true"
           aria-invalid={fieldHasIssue(fieldKeys.suburb)}
+          {...errorProps(fieldKeys.suburb)}
           {...lockProps}
         />
+        {errorText(fieldKeys.suburb)}
       </div>
       <div className={fieldClass(fieldKeys.postalCode)}>
         <label htmlFor={inputId(fieldKeys.postalCode)}>Postal code</label>
@@ -89,8 +100,10 @@ function StructuredAddressFields({
           required
           aria-required="true"
           aria-invalid={fieldHasIssue(fieldKeys.postalCode)}
+          {...errorProps(fieldKeys.postalCode)}
           {...lockProps}
         />
+        {errorText(fieldKeys.postalCode)}
       </div>
       <div className={fieldClass(fieldKeys.city)}>
         <label htmlFor={inputId(fieldKeys.city)}>City</label>
@@ -105,8 +118,10 @@ function StructuredAddressFields({
           required
           aria-required="true"
           aria-invalid={fieldHasIssue(fieldKeys.city)}
+          {...errorProps(fieldKeys.city)}
           {...lockProps}
         />
+        {errorText(fieldKeys.city)}
       </div>
     </>
   );
@@ -144,6 +159,7 @@ export default function BillingDeliveryFields({
   setOtherBuildingType,
   deliveryFieldsLocked = false,
   fieldHasIssue = () => false,
+  fieldError = () => '',
   onKeyDown,
   gridClassName = 'lp-register-grid',
   subheadClassName = 'lp-register-subhead',
@@ -156,10 +172,17 @@ export default function BillingDeliveryFields({
   );
   const billingUsesAutocomplete = !otherCountrySelected && (!country || country === 'South Africa');
   const showCountryPicker = countryPickerOpen || otherCountrySelected || country !== 'South Africa' || fieldHasIssue('country');
+  const errorProps = (key) => ({
+    'aria-invalid': fieldHasIssue(key),
+    'aria-describedby': fieldError(key) ? registrationErrorId(key) : undefined,
+  });
+  const errorText = (key) => fieldError(key) && (
+    <span id={registrationErrorId(key)} className="lp-register-field-error">{fieldError(key)}</span>
+  );
 
   return (
     <div className={gridClassName}>
-      <div className={`lp-register-country-block lp-quiz-field lp-quiz-field--full${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
+      <div id="trade-country" tabIndex={-1} role="group" aria-label="Country" {...errorProps('country')} className={`lp-register-country-block lp-quiz-field lp-quiz-field--full${fieldHasIssue('country') ? ' lp-quiz-field--error' : ''}`}>
         {!showCountryPicker ? (
           <div className="lp-register-country-summary">
             <span>Country: {country}</span>
@@ -213,7 +236,7 @@ export default function BillingDeliveryFields({
                   placeholder="Enter your country"
                   required
                   aria-required="true"
-                  aria-invalid={fieldHasIssue('country')}
+                  {...errorProps('country')}
                 />
               </div>
             )}
@@ -244,6 +267,7 @@ export default function BillingDeliveryFields({
             )}
           </>
         )}
+        {errorText('country')}
       </div>
       <div className={subheadClassName}>Billing address</div>
       <p className="lp-register-field-hint lp-register-field-hint--block">
@@ -266,6 +290,7 @@ export default function BillingDeliveryFields({
           city: 'billingCity',
         }}
         fieldHasIssue={fieldHasIssue}
+        fieldError={fieldError}
         onKeyDown={onKeyDown}
         streetUsesAutocomplete={billingUsesAutocomplete}
         onPlaceSelect={onBillingPlaceSelect}
@@ -299,13 +324,14 @@ export default function BillingDeliveryFields({
           city: 'city',
         }}
         fieldHasIssue={fieldHasIssue}
+        fieldError={fieldError}
         onKeyDown={onKeyDown}
         locked={deliveryFieldsLocked}
       />
 
       <div className="lp-quiz-field lp-quiz-field--full">
         <div id="trade-building-type-label" className={subheadClassName}>Building type <span className="lp-register-required">(required)</span></div>
-        <div className={`${buildingTypesClassName}${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`} role="group" aria-labelledby="trade-building-type-label" aria-required="true">
+        <div id="trade-building-type" tabIndex={-1} {...errorProps('buildingType')} className={`${buildingTypesClassName}${fieldHasIssue('buildingType') ? ' lp-quiz-field--error' : ''}`} role="group" aria-labelledby="trade-building-type-label" aria-required="true">
           {BUILDING_TYPES.map((type) => (
             <button
               key={type}
@@ -333,6 +359,7 @@ export default function BillingDeliveryFields({
             Other
           </button>
         </div>
+        {errorText('buildingType')}
       </div>
 
       {buildingType === 'Other' && (
@@ -347,8 +374,9 @@ export default function BillingDeliveryFields({
             placeholder="e.g. Warehouse, Industrial unit"
             required
             aria-required="true"
-            aria-invalid={fieldHasIssue('otherBuildingType')}
+            {...errorProps('otherBuildingType')}
           />
+          {errorText('otherBuildingType')}
         </div>
       )}
 
@@ -365,8 +393,9 @@ export default function BillingDeliveryFields({
             placeholder="Unit number"
             required
             aria-required="true"
-            aria-invalid={fieldHasIssue('unitNumber')}
+            {...errorProps('unitNumber')}
           />
+          {errorText('unitNumber')}
         </div>
       )}
     </div>

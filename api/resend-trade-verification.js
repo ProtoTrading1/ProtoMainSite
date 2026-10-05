@@ -1,7 +1,9 @@
 import { checkRateLimit, clientIp } from './_rate-limit.js';
 import { tradeEmailClient, sendTradeVerificationEmail } from './_trade-email-verification.js';
 
-export function createResendTradeVerificationHandler({ rateLimit = checkRateLimit, client = tradeEmailClient, send = sendTradeVerificationEmail } = {}) {
+export function createResendTradeVerificationHandler({ rateLimit = checkRateLimit, client = tradeEmailClient, send = sendTradeVerificationEmail,
+  onFailure = () => console.error('Trade confirmation email request did not complete'),
+} = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (req.method !== 'POST') return res.status(405).end();
@@ -18,11 +20,16 @@ export function createResendTradeVerificationHandler({ rateLimit = checkRateLimi
         .select('id, name, email, trade_email_verification_required, trade_email_verified_at').eq('email', email).maybeSingle();
       if (error) throw error;
       if (profile?.trade_email_verification_required && !profile.trade_email_verified_at) {
-        await send({ client: service, userId: profile.id, email: profile.email, name: profile.name });
+        const delivery = await send({ client: service, userId: profile.id, email: profile.email, name: profile.name });
+        if (delivery?.sent !== true) throw new Error('Confirmation email was not accepted');
       }
       return res.status(200).json({ ok: true });
     } catch {
-      return res.status(503).json({ error: 'Confirmation email is unavailable. Please try again later.' });
+      // A failure status only for pending applications would disclose account
+      // eligibility during a mail outage. This receipt acknowledges the request,
+      // not delivery; keep operational failure details on the server.
+      onFailure();
+      return res.status(200).json({ ok: true });
     }
   };
 }

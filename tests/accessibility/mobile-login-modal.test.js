@@ -12,9 +12,9 @@ test('names the mobile sign-in dialog controls and explains registration routes'
   assert.match(modal, /aria-labelledby="login-modal-heading"/);
   assert.match(modal, /aria-label="Close sign-in"/);
   assert.match(modal, /aria-label=\{showPw \? 'Hide password' : 'Show password'\}/);
-  assert.match(modal, /Bought from Proto before, but not online\?/);
-  assert.match(modal, /New trade customer\?/);
-  assert.match(modal, /Re-register or apply/);
+  assert.match(modal, /Bought from Proto before without an online account\?/);
+  assert.match(modal, /New customer\?/);
+  assert.match(modal, /Register for online access/);
   assert.match(modal, /focusableSelector/);
   assert.match(modal, /previouslyFocused\.focus\(\)/);
   assert.match(modal, /htmlFor="login-email"/);
@@ -22,7 +22,7 @@ test('names the mobile sign-in dialog controls and explains registration routes'
 });
 
 test('keeps all secondary sign-in actions at least 44px tall', async () => {
-  const styles = await readSource('src/landing.css');
+  const styles = `${await readSource('src/landing.css')}\n${await readSource('src/components/LoginModal.css')}`;
 
   assert.match(styles, /\.lm-close\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/);
   assert.match(styles, /\.lm-eye\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/);

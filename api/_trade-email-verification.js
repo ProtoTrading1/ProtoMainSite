@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
 import { PUBLIC_SITE_URL } from './_public-site-url.js';
 
+const INVALID_LINK_MESSAGE = 'This confirmation link is invalid or expired. If you requested another email, use the link in the newest confirmation email. Otherwise request a new email.';
+
 export function tradeEmailClient() {
   return createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false, autoRefreshToken: false } });
@@ -19,11 +21,11 @@ export function verificationEmailHtml(name, link) {
     <p>Confirm this email address to complete your Proto Trading trade application.
     Existing customers receive catalogue access after confirmation; new applications are reviewed by our team.</p>
     <p><a href="${escapeHtml(link)}">Confirm my email</a></p>
-    <p>This secure link can only be used once. If you did not apply, you can ignore this email.</p>`;
+    <p>This secure link can only be used once. If you requested another confirmation email, use the link in the newest email; older links will no longer work. If you did not apply, you can ignore this email.</p>`;
 }
 
 export async function sendTradeVerificationEmail({ client, userId, email, name, fetcher = fetch }) {
-  if (!process.env.BREVO_API_KEY) return { sent: false };
+  if (!process.env.BREVO_API_KEY) throw new Error('Confirmation email is unavailable. Please try again later.');
   const { data, error } = await client.auth.admin.generateLink({ type: 'magiclink', email });
   const token = data?.properties?.hashed_token;
   if (error || !token || data?.user?.id !== userId) throw new Error('Verification link could not be generated');
@@ -37,17 +39,20 @@ export async function sendTradeVerificationEmail({ client, userId, email, name, 
     }),
     signal: AbortSignal.timeout(8000),
   });
-  return { sent: response.ok };
+  // Generating a replacement invalidates the preceding proof. A rejected mail
+  // must not be acknowledged as a successful resend or expose provider details.
+  if (!response.ok) throw new Error('Confirmation email is unavailable. Please try again later.');
+  return { sent: true };
 }
 
 export async function verifyTradeEmail({ tokenHash, verifyClient, serviceClient }) {
   if (typeof tokenHash !== 'string' || !/^[a-zA-Z0-9_-]{20,256}$/.test(tokenHash)) {
-    const error = new Error('This confirmation link is invalid or expired. Request a new email.');
+    const error = new Error(INVALID_LINK_MESSAGE);
     error.status = 400; throw error;
   }
   const { data, error } = await verifyClient.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
   if (error || !data?.user?.id || !data.user.email_confirmed_at) {
-    const failure = new Error('This confirmation link is invalid, expired or already used. Request a new email.');
+    const failure = new Error(INVALID_LINK_MESSAGE);
     failure.status = 400; throw failure;
   }
   const result = await serviceClient.rpc('complete_trade_email_verification', { p_user_id: data.user.id });

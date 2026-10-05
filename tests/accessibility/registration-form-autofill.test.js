@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { registrationErrorId } from '../../src/lib/registrationValidation.mjs';
 
 const landingSource = await readFile(
   new URL('../../src/pages/LandingPage.jsx', import.meta.url),
@@ -61,6 +62,8 @@ test('registration fields expose mobile-friendly names and autofill metadata', (
 });
 
 test('email validation feedback is programmatically linked to the email field', () => {
-  assert.match(fieldMarkup('trade-email'), /aria-describedby=\{emailError \? 'trade-email-error' : undefined\}/);
-  assert.match(landingSource, /<span id="trade-email-error"/);
+  assert.match(fieldMarkup('trade-email'), /fieldFeedback\('email'\)/);
+  assert.match(landingSource, /'aria-describedby':[\s\S]*registrationErrorId\(key\)/);
+  assert.match(landingSource, /<span id=\{registrationErrorId\(key\)\}/);
+  assert.equal(registrationErrorId('email'), 'trade-email-error');
 });

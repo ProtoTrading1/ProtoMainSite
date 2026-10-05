@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { validateRegistrationStep } from '../src/lib/registrationValidation.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -8,7 +9,10 @@ describe('business description registration contract', () => {
   it('requires and persists an applicant business description', () => {
     const page = read('src/pages/LandingPage.jsx');
     const api = read('api/register-trade.js');
-    assert.match(page, /businessDescription\.trim\(\)\.length >= 20/);
+    assert.match(page, /firstInvalidRegistrationStep\(formValues\)/);
+    const values = { tradingChannels: ['Retail store'], productCategories: ['Gifts'] };
+    assert.ok(validateRegistrationStep(3, { ...values, businessDescription: 'short' }).businessDescription);
+    assert.equal(validateRegistrationStep(3, { ...values, businessDescription: 'Wholesale gifts sold to shops.' }).businessDescription, undefined);
     assert.match(api, /business_description: normalizedBusinessDescription/);
     assert.match(api, /normalizedBusinessDescription\.length < 20/);
   });
