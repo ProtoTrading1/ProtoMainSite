@@ -1,4 +1,4 @@
-import { MIN_PASSWORD_LENGTH } from './passwordPolicy.js';
+import { MIN_PASSWORD_LENGTH, PASSWORD_STRENGTH_GUIDANCE } from './passwordPolicy.js';
 
 // Fixed public messages only. Never render arbitrary server field text.
 const fields = {
@@ -6,7 +6,7 @@ const fields = {
   companyName: ['Enter your company name.', 'Check your business and address details.'],
   phone: ['Enter your phone number.', 'Enter a phone number with at least 8 digits, including your area or country code.'],
   email: ['Enter your email address.'],
-  password: ['Enter a password as text.', `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, 'Enter matching passwords.'],
+  password: ['Enter a password as text.', `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, 'Enter matching passwords.', PASSWORD_STRENGTH_GUIDANCE],
   whatsappOptIn: ['Choose Yes or No for WhatsApp updates.'],
   billingStreet: ['Enter your billing address.'],
   streetName: ['Enter your delivery address.', 'Enter your delivery street name and number.'],

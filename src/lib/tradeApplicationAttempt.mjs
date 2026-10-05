@@ -1,5 +1,5 @@
 import { submitTradeApplication } from './tradeApplication.js';
-import { MIN_PASSWORD_LENGTH } from './passwordPolicy.js';
+import { MIN_PASSWORD_LENGTH, PASSWORD_STRENGTH_GUIDANCE } from './passwordPolicy.js';
 import { safeServerRegistrationFields } from './registrationServerGuidance.mjs';
 
 const ATTEMPT_KEY = 'proto.trade-application-attempt.v1';
@@ -35,10 +35,18 @@ export function isConfirmedTradeApplication(result) {
 }
 
 // Only status + a fixed, known pre-account response permits another POST.
-// Provider creation failures, 5xx, aborted/lost bodies and malformed success
+// A definite weak-password rejection also permits explicit correction.
+// Other provider failures, 5xx, aborted/lost bodies and malformed success
 // envelopes cannot establish whether an account was already created.
 export function applicationFailure(error) {
   const status = Number(error?.status);
+  if (status === 422 && error?.code === 'REGISTRATION_PASSWORD_REJECTED'
+      && error?.data?.error === 'Choose a stronger password before submitting again.') {
+    const fieldErrors = safeServerRegistrationFields(error.data.fieldErrors);
+    if (fieldErrors && Object.keys(fieldErrors).length === 1 && fieldErrors.password === PASSWORD_STRENGTH_GUIDANCE) {
+      return attemptError('Choose a stronger password before submitting again. Your other details are still here.', 'REGISTRATION_PASSWORD_REJECTED', { retrySafe: true, fieldErrors });
+    }
+  }
   if (status === 400 && error?.code === 'REGISTRATION_VALIDATION_FAILED'
       && error?.data?.error === 'Check the highlighted application details.') {
     const fieldErrors = safeServerRegistrationFields(error.data.fieldErrors);
