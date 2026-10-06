@@ -88,4 +88,3 @@ for (const sameBasket of [false, true]) test(`actual Root routes a read-only rec
   await page.locator('[data-cart-trigger]').filter({ visible: true }).first().click();
   await expect(page.locator('.order-drawer').filter({ visible: true }).first().getByRole('spinbutton', { name: `Quantity for ${current.product.code} (${current.preference})`, exact: true })).toHaveValue(String(current.qty));
 });
-
