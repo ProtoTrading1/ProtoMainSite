@@ -3,6 +3,7 @@ import { requireApprovedCustomer } from './_auth.js';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
 import { basketLineKey, mergeBasketLines } from '../lib/basket-lines.mjs';
 import { cartSyncFailure } from '../src/lib/cartSyncRecovery.mjs';
+import { normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
 
 const MAX_LINES = 250;
 const MAX_QTY = 9999;
@@ -79,6 +80,24 @@ function cleanNumber(value, { minimum = Number.NEGATIVE_INFINITY, fallback = nul
 
 function sanitizeProduct(product, identifiers) {
   const primary = identifiers.primary;
+  // Saved hints preserve basket presentation and routing, while fresh server
+  // catalogue data still determines price, minimum quantity and availability.
+  const metadata = {};
+  if (typeof product.isExtendedRange === 'boolean') metadata.isExtendedRange = product.isExtendedRange;
+  if (['main', 'instore'].includes(product.source)) metadata.source = product.source;
+  if (Number.isSafeInteger(product.minQty) && product.minQty >= 1 && product.minQty <= MAX_QTY) {
+    metadata.minQty = product.minQty;
+  }
+  if ((typeof product.unitsOfIssue === 'string' && product.unitsOfIssue.trim())
+    || (Number.isSafeInteger(product.unitsOfIssue) && product.unitsOfIssue > 0 && product.unitsOfIssue <= 99999)) {
+    metadata.unitsOfIssue = normalizeUnitsOfIssue(cleanText(product.unitsOfIssue, 160));
+  }
+  if (['nutstore', 'isolated-preview'].includes(product.imageSource)) metadata.imageSource = product.imageSource;
+  if (typeof product.orderableWhenOutOfStock === 'boolean'
+    || typeof product.orderable_when_out_of_stock === 'boolean') {
+    metadata.orderableWhenOutOfStock = product.orderableWhenOutOfStock === true
+      || product.orderable_when_out_of_stock === true;
+  }
   return {
     id: identifiers.id || primary,
     sku: identifiers.sku || primary,
@@ -93,6 +112,7 @@ function sanitizeProduct(product, identifiers) {
     inStock: product.inStock !== false,
     toOrder: product.toOrder === true,
     to_order: product.to_order === true,
+    ...metadata,
   };
 }
 

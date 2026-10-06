@@ -9,6 +9,7 @@ import { scrollToTop } from './lib/scrollToTop';
 import { setMonitoringUser } from './lib/monitoring';
 import { hasStoredSession, isSessionExpired } from './lib/sessionPolicy';
 import { captureAuthIdentity, rememberAuthSession } from './lib/authHeaders';
+import { createOrderReceiptTarget, visibleOrderReceiptTarget } from './lib/orderReceiptTarget.mjs';
 import { createProfileRequestCache } from './lib/profileRequestCache';
 import { createAuthBootstrapGuard, createAuthIdentityGuard } from './lib/authBootstrapGuard.mjs';
 import './pages/ResetPasswordPage.css';
@@ -37,6 +38,7 @@ export default function Root() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [verificationResending, setVerificationResending] = useState(false);
   const [requestedReorder, setRequestedReorder] = useState(null);
+  const [orderReceiptTarget, setOrderReceiptTarget] = useState(null);
   const [loginOptions, setLoginOptions] = useState({ initialEmail: '', initialMode: 'login' });
   const authBootstrapped = useRef(false);
   const authBootstrapGuard = useRef(createAuthBootstrapGuard());
@@ -46,6 +48,7 @@ export default function Root() {
 
   useEffect(() => {
     setRequestedReorder(null);
+    setOrderReceiptTarget(null);
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -153,6 +156,7 @@ export default function Root() {
     setCustomerLoading(Boolean(sess?.user));
     setMonitoringUser(null);
     setRequestedReorder(null);
+    setOrderReceiptTarget(null);
   }, []);
 
   const loadCustomer = useCallback((userId, sessionOrToken = null) => {
@@ -330,6 +334,7 @@ export default function Root() {
     setCustomerLoadError(null);
     setMonitoringUser(null);
     setRequestedReorder(null);
+    setOrderReceiptTarget(null);
     setLoginOptions({ initialEmail: '', initialMode: 'login' });
     window.sessionStorage.removeItem('proto-surface');
     setView('landing');
@@ -590,6 +595,7 @@ export default function Root() {
       <Suspense fallback={authSurfaceFallback}>
         <ProfilePage
           customer={customer}
+          receiptTarget={visibleOrderReceiptTarget(orderReceiptTarget, customer?.id, captureAuthIdentity())}
           onBack={() => setSurface('portal')}
           onProfileUpdate={(updated) => setCustomer(updated)}
           onReorderOrder={(order) => {
@@ -600,6 +606,8 @@ export default function Root() {
                 productId: item.productId,
                 code: item.code,
                 qty: item.qty,
+                ...(['main', 'instore'].includes(item.source) ? { source: item.source } : {}),
+                ...(typeof item.isExtendedRange === 'boolean' ? { isExtendedRange: item.isExtendedRange } : {}),
               })),
             });
             setSurface('portal');
@@ -617,7 +625,10 @@ export default function Root() {
             customer={customer}
             loginSessionKey={session?.user?.last_sign_in_at || String(session?.expires_at || '')}
             onLogout={handleLogout}
-            onViewProfile={() => setSurface('profile')}
+            onViewProfile={(request) => {
+              setOrderReceiptTarget(createOrderReceiptTarget(request, customer?.id, captureAuthIdentity()));
+              setSurface('profile');
+            }}
             onViewAdmin={null}
             requestedReorder={requestedReorder}
             onRequestedReorderHandled={() => setRequestedReorder(null)}

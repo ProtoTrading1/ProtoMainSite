@@ -171,7 +171,9 @@ test('the collection survives a reload without downloading again', async () => {
   assert.match(range, /if \(local\) \{[\s\S]*void fetchWhenIdle\(\);\s*\n\s*return local;/);
   // Nothing stale, nothing shaped for older code, and nothing left at sign-out.
   assert.match(range, /if \(!Array\.isArray\(entry\?\.data\) \|\| !entry\.data\.length\) return null;/);
-  assert.match(range, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
+  assert.match(range, /return openOptionalCache\(IDB_NAME, IDB_VERSION, IDB_STORE\)/);
+  const optionalCache = await readSource('src/lib/optionalIndexedCache.mjs');
+  assert.match(optionalCache, /request\.transaction\.objectStore\(store\)\.clear\(\)/);
   assert.match(range, /void clearPersistedCollection\(\)/);
 });
 

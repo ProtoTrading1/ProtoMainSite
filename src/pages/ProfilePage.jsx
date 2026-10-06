@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { cloneElement, useEffect, useId, useState } from 'react';
 import {
   ArrowLeft, Building2, CheckCircle2, Globe, Loader2, Mail, MessageCircle,
   MapPin, Phone, ShieldCheck, Store, User,
 } from 'lucide-react';
 import { updateProfile } from '../lib/customers';
-import { fetchOrderHistory } from '../lib/orders';
+import { createOrderHistoryReadScope, visibleOrderHistoryState } from '../lib/orders';
+import { captureAuthIdentity } from '../lib/authHeaders';
+import { visibleOrderReceiptTarget } from '../lib/orderReceiptTarget.mjs';
 import MyOrdersCentre from '../components/MyOrdersCentre';
 import { MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { SADC_COUNTRIES, SA_PROVINCES } from '../lib/sadcCountries';
@@ -53,18 +55,23 @@ const focusProps = {
 };
 
 function Field({ label, hint, children, full = false }) {
+  const id = useId();
   return (
     <div style={full ? { gridColumn: '1 / -1' } : undefined}>
-      <label style={LABEL_STYLE}>{label}</label>
-      {children}
+      <label htmlFor={id} style={LABEL_STYLE}>{label}</label>
+      {cloneElement(children, { id })}
       {hint && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 5 }}>{hint}</div>}
     </div>
   );
 }
 
-export default function ProfilePage({ customer, onBack, onProfileUpdate, onReorderOrder }) {
+export default function ProfilePage({ customer, onBack, onProfileUpdate, onReorderOrder, receiptTarget = null }) {
   const [form, setForm] = useState(() => buildProfileForm(customer));
-  const [orders, setOrders] = useState([]);
+  const [orderHistory, setOrderHistory] = useState(null);
+  const historyIdentity = captureAuthIdentity();
+  const history = visibleOrderHistoryState(orderHistory, customer?.id, historyIdentity);
+  const visibleReceipt = visibleOrderReceiptTarget(receiptTarget, customer?.id, historyIdentity);
+  const [historyRetry, setHistoryRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -77,8 +84,9 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
 
   useEffect(() => {
     if (!customer?.id) return;
-    fetchOrderHistory(customer.id, 10).then(setOrders).catch(() => {});
-  }, [customer?.id]);
+    const scope = createOrderHistoryReadScope(customer.id, setOrderHistory);
+    return () => scope.cancel();
+  }, [customer?.id, historyIdentity, historyRetry]);
 
   const handleSave = async () => {
     const problem = validateProfileForm(form);
@@ -121,7 +129,8 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px', display: 'grid', gap: 20 }}>
 
-        <MyOrdersCentre orders={orders} onReorderOrder={onReorderOrder} />
+        <MyOrdersCentre key={visibleReceipt?.orderId || visibleReceipt?.kind || 'history'} receiptTarget={visibleReceipt} orders={history.rows} loading={history.state === 'loading'} error={history.error}
+          onRetry={() => setHistoryRetry((attempt) => attempt + 1)} onReorderOrder={onReorderOrder} />
 
         {/* Trade Profile card — read-only business details */}
         <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 20, padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>

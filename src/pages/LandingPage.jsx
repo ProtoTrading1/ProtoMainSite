@@ -323,7 +323,7 @@ function Questionnaire({ onLogin }) {
     .map(([key, detail]) => [key, detail.message]));
   const visibleErrors = Object.fromEntries(Object.entries({ ...fieldErrors, ...activeServerErrors }).filter(([key]) => (
     currentValidation[key] || activeServerErrors[key] || (key === 'email' && ['existing', 'error'].includes(emailCheck.status))
-  )).map(([key, message]) => [key, currentValidation[key] || (key === 'email' ? emailError : '') || message]));
+  )).map(([key, message]) => [key, (key === 'password' && activeServerErrors[key]) || currentValidation[key] || (key === 'email' ? emailError : '') || message]));
   const fieldError = (key) => visibleErrors[key] || (key === 'email' ? emailError : '') || '';
   const fieldFeedback = (key, helpId) => ({
     'aria-invalid': Boolean(fieldError(key)),
@@ -371,6 +371,16 @@ function Questionnaire({ onLogin }) {
     setEmail(value);
     setEmailError('');
     setEmailCheck({ status: 'idle', checkedEmail: '', message: '' });
+  };
+
+  const updatePassword = (value) => {
+    setPassword(value);
+    setServerFields((previous) => {
+      if (!Object.hasOwn(previous, 'password')) return previous;
+      const next = { ...previous };
+      delete next.password;
+      return next;
+    });
   };
 
   const checkEmailAvailability = () => {
@@ -509,7 +519,7 @@ function Questionnaire({ onLogin }) {
       setOutcomeUnknown(unknown);
       setSubmitCode(err.code || 'REGISTRATION_OUTCOME_UNKNOWN');
       setShowAccountRecovery(!storageBlocked && (unknown || err.recovery === 'SIGN_IN_OR_RESET_PASSWORD'));
-      const knownCodes = ['REGISTRATION_STORAGE_UNAVAILABLE', 'REGISTRATION_OUTCOME_UNKNOWN', 'REGISTRATION_VALIDATION_FAILED', 'REGISTRATION_RATE_LIMITED', 'REGISTRATION_UNAVAILABLE', 'EMAIL_ALREADY_REGISTERED'];
+      const knownCodes = ['REGISTRATION_STORAGE_UNAVAILABLE', 'REGISTRATION_OUTCOME_UNKNOWN', 'REGISTRATION_VALIDATION_FAILED', 'REGISTRATION_PASSWORD_REJECTED', 'REGISTRATION_RATE_LIMITED', 'REGISTRATION_UNAVAILABLE', 'EMAIL_ALREADY_REGISTERED'];
       setSubmitError(knownCodes.includes(err.code) ? err.message : unknown
         ? 'We cannot confirm whether your application was saved. Check your inbox and spam folder for confirmation. Please do not submit another application while the result is uncertain.'
         : err.code === 'EMAIL_ALREADY_REGISTERED'
@@ -518,11 +528,12 @@ function Questionnaire({ onLogin }) {
       if (!unknown) {
         setStep(1);
         const knownFields = Object.entries(err.fieldErrors || {}).filter(([key]) => REGISTRATION_FIELD_IDS[key]);
-        // Keep only nonsecret field values in memory so editing a rejected field
-        // clears its server feedback. A failed password is always cleared.
-        setServerFields(Object.fromEntries(knownFields.filter(([key]) => key !== 'password')
-          .map(([key, message]) => [key, { message, value: formValues[key] }])));
-        setFieldErrors({ password: `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` });
+        const passwordRejected = err.code === 'REGISTRATION_PASSWORD_REJECTED';
+        // The cleared password uses an empty marker, never the secret itself.
+        // Its provider guidance is removed on the next password edit.
+        setServerFields(Object.fromEntries(knownFields.filter(([key]) => key !== 'password' || passwordRejected)
+          .map(([key, message]) => [key, { message, value: key === 'password' ? '' : formValues[key] }])));
+        setFieldErrors({ password: passwordRejected ? err.fieldErrors.password : `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` });
       }
       trackJourneyEvent('registration_failed', {
         journey: 'registration',
@@ -817,8 +828,8 @@ function Questionnaire({ onLogin }) {
                     type={showPw ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={password}
-                    onInput={(e) => setPassword(e.currentTarget.value)}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onInput={(e) => updatePassword(e.currentTarget.value)}
+                    onChange={(e) => updatePassword(e.target.value)}
                     onKeyDown={handleKey}
                     placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                     minLength={MIN_PASSWORD_LENGTH}

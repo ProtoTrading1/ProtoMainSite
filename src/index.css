@@ -4609,11 +4609,26 @@ textarea:focus-visible,
 }
 .ocm-copy-btn:hover { border-color: #0f172a; background: #f8fafc; }
 .order-modal-v2--simple { max-width: 420px; }
+.order-modal-v2--simple { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
+.order-modal-v2--simple > * { flex-shrink: 0; }
+.order-modal-v2--simple .ocm-header { padding-right: 58px; }
+.order-modal-v2--simple > .ocm-subtitle { margin: 0 24px 20px; color: #475569; font-size: 16px; }
+.order-modal-v2--simple > .ocm-copy-btn { margin: 0 24px 20px; width: calc(100% - 48px); }
+.ocm-request-summary { margin: 0 24px 20px; padding: 16px 0; border-block: 1px solid #e2e8f0; color: #334155; overflow-wrap: anywhere; }
+.ocm-request-summary dl { margin: 0; display: grid; gap: 12px; }
+.ocm-request-summary dt { font-weight: 700; font-size: 16px; color: #0f172a; }
+.ocm-request-summary dd { margin: 4px 0 0; font-size: 16px; }
+.ocm-request-summary p { font-size: 14px; line-height: 1.5; margin: 12px 0 0; }
+.ocm-request-summary .ocm-request-difference { font-size: 16px; }
+.ocm-request-reference { display: block; font-family: monospace; }
+.order-modal-v2--simple .ocm-actions--simple { flex-wrap: wrap; }
+.order-modal-v2--simple .ocm-copy-btn { min-height: 44px; height: auto; padding: 12px 16px; white-space: normal; }
+.order-modal-v2--simple .ocm-copy-btn:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
 .ocm-actions--simple { padding: 0 24px 28px; border-top: none; display: flex; justify-content: center; }
 .ocm-payment-notice { margin: 0 24px 18px; }
 .ocm-payment-notice + .ocm-actions--simple { padding-top: 0; }
-.ocm-done-btn { min-width: 200px; padding: 0 44px; justify-content: center; background: #16a34a; color: #fff; border-color: #16a34a; font-weight: 800; }
-.ocm-done-btn:hover { background: #15803d; border-color: #15803d; color: #fff; }
+.ocm-done-btn { min-width: 200px; padding: 0 44px; justify-content: center; background: #15803d; color: #fff; border-color: #15803d; font-weight: 800; }
+.ocm-done-btn:hover { background: #166534; border-color: #166534; color: #fff; }
 .ocm-change-list { margin: 0 24px 18px; border: 1px solid #fecaca; border-radius: 12px; background: #fff7f7; }
 .ocm-change-line { display: grid; gap: 3px; padding: 12px 14px; border-bottom: 1px solid #fee2e2; color: #7f1d1d; font-size: 13px; }
 .ocm-change-line:last-child { border-bottom: 0; }

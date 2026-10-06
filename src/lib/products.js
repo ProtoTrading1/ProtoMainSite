@@ -1,3 +1,4 @@
+import { openOptionalCache, runOptionalCache } from './optionalIndexedCache.mjs';
 import { fuzzyFilter } from './fuzzySearch';
 import { isIdentifierQuery } from './identifierNormalize';
 import {
@@ -33,6 +34,7 @@ export const CATALOG_SORT_OPTIONS = [
 // Promise singleton — prevents parallel fetches when multiple components mount at once
 let _loadPromise = null;
 let _cache = null;
+let _cacheGeneration = 0;
 let _sortOrdersPromise = null;
 let _sortOrdersCache = null;
 let _sortOrdersCachedAt = 0;
@@ -126,46 +128,21 @@ function loadFromLocalCache() {
 }
 
 function openCatalogueDb() {
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) {
-        db.createObjectStore(IDB_STORE);
-      } else {
-        // A schema/version release must not resurrect the previous catalogue
-        // snapshot from IndexedDB after the localStorage cache was invalidated.
-        request.transaction.objectStore(IDB_STORE).clear();
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(null);
-  });
+  return openOptionalCache(IDB_NAME, IDB_VERSION, IDB_STORE);
 }
 
 async function saveToIndexedCache(data) {
+  const generation = _cacheGeneration;
   const db = await openCatalogueDb();
   if (!db) return;
-  await new Promise((resolve) => {
-    const transaction = db.transaction(IDB_STORE, 'readwrite');
-    transaction.objectStore(IDB_STORE).put({ data, ts: Date.now() }, IDB_KEY);
-    transaction.oncomplete = resolve;
-    transaction.onerror = resolve;
-    transaction.onabort = resolve;
-  });
-  db.close();
+  if (generation !== _cacheGeneration) { db.close(); return; }
+  await runOptionalCache(db, IDB_STORE, 'readwrite', store => store.put({ data, ts: Date.now() }, IDB_KEY));
 }
 
 async function loadFromIndexedCache() {
   const db = await openCatalogueDb();
   if (!db) return null;
-  const entry = await new Promise((resolve) => {
-    const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => resolve(null);
-  });
-  db.close();
+  const entry = await runOptionalCache(db, IDB_STORE, 'readonly', store => store.get(IDB_KEY));
   if (!entry || Date.now() - Number(entry.ts || 0) >= LS_TTL) return null;
   return Array.isArray(entry.data) ? entry.data : null;
 }
@@ -177,16 +154,11 @@ async function loadFromPersistentCache() {
 }
 
 async function clearIndexedCache() {
+  const generation = _cacheGeneration;
   const db = await openCatalogueDb();
   if (!db) return;
-  await new Promise((resolve) => {
-    const transaction = db.transaction(IDB_STORE, 'readwrite');
-    transaction.objectStore(IDB_STORE).delete(IDB_KEY);
-    transaction.oncomplete = resolve;
-    transaction.onerror = resolve;
-    transaction.onabort = resolve;
-  });
-  db.close();
+  if (generation !== _cacheGeneration) { db.close(); return; }
+  await runOptionalCache(db, IDB_STORE, 'readwrite', store => store.delete(IDB_KEY));
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticated = false } = {}) {
@@ -215,21 +187,28 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4500, { cache, authenticate
 // speed up an approved customer's repeat visit, but no public static catalogue
 // is shipped because it would expose trade pricing outside the login gate.
 function startCatalogFetch() {
+  const generation = _cacheGeneration;
+  const checkGeneration = () => {
+    if (generation !== _cacheGeneration) throw new Error('Catalogue cache invalidated');
+  };
   // 'no-cache' (not 'no-store'): always revalidate with the server, but send
   // If-None-Match so an unchanged catalogue answers 304 with no body and no
   // server-side rebuild. Prices/stock stay authoritative; the 6 MB payload is
   // only transferred when the catalogue has actually changed.
-  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
+  const request = fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
     .then((products) => {
+      checkGeneration();
       _lastLiveRefreshAt = Date.now();
       return products;
     })
     .catch(() => {
+      checkGeneration();
       const local = loadFromLocalCache();
       if (local) return local;
       throw new Error('Catalogue unavailable');
     })
     .then((products) => {
+      checkGeneration();
       const hadPrior = !!_cache;
       _cache = products;
       saveToLocalCache(products);
@@ -242,9 +221,10 @@ function startCatalogFetch() {
       return _cache;
     })
     .catch((err) => {
-      _loadPromise = null;
+      if (generation === _cacheGeneration && _loadPromise === request) _loadPromise = null;
       throw err;
     });
+  return request;
 }
 
 function getAllCached() {
@@ -258,12 +238,14 @@ function getAllCached() {
   }
 
   if (!_persistentCachePromise) {
+    const generation = _cacheGeneration;
     _persistentCachePromise = loadFromPersistentCache().then((stale) => {
+      if (generation !== _cacheGeneration) throw new Error('Catalogue cache invalidated');
       if (stale?.length && !_cache) _cache = stale;
       if (!_loadPromise) _loadPromise = startCatalogFetch();
       return _cache ? Promise.resolve(_cache) : _loadPromise;
     }).catch((error) => {
-      _persistentCachePromise = null;
+      if (generation === _cacheGeneration) _persistentCachePromise = null;
       throw error;
     });
   }
@@ -271,9 +253,11 @@ function getAllCached() {
 }
 
 export function invalidateProductCache() {
+  _cacheGeneration++;
   _cache = null;
   _featuredResolved = null;
   _featuredLoad = null;
+  _featuredRefreshing = false;
   _loadPromise = null;
   _sortOrdersCache = null;
   _sortOrdersCachedAt = 0;
@@ -302,8 +286,9 @@ export function refreshProductCache({ maxAgeMs = CATALOG_REFRESH_MIN_MS } = {}) 
     return Promise.resolve(_cache);
   }
 
+  const generation = _cacheGeneration;
   _refreshPromise = startCatalogFetch().finally(() => {
-    _refreshPromise = null;
+    if (generation === _cacheGeneration) _refreshPromise = null;
   });
   return _refreshPromise;
 }
@@ -312,15 +297,17 @@ async function getSortOrders() {
   if (_sortOrdersCache && Date.now() - _sortOrdersCachedAt < SORT_ORDERS_TTL) return _sortOrdersCache;
   _sortOrdersCache = null;
   if (!_sortOrdersPromise) {
+    const generation = _cacheGeneration;
     _sortOrdersPromise = fetchJsonWithTimeout('/api/sort-orders', 8000, { cache: 'no-store' })
       .then((store) => {
+        if (generation !== _cacheGeneration) return {};
         _sortOrdersCache = store?.orders || {};
         _sortOrdersCachedAt = Date.now();
         _sortOrdersPromise = null;
         return _sortOrdersCache;
       })
       .catch(() => {
-        _sortOrdersPromise = null;
+        if (generation === _cacheGeneration) _sortOrdersPromise = null;
         return {};
       });
   }
@@ -408,7 +395,9 @@ let _featuredLoad = null; // { key, promise }
 const FEATURED_RESOLVED_REFRESH_MS = 60_000;
 
 async function fetchFeaturedCatalogProducts() {
+  const generation = _cacheGeneration;
   const featuredSkus = await getFeaturedProducts();
+  if (generation !== _cacheGeneration) return [];
   if (!featuredSkus.length) return [];
 
   const key = featuredSkus.join(',');
@@ -416,9 +405,9 @@ async function fetchFeaturedCatalogProducts() {
     if (Date.now() - _featuredResolved.at > FEATURED_RESOLVED_REFRESH_MS && !_featuredRefreshing) {
       _featuredRefreshing = true;
       void resolveFeaturedCatalogProducts(featuredSkus, key)
-        .then(() => emitCatalogRefresh())
+        .then(() => { if (generation === _cacheGeneration) emitCatalogRefresh(); })
         .catch(() => {})
-        .finally(() => { _featuredRefreshing = false; });
+        .finally(() => { if (generation === _cacheGeneration) _featuredRefreshing = false; });
     }
     return _featuredResolved.products;
   }
@@ -433,6 +422,7 @@ async function fetchFeaturedCatalogProducts() {
 }
 
 async function resolveFeaturedCatalogProducts(featuredSkus, key) {
+  const generation = _cacheGeneration;
   try {
     const batches = chunkArray(featuredSkus, FEATURED_PRODUCTS_BATCH_SIZE);
     const responses = await Promise.all(
@@ -452,15 +442,18 @@ async function resolveFeaturedCatalogProducts(featuredSkus, key) {
     const resolved = featuredSkus
       .map((sku) => bySku.get(String(sku || '').toUpperCase()))
       .filter(Boolean);
+    if (generation !== _cacheGeneration) return [];
     _featuredResolved = { key, products: resolved, at: Date.now() };
     return resolved;
   } catch {
+    if (generation !== _cacheGeneration) return [];
     // Fall back to cached full catalogue when the fast SKU request path fails.
     const allProducts = await getAllCached();
     const bySku = new Map(allProducts.map((product) => [productSkuKey(product), product]));
     const resolved = featuredSkus
       .map((sku) => bySku.get(String(sku || '').toUpperCase()))
       .filter(Boolean);
+    if (generation !== _cacheGeneration) return [];
     _featuredResolved = { key, products: resolved, at: Date.now() };
     return resolved;
   }

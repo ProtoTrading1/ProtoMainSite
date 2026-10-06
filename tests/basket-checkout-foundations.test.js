@@ -20,14 +20,16 @@ test('quantity stepping uses the current typed draft instead of stale persisted 
   assert.equal(stepCartQuantity('4', 4, -1, 4), 4);
 });
 
-test('checkout failure can retry the retained options with one idempotency key', () => {
+test('checkout failure retains one reference and offers a read-only saved-request check', () => {
   assert.match(appSource, /lastCheckoutOptionsRef\.current = checkoutOptions/);
   assert.match(appSource, /lastCheckoutSubmissionRef\.current = \{/);
   assert.match(appSource, /submittedBasketStillCurrent\(intent, cartFingerprint\(currentCartRef\.current\.items\)\)/);
   assert.match(appSource, /if \(!checkoutRefRef\.current\) checkoutRefRef\.current = makeClientRef\(\)/);
-  assert.match(appSource, /sendOrderEmail\(pendingCheckoutRef\.current\.options, true\)/);
+  assert.match(appSource, /checkSavedCheckout\(\{ storage: localStorage, locks: navigator\.locks/);
+  assert.doesNotMatch(appSource, /sendOrderEmail\(pendingCheckoutRef\.current\.options, true\)/);
   assert.match(appSource, /sendOrderEmail=\{sendOrderEmail\}/, 'mobile checkout awaits and retains failed form state');
-  assert.match(confirmationSource, /onClick=\{isError \? \(requiresReview \? onReview : onRetry\) : onClose\}/);
+  assert.match(confirmationSource, /onClick=\{onCheckSavedRequest\}/);
+  assert.match(confirmationSource, /Check saved request/);
   assert.match(drawerSource, /if \(result\?\.ok\)/, 'failed submission leaves the delivery form intact');
   assert.match(confirmationSource, /onClick=\{isSending \? undefined : onClose\}/);
   assert.match(drawerSource, /disabled=\{submitting\}/);
@@ -37,7 +39,7 @@ test('checkout sends a visible price and stock snapshot and requires review befo
   assert.match(appSource, /checkoutSnapshot: checkoutSnapshotForProduct\(item\.product\)/);
   assert.match(appSource, /ORDER_REVIEW_REQUIRED/);
   assert.match(confirmationSource, /Your basket needs review/);
-  assert.match(confirmationSource, /Review basket/);
+  assert.match(confirmationSource, /Review current basket/);
   assert.match(confirmationSource, /Price:/);
   assert.match(confirmationSource, /Stock:/);
 });
@@ -66,7 +68,9 @@ test('order centre explains customer status, VAT, delivery and pro-forma expecta
     vatIncluded: 1000 * (15 / 115),
   });
   assert.match(profileSource, /MyOrdersCentre/);
-  assert.match(profileSource, /fetchOrderHistory/);
+  assert.match(profileSource, /createOrderHistoryReadScope\(customer\.id, setOrderHistory\)/);
+  assert.match(profileSource, /scope\.cancel\(\)/);
+  assert.match(profileSource, /visibleOrderHistoryState\(orderHistory, customer\?\.id, historyIdentity\)/);
 });
 
 test('reorder dialog and post-order actions expose accessible recovery paths', () => {

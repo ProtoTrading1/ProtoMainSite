@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ShoppingCart, X } from 'lucide-react';
 import { basketLineKey } from '../../lib/basket-lines.mjs';
 
@@ -15,6 +15,18 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   const [unavailable, setUnavailable] = useState([]);
   const dialogRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const operationRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  const closeReorder = useCallback(() => {
+    operationRef.current?.abort();
+    operationRef.current = null;
+    onCloseRef.current?.();
+  }, []);
+  useEffect(() => () => {
+    operationRef.current?.abort();
+    operationRef.current = null;
+  }, []);
   const titleId = useId();
   const unavailableLines = new Map(unavailable.map((item) => [orderLineKey(item), item]));
 
@@ -28,12 +40,12 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose?.();
+        closeReorder();
         return;
       }
       if (event.key !== 'Tab') return;
       const candidates = focusable();
-      if (!candidates.length) return;
+      if (!candidates.length) { event.preventDefault(); dialog?.focus(); return; }
       const first = candidates[0];
       const last = candidates[candidates.length - 1];
       if (event.shiftKey && document.activeElement === first) {
@@ -56,7 +68,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus?.();
     };
-  }, [lastOrder, onClose]);
+  }, [lastOrder, closeReorder]);
 
   if (!lastOrder) return null;
 
@@ -69,7 +81,9 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
   });
 
   const handleReorder = async () => {
-    if (busy) return;
+    if (busy || operationRef.current) return;
+    const operation = new AbortController();
+    operationRef.current = operation;
     setBusy(true);
     setError('');
     try {
@@ -77,14 +91,21 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
       // Resolving 160 lines is a real round-trip, so the button reports
       // progress; the previous version returned instantly whether or not the
       // items had actually gone into the cart.
-      const result = await onReorder(selectedItems);
+      const result = await onReorder(selectedItems, { signal: operation.signal });
+      if (operation.signal.aborted || operationRef.current !== operation) return;
+      if (result?.held) { setError(result.message); return; }
       const missing = result?.missing || [];
       const overflow = result?.overflow || 0;
       if (missing.length || overflow) {
         setUnavailable(missing);
         const parts = [`${result.added} item${result.added === 1 ? '' : 's'} added.`];
-        if (missing.length) {
-          parts.push(`${missing.length} requested ${missing.length === 1 ? 'line could' : 'lines could'} not be added in full. Review the highlighted quantities.`);
+        const sourceReviewCount = missing.filter(item => item.reason === 'source_review_required').length;
+        const quantityReviewCount = missing.length - sourceReviewCount;
+        if (sourceReviewCount) {
+          parts.push(`${sourceReviewCount} saved ${sourceReviewCount === 1 ? 'product needs' : 'products need'} source review. Find and select the current product in the catalogue, or contact Proto before reordering it.`);
+        }
+        if (quantityReviewCount) {
+          parts.push(`${quantityReviewCount} requested ${quantityReviewCount === 1 ? 'line could' : 'lines could'} not be added in full. Review the highlighted quantities.`);
         }
         if (overflow) {
           parts.push(`${overflow} could not fit — an order can hold at most 250 different products.`);
@@ -92,19 +113,23 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
         setError(parts.join(' '));
       }
     } catch {
-      setError('Those items could not be added right now. Please try again.');
+      if (!operation.signal.aborted && operationRef.current === operation) setError('Those items could not be added right now. Please try again.');
     } finally {
-      setBusy(false);
+      if (!operation.signal.aborted && operationRef.current === operation) {
+        operationRef.current = null;
+        setBusy(false);
+      }
     }
   };
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+    <div onClick={closeReorder} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '480px', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
       >
@@ -116,7 +141,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
               From {new Date(lastOrder.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          <button data-reorder-close type="button" aria-label="Close reorder" onClick={onClose} style={{ width: 44, height: 44, background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button data-reorder-close type="button" aria-label="Close reorder" onClick={closeReorder} style={{ width: 44, height: 44, background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={18} aria-hidden />
           </button>
         </div>
@@ -134,6 +159,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
               <input
                 type="checkbox"
                 checked={selected.has(i)}
+                disabled={busy}
                 onChange={() => toggleItem(i)}
                 aria-label={`Include ${item.name || item.code} in reorder`}
                 style={{ width: '22px', height: '22px', accentColor: '#8B1A1A', flexShrink: 0 }}
@@ -147,7 +173,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
                   {item.code} · qty {item.qty} · R{Number(item.unitPrice).toFixed(2)} each
                   {item.preference && <span> · Preferred: {item.preference}</span>}
                   {unavailableLines.has(orderLineKey(item)) && (
-                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · {unavailableLines.get(orderLineKey(item)).reason === 'stock_limit' ? 'requested quantity unavailable' : 'no longer available'}</span>
+                    <span style={{ color: '#9a3412', fontWeight: 700 }}> · {unavailableLines.get(orderLineKey(item)).reason === 'source_review_required' ? 'source review required' : unavailableLines.get(orderLineKey(item)).reason === 'stock_limit' ? 'requested quantity unavailable' : 'no longer available'}</span>
                   )}
                 </div>
               </div>
@@ -160,7 +186,7 @@ export default function ReorderModal({ lastOrder, onReorder, onClose }) {
 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '10px' }}>
-          <button type="button" onClick={onClose} style={{ minHeight: 44, flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', color: '#64748b' }}>
+          <button type="button" onClick={closeReorder} style={{ minHeight: 44, flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', color: '#64748b' }}>
             Cancel
           </button>
           <button

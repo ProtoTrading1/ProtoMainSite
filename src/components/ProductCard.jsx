@@ -167,7 +167,8 @@ function orderQuantityLabel(product) {
 }
 
 function StockBadge({ product }) {
-  const sku = product?.code || product?.barcode || product?.sku || product?.id;
+  const sku = product?.isExtendedRange === true ? product?.sku || product?.id || product?.code
+    : product?.sku || product?.id || product?.code || product?.barcode;
   if (!product) return null;
   const availability = catalogStockState(product);
   const badgeClass = STOCK_BADGE_CLASS[availability.state] || 'out';
@@ -180,7 +181,7 @@ function StockBadge({ product }) {
       </div>
       {!product.isVariantGroup && sku ? <StockCheck
         sku={sku}
-        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : product.isExtendedRange === true ? 'instore' : 'main'}
         isInstore={Boolean(product.isExtendedRange)}
       /> : null}
     </div>
@@ -200,7 +201,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
     requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
     try {
-      const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
+      const sourceQuery = ['main', 'instore', 'instore-preview'].includes(source) ? `&source=${source}` : '';
       const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
@@ -503,7 +504,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
       openOptions();
       return;
     }
-    if (!cardCanOrder) return;
+    if (!cardCanOrder || cardAdvisory.isOverOrder) return;
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
     addToCart(activeProduct, qty, pos);
@@ -715,7 +716,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                   className="add-button"
                   onClick={handleAdd}
                   type="button"
-                  disabled={!cardCanOrder}
+                  disabled={!cardCanOrder || cardAdvisory.isOverOrder}
                 >
                   <ShoppingCart size={16} />
                   Add to Cart
@@ -724,7 +725,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             )}
           </div>
           {!isVariantGroup && cardAdvisory.isOverOrder && (
-            <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
+            <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; reduce the quantity before adding.</p>
           )}
           <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
             {inCart ? `In Your Order: ${cartQty}` : '\u00A0'}
@@ -927,8 +928,10 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 {(!isVariantGroup || selectedVariant) && (
                   <div className="pz-stock-check">
                     <StockCheck
-                      sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
+                      sku={activeProduct.isExtendedRange === true ? activeProduct.sku || activeProduct.id || activeProduct.code
+                        : activeProduct.sku || activeProduct.id || activeProduct.code || activeProduct.barcode}
                       autoCheck
+                      source={activeProduct.imageSource === 'isolated-preview' ? 'instore-preview' : activeProduct.isExtendedRange === true ? 'instore' : 'main'}
                       isInstore={Boolean(activeProduct.isExtendedRange)}
                     />
                   </div>
@@ -953,13 +956,13 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                       </div>
                     </div>
                     {modalAdvisory.isOverOrder && (
-                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; reduce the quantity before ordering.</p>
+                      <p className="pz-stock-advisory">Only {modalAdvisory.availableStock} in stock &mdash; reduce the quantity before adding.</p>
                     )}
                     <button
                       className={`pz-add-btn${justAdded ? ' pz-add-btn--added' : ''}`}
-                      disabled={!modalCanOrder}
+                      disabled={!modalCanOrder || modalAdvisory.isOverOrder}
                       onClick={() => {
-                        if (!modalCanOrder) return;
+                        if (!modalCanOrder || modalAdvisory.isOverOrder) return;
                         addToCart(activeProduct, qty, null, true);
                         setJustAdded(true);
                         setTimeout(() => setJustAdded(false), 1800);

@@ -32,8 +32,9 @@ test('basket restores Olive photo and keeps failed thumbnails and details contai
         await expect(fallback).toBeVisible();
       }
       const thumb = await row.locator('.drawer-thumb').boundingBox();
-      expect(thumb.width).toBe(44);
-      expect(thumb.height).toBe(44);
+      // Chromium may round transformed CSS bounds by a tiny fraction of a pixel.
+      expect(thumb.width).toBeCloseTo(44, 3);
+      expect(thumb.height).toBeCloseTo(44, 3);
       if (width === 1074) await row.screenshot({ path: testInfo.outputPath('olive-basket-fixed.png') });
       await page.keyboard.press('Escape');
     }

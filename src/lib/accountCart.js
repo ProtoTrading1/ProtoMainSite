@@ -1,32 +1,41 @@
-import { authHeaders, refreshAuthHeaders } from './authHeaders';
+import { authHeaders, refreshAuthHeaders, captureAuthIdentity, bindInitialAuthIdentity, assertAuthIdentity } from './authHeaders';
 import { boundedCartRequest } from './accountCartRequest.mjs';
+import { verifiedAccountCartEnvelope } from './accountCartEnvelope.mjs';
 import { basketLineKey, mergeBasketLines } from '../../lib/basket-lines.mjs';
 
 async function requestAccountCart(method, body) {
+  let identity = captureAuthIdentity();
   const payload = body?.items ? { ...body, items: mergeBasketLines(body.items) } : body;
   return boundedCartRequest(async (signal) => {
-    const request = (headers) => fetch('/api/account-cart', {
-      method,
-      headers,
-      credentials: 'same-origin',
-      signal,
-      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-    });
+    const request = async (headers) => {
+      assertAuthIdentity(identity);
+      const response = await fetch('/api/account-cart', {
+        method,
+        headers,
+        credentials: 'same-origin',
+        signal,
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+      });
+      assertAuthIdentity(identity);
+      return response;
+    };
 
-    let response = await request(await authHeaders());
+    const firstHeaders = await authHeaders();
+    identity = bindInitialAuthIdentity(identity, firstHeaders);
+    let response = await request(firstHeaders);
     if (response.status === 401) {
-      response = await request(await refreshAuthHeaders());
+      assertAuthIdentity(identity);
+      response = await request(await refreshAuthHeaders({}, identity));
     }
     const data = await response.json().catch(() => ({}));
+    assertAuthIdentity(identity);
     if (!response.ok) {
       const error = new Error(data.error || 'Account basket could not be saved');
       error.status = response.status;
       error.data = data;
       throw error;
     }
-    if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision)) {
-      throw new Error('Account basket response could not be confirmed');
-    }
+    verifiedAccountCartEnvelope(data);
     return { ...data, items: mergeBasketLines(data.items) };
   });
 }

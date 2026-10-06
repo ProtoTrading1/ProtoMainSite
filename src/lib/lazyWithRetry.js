@@ -27,7 +27,9 @@ export async function loadWithRetry(importer, key, browser = window) {
       if (shouldReload && retriedKey !== key) {
         try { browser.sessionStorage.setItem(RETRY_KEY, key); } catch { throw error; }
         browser.location.reload();
-        return new Promise(() => {});
+        // Navigation may be cancelled. Let the error boundary recover instead
+        // of leaving a mounted Suspense boundary waiting forever.
+        throw error;
       }
       try { browser.sessionStorage.removeItem(RETRY_KEY); } catch { /* Preserve the original failure for recovery. */ }
       throw error;

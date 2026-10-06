@@ -32,5 +32,7 @@ test('this catalogue-contract release cannot reload the previous persistent snap
   assert.match(products, /const LS_KEY = 'proto_catalog_v13'/);
   assert.match(products, /const IDB_VERSION = 4/);
   assert.match(products, /const IDB_KEY = 'approved-customer-v4'/);
-  assert.match(products, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
+  assert.match(products, /return openOptionalCache\(IDB_NAME, IDB_VERSION, IDB_STORE\)/);
+  const helper = await readFile(new URL('../src/lib/optionalIndexedCache.mjs', import.meta.url), 'utf8');
+  assert.match(helper, /request\.transaction\.objectStore\(store\)\.clear\(\)/);
 });

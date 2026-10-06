@@ -1,3 +1,4 @@
+import { openOptionalCache, runOptionalCache } from './optionalIndexedCache.mjs';
 import { authenticatedGetJson } from './authHeaders';
 import { preloadProductImages } from './imageUrl';
 import { instorePage } from '../../lib/instore-page.mjs';
@@ -23,60 +24,35 @@ const responseCache = new Map();
 let catalogueRequest = null;
 let catalogueProducts = null;
 let hydration = null;
+let cacheGeneration = 0;
 
 function openCollectionDb() {
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
-      // A version release must not resurrect a collection shaped for older code.
-      else request.transaction.objectStore(IDB_STORE).clear();
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(null);
-  });
+  return openOptionalCache(IDB_NAME, IDB_VERSION, IDB_STORE);
 }
 
 async function readPersistedCollection() {
   const db = await openCollectionDb();
   if (!db) return null;
-  const entry = await new Promise((resolve) => {
-    const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => resolve(null);
-  });
-  db.close();
+  const entry = await runOptionalCache(db, IDB_STORE, 'readonly', store => store.get(IDB_KEY));
   const age = Date.now() - Number(entry?.ts || 0);
   if (!Array.isArray(entry?.data) || !entry.data.length) return null;
   return Number.isFinite(age) && age >= 0 && age < PERSISTED_COLLECTION_MAX_AGE_MS ? entry.data : null;
 }
 
 async function writePersistedCollection(products) {
+  const generation = cacheGeneration;
   const db = await openCollectionDb();
   if (!db) return;
-  await new Promise((resolve) => {
-    const transaction = db.transaction(IDB_STORE, 'readwrite');
-    transaction.objectStore(IDB_STORE).put({ data: products, ts: Date.now() }, IDB_KEY);
-    transaction.oncomplete = resolve;
-    transaction.onerror = resolve;
-    transaction.onabort = resolve;
-  });
-  db.close();
+  if (generation !== cacheGeneration) { db.close(); return; }
+  await runOptionalCache(db, IDB_STORE, 'readwrite', store => store.put({ data: products, ts: Date.now() }, IDB_KEY));
 }
 
 async function clearPersistedCollection() {
+  const generation = cacheGeneration;
   const db = await openCollectionDb();
   if (!db) return;
-  await new Promise((resolve) => {
-    const transaction = db.transaction(IDB_STORE, 'readwrite');
-    transaction.objectStore(IDB_STORE).delete(IDB_KEY);
-    transaction.oncomplete = resolve;
-    transaction.onerror = resolve;
-    transaction.onabort = resolve;
-  });
-  db.close();
+  if (generation !== cacheGeneration) { db.close(); return; }
+  await runOptionalCache(db, IDB_STORE, 'readwrite', store => store.delete(IDB_KEY));
 }
 
 function storage() {
@@ -92,6 +68,7 @@ function storage() {
 // same for every approved customer, but the store is still cleared on sign-out
 // so nothing of one session is left for the next.
 export function clearStoredInstoreResponses() {
+  cacheGeneration++;
   responseCache.clear();
   catalogueRequest = null;
   catalogueProducts = null;
@@ -161,15 +138,17 @@ export function storedExtendedRange(query = '', options = {}) {
   return readStored(key);
 }
 
-export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false } = {}) {
+export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, fresh = false } = {}) {
+  const generation = cacheGeneration;
   const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue });
   const cached = responseCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (!fresh && cached && cached.expiresAt > Date.now()) return cached.data;
   // The preview may be reading a few thousand staged products. Give its
   // protected, server-side eligibility checks enough time to finish instead
   // of turning a slow-but-valid response into a false loading failure.
   const { response, data } = await authenticatedGetJson(`/api/extended-range?${cacheKey}`, { signal, timeoutMs: 45000 });
   if (!response.ok) throw new Error('Unable to load Instore Products. Please try again.');
+  if (generation !== cacheGeneration) throw new Error('Instore cache invalidated');
   if (!signal?.aborted) {
     responseCache.set(cacheKey, { data, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
     if (!includeCatalogue) writeStored(cacheKey, data);
@@ -180,6 +159,24 @@ export async function fetchExtendedRange(query = '', { signal, page = 1, categor
     }
   }
   return data;
+}
+
+// Saved/reorder Instore lines must use their own verified catalogue projection.
+// A Main SKU or barcode match cannot establish the origin of an Instore line.
+export async function fetchInstoreProductsBySkus(skus, { signal } = {}) {
+  const wanted = new Set(skus.map(value => String(value ?? '').trim().toUpperCase()).filter(Boolean));
+  if (!wanted.size) return new Map();
+  const data = await fetchExtendedRange('', { signal, includeCatalogue: true, fresh: true });
+  if (!Array.isArray(data?.catalogue)) throw new Error('Instore product details could not be confirmed. Please retry.');
+  const matches = new Map();
+  const ambiguous = new Set();
+  for (const product of data.catalogue) {
+    const sku = String(product?.sku || product?.id || '').trim().toUpperCase();
+    if (!wanted.has(sku) || ambiguous.has(sku)) continue;
+    if (matches.has(sku)) { matches.delete(sku); ambiguous.add(sku); }
+    else matches.set(sku, product);
+  }
+  return matches;
 }
 
 /**
@@ -201,14 +198,16 @@ function preloadLandingImages(products) {
 }
 
 async function fetchCollection() {
+  const generation = cacheGeneration;
   const data = await fetchExtendedRange('', { page: 1, includeCatalogue: true });
+  if (generation !== cacheGeneration) return null;
   const products = Array.isArray(data?.catalogue) && data.catalogue.length ? data.catalogue : null;
   if (products) {
     catalogueProducts = products;
     preloadLandingImages(products);
     await writePersistedCollection(products).catch(() => {});
   }
-  return products;
+  return generation === cacheGeneration ? products : null;
 }
 
 /**
@@ -219,8 +218,10 @@ async function fetchCollection() {
 export function hydrateInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
   if (!hydration) {
+    const generation = cacheGeneration;
     hydration = readPersistedCollection()
       .then((persisted) => {
+        if (generation !== cacheGeneration) return null;
         if (persisted && !catalogueProducts) {
           catalogueProducts = persisted;
           preloadLandingImages(persisted);
@@ -237,12 +238,13 @@ function fetchWhenIdle() {
   const connection = typeof navigator === 'undefined' ? null : navigator.connection;
   // Nothing optional on a connection the customer pays for by the megabyte.
   if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return Promise.resolve(catalogueProducts);
+  const generation = cacheGeneration;
   catalogueRequest = new Promise((resolve) => {
-    const start = () => resolve(fetchCollection().catch(() => null));
+    const start = () => resolve(generation === cacheGeneration ? fetchCollection().catch(() => null) : null);
     if (typeof window === 'undefined') start();
     else if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
     else window.setTimeout(start, 1200);
-  }).finally(() => { catalogueRequest = null; });
+  }).finally(() => { if (generation === cacheGeneration) catalogueRequest = null; });
   return catalogueRequest;
 }
 
@@ -261,7 +263,9 @@ export function instoreCatalogue() {
  * so a page can join a load already running instead of starting a second one.
  */
 export function prefetchInstoreCatalogue() {
+  const generation = cacheGeneration;
   return hydrateInstoreCatalogue().then((local) => {
+    if (generation !== cacheGeneration) return null;
     if (local) {
       // Refresh behind the customer so the next view is current.
       void fetchWhenIdle();

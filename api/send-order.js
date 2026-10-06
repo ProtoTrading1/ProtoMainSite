@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
+import { basketProductSource } from '../lib/basket-lines.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
@@ -271,6 +272,13 @@ function availableFromBridge(row) {
   return Number.isFinite(onHand) && Number.isFinite(booked) && booked >= 0 ? Math.floor(onHand - booked) : null;
 }
 
+function instoreReviewRequired(changes) {
+  const error = orderError('Price or stock changed while you were shopping. Review the affected products before sending your order request.', 409);
+  error.code = 'ORDER_REVIEW_REQUIRED';
+  error.changes = changes;
+  return error;
+}
+
 // Pure server boundary used by the checkout tests. Browser titles, prices and
 // quantities are not trusted: the reviewed index and fresh bridge response win.
 export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible' } = {}) {
@@ -286,8 +294,15 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   const available = availableFromBridge(bridgeRow);
   const price = websitePriceFromExVat(Number(bridgeRow?.PRICE_A));
   if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-  if (!Number.isFinite(price) || price <= 0 || available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  if (!Number.isFinite(price) || price <= 0) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  const review = evaluateCheckoutSnapshot({
+    sku, name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), quantity: qty,
+    submittedSnapshot: item?.product?.checkoutSnapshot || {}, currentPrice: price,
+    currentStockQty: normaliseStockQty(available),
+  });
+  if (review) throw instoreReviewRequired([review]);
+  if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', source: 'instore', isExtendedRange: true } };
 }
 
 async function resolveInstorePrices(items) {
@@ -334,16 +349,37 @@ async function resolveInstorePrices(items) {
     if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
     requestedBySku.set(sku, (requestedBySku.get(sku) || 0) + qty);
   }
-  for (const [sku, requested] of requestedBySku) {
-    const available = availableFromBridge(bridgeBySku.get(sku));
-    if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || requested > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
-  }
-  return items.map((item) => {
+  const reviewChanges = [];
+  const resolved = items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible' });
+    try {
+      return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible' });
+    } catch (error) {
+      if (error?.code !== 'ORDER_REVIEW_REQUIRED') throw error;
+      reviewChanges.push(...error.changes);
+      return null;
+    }
   });
+  for (const [sku, requested] of requestedBySku) {
+    const available = availableFromBridge(bridgeBySku.get(sku));
+    if (available !== null && requested <= available) continue;
+    const changes = reviewChanges.filter(change => textId(change.sku) === sku);
+    if (changes.length) {
+      for (const change of changes) Object.assign(change, { requestedQty: requested, quantityExceedsStock: true });
+    } else {
+      const item = items.find(line => textId(line?.product?.sku || line?.product?.id) === sku);
+      const bridgeRow = bridgeBySku.get(sku);
+      reviewChanges.push(evaluateCheckoutSnapshot({
+        sku, name: cleanText(bridgeRow.DESCR, sku), quantity: requested,
+        submittedSnapshot: item.product.checkoutSnapshot || {},
+        currentPrice: websitePriceFromExVat(Number(bridgeRow.PRICE_A)), currentStockQty: normaliseStockQty(available),
+      }));
+    }
+  }
+  if (reviewChanges.length) throw instoreReviewRequired(reviewChanges);
+  return resolved;
 }
 
 async function resolveStandardPrices(items) {
@@ -379,12 +415,17 @@ async function resolveStandardPrices(items) {
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
-        if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
+        if (row.barcode != null) {
+          const barcode = String(row.barcode).trim();
+          const matches = productByBarcode.get(barcode) || [];
+          matches.push(row);
+          productByBarcode.set(barcode, matches);
+        }
       }
     }
     const resolvedSkus = [...new Set([
       ...productBySku.values(),
-      ...productByBarcode.values(),
+      ...[...productByBarcode.values()].flat(),
     ].map((row) => row.sku).filter(Boolean))];
     incomingBySku = await loadIncomingAvailabilityMap(sb, resolvedSkus);
   } catch (err) {
@@ -395,7 +436,7 @@ async function resolveStandardPrices(items) {
   }
 
   const reviewChanges = [];
-  const requestedBySku = new Map();
+  const requestedByPhysicalStock = new Map();
   const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
@@ -406,20 +447,35 @@ async function resolveStandardPrices(items) {
       error.status = 400;
       throw error;
     }
-    const row = productBySku.get(sku) || (barcode ? productByBarcode.get(barcode) : null);
+    const exact = productBySku.get(sku);
+    const barcodeMatches = barcode ? productByBarcode.get(barcode) || [] : [];
+    if (!exact && barcodeMatches.length > 1) {
+      const error = new Error(`Product on order line ${index + 1} matches multiple variants. Select the current exact product before ordering.`);
+      error.status = 409;
+      error.code = 'ORDER_PRODUCT_AMBIGUOUS';
+      throw error;
+    }
+    const row = exact || barcodeMatches[0];
     const rawPrice = Number(row?.price);
     if (!row || !Number.isFinite(rawPrice) || rawPrice < 0) {
       const error = new Error(`Product on order line ${index + 1} is unavailable.`);
       error.status = 400;
+      error.code = 'ORDER_PRODUCT_UNAVAILABLE';
       throw error;
     }
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
-    const aggregateKey = textId(row.sku);
-    const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
-    aggregate.qty += qty;
-    requestedBySku.set(aggregateKey, aggregate);
+    if (!toOrder) {
+      // website_stock variants inherit one POS pool via their authoritative
+      // barcode (migration 016). Keep variant lines/prices separate while
+      // preventing different SKUs or preferences from splitting that ceiling.
+      const physicalKey = textId(row.barcode) || textId(row.sku);
+      const aggregate = requestedByPhysicalStock.get(physicalKey) || { qty: 0, lines: [] };
+      aggregate.qty += qty;
+      aggregate.lines.push({ row, availability, submittedSnapshot: product.checkoutSnapshot || {} });
+      requestedByPhysicalStock.set(physicalKey, aggregate);
+    }
     const review = evaluateCheckoutSnapshot({
       sku: row.sku,
       name: cleanText(row.title, `Product on line ${index + 1}`),
@@ -467,25 +523,29 @@ async function resolveStandardPrices(items) {
         minQty,
         availabilityState: availability.state,
         availabilityLabel: availability.label,
+        source: 'main',
+        isExtendedRange: false,
+        toOrder,
       },
     };
   });
 
-  // Preferences form separate order lines but share the same physical SKU.
-  // Resolve identifiers first so SKU/barcode aliases cannot split the cap.
-  for (const { qty, row, availability, toOrder, submittedSnapshot } of requestedBySku.values()) {
-    if (toOrder) continue;
-    const stockQty = normaliseStockQty(availability.stockQty);
-    if (stockQty !== null && qty <= stockQty) continue;
-    const aggregateReview = evaluateCheckoutSnapshot({
-      sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
-      submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
-    });
-    const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
-    if (existing.length) {
-      for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
-    } else if (aggregateReview) {
-      reviewChanges.push(aggregateReview);
+  // Every ordinary row must support the combined pool request: a missing or
+  // lower fresh ceiling cannot be hidden by a higher sibling's first row.
+  for (const { qty, lines } of requestedByPhysicalStock.values()) {
+    for (const { row, availability, submittedSnapshot } of lines) {
+      const stockQty = normaliseStockQty(availability.stockQty);
+      if (stockQty !== null && qty <= stockQty) continue;
+      const aggregateReview = evaluateCheckoutSnapshot({
+        sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
+        submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+      });
+      const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
+      if (existing.length) {
+        for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
+      } else if (aggregateReview) {
+        reviewChanges.push(aggregateReview);
+      }
     }
   }
 
@@ -1189,8 +1249,11 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
       const product = item.product || {};
       const qty = Number(item.qty || 0);
       const unitPrice = Number(product.price || 0);
+      const source = basketProductSource(product);
       return {
         productId: product.id,
+        ...(source ? { source, isExtendedRange: source === 'instore',
+          ...(typeof product.toOrder === 'boolean' ? { toOrder: product.toOrder } : {}) } : {}),
         ...itemPreferenceFields(item),
         code: product.code,
         name: product.name,
@@ -1575,6 +1638,9 @@ export function createSendOrderHandler(overrides = {}) {
     return res.status(err?.status || 500).json({
       error: err?.message || 'Order items could not be verified.',
       code: err?.code || null,
+      // Only this authoritative rejection, after the second saved-reference
+      // lookup, proves this response did not capture an order.
+      rejectedBeforeCapture: err?.status === 400 && err?.code === 'ORDER_PRODUCT_UNAVAILABLE' ? true : undefined,
       changes: Array.isArray(err?.changes) ? err.changes : undefined,
     });
   }
