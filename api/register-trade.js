@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from './_escape-html.js';
 import { checkRateLimit, clientIp } from './_rate-limit.js';
 import { sendTradeVerificationEmail } from './_trade-email-verification.js';
-import { passwordPolicyError } from '../src/lib/passwordPolicy.js';
+import { PASSWORD_STRENGTH_GUIDANCE, passwordPolicyError } from '../src/lib/passwordPolicy.js';
 import { registrationFieldErrors } from './_registration-validation.js';
 import { registrationReceipt } from './_registration-receipt.js';
 
@@ -212,6 +212,19 @@ return async function handler(req, res) {
     await wait(Math.max(0, 1400 - (now() - started)));
     return res.status(200).json(registrationReceipt());
   };
+  const creationFailure = (error) => {
+    // Only a definite provider rejection permits a password correction.
+    // Duplicate and uncertain outcomes retain the neutral receipt.
+    if (error?.code === 'weak_password') {
+      return res.status(422).json({
+        error: 'Choose a stronger password before submitting again.',
+        code: 'REGISTRATION_PASSWORD_REJECTED',
+        fieldErrors: { password: PASSWORD_STRENGTH_GUIDANCE },
+      });
+    }
+    console.error('Registration account creation did not complete');
+    return publicReceipt();
+  };
 
   const {
     email,
@@ -334,7 +347,9 @@ return async function handler(req, res) {
   // A legacy email match is eligibility, not identity. The mailbox must be
   // confirmed through the one-time verification callback before access.
   try {
-  const { data, error } = await supabase.auth.admin.createUser({
+  let creation;
+  try {
+  creation = await supabase.auth.admin.createUser({
     email: normalizedEmail,
     password,
     email_confirm: false,
@@ -357,13 +372,11 @@ return async function handler(req, res) {
       website: website || null,
     },
   });
-
-  if (error) {
-    console.error('Registration account creation did not complete');
-    // Never reset, resend to or update an existing account here. Provider
-    // outcomes share the same public receipt as a new application.
-    return publicReceipt();
+  } catch (error) {
+    return creationFailure(error);
   }
+  const { data, error } = creation;
+  if (error) return creationFailure(error);
 
   const userId = data?.user?.id;
   if (!userId) return publicReceipt();
