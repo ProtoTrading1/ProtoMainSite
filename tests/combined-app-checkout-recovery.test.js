@@ -119,6 +119,36 @@ test('uncertain retry sends the captured payload and snapshots even after the ba
   assert.match(h.state.OrderRecoveryNote, /current basket was kept/);
 });
 
+test('first explicit unavailable rejection allows a synced 11-to-8-line amendment with the same reference', async () => {
+  const eleven = Array.from({ length: 11 }, (_, index) => ({ ...line(), product: {
+    ...line().product, id: `SYNTHETIC-${index}`, sku: `SYNTHETIC-${index}`, code: `SYNTHETIC-${index}`,
+  } }));
+  const h = harness(eleven);
+  h.context.requestJson = async (_url, request) => {
+    h.calls.posts.push(JSON.parse(request.body));
+    const error = new Error('Product on order line 4 is unavailable.');
+    error.status = 400; error.code = 'ORDER_PRODUCT_UNAVAILABLE';
+    error.data = { rejectedBeforeCapture: true }; throw error;
+  };
+  assert.equal((await h.run()).ok, false);
+  const first = h.calls.posts[0];
+  assert.equal(first.items.length, 11);
+  const eight = eleven.slice(0, 8);
+  h.context.currentCartRef.current.items = eight;
+  h.context.lastSavedCartRef.current = fingerprint(eight);
+  h.context.cartRevisionRef.current = 8;
+  h.context.getAccountCart = async () => ({ items: eight, revision: 8 });
+  h.context.requestJson = async (_url, request) => {
+    h.calls.posts.push(JSON.parse(request.body));
+    return { success: true, orderId: 'only-amended-order' };
+  };
+  assert.equal((await h.run()).ok, true);
+  assert.equal(h.calls.posts.length, 2);
+  assert.equal(h.calls.posts[1].items.length, 8);
+  assert.equal(h.calls.posts[1].clientRef, first.clientRef);
+  assert.equal(h.calls.newRefs, 1);
+});
+
 test('a queued checkout from an earlier A-B-A epoch cannot dispatch or mutate the current receipt', async () => {
   const h = harness();
   h.context.navigator.locks.request = async (_name, _options, action) => {
@@ -128,6 +158,38 @@ test('a queued checkout from an earlier A-B-A epoch cannot dispatch or mutate th
   assert.equal(h.calls.posts.length, 0);
   assert.equal(h.calls.newRefs, 0);
   assert.equal(h.state.OrderStatus, undefined);
+});
+
+test('generic, unmarked and wrong-status unavailable responses never authorize amendment', async () => {
+  for (const fields of [{ status: 400 }, { status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE' },
+    { status: 500, code: 'ORDER_PRODUCT_UNAVAILABLE', data: { rejectedBeforeCapture: true } }]) {
+    const h = harness();
+    h.context.requestJson = async () => { throw Object.assign(new Error('Unavailable'), fields); };
+    await h.run();
+    assert.notEqual(pendingHelpers.readPendingCheckout(h.context.localStorage, 'buyer').confirmedRejectedBeforeCapture, true);
+    h.context.currentCartRef.current.items = [line(3)];
+    assert.equal((await h.run()).ok, false);
+    assert.equal(h.calls.newRefs, 1);
+  }
+});
+
+test('unavailable rejection after lost reply preserves exact uncertain payload and reference', async () => {
+  const h = harness();
+  h.context.requestJson = async (_url, request) => {
+    h.calls.posts.push(JSON.parse(request.body)); throw new Error('lost reply');
+  };
+  await h.run();
+  h.context.currentCartRef.current.items = [line(3)];
+  h.context.requestJson = async (_url, request) => {
+    h.calls.posts.push(JSON.parse(request.body));
+    throw Object.assign(new Error('Unavailable'), { status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE',
+      data: { rejectedBeforeCapture: true } });
+  };
+  await h.run(options, true);
+  assert.deepEqual(h.calls.posts[1], h.calls.posts[0]);
+  assert.equal(pendingHelpers.readPendingCheckout(h.context.localStorage, 'buyer').confirmedRejectedBeforeCapture, false);
+  assert.equal((await h.run()).ok, false);
+  assert.equal(h.calls.newRefs, 1);
 });
 
 test('first definitive review refreshes the matching basket; review after uncertain dispatch keeps it unchanged', async () => {

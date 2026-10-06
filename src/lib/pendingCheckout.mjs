@@ -149,7 +149,7 @@ export function recordPendingCheckoutDispatch(storage, intent) {
     confirmedRejectedBeforeCapture: false }, current);
 }
 
-/** Call only for the API's explicit ORDER_REVIEW_REQUIRED response. */
+/** Call only for the API's explicit pre-capture review or unavailable-product response. */
 export function recordPendingCheckoutReview(storage, intent, reviewChanges = []) {
   const current = verifyPendingCheckout(storage, intent);
   if (current.status !== 'pending') throw failure('CHECKOUT_ATTEMPT_UNRESOLVED');

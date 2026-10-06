@@ -9,7 +9,7 @@ const body = () => ({ clientRef: randomUUID(), deliveryMethod: 'In store pick up
 const authoritative = (items) => items.map(item => ({ qty: item.qty, preference: item.preference, product: { id: 'SKU-1', sku: 'SKU-1', code: '1001', name: 'Verified notebook', price: 10, unitsOfIssue: 'EACH' } }));
 
 function fixture(options = {}) {
-  const orders = []; const jobs = new Map(); const calls = { prices: 0, team: [], ack: [], pdf: 0, fallback: [], profile: 0, patches: 0 };
+  const orders = []; const jobs = new Map(); const calls = { prices: 0, team: [], ack: [], pdf: 0, fallback: [], profile: 0, patches: 0, lookups: 0 };
   class Query {
     constructor(table) { this.table = table; this.filters = []; }
     select() { return this; }
@@ -28,6 +28,10 @@ function fixture(options = {}) {
           orders.push(row); options.onCaptured?.(row); return { data: structuredClone(row) };
         }
         if (this.patch) calls.patches++;
+        if (!this.patch) {
+          calls.lookups++;
+          if (options.lookupFailureAt === calls.lookups) return { error: { message: 'Synthetic lookup unavailable' } };
+        }
         return { data: structuredClone(orders.find(row => this.filters.every(([key, value]) => row[key] === value)) || null) };
       }
       if (this.table === 'customers') {
@@ -109,6 +113,28 @@ test('handler replays the original saved result before fresh price, stock or pro
   assert.doesNotMatch(f.calls.team[0].htmlContent, /Forged title|99999/);
 });
 
+test('explicit unavailable rejection permits same-reference amended capture and exactly one order/delivery', async () => {
+  const f = fixture({ resolve: () => { throw Object.assign(new Error('Product on order line 4 is unavailable.'),
+    { status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE' }); } });
+  const input = body();
+  input.items = Array.from({ length: 11 }, (_, index) => ({ ...input.items[0], product: {
+    ...input.items[0].product, id: `SYNTHETIC-${index}`, sku: `SYNTHETIC-${index}`,
+  } }));
+  const rejected = await f.invoke(input);
+  assert.equal(rejected.statusCode, 400); assert.equal(rejected.body.rejectedBeforeCapture, true);
+  assert.equal(f.orders.length, 0); assert.equal(f.calls.team.length, 0);
+  f.options.resolve = authoritative;
+  const amended = structuredClone(input); amended.items = amended.items.slice(0, 8);
+  assert.equal((await f.invoke(amended)).statusCode, 200);
+  assert.equal((await f.invoke(amended)).statusCode, 200);
+  assert.equal(f.orders.length, 1); assert.equal(f.orders[0].items.length, 8);
+  assert.equal(f.calls.team.length, 1); assert.equal(f.calls.ack.length, 1);
+  const stale = await f.invoke(input);
+  assert.equal(stale.statusCode, 409); assert.equal(stale.body.code, 'ORDER_REFERENCE_CONFLICT');
+  assert.equal(stale.body.rejectedBeforeCapture, undefined);
+  assert.equal(f.orders.length, 1);
+});
+
 test('same reference with changed quantity, delivery, notes, preference or submitted price conflicts without mail or order mutation', async () => {
   const f = fixture(); const input = body(); await f.invoke(input);
   const original = structuredClone(f.orders);
@@ -119,6 +145,32 @@ test('same reference with changed quantity, delivery, notes, preference or submi
   ];
   for (const mutate of variants) { const changed = structuredClone(input); mutate(changed); const result = await f.invoke(changed); assert.equal(result.statusCode, 409); assert.equal(result.body.code, 'ORDER_REFERENCE_CONFLICT'); }
   assert.deepEqual(f.orders, original); assert.equal(f.calls.team.length, 1); assert.equal(f.calls.ack.length, 1);
+});
+
+test('failed second lookup cannot emit unavailable amendment proof', async () => {
+  const f = fixture({ lookupFailureAt: 2, resolve: () => { throw Object.assign(new Error('Unavailable'),
+    { status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE' }); } });
+  const response = await f.invoke(body());
+  assert.equal(response.statusCode, 503); assert.equal(response.body.rejectedBeforeCapture, undefined);
+  assert.equal(f.calls.lookups, 2); assert.equal(f.orders.length, 0); assert.equal(f.calls.team.length, 0);
+});
+
+for (const changed of [false, true]) test(`unavailable recheck after raced ${changed ? 'different' : 'matching'} capture emits no amendment proof`, async () => {
+  let release; const captured = new Promise(resolve => release = resolve);
+  const f = fixture({ resolve: async (items, count) => {
+    if (count === 1) { await captured; throw Object.assign(new Error('Unavailable'),
+      { status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE' }); }
+    return authoritative(items);
+  }, onCaptured: () => release() });
+  const input = body(); const first = f.invoke(input);
+  while (f.calls.prices < 1) await new Promise(resolve => setTimeout(resolve, 1));
+  const secondInput = structuredClone(input); if (changed) secondInput.items[0].qty++;
+  const second = await f.invoke(secondInput); const late = await first;
+  assert.equal(second.statusCode, 200); assert.equal(late.statusCode, changed ? 409 : 200);
+  if (changed) assert.equal(late.body.code, 'ORDER_REFERENCE_CONFLICT');
+  else assert.equal(late.body.orderId, second.body.orderId);
+  assert.equal(late.body.rejectedBeforeCapture, undefined);
+  assert.equal(f.orders.length, 1); assert.equal(f.calls.team.length, 1); assert.equal(f.calls.ack.length, 1);
 });
 
 test('concurrent handler capture and replay send each channel only once', async () => {
@@ -235,6 +287,9 @@ test('real authoritative resolver rejects changed stock/prices and never accepts
   try {
     const input = body(); const resolved = await resolveAuthoritativePrices(input.items);
     assert.equal(resolved[0].product.price, 10); assert.equal(resolved[0].product.name, 'Server notebook');
+    row.price = -1;
+    await assert.rejects(() => resolveAuthoritativePrices(input.items), error => error.status === 400
+      && error.code === 'ORDER_PRODUCT_UNAVAILABLE');
     row.price = 12; row.available_stock = 0;
     await assert.rejects(() => resolveAuthoritativePrices(input.items), error => error.code === 'ORDER_REVIEW_REQUIRED');
   } finally {

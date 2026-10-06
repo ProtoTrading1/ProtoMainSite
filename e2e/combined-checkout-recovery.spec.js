@@ -170,6 +170,29 @@ test('first explicit review rejection authorizes an amended basket with the orig
   expect(state.posts[1].clientRef).toBe(state.posts[0].clientRef); expect(state.posts[1].items[0].qty).toBe(21); expect(state.captures.size).toBe(1);
 });
 
+test('first unavailable rejection then removing three of eleven saved lines submits eight with the same reference', async ({ page, context }) => {
+  const products = Array.from({ length: 11 }, (_, index) => ({ ...product,
+    id: `SYNTHETIC-${index}`, sku: `SYNTHETIC-${index}`, code: `SYNTHETIC-${index}`, name: `Synthetic item ${index}`,
+  }));
+  const state = await fixture(context, { products, cartItems: products.map(product => ({ product, qty: 20 })) });
+  state.respond = route => route.fulfill({ status: 400, json: { code: 'ORDER_PRODUCT_UNAVAILABLE',
+    rejectedBeforeCapture: true, error: 'Product on order line 4 is unavailable.' } });
+  await mount(page); await prepare(page); await send(page);
+  await expect(failure(page)).toBeVisible();
+  expect(state.posts[0].items).toHaveLength(11); expect(state.captures.size).toBe(0);
+  expect((await readPending(page)).confirmedRejectedBeforeCapture).toBe(true);
+  await failure(page).getByRole('button', { name: 'Close', exact: true }).last().click();
+  for (const index of [8, 9, 10]) {
+    await drawer(page).getByRole('button', { name: `Remove Synthetic item ${index} from cart`, exact: true }).click();
+  }
+  await expect.poll(() => state.cart.items.length).toBe(8);
+  await expect(drawer(page).getByText('Saved to account', { exact: true })).toBeVisible();
+  state.respond = null; await prepare(page); await send(page); await expect(receipt(page)).toBeVisible();
+  expect(state.posts).toHaveLength(2); expect(state.posts[1].items).toHaveLength(8);
+  expect(state.posts[1].clientRef).toBe(state.posts[0].clientRef); expect(state.captures.size).toBe(1);
+  expect(state.safety.blockedRequests).toEqual([]);
+});
+
 test('lost dispatch then missing receipt cannot authorize a changed basket or fresh reference', async ({ page, context }) => {
   const state = await fixture(context);
   state.respond = route => state.posts.length === 1 ? route.abort('connectionreset') : reviewResponse(route);

@@ -2209,7 +2209,9 @@ export default function App({
           } catch (error) {
             assertAuthIdentity(identity);
             if (!ownsAccount()) return { ok: false };
-            if (error.code === 'ORDER_REVIEW_REQUIRED') {
+            if (error.code === 'ORDER_REVIEW_REQUIRED'
+              || (error.code === 'ORDER_PRODUCT_UNAVAILABLE' && error.status === 400
+                && error.data?.rejectedBeforeCapture === true)) {
               const changes = Array.isArray(error.changes) ? error.changes : [];
               pendingCheckoutRef.current = recordPendingCheckoutReview(localStorage, intent, changes);
               setPendingRequestSummary(savedCheckoutSummary(pendingCheckoutRef.current));
