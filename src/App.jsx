@@ -7,7 +7,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import { requestJson, withDeadline } from './lib/requestDeadline.mjs';
-import { clearPendingCheckout, readPendingCheckout, submittedBasketStillCurrent, writePendingCheckout } from './lib/pendingCheckout.mjs';
+import { clearPendingCheckout, readPendingCheckout, recordPendingCheckoutDispatch, recordPendingCheckoutRejection, submittedBasketStillCurrent, verifyPendingCheckout, withPendingCheckoutLock, writePendingCheckout } from './lib/pendingCheckout.mjs';
 import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
@@ -35,7 +35,7 @@ import { fetchSpecials, buildSpecialsMap } from './lib/specials';
 import { fetchBanner, invalidateBannerCache } from './lib/banner';
 import { fetchPopupSpecial, shouldShowPopup, dismissPopup } from './lib/popupSpecial';
 import PopupSpecialModal from './components/PopupSpecialModal';
-import { authHeaders } from './lib/authHeaders';
+import { assertAuthIdentity, authHeaders, captureAuthIdentity } from './lib/authHeaders';
 import { trackEvent } from './lib/trackEvent';
 import { logSearch, logSearchClick, logSearchCartAdd, logSearchOrder } from './lib/searchAnalytics';
 import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
@@ -357,6 +357,8 @@ export default function App({
   const pendingCheckoutRef = useRef(null);
   const pendingCheckoutStorageErrorRef = useRef(null);
   const checkoutSendingRef = useRef(false);
+  const checkoutLockPendingRef = useRef(false);
+  const checkoutAccountEpochRef = useRef(0);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
   const [activeCollection, setActiveCollection] = useState('all');
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
@@ -1350,6 +1352,7 @@ export default function App({
   const [orderRecoveryNote, setOrderRecoveryNote] = useState('');
 
   useEffect(() => {
+    checkoutAccountEpochRef.current += 1;
     pendingCheckoutRef.current = null;
     pendingCheckoutStorageErrorRef.current = null;
     checkoutRefRef.current = null;
@@ -1761,10 +1764,20 @@ export default function App({
     prevCartSnapshotRef.current = next;
   }, [totalItemCount, cartTotal]);
 
-  const sendOrderEmail = async (opts = {}, retryPending = false) => {
+  const sendOrderEmailUnlocked = async (opts = {}, retryPending = false, accountEpoch, authIdentity) => {
     if (checkoutSendingRef.current || !cartHydratedRef.current) return { ok: false };
     const accountId = customer?.id;
     if (!accountId) return { ok: false };
+    const ownsCheckout = () => {
+      try { assertAuthIdentity(authIdentity); } catch { return false; }
+      return authIdentity.userId === accountId && cartAccountRef.current === accountId
+        && checkoutAccountEpochRef.current === accountEpoch;
+    };
+    if (!ownsCheckout()) return { ok: false };
+    // The native lock may have queued this callback behind another tab.
+    if (JSON.stringify(currentCartRef.current.items) !== JSON.stringify(cartItems)) return { ok: false };
+    const basketAtStart = JSON.stringify(currentCartRef.current);
+    const basketRevisionAtStart = cartRevisionRef.current;
     let pending = pendingCheckoutRef.current;
     try {
       // Another tab may have started checkout since this tab hydrated.
@@ -1780,7 +1793,12 @@ export default function App({
       setModalOpen(true);
       return { ok: false };
     }
-    if (pending && !retryPending && !pending.reviewRequired) {
+    // Only a new first-dispatch rejection can release the captured snapshot.
+    // An uncertain or historical request continues to replay its exact payload.
+    const amendRejected = pending?.confirmedRejectedBeforeCapture === true
+      && JSON.stringify(pending.items) !== JSON.stringify(cartItems);
+    const replayPending = Boolean(pending && !amendRejected);
+    if (pending && !retryPending && !amendRejected && !pending.reviewRequired) {
       setOrderStatus('error');
       setOrderError('Your earlier order request still needs confirmation. Use Try again to recover that same request, or check My Orders and contact Proto. A new order will not be sent.');
       setOrderChanges([]);
@@ -1792,12 +1810,12 @@ export default function App({
       setCartAnnouncement('Preview basket only — order requests are disabled here.');
       return { ok: false, preview: true };
     }
-    if (!retryPending && (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
+    if ((!retryPending || amendRejected) && (cartConflictRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current
       || cartSyncStatus !== 'saved' || cartFingerprint(cartItems) !== lastSavedCartRef.current)) {
       setCartAnnouncement('Please confirm account basket sync before submitting this order. Your items are kept.');
       return { ok: false, syncRequired: true };
     }
-    const checkoutOptions = retryPending && pending ? pending.options : opts;
+    const checkoutOptions = pending ? pending.options : opts;
     const courierChoice = checkoutOptions?.courierChoice || null;
     const customerNotes = String(checkoutOptions?.customerNotes || '').trim();
     const deliveryMethod = courierChoice === 'own'
@@ -1822,10 +1840,10 @@ export default function App({
     }
 
     const isRetry = Boolean(pending);
-    const submittedItems = retryPending && pending
+    const submittedItems = replayPending
       ? pending.items
       : cartItems.map((item) => ({ ...item, product: { ...item.product } }));
-    const submittedTotal = retryPending && pending ? pending.total : cartTotal;
+    const submittedTotal = replayPending ? pending.total : cartTotal;
     lastCheckoutOptionsRef.current = checkoutOptions;
     lastCheckoutSubmissionRef.current = {
       items: submittedItems,
@@ -1850,6 +1868,7 @@ export default function App({
     setModalOpen(true);
     checkoutSendingRef.current = true;
 
+    let dispatchedIntent = null;
     try {
       // Idempotency key for this checkout: generated once per cart and reused
       // across retries, so a human "try again" after an error recovers the
@@ -1857,7 +1876,7 @@ export default function App({
       if (!checkoutRefRef.current) checkoutRefRef.current = makeClientRef();
       const clientRef = checkoutRefRef.current;
 
-      const payload = retryPending && pending ? pending.payload : {
+      const payload = replayPending ? pending.payload : {
         clientRef,
         promoCode: checkoutOptions.promo?.code || null,
         deliveryMethod,
@@ -1875,20 +1894,28 @@ export default function App({
         })),
       };
 
-      // Read-back verification is required before POST. Storage denial cannot
-      // leave a committed request whose reference disappears on a reload.
+      // The secure API resolves the signed-in customer and every product price
+      // from server-side data, then saves the order before confirming success.
+      const sendHeaders = await withDeadline(() => authHeaders(), { timeoutMs: 10_000 });
+      if (!ownsCheckout()) throw new Error('The signed-in account changed. Your earlier order request is kept for recovery on its original account.');
+      if (!replayPending && (JSON.stringify(currentCartRef.current) !== basketAtStart
+        || cartRevisionRef.current !== basketRevisionAtStart
+        || !cartHydratedRef.current || cartPreviewModeRef.current || cartConflictRef.current
+        || cartSyncInFlightRef.current || pendingCartSyncRef.current
+        || cartFingerprint(currentCartRef.current.items) !== lastSavedCartRef.current)) {
+        throw new Error('Your basket changed while preparing this order. Your items are kept. Confirm basket sync and submit again.');
+      }
+      // Stage only after authentication and the fresh-basket check. An edit
+      // during the wait must leave the earlier journal and rejection proof intact.
       const intent = writePendingCheckout(localStorage, accountId, {
         version: 1, customerId: accountId, payload,
         items: submittedItems, total: submittedTotal,
         fingerprint: cartFingerprint(submittedItems), options: checkoutOptions,
-        ...(retryPending && pending?.result ? { result: pending.result } : {}),
+        ...(pending ? { raw: pending.raw } : {}),
+        ...(pending?.result ? { result: pending.result } : {}),
       });
       pendingCheckoutRef.current = intent;
-
-      // The secure API resolves the signed-in customer and every product price
-      // from server-side data, then saves the order before confirming success.
-      const sendHeaders = await withDeadline(() => authHeaders(), { timeoutMs: 10_000 });
-      if (cartAccountRef.current !== accountId) throw new Error('The signed-in account changed. Your earlier order request is kept for recovery on its original account.');
+      verifyPendingCheckout(localStorage, intent);
       const body = JSON.stringify(payload);
       const submitOrder = () => requestJson('/api/send-order', {
         method: 'POST',
@@ -1909,7 +1936,15 @@ export default function App({
         }
       };
 
+      if (!intent.result) {
+        dispatchedIntent = recordPendingCheckoutDispatch(localStorage, intent);
+        pendingCheckoutRef.current = dispatchedIntent;
+        // Nothing asynchronous may separate the durable dispatch from POST.
+      }
       const result = intent.result || await submitOrder();
+      if (!ownsCheckout()) return { ok: false };
+      const responseIntent = dispatchedIntent || intent;
+      verifyPendingCheckout(localStorage, responseIntent);
       if (result?.success !== true || !result.orderId) {
         const error = new Error('We could not confirm whether your order was received. Use Try again to recover this same request, or check My Orders.');
         error.code = 'INVALID_RESPONSE';
@@ -1917,7 +1952,7 @@ export default function App({
       }
       // Record acceptance before basket cleanup. A crash during cleanup can
       // finish recovery from this result without making another API request.
-      pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, { ...intent, result });
+      pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, { ...responseIntent, raw: responseIntent.raw, result });
       if (cartAccountRef.current !== accountId) return { ok: true, result };
       setSubmittedOrderNumber(result.orderNumber || '');
       setOrderStatus(result.emailDeliveryFailed ? 'saved' : 'sent');
@@ -1948,7 +1983,19 @@ export default function App({
       pendingCheckoutRef.current = null;
       checkoutRefRef.current = null;
       return { ok: true, result };
-    } catch (err) {
+    } catch (caughtError) {
+      let err = caughtError;
+      // A response belonging to an earlier account visit cannot mutate either
+      // account's journal or UI, even if the customer switched back meanwhile.
+      if (!ownsCheckout()) return { ok: false };
+      if (dispatchedIntent) {
+        try {
+          pendingCheckoutRef.current = recordPendingCheckoutRejection(localStorage, dispatchedIntent, err);
+        } catch (storageError) {
+          pendingCheckoutStorageErrorRef.current = storageError;
+          err = storageError;
+        }
+      }
       setOrderStatus('error');
       setOrderError(err.message || 'Order could not be sent');
       if (err?.code === 'ORDER_REVIEW_REQUIRED') {
@@ -1957,7 +2004,9 @@ export default function App({
         // Refresh only the price/stock snapshots returned by the authoritative
         // checkout check. We never auto-reduce a quantity: the customer must
         // explicitly decide which line to amend before resubmitting.
-        setCartItems((previous) => previous.map((item) => {
+        if (pendingCheckoutRef.current?.confirmedRejectedBeforeCapture === true
+          && JSON.stringify(currentCartRef.current) === basketAtStart) {
+          setCartItems((previous) => previous.map((item) => {
           const change = changes.find((candidate) => {
             const key = String(candidate?.sku || '').toUpperCase();
             return key && [item.product.id, item.product.sku, item.product.code]
@@ -1974,14 +2023,13 @@ export default function App({
                 : {}),
             },
           };
-        }));
-        // A previous uncertain handler may still capture after this review.
-        // Explicitly amended checkout keeps the reference so the server can
-        // conflict with that earlier capture rather than create a second order.
+          }));
+        }
+        // Keep review details without inventing first-response rejection proof.
         if (pendingCheckoutRef.current) {
           try {
             pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, {
-              ...pendingCheckoutRef.current, reviewRequired: true, reviewChanges: changes,
+              ...pendingCheckoutRef.current, raw: pendingCheckoutRef.current.raw, reviewRequired: true, reviewChanges: changes,
             });
           } catch (storageError) {
             pendingCheckoutStorageErrorRef.current = storageError;
@@ -2006,6 +2054,26 @@ export default function App({
       return { ok: false };
     } finally {
       checkoutSendingRef.current = false;
+    }
+  };
+
+  const sendOrderEmail = async (opts = {}, retryPending = false) => {
+    if (checkoutLockPendingRef.current || !customer?.id) return { ok: false };
+    checkoutLockPendingRef.current = true;
+    const accountEpoch = checkoutAccountEpochRef.current;
+    const authIdentity = captureAuthIdentity();
+    try {
+      return await withPendingCheckoutLock(navigator.locks, customer.id,
+        () => sendOrderEmailUnlocked(opts, retryPending, accountEpoch, authIdentity));
+    } catch (error) {
+      try { assertAuthIdentity(authIdentity); } catch { return { ok: false }; }
+      if (checkoutAccountEpochRef.current !== accountEpoch) return { ok: false };
+      setOrderStatus('error');
+      setOrderError(error.message);
+      setModalOpen(true);
+      return { ok: false };
+    } finally {
+      checkoutLockPendingRef.current = false;
     }
   };
 

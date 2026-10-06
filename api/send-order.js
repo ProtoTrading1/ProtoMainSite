@@ -411,6 +411,7 @@ async function resolveStandardPrices(items) {
     if (!row || !Number.isFinite(rawPrice) || rawPrice < 0) {
       const error = new Error(`Product on order line ${index + 1} is unavailable.`);
       error.status = 400;
+      error.code = 'ORDER_PRODUCT_UNAVAILABLE';
       throw error;
     }
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
@@ -1575,6 +1576,11 @@ export function createSendOrderHandler(overrides = {}) {
     return res.status(err?.status || 500).json({
       error: err?.message || 'Order items could not be verified.',
       code: err?.code || null,
+      // Only this handler's explicit unavailable rejection, after the second
+      // same-reference lookup found no captured order, can authorize an edit.
+      ...((err?.status === 400 && err?.code === 'ORDER_PRODUCT_UNAVAILABLE')
+        || (err?.status === 409 && err?.code === 'ORDER_REVIEW_REQUIRED')
+        ? { rejectedBeforeCapture: true } : {}),
       changes: Array.isArray(err?.changes) ? err.changes : undefined,
     });
   }

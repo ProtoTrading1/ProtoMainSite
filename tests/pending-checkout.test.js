@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearPendingCheckout, readPendingCheckout, submittedBasketStillCurrent, writePendingCheckout } from '../src/lib/pendingCheckout.mjs';
+import { clearPendingCheckout, readPendingCheckout, recordPendingCheckoutDispatch, recordPendingCheckoutRejection, submittedBasketStillCurrent, writePendingCheckout } from '../src/lib/pendingCheckout.mjs';
 
 const intent = (customerId = 'buyer') => ({ version: 1, customerId,
   payload: { clientRef: 'original-reference', items: [{ qty: 2, preference: 'Blue', product: { sku: 'ONE', checkoutSnapshot: { unitPrice: 10, stockQty: 5 } } }], deliveryMethod: 'In store pick up', customerNotes: 'Original notes' },
@@ -40,12 +40,20 @@ test('an unresolved reference cannot be replaced or cleared by another checkout'
   assert.equal(readPendingCheckout(device, 'buyer').payload.clientRef, 'original-reference');
 });
 
-test('explicit reviewed amendment preserves reference, and accepted result survives interrupted cleanup', () => {
+test('only proved first rejection authorizes amendment; accepted result survives interrupted cleanup', () => {
   const device = storage(); const pending = writePendingCheckout(device, 'buyer', intent());
   const reviewed = writePendingCheckout(device, 'buyer', { ...pending, reviewRequired: true });
   const amended = structuredClone(reviewed); amended.payload.items[0].qty = 1;
-  writePendingCheckout(device, 'buyer', amended);
-  const accepted = writePendingCheckout(device, 'buyer', { ...amended, result: { success: true, orderId: 'saved-order' } });
+  assert.throws(() => writePendingCheckout(device, 'buyer', amended), { code: 'CHECKOUT_RECOVERY_STORAGE' });
+  const dispatched = recordPendingCheckoutDispatch(device, readPendingCheckout(device, 'buyer'));
+  const rejected = recordPendingCheckoutRejection(device, dispatched, {
+    status: 400, code: 'ORDER_PRODUCT_UNAVAILABLE', data: { rejectedBeforeCapture: true },
+  });
+  const staged = writePendingCheckout(device, 'buyer', { ...amended, raw: rejected.raw });
+  assert.equal(staged.dispatchCount, 0);
+  assert.equal(staged.confirmedRejectedBeforeCapture, false);
+  const sent = recordPendingCheckoutDispatch(device, staged);
+  const accepted = writePendingCheckout(device, 'buyer', { ...sent, raw: sent.raw, result: { success: true, orderId: 'saved-order' } });
   assert.equal(readPendingCheckout(device, 'buyer').result.orderId, 'saved-order');
   assert.equal(accepted.payload.clientRef, pending.payload.clientRef);
   clearPendingCheckout(device, 'buyer', accepted.payload.clientRef);
