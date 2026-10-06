@@ -6,6 +6,7 @@ import {
 import { updateProfile } from '../lib/customers';
 import { createOrderHistoryReadScope, visibleOrderHistoryState } from '../lib/orders';
 import { captureAuthIdentity } from '../lib/authHeaders';
+import { visibleOrderReceiptTarget } from '../lib/orderReceiptTarget.mjs';
 import MyOrdersCentre from '../components/MyOrdersCentre';
 import { MONTHLY_SPEND_BANDS } from '../lib/businessTypes';
 import { SADC_COUNTRIES, SA_PROVINCES } from '../lib/sadcCountries';
@@ -64,11 +65,12 @@ function Field({ label, hint, children, full = false }) {
   );
 }
 
-export default function ProfilePage({ customer, onBack, onProfileUpdate, onReorderOrder }) {
+export default function ProfilePage({ customer, onBack, onProfileUpdate, onReorderOrder, receiptTarget = null }) {
   const [form, setForm] = useState(() => buildProfileForm(customer));
   const [orderHistory, setOrderHistory] = useState(null);
   const historyIdentity = captureAuthIdentity();
   const history = visibleOrderHistoryState(orderHistory, customer?.id, historyIdentity);
+  const visibleReceipt = visibleOrderReceiptTarget(receiptTarget, customer?.id, historyIdentity);
   const [historyRetry, setHistoryRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -127,7 +129,7 @@ export default function ProfilePage({ customer, onBack, onProfileUpdate, onReord
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px', display: 'grid', gap: 20 }}>
 
-        <MyOrdersCentre orders={history.rows} loading={history.state === 'loading'} error={history.error}
+        <MyOrdersCentre key={visibleReceipt?.orderId || visibleReceipt?.kind || 'history'} receiptTarget={visibleReceipt} orders={history.rows} loading={history.state === 'loading'} error={history.error}
           onRetry={() => setHistoryRetry((attempt) => attempt + 1)} onReorderOrder={onReorderOrder} />
 
         {/* Trade Profile card — read-only business details */}

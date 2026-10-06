@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { addBasketLine, mergeBasketLines } from '../lib/basket-lines.mjs';
-import { verifiedReorderProduct } from '../src/lib/cartProductRecovery.mjs';
+import { knownCartProductSource, verifiedReorderProduct } from '../src/lib/cartProductRecovery.mjs';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
 const source = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const body = source.match(/const handleReorder = ([\s\S]*?\r?\n {2}});/)[1];
@@ -21,7 +21,7 @@ function fixture() {
     pendingCheckoutRef: { current: null }, lastCheckoutOptionsRef: { current: null },
     cartConflictRef: { current: false }, cartSyncInFlightRef: { current: false }, currentCartRef,
     canChangeBasket: () => true, fetchProductsBySkus: () => lookup, catalogProducts: [],
-    verifiedReorderProduct, mergeBasketLines, addBasketLine, itemPreferenceFields,
+    knownCartProductSource, verifiedReorderProduct, mergeBasketLines, addBasketLine, itemPreferenceFields,
     cartQtyCapForProduct: item => item.stockQty, MAX_CART_LINES: 250,
     flushSync: action => action(),
     setCartItems: updater => { calls.updates++; if (queued) { live = queued; queued = undefined; }

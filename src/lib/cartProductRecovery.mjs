@@ -35,15 +35,16 @@ export function verifiedReorderProduct(item, product, sourceHint) {
 
 // The map is a fresh main-catalogue lookup. Its matching SKU proves existence,
 // while explicit saved hints establish whether refreshing the line is safe.
-export function recoverCartProducts(items, bySku = new Map()) {
+export function recoverCartProducts(items, bySku = new Map(), instoreBySku = new Map()) {
   return (Array.isArray(items) ? items : []).map(item => {
     const source = knownCartProductSource(item?.product);
-    const live = source === 'main' ? identifiers(item.product).map(key => bySku.get(key)).find(Boolean) : null;
+    const live = source === 'main' ? identifiers(item.product).map(key => bySku.get(key)).find(Boolean)
+      : source === 'instore' ? instoreBySku.get(String(item.product?.sku || item.product?.id || '').trim().toUpperCase()) : null;
     const retained = { ...item };
     delete retained.accountProductNeedsReview;
     if (!source) return { ...retained, accountProductNeedsReview: true };
     if (live) {
-      const verified = verifiedReorderProduct({ product: item.product }, live, 'main');
+      const verified = verifiedReorderProduct({ product: item.product }, live, source);
       if (verified) return { ...retained, product: verified };
     }
     return { ...retained, product: freshCartProduct(item.product) };

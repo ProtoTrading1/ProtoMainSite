@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { verifiedReorderProduct } from '../../src/lib/cartProductRecovery.mjs';
+import { knownCartProductSource, verifiedReorderProduct } from '../../src/lib/cartProductRecovery.mjs';
 import { addBasketLine, mergeBasketLines } from '../../lib/basket-lines.mjs';
 import { itemPreferenceFields } from '../../lib/item-preference.mjs';
 
@@ -27,6 +27,7 @@ function reorderHarness({ cartItems = [], products = new Map() } = {}) {
     pendingCheckoutRef: { current: null }, lastCheckoutOptionsRef: { current: null },
     cartConflictRef: { current: false }, cartSyncInFlightRef: { current: false },
     fetchProductsBySkus: async keys => { changes.lookups.push(Array.from(keys)); return products; },
+    fetchInstoreProductsBySkus: async () => new Map(), knownCartProductSource,
     catalogProducts: [], cartItems, verifiedReorderProduct, mergeBasketLines, addBasketLine, itemPreferenceFields,
     cartQtyCapForProduct: product => product.stockQty ?? 9999,
     MAX_CART_LINES: 250,
@@ -47,7 +48,8 @@ const plain = value => JSON.parse(JSON.stringify(value));
 
 test('reorder resolves products through the API, not the current catalogue page', () => {
   assert.match(appSrc, /const handleReorder = async \(items,/, 'reorder is async so it can look products up');
-  assert.match(appSrc, /fetchProductsBySkus\(items\.map/, 'reorder resolves every requested sku');
+  assert.match(appSrc, /fetchProductsBySkus\(mainItems\.map/, 'reorder resolves Main SKUs through their own catalogue');
+  assert.match(appSrc, /fetchInstoreProductsBySkus\(instoreItems\.map/, 'Instore SKUs use their own verified route');
   assert.doesNotMatch(
     appSrc,
     /const selectedItems = items\s*\n?\s*\.map\(\(item\) => \{\s*\n?\s*const product = catalogProducts\.find/,
@@ -58,7 +60,7 @@ test('reorder resolves products through the API, not the current catalogue page'
 test('actual reorder preserves unresolved and source-review lines without mutating the basket', async () => {
   assert.match(appSrc, /return \{ added, missing, overflow \}/, 'the caller is told what happened');
   assert.match(appSrc, /if \(!missing\.length && !overflow\) setReorderModal\(false\)/, 'the modal stays open when something failed');
-  const unavailable = { productId: 'MISSING', code: 'MISSING', qty: 2, preference: 'Blue' };
+  const unavailable = { productId: 'MISSING', code: 'MISSING', source: 'main', isExtendedRange: false, qty: 2, preference: 'Blue' };
   const historical = { productId: 'COLLISION', code: 'COLLISION', name: 'Historical item', qty: 4, preference: 'Red', unitPrice: 17 };
   const conflicting = { ...historical, preference: 'Green', source: 'main', isExtendedRange: true };
   const wrongSource = { ...historical, preference: 'Yellow', source: 'instore', isExtendedRange: true };
@@ -72,14 +74,14 @@ test('actual reorder preserves unresolved and source-review lines without mutati
   assert.equal(result.added, 0);
   assert.equal(result.overflow, 0);
   assert.equal(result.missing[0], unavailable, 'an unavailable line retains its original record');
-  assert.deepEqual(plain(result.missing.slice(1)), [historical, conflicting, wrongSource]
-    .map(item => ({ ...item, reason: 'source_review_required' })));
+  assert.deepEqual(plain(result.missing.slice(1)), [historical, conflicting]
+    .map(item => ({ ...item, reason: 'source_review_required' })).concat(wrongSource));
   assert.equal(changes.basket.length, 0, 'a matching main SKU cannot bless historical source or replace the basket');
   assert.equal(changes.activity, 0);
   assert.deepEqual(changes.modal, [], 'review remains open and actionable');
   assert.equal(JSON.stringify(currentBasket), before);
   assert.equal(JSON.stringify(originalItems), originals);
-  assert.deepEqual(changes.lookups[0], ['MISSING', 'COLLISION', 'COLLISION', 'COLLISION']);
+  assert.deepEqual(changes.lookups[0], ['MISSING']);
 });
 
 test('actual reorder preserves verified preference lines and reports the aggregate stock remainder', async () => {

@@ -28,5 +28,8 @@ test('App isolates catalogue and Instore results from route changes before effec
   assert.match(app, /instoreSearch\.query\.trim\(\) === routeSearchQuery\.trim\(\)/);
   assert.match(app, /loading=\{catalogueResultsPending\}/);
   assert.match(app, /instoreSearch=\{visibleInstoreSearch\}/);
-  assert.match(app, /\|\| catalogProducts\.find\(\(p\) => p\.id === item\.productId \|\| p\.code === item\.code\)/);
+  const reorder = app.match(/const handleReorder = ([\s\S]*?\r?\n {2}});/)[1];
+  assert.doesNotMatch(reorder, /catalogProducts\.find/, 'a cached page cannot substitute another catalogue source');
+  assert.match(reorder, /fetchProductsBySkus\(mainItems\.map/);
+  assert.match(reorder, /fetchInstoreProductsBySkus\(instoreItems\.map/);
 });

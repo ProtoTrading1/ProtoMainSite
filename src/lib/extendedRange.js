@@ -138,11 +138,11 @@ export function storedExtendedRange(query = '', options = {}) {
   return readStored(key);
 }
 
-export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false } = {}) {
+export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, fresh = false } = {}) {
   const generation = cacheGeneration;
   const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue });
   const cached = responseCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (!fresh && cached && cached.expiresAt > Date.now()) return cached.data;
   // The preview may be reading a few thousand staged products. Give its
   // protected, server-side eligibility checks enough time to finish instead
   // of turning a slow-but-valid response into a false loading failure.
@@ -159,6 +159,24 @@ export async function fetchExtendedRange(query = '', { signal, page = 1, categor
     }
   }
   return data;
+}
+
+// Saved/reorder Instore lines must use their own verified catalogue projection.
+// A Main SKU or barcode match cannot establish the origin of an Instore line.
+export async function fetchInstoreProductsBySkus(skus, { signal } = {}) {
+  const wanted = new Set(skus.map(value => String(value ?? '').trim().toUpperCase()).filter(Boolean));
+  if (!wanted.size) return new Map();
+  const data = await fetchExtendedRange('', { signal, includeCatalogue: true, fresh: true });
+  if (!Array.isArray(data?.catalogue)) throw new Error('Instore product details could not be confirmed. Please retry.');
+  const matches = new Map();
+  const ambiguous = new Set();
+  for (const product of data.catalogue) {
+    const sku = String(product?.sku || product?.id || '').trim().toUpperCase();
+    if (!wanted.has(sku) || ambiguous.has(sku)) continue;
+    if (matches.has(sku)) { matches.delete(sku); ambiguous.add(sku); }
+    else matches.set(sku, product);
+  }
+  return matches;
 }
 
 /**

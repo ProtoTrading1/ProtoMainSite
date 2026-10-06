@@ -7,6 +7,7 @@ import * as icons from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { transformWithOxc } from 'vite';
 import { createClient } from '@supabase/supabase-js';
+import * as receiptTargets from '../src/lib/orderReceiptTarget.mjs';
 let sequence = 0;
 const session = (id) => ({ user: { id }, access_token: `synthetic-${id}` });
 async function fixture(injectedSdk = null) {
@@ -119,10 +120,12 @@ test('late A read error cannot set B error or false empty state', async () => {
 test('actual MyOrders component renders distinct loading, read error/retry and confirmed empty states', async () => {
   const presentationSource = await readFile(new URL('../src/lib/orderPresentation.js', import.meta.url), 'utf8');
   globalThis.__historyPresentation = await import(`data:text/javascript;base64,${Buffer.from(presentationSource).toString('base64')}`);
+  globalThis.__historyReceiptTargets = receiptTargets;
   globalThis.__historyReact = React; globalThis.__historyRuntime = jsxRuntime; globalThis.__historyIcons = icons;
   const source = (await readFile(new URL('../src/components/MyOrdersCentre.jsx', import.meta.url), 'utf8'))
     .replace("import { ChevronDown, ChevronUp, Package, RotateCcw, Truck } from 'lucide-react';", 'const { ChevronDown, ChevronUp, Package, RotateCcw, Truck } = globalThis.__historyIcons;')
     .replace("import { useState } from 'react';", 'const { useState } = globalThis.__historyReact;')
+    .replace("import { exactReceiptOrder } from '../lib/orderReceiptTarget.mjs';", 'const { exactReceiptOrder } = globalThis.__historyReceiptTargets;')
     .replace("import { customerOrderStatus, customerOrderTimeline, orderVatSummary } from '../lib/orderPresentation';", 'const { customerOrderStatus, customerOrderTimeline, orderVatSummary } = globalThis.__historyPresentation;');
   const compiled = (await transformWithOxc(source, 'MyOrdersCentre.jsx', { jsx: { runtime: 'automatic' } })).code
     .replace(/import\s*{([^}]+)}\s*from\s*["']react\/jsx-runtime["'];/g, (_match, entries) => `const { ${entries.replace(/ as /g, ': ')} } = globalThis.__historyRuntime;`);
@@ -134,6 +137,14 @@ test('actual MyOrders component renders distinct loading, read error/retry and c
   const empty = renderToStaticMarkup(React.createElement(MyOrders, { orders: [] })); assert.match(empty, /No orders placed yet/);
   const populated = renderToStaticMarkup(React.createElement(MyOrders, { orders: [row()], onReorderOrder: () => {} }));
   assert.match(populated, /TEST001/); assert.match(populated, /R18.00/); assert.doesNotMatch(populated, /private-provider-recipient/);
+  const identity = { userId: 'A' };
+  const target = receiptTargets.createOrderReceiptTarget({ kind: 'received', customerId: 'A', orderId: 'ORDER1', orderNumber: 'TEST001' }, 'A', identity);
+  const selected = renderToStaticMarkup(React.createElement(MyOrders, { orders: [row()], receiptTarget: target }));
+  assert.match(selected, /aria-label="Confirmed order TEST001"/); assert.match(selected, /aria-expanded="true"/); assert.match(selected, /Synthetic item/);
+  const missing = renderToStaticMarkup(React.createElement(MyOrders, { orders: [row()], receiptTarget: { ...target, orderId: 'OUTSIDE-HISTORY' } }));
+  assert.match(missing, /is not available in these recent orders/); assert.doesNotMatch(missing, /aria-expanded="true"/);
+  const unresolved = renderToStaticMarkup(React.createElement(MyOrders, { orders: [row()], receiptTarget: { kind: 'unconfirmed', customerId: 'A', identity } }));
+  assert.match(unresolved, /Previous orders below do not confirm that it was received/); assert.doesNotMatch(unresolved, /aria-expanded="true"/);
 });
 
 test('explicit history retry performs a new read-only scope and recovers verified empty history', async () => {
@@ -174,4 +185,22 @@ for (const status of [401, 503]) test(`installed SDK ${status} error/retry is bo
   const f = await fixture(sdk); const reader = f.orders.createCustomerOrderReader({ client: sdk, timeoutMs: 30 });
   await assert.rejects(reader.fetchOrderHistory('A')); assert.equal(signal.aborted, true);
   assert.equal(calls, 1); // 503 retry backoff is aborted; 401 is not retried.
+});
+
+
+test('receipt target binds exact account epoch, ID and number without newest-order fallback', () => {
+  const identity = { userId: 'A' };
+  const request = { kind: 'received', customerId: 'A', orderId: 'ORDER1', orderNumber: 'TEST001', identity };
+  assert.equal(receiptTargets.createOrderReceiptTarget({ kind: 'unconfirmed' }, undefined, undefined), null);
+  assert.equal(receiptTargets.createOrderReceiptTarget({ ...request, customerId: undefined }, undefined, undefined), null);
+  const target = receiptTargets.createOrderReceiptTarget(request, 'A', identity);
+  assert.equal(receiptTargets.visibleOrderReceiptTarget(target, 'A', identity).orderId, 'ORDER1');
+  assert.equal(receiptTargets.visibleOrderReceiptTarget(target, 'B', { userId: 'B' }), null);
+  assert.equal(receiptTargets.visibleOrderReceiptTarget(target, 'A', { userId: 'A' }), null);
+  for (const patch of [{ customerId: 'B' }, { orderId: '' }, { orderNumber: null }, { identity: { userId: 'A' } }])
+    assert.equal(receiptTargets.createOrderReceiptTarget({ ...request, ...patch }, 'A', identity), null);
+  assert.equal(receiptTargets.exactReceiptOrder([{ ...row(), order_number: 'WRONG' }], target), null);
+  assert.equal(receiptTargets.exactReceiptOrder([{ ...row(), customer_id: 'B' }], target), null);
+  assert.equal(receiptTargets.exactReceiptOrder([row(), row()], target), null);
+  assert.equal(receiptTargets.exactReceiptOrder([row()], { ...target, orderId: 'OUTSIDE-HISTORY' }), null);
 });

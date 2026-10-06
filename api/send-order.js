@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
+import { basketProductSource } from '../lib/basket-lines.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
@@ -301,7 +302,7 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   });
   if (review) throw instoreReviewRequired([review]);
   if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', source: 'instore', isExtendedRange: true } };
 }
 
 async function resolveInstorePrices(items) {
@@ -414,12 +415,17 @@ async function resolveStandardPrices(items) {
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
-        if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
+        if (row.barcode != null) {
+          const barcode = String(row.barcode).trim();
+          const matches = productByBarcode.get(barcode) || [];
+          matches.push(row);
+          productByBarcode.set(barcode, matches);
+        }
       }
     }
     const resolvedSkus = [...new Set([
       ...productBySku.values(),
-      ...productByBarcode.values(),
+      ...[...productByBarcode.values()].flat(),
     ].map((row) => row.sku).filter(Boolean))];
     incomingBySku = await loadIncomingAvailabilityMap(sb, resolvedSkus);
   } catch (err) {
@@ -430,7 +436,7 @@ async function resolveStandardPrices(items) {
   }
 
   const reviewChanges = [];
-  const requestedBySku = new Map();
+  const requestedByPhysicalStock = new Map();
   const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
@@ -441,7 +447,15 @@ async function resolveStandardPrices(items) {
       error.status = 400;
       throw error;
     }
-    const row = productBySku.get(sku) || (barcode ? productByBarcode.get(barcode) : null);
+    const exact = productBySku.get(sku);
+    const barcodeMatches = barcode ? productByBarcode.get(barcode) || [] : [];
+    if (!exact && barcodeMatches.length > 1) {
+      const error = new Error(`Product on order line ${index + 1} matches multiple variants. Select the current exact product before ordering.`);
+      error.status = 409;
+      error.code = 'ORDER_PRODUCT_AMBIGUOUS';
+      throw error;
+    }
+    const row = exact || barcodeMatches[0];
     const rawPrice = Number(row?.price);
     if (!row || !Number.isFinite(rawPrice) || rawPrice < 0) {
       const error = new Error(`Product on order line ${index + 1} is unavailable.`);
@@ -451,10 +465,16 @@ async function resolveStandardPrices(items) {
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
-    const aggregateKey = textId(row.sku);
-    const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
-    aggregate.qty += qty;
-    requestedBySku.set(aggregateKey, aggregate);
+    if (!toOrder) {
+      // website_stock variants inherit one POS pool via their authoritative
+      // barcode (migration 016). Keep variant lines/prices separate while
+      // preventing different SKUs or preferences from splitting that ceiling.
+      const physicalKey = textId(row.barcode) || textId(row.sku);
+      const aggregate = requestedByPhysicalStock.get(physicalKey) || { qty: 0, lines: [] };
+      aggregate.qty += qty;
+      aggregate.lines.push({ row, availability, submittedSnapshot: product.checkoutSnapshot || {} });
+      requestedByPhysicalStock.set(physicalKey, aggregate);
+    }
     const review = evaluateCheckoutSnapshot({
       sku: row.sku,
       name: cleanText(row.title, `Product on line ${index + 1}`),
@@ -502,25 +522,29 @@ async function resolveStandardPrices(items) {
         minQty,
         availabilityState: availability.state,
         availabilityLabel: availability.label,
+        source: 'main',
+        isExtendedRange: false,
+        toOrder,
       },
     };
   });
 
-  // Preferences form separate order lines but share the same physical SKU.
-  // Resolve identifiers first so SKU/barcode aliases cannot split the cap.
-  for (const { qty, row, availability, toOrder, submittedSnapshot } of requestedBySku.values()) {
-    if (toOrder) continue;
-    const stockQty = normaliseStockQty(availability.stockQty);
-    if (stockQty !== null && qty <= stockQty) continue;
-    const aggregateReview = evaluateCheckoutSnapshot({
-      sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
-      submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
-    });
-    const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
-    if (existing.length) {
-      for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
-    } else if (aggregateReview) {
-      reviewChanges.push(aggregateReview);
+  // Every ordinary row must support the combined pool request: a missing or
+  // lower fresh ceiling cannot be hidden by a higher sibling's first row.
+  for (const { qty, lines } of requestedByPhysicalStock.values()) {
+    for (const { row, availability, submittedSnapshot } of lines) {
+      const stockQty = normaliseStockQty(availability.stockQty);
+      if (stockQty !== null && qty <= stockQty) continue;
+      const aggregateReview = evaluateCheckoutSnapshot({
+        sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
+        submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+      });
+      const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
+      if (existing.length) {
+        for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
+      } else if (aggregateReview) {
+        reviewChanges.push(aggregateReview);
+      }
     }
   }
 
@@ -1224,8 +1248,11 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
       const product = item.product || {};
       const qty = Number(item.qty || 0);
       const unitPrice = Number(product.price || 0);
+      const source = basketProductSource(product);
       return {
         productId: product.id,
+        ...(source ? { source, isExtendedRange: source === 'instore',
+          ...(typeof product.toOrder === 'boolean' ? { toOrder: product.toOrder } : {}) } : {}),
         ...itemPreferenceFields(item),
         code: product.code,
         name: product.name,

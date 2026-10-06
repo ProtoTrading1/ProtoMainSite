@@ -55,6 +55,10 @@ export default async function handler(req, res) {
   if (!sku || !SKU_RE.test(sku)) {
     return res.status(400).json({ error: 'Invalid or missing sku' });
   }
+  const source = req.query.source;
+  if (source !== undefined && !['main', 'instore', 'instore-preview'].includes(source)) {
+    return res.status(400).json({ error: 'Invalid product source' });
+  }
 
   try {
     const user = await requireAuth(req, res);
@@ -62,7 +66,7 @@ export default async function handler(req, res) {
 
     // A preview product always uses the isolated snapshot. It is deliberately
     // unable to fall back to website_stock or the SQL bridge.
-    if (req.query.source === 'instore-preview') {
+    if (source === 'instore-preview') {
       if (!isIsolatedPreviewRequest(req)) return res.status(404).json({ error: 'Preview stock is not available here' });
       const access = await getApprovedCustomer(user, res);
       if (!access) return;
@@ -84,6 +88,15 @@ export default async function handler(req, res) {
     }
 
     const includeStaged = false;
+    // An explicit catalogue origin must not be redirected by a coinciding
+    // Main SKU/barcode. Instore's fresh bridge is its stock authority.
+    if (source === 'instore') {
+      const access = await getApprovedCustomer(user, res);
+      if (!access) return;
+      const instore = await readFreshInstoreStock(sku, { includeStaged });
+      if (!instore) return res.status(404).json({ error: 'SKU not found' });
+      return res.status(200).json({ sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
+    }
     const supabase = createClient(
       process.env.VITE_STOCK_SUPABASE_URL,
       process.env.VITE_STOCK_SUPABASE_KEY,
@@ -93,13 +106,15 @@ export default async function handler(req, res) {
     // Authentication must complete first, but the independent approval and
     // stock reads can run together. This removes one full database round trip
     // from every live stock check without caching or weakening either rule.
+    const stockQuery = supabase.from('website_stock')
+      .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order');
+    // Explicit Main callers supply the storefront variant SKU. Its policy
+    // must not be borrowed from a sibling sharing the canonical barcode.
+    const matchingStock = source === 'main' ? stockQuery.eq('sku', sku)
+      : stockQuery.or(`barcode.eq.${sku},sku.eq.${sku}`);
     const [access, stockResult] = await Promise.all([
       getApprovedCustomer(user, res),
-      supabase
-        .from('website_stock')
-        .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order')
-        .or(`barcode.eq.${sku},sku.eq.${sku}`)
-        .limit(1),
+      matchingStock.limit(1),
     ]);
     if (!access) return;
 
@@ -107,6 +122,7 @@ export default async function handler(req, res) {
 
     if (error) throw error;
     if (!data || data.length === 0) {
+      if (source === 'main') return res.status(404).json({ error: 'SKU not found' });
       const instore = await readFreshInstoreStock(sku, { includeStaged });
       if (!instore) return res.status(404).json({ error: 'SKU not found' });
       return res.status(200).json({ sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });

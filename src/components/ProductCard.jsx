@@ -167,7 +167,8 @@ function orderQuantityLabel(product) {
 }
 
 function StockBadge({ product }) {
-  const sku = product?.code || product?.barcode || product?.sku || product?.id;
+  const sku = product?.isExtendedRange === true ? product?.sku || product?.id || product?.code
+    : product?.sku || product?.id || product?.code || product?.barcode;
   if (!product) return null;
   const availability = catalogStockState(product);
   const badgeClass = STOCK_BADGE_CLASS[availability.state] || 'out';
@@ -180,7 +181,7 @@ function StockBadge({ product }) {
       </div>
       {!product.isVariantGroup && sku ? <StockCheck
         sku={sku}
-        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+        source={product.imageSource === 'isolated-preview' ? 'instore-preview' : product.isExtendedRange === true ? 'instore' : 'main'}
         isInstore={Boolean(product.isExtendedRange)}
       /> : null}
     </div>
@@ -200,7 +201,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
     requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
     try {
-      const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
+      const sourceQuery = ['main', 'instore', 'instore-preview'].includes(source) ? `&source=${source}` : '';
       const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
@@ -927,8 +928,10 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 {(!isVariantGroup || selectedVariant) && (
                   <div className="pz-stock-check">
                     <StockCheck
-                      sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
+                      sku={activeProduct.isExtendedRange === true ? activeProduct.sku || activeProduct.id || activeProduct.code
+                        : activeProduct.sku || activeProduct.id || activeProduct.code || activeProduct.barcode}
                       autoCheck
+                      source={activeProduct.imageSource === 'isolated-preview' ? 'instore-preview' : activeProduct.isExtendedRange === true ? 'instore' : 'main'}
                       isInstore={Boolean(activeProduct.isExtendedRange)}
                     />
                   </div>
