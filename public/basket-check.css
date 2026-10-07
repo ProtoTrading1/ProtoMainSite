@@ -1,0 +1,36 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #202322;
+  background: #f5f4ef;
+  line-height: 1.6;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(100% - 2.5rem, 42rem); margin: 0 auto; padding: 2.5rem 0 2rem; }
+header { margin-bottom: 1.75rem; }
+.brand { font-weight: 850; font-size: 1.45rem; letter-spacing: .08em; margin: 0 0 2rem; }
+.brand span { font-size: .75rem; font-weight: 650; letter-spacing: .13em; }
+.eyebrow { margin: 0 0 .35rem; font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #555d57; }
+h1 { font-size: clamp(1.9rem, 6vw, 2.6rem); line-height: 1.16; letter-spacing: -.025em; margin: 0 0 1rem; }
+.intro { font-size: 1.1rem; margin: 0; color: #465048; }
+.card { border: 1px solid #d7dcd5; background: #fff; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; }
+h2 { font-size: 1.1rem; line-height: 1.35; margin: 0 0 .7rem; }
+p { margin: 0 0 1rem; }
+button { min-height: 48px; border: 1px solid #253e30; border-radius: .55rem; padding: .7rem 1.1rem; background: #253e30; color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+button:hover:not(:disabled) { background: #355440; }
+button:disabled { background: #e7ebe6; border-color: #d2d9d0; color: #576153; cursor: default; }
+button:focus-visible, input:focus-visible, pre:focus-visible { outline: 3px solid #be6b00; outline-offset: 4px; }
+#status, #copy-status { margin: 1rem 0 0; color: #465048; overflow-wrap: anywhere; }
+#copy-status:empty { display: none; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: .85rem; line-height: 1.6; background: #f4f6f2; border: 1px solid #d7dcd5; border-radius: .55rem; padding: 1rem; max-height: 24rem; overflow: auto; margin: 0 0 1.25rem; }
+.consent { display: flex; align-items: flex-start; gap: .7rem; margin: 0 0 1.25rem; cursor: pointer; }
+input[type="checkbox"] { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; margin: .2rem 0 0; accent-color: #253e30; }
+footer { font-size: .85rem; color: #555d57; padding: .35rem .2rem; }
+[hidden] { display: none !important; }
+@media (max-width: 420px) {
+  main { width: calc(100% - 2rem); padding-top: 1.5rem; }
+  .brand { margin-bottom: 1.5rem; }
+  .card { padding: 1.15rem; }
+  button { width: 100%; }
+}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <title>Basket reference check · Proto Trading</title>
+    <link rel="stylesheet" href="/basket-check.css">
+    <script type="module" src="/basket-check.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="brand">PROTO <span>TRADING</span></p>
+        <p class="eyebrow">Basket support</p>
+        <h1>Check your checkout reference</h1>
+        <p class="intro">If checkout stopped responding, this check can look for the reference saved in this browser.</p>
+      </header>
+      <section aria-labelledby="check-heading" class="card">
+        <h2 id="check-heading">Your basket stays as it is</h2>
+        <p>This page only reads the checkout reference information it needs. It does not change your basket or submit an order. It verifies your existing sign-in; the reference report stays on this page until you choose to copy and share it.</p>
+        <p>Use the same browser and website where checkout stopped. If the saved reference or session is missing or expired, stop here. A saved reference is a local browser record, not proof that an order was accepted. A missing reference does not tell us whether an order was accepted.</p>
+        <button id="check-button" type="button">Check saved reference</button>
+        <p id="status" role="status" aria-live="polite" aria-atomic="true">Ready when you are. Nothing has been checked yet.</p>
+      </section>
+      <section aria-labelledby="report-heading" class="card report-card">
+        <h2 id="report-heading">Review before sharing</h2>
+        <p>Any reference report appears below for you to review. Copying puts it on your clipboard; you choose whether and where to share it.</p>
+        <pre id="report" hidden tabindex="0" aria-label="Reference report preview"></pre>
+        <label class="consent" for="consent">
+          <input id="consent" type="checkbox" disabled>
+          <span>I want to copy this reference report to share with Proto</span>
+        </label>
+        <button id="copy-button" type="button" disabled>Copy report</button>
+        <p id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+      </section>
+      <footer>No password, cookies or complete browser-storage export belongs in this report.</footer>
+    </main>
+  </body>
+</html>
