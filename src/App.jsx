@@ -1363,6 +1363,13 @@ export default function App({
       checkoutRefRef.current = pending.payload.clientRef;
       lastCheckoutOptionsRef.current = pending.options;
       lastCheckoutSubmissionRef.current = pending;
+      if (!pending.result && !pending.reviewRequired) {
+        // A request the server never confirmed must not lock the basket. The
+        // next checkout reuses its reference, so the server returns the earlier
+        // order if it was captured and refuses a duplicate otherwise.
+        setCartAnnouncement('An earlier order request was not confirmed. Sending your basket again will not create a duplicate order.');
+        return;
+      }
       setOrderStatus('error');
       setOrderError(pending.result
         ? 'Your earlier order was received. Use Try again to finish recovery without sending another order. Your current basket will be kept if it changed.'
@@ -1780,9 +1787,11 @@ export default function App({
       setModalOpen(true);
       return { ok: false };
     }
-    if (pending && !retryPending && !pending.reviewRequired) {
+    // Only an order the server already received (cleanup unfinished) blocks a
+    // fresh checkout. An unconfirmed request simply lends its reference below.
+    if (pending && !retryPending && pending.result) {
       setOrderStatus('error');
-      setOrderError('Your earlier order request still needs confirmation. Use Try again to recover that same request, or check My Orders and contact Proto. A new order will not be sent.');
+      setOrderError('Your earlier order was received. Use Try again to finish recovery without sending another order. Your current basket will be kept if it changed.');
       setOrderChanges([]);
       setModalOpen(true);
       return { ok: false, pending: true };
@@ -1994,6 +2003,20 @@ export default function App({
       }
       if (err?.code === 'ORDER_REFERENCE_CONFLICT') {
         setOrderError(`${err.message} Check My Orders or contact Proto to resolve this request before placing another order.`);
+      }
+      // A definitive rejection (4xx) is returned before any order is captured,
+      // so nothing is left to recover: release the reference so the customer
+      // can fix the basket and send again. Uncertain outcomes (network, 5xx,
+      // 401) and server-directed review/conflict states keep it.
+      const definitiveRejection = Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 && err.status !== 401
+        && !['ORDER_REVIEW_REQUIRED', 'ORDER_REFERENCE_CONFLICT', 'PROMO_REDEMPTION_IN_PROGRESS', 'CHECKOUT_RECOVERY_STORAGE'].includes(err?.code);
+      if (definitiveRejection && pendingCheckoutRef.current && !pendingCheckoutRef.current.result) {
+        try {
+          clearPendingCheckout(localStorage, accountId, pendingCheckoutRef.current.payload.clientRef);
+          pendingCheckoutRef.current = null;
+          checkoutRefRef.current = null;
+          lastCheckoutSubmissionRef.current = null;
+        } catch { /* keep the recovery record when storage cannot be cleared */ }
       }
       trackJourneyEvent('order_submit_failed', {
         journey: 'checkout',
