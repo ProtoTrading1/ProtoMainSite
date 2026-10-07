@@ -500,13 +500,63 @@ async function resolveStandardPrices(items) {
   return authItems;
 }
 
-export async function resolveAuthoritativePrices(items) {
+// The browser's isExtendedRange flag is a hint, not the source of truth: older
+// account baskets lost it on save/restore. A line that is not in the main
+// catalogue (by SKU or barcode) but is in the Instore index is an Instore line.
+// Lookup failures fall back to the browser flag so checkout is never blocked
+// by this reclassification step alone.
+export async function detectUnflaggedInstoreSkus(items, client = null) {
+  const unflagged = items.filter((item) => item?.product?.isExtendedRange !== true);
+  const skus = [...new Set(unflagged.map((item) => textId(item?.product?.sku || item?.product?.id)).filter(Boolean))];
+  if (!skus.length) return new Set();
+  const barcodes = [...new Set(unflagged.map((item) => String(item?.product?.code || item?.product?.barcode || '').trim()).filter(Boolean))];
+  try {
+    client = client || getStockClient();
+    const [bySku, byBarcode, instore] = await Promise.all([
+      client.from('website_stock').select('sku, barcode').in('sku', skus),
+      barcodes.length ? client.from('website_stock').select('sku, barcode').in('barcode', barcodes) : Promise.resolve({ data: [] }),
+      client.from('extended_range_items').select('sku').in('sku', skus),
+    ]);
+    if (bySku.error || byBarcode.error || instore.error) throw bySku.error || byBarcode.error || instore.error;
+    const mainSkus = new Set((bySku.data || []).map((row) => textId(row.sku)));
+    const mainBarcodes = new Set((byBarcode.data || []).map((row) => String(row.barcode ?? '').trim()));
+    const instoreSkus = new Set((instore.data || []).map((row) => textId(row.sku)));
+    const detected = new Set();
+    for (const item of unflagged) {
+      const sku = textId(item?.product?.sku || item?.product?.id);
+      const barcode = String(item?.product?.code || item?.product?.barcode || '').trim();
+      if (instoreSkus.has(sku) && !mainSkus.has(sku) && !(barcode && mainBarcodes.has(barcode))) detected.add(sku);
+    }
+    return detected;
+  } catch (error) {
+    console.error('send-order: Instore line classification failed:', error?.message || error);
+    return new Set();
+  }
+}
+
+export async function resolveAuthoritativePrices(items, { classify = detectUnflaggedInstoreSkus } = {}) {
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
-  const instoreItems = items.filter((item) => item?.product?.isExtendedRange === true);
-  const standardItems = items.filter((item) => item?.product?.isExtendedRange !== true);
-  const [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems)]);
+  const detectedInstore = await classify(items);
+  const isInstore = (item) => item?.product?.isExtendedRange === true
+    || detectedInstore.has(textId(item?.product?.sku || item?.product?.id));
+  const instoreItems = items.filter(isInstore);
+  const standardItems = items.filter((item) => !isInstore(item));
+  let resolvedInstore; let resolvedStandard;
+  try {
+    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems)]);
+  } catch (error) {
+    // Line numbers inside each resolver count only that group; report the
+    // basket's own line number to the customer.
+    const match = /^(Product on order line|Invalid quantity on order line) (\d+)/.exec(error?.message || '');
+    if (match) {
+      const groupIndex = Number(match[2]) - 1;
+      const basketIndex = items.indexOf(standardItems[groupIndex]);
+      if (basketIndex >= 0) error.message = error.message.replace(`line ${match[2]}`, `line ${basketIndex + 1}`);
+    }
+    throw error;
+  }
   let instoreIndex = 0; let standardIndex = 0;
-  return items.map((item) => item?.product?.isExtendedRange === true ? resolvedInstore[instoreIndex++] : resolvedStandard[standardIndex++]);
+  return items.map((item) => isInstore(item) ? resolvedInstore[instoreIndex++] : resolvedStandard[standardIndex++]);
 }
 
 function estimatedTotal(subtotal, discountAmount) {
