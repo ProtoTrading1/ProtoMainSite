@@ -93,6 +93,9 @@ function sanitizeProduct(product, identifiers) {
     inStock: product.inStock !== false,
     toOrder: product.toOrder === true,
     to_order: product.to_order === true,
+    // Checkout routes Instore lines by this flag. Dropping it made a restored
+    // account basket send Instore SKUs through the main-catalogue check.
+    isExtendedRange: product.isExtendedRange === true,
   };
 }
 
