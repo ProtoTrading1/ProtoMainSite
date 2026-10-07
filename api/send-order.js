@@ -271,6 +271,13 @@ function availableFromBridge(row) {
   return Number.isFinite(onHand) && Number.isFinite(booked) && booked >= 0 ? Math.floor(onHand - booked) : null;
 }
 
+function instoreStockMessage(title, sku, requested, available) {
+  if (available < MIN_INSTORE_AVAILABLE_STOCK) {
+    return `${title} (${sku}) is no longer available from Instore Products: only ${available} left in store and Instore items need at least ${MIN_INSTORE_AVAILABLE_STOCK} in stock. Remove it from your basket to send the rest of your order.`;
+  }
+  return `${title} (${sku}): only ${available} available in store but ${requested} requested. Reduce the quantity to send your order.`;
+}
+
 // Pure server boundary used by the checkout tests. Browser titles, prices and
 // quantities are not trusted: the reviewed index and fresh bridge response win.
 export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible' } = {}) {
@@ -286,7 +293,10 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   const available = availableFromBridge(bridgeRow);
   const price = websitePriceFromExVat(Number(bridgeRow?.PRICE_A));
   if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-  if (!Number.isFinite(price) || price <= 0 || available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  const title = cleanText(indexRow.title, sku);
+  if (available === null) throw orderError(`Current stock for ${title} (${sku}) could not be verified. Please try again.`, 503);
+  if (!Number.isFinite(price) || price <= 0) throw orderError(`${title} (${sku}) has no current Instore price and cannot be ordered.`, 409);
+  if (available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError(instoreStockMessage(title, sku, qty, available), 409);
   return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
@@ -336,7 +346,17 @@ async function resolveInstorePrices(items) {
   }
   for (const [sku, requested] of requestedBySku) {
     const available = availableFromBridge(bridgeBySku.get(sku));
-    if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || requested > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+    const title = cleanText(indexRows.find((row) => textId(row.sku) === sku)?.title, sku);
+    // Name the product: the customer can remove or reduce one line instead of
+    // guessing which of their Instore items blocked the whole order.
+    if (available === null) {
+      console.error('send-order: Instore stock could not be read for', sku);
+      throw orderError(`Current stock for ${title} (${sku}) could not be verified. Please try again.`, 503);
+    }
+    if (available < MIN_INSTORE_AVAILABLE_STOCK || requested > available) {
+      console.warn('send-order: Instore stock gate', { sku, requested, available, minimum: MIN_INSTORE_AVAILABLE_STOCK });
+      throw orderError(instoreStockMessage(title, sku, requested, available), 409);
+    }
   }
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);

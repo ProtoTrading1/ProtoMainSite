@@ -45,7 +45,13 @@ test('Instore checkout rejects an item that has fallen below the ten-unit displa
 test('Instore checkout rejects inactive, duplicate-main and unverified records', () => {
   assert.throws(() => resolveInstoreOrderLine(item, { indexRow: { ...indexRow, is_active: false }, bridgeRow }), { status: 409 });
   assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows: [{ sku: '8618100133' }] }), { status: 409 });
-  assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, BOOKED: null } }), { status: 409 });
+  // Unreadable live stock is a retryable verification failure, not "out of stock".
+  assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, BOOKED: null } }), { status: 503, message: /could not be verified/ });
+});
+
+test('Instore stock errors name the product so the customer can fix one line', () => {
+  assert.throws(() => resolveInstoreOrderLine({ ...item, qty: 12 }, { indexRow, bridgeRow }), { status: 409, message: /BRACELET WOODEN BEADS \(8618100133\): only 11 available in store but 12 requested/ });
+  assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, ONHAND: 3, BOOKED: 0 } }), { status: 409, message: /only 3 left in store and Instore items need at least 10/ });
 });
 
 test('Preview cannot create a real order, while production retains the same resolver', async () => {
