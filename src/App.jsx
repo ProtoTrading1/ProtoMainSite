@@ -1870,6 +1870,9 @@ export default function App({
             sku: item.product.sku,
             code: item.product.code,
             name: item.product.name,
+            // The server decides whether a line is Instore from the catalogue
+            // tables; this flag is only a hint and is sent when known.
+            ...(item.product.isExtendedRange === true ? { isExtendedRange: true } : {}),
             checkoutSnapshot: checkoutSnapshotForProduct(item.product),
           },
         })),
