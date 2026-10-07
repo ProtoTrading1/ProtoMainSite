@@ -21,7 +21,7 @@ test('session parser rejects missing, corrupt, expired, foreign identity and mal
   assert.equal(readSession(session(), 0).customerId, A);
   for (const raw of [null, '{}', '{', JSON.stringify({ access_token: 'abc.def.ghi', user: { id: A }, expires_at: 1 }), session('x'), session().replace('abc.def.ghi', '<secret>')]) assert.throws(() => readSession(raw, 2000));
 });
-function fixture({ identity = A, mutate } = {}) {
+function fixture({ identity = A, mutate, response, transport } = {}) {
   const ids = ['check-button', 'status', 'report', 'consent', 'copy-button', 'copy-status'];
   const elements = Object.fromEntries(ids.map(id => [id, { textContent: '', hidden: true, checked: false, disabled: true, addEventListener() {} }]));
   const values = new Map([[KEY, session()], [`proto_pending_checkout_v1:${A}`, JSON.stringify(intent())], [`proto_pending_checkout_v1:${B}`, 'PRIVATE FOREIGN']]);
@@ -33,6 +33,8 @@ function fixture({ identity = A, mutate } = {}) {
   window.top = window.self = window;
   const fetch = async (url, options) => {
     requests.push({ url, options });
+    if (transport) return transport(url, options);
+    if (response) return response;
     if (url.endsWith('identity')) mutate?.(values);
     return { ok: true, text: async () => JSON.stringify({ version: 1, sessionStorageKey: KEY, ...(url.endsWith('identity') ? { customerId: identity } : {}) }) };
   };
@@ -51,8 +53,56 @@ test('explicit check and consent precede copying; only exact session and owned j
   assert.equal(f.copies.length, 1);
   assert.equal(f.requests.length, 2);
   assert.ok(f.requests.every(r => r.options.method === 'GET' && r.url.startsWith('/api/basket-check-session?mode=')));
+  assert.ok(f.requests.every(r => r.options.credentials === 'same-origin' && r.options.redirect === 'error' && r.options.cache === 'no-store'));
   assert.deepEqual([...new Set(f.reads)].sort(), [KEY, `proto_pending_checkout_v1:${A}`].sort());
   assert.doesNotMatch(f.copies[0], /PRIVATE|abc.def.ghi|customerId/);
+});
+
+test('absent normal Proto session gives manual sign-in guidance without identity or journal reads', async () => {
+  const f = fixture(); f.values.delete(KEY);
+  await f.controller.check();
+  assert.match(f.elements.status.textContent, /not signed in to Proto/);
+  assert.match(f.elements.status.textContent, /same browser and sign in/);
+  assert.match(f.elements.status.textContent, /preview cannot recover/);
+  assert.equal(f.requests.length, 1);
+  assert.deepEqual(f.reads, [KEY]);
+  assert.equal(f.elements.report.hidden, true); assert.equal(f.elements.consent.disabled, true);
+});
+
+test('expired or corrupt sessions do not masquerade as missing normal sign-in', async () => {
+  for (const raw of ['{', session().replace('9999999999', '-1')]) {
+    const f = fixture(); f.values.set(KEY, raw); await f.controller.check();
+    assert.match(f.elements.status.textContent, /no current session we can verify/);
+    assert.doesNotMatch(f.elements.status.textContent, /same browser and sign in/);
+    assert.equal(f.requests.length, 1); assert.equal(f.elements.report.hidden, true);
+  }
+});
+
+test('unavailable config and non-JSON responses hold before browser session reads', async () => {
+  for (const response of [{ ok: false, status: 503 }, { ok: true, text: async () => '<html>Sign in to Vercel</html>' }, { ok: true, text: async () => JSON.stringify({ version: 1, sessionStorageKey: 'wrong' }) }]) {
+    const f = fixture({ response }); await f.controller.check();
+    assert.match(f.elements.status.textContent, /could not safely read/);
+    assert.deepEqual(f.reads, []); assert.equal(f.elements.report.hidden, true);
+  }
+});
+
+test('same-origin protected GET retains platform session while customer identity remains separate', async () => {
+  const f = fixture({ transport: async (url, options) => {
+    if (options.credentials !== 'same-origin') throw new TypeError('Vercel authentication redirect');
+    assert.equal(options.redirect, 'error');
+    return { ok: true, text: async () => JSON.stringify({ version: 1, sessionStorageKey: KEY }) };
+  } });
+  f.values.delete(KEY); await f.controller.check();
+  assert.match(f.elements.status.textContent, /not signed in to Proto/);
+  assert.deepEqual(f.requests[0].options.headers, {});
+  assert.deepEqual(f.reads, [KEY]); assert.equal(f.elements.report.hidden, true);
+});
+
+test('platform transport failures remain fail-closed without claiming customer sign-in failure', async () => {
+  const f = fixture({ transport: async () => { throw new TypeError('Authentication redirect'); } });
+  await f.controller.check();
+  assert.match(f.elements.status.textContent, /could not safely read/);
+  assert.deepEqual(f.reads, []); assert.equal(f.elements.report.hidden, true);
 });
 test('server identity mismatch and account change during verification hold without journal export', async () => {
   for (const settings of [{ identity: B }, { mutate: values => values.set(KEY, session(B)) }]) {

@@ -3,6 +3,7 @@ const SESSION_KEY = /^sb-[a-z0-9]{20}-auth-token$/;
 const PREFIX = 'proto_pending_checkout_v1:';
 const LIMIT = 2 * 1024 * 1024;
 const messages = {
+  signin: 'You are not signed in to Proto in this browser on this website. Open the normal Proto site in the same browser and sign in, then return here. Keep your basket and do not submit the order again. Signing in on a preview cannot recover a reference saved on the live website.',
   unavailable: 'This browser could not safely read the reference. Please tell Proto; keep your basket and avoid trying the order again.',
   session: 'This browser has no current session we can verify. Please tell Proto; this check cannot continue.',
   missing: 'No saved request reference was found for this verified account on this browser. This does not prove that an order was never received. Please tell Proto.',
@@ -16,6 +17,7 @@ function parse(raw, limit, code) {
   try { return JSON.parse(raw); } catch { fail(code); }
 }
 export function readSession(raw, now = Date.now()) {
+  if (raw === null) fail('signin');
   const session = parse(raw, 65536, 'session');
   if (!record(session) || typeof session.access_token !== 'string'
     || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(session.access_token)
@@ -64,7 +66,9 @@ export function mountBasketCheck({ document, window, fetch, storage, clipboard, 
   }
   async function request(mode, token, signal) {
     const response = await fetch(`/api/basket-check-session?mode=${mode}`, {
-      method: 'GET', cache: 'no-store', credentials: 'omit', redirect: 'error', signal,
+      // Preserve this origin's existing deployment-authentication cookies.
+      // Customer identity still requires the explicit verified Bearer token.
+      method: 'GET', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) fail(response.status === 401 ? 'session' : 'unavailable');
