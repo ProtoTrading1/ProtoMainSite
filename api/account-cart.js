@@ -80,6 +80,8 @@ function cleanNumber(value, { minimum = Number.NEGATIVE_INFINITY, fallback = nul
 function sanitizeProduct(product, identifiers) {
   const primary = identifiers.primary;
   return {
+    ...((product.source === 'main' && product.isExtendedRange !== true)
+      || product.source === 'instore' ? { source: product.source } : {}),
     id: identifiers.id || primary,
     sku: identifiers.sku || primary,
     code: identifiers.code || primary,

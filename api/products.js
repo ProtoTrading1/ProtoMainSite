@@ -349,6 +349,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
   const unitsOfIssue = normalizeUnitsOfIssue(row.units_of_issue || 'EACH');
   const sellingUnit = sellingUnitDetails(unitsOfIssue);
   const base = {
+    source: 'main',
     id: row.sku,
     code: row.barcode,
     barcode: row.barcode,

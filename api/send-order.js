@@ -22,7 +22,8 @@ import {
 } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
-import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
+import { availabilityForRow, availabilityTableMissing } from './_product-availability.js';
+import { checkoutIncomingObservation, checkoutRemovalProof, stockOrderableAvailability } from '../lib/checkout-removal-guard.mjs';
 import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
@@ -346,7 +347,7 @@ async function resolveInstorePrices(items) {
   });
 }
 
-async function resolveStandardPrices(items) {
+async function resolveStandardPrices(items, originalLineIndices = items.map((_, index) => index)) {
   if (items.length > MAX_ORDER_LINES) {
     const error = new Error(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
     error.status = 400;
@@ -361,7 +362,10 @@ async function resolveStandardPrices(items) {
     .filter(Boolean))];
   const productBySku = new Map();
   const productByBarcode = new Map();
+  const exactSkuRows = new Map();
+  const conflictingSkus = new Set();
   let incomingBySku = new Map();
+  let incomingKnown = false;
   const sb = getStockClient();
   try {
     if (skus.length) {
@@ -370,7 +374,12 @@ async function resolveStandardPrices(items) {
         .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order')
         .in('sku', skus);
       if (error) throw error;
-      for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
+      for (const row of data || []) {
+        const key = String(row.sku).trim().toUpperCase();
+        if (exactSkuRows.has(key)) conflictingSkus.add(key);
+        exactSkuRows.set(key, row);
+        productBySku.set(key, row);
+      }
     }
     if (barcodes.length) {
       const { data, error } = await sb
@@ -379,6 +388,9 @@ async function resolveStandardPrices(items) {
         .in('barcode', barcodes);
       if (error) throw error;
       for (const row of data || []) {
+        const key = String(row.sku).trim().toUpperCase();
+        const exact = exactSkuRows.get(key);
+        if (exact && Object.keys(exact).some(field => exact[field] !== row[field])) conflictingSkus.add(key);
         if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
       }
     }
@@ -386,7 +398,13 @@ async function resolveStandardPrices(items) {
       ...productBySku.values(),
       ...productByBarcode.values(),
     ].map((row) => row.sku).filter(Boolean))];
-    incomingBySku = await loadIncomingAvailabilityMap(sb, resolvedSkus);
+    const { data: incomingData, error: incomingError } = await sb.rpc('get_website_product_availability', { p_skus: resolvedSkus.length ? resolvedSkus : null });
+    if (incomingError && !availabilityTableMissing(incomingError)) throw incomingError;
+    if (!incomingError) {
+      const observation = checkoutIncomingObservation(incomingData, resolvedSkus);
+      incomingBySku = observation.incomingBySku;
+      incomingKnown = observation.known;
+    }
   } catch (err) {
     console.error('send-order: authoritative product lookup failed:', err?.message || err);
     const unavailable = new Error('Current product pricing could not be verified. Please try again.');
@@ -417,6 +435,7 @@ async function resolveStandardPrices(items) {
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
+    const stockOrderable = stockOrderableAvailability(availability);
     const aggregateKey = textId(row.sku);
     const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
     aggregate.qty += qty;
@@ -430,7 +449,11 @@ async function resolveStandardPrices(items) {
       currentPrice: price,
       currentStockQty: normaliseStockQty(availability.stockQty),
     });
-    if (review) reviewChanges.push(review);
+    if (review) reviewChanges.push({ ...review,
+      ...(stockOrderable ? { stockOrderable: true } : {}),
+      removalProof: checkoutRemovalProof({ item, lineIndex: originalLineIndices[index], row, availability,
+        incomingKnown, uniqueRow: exactSkuRows.get(sku) === row && !conflictingSkus.has(sku) }),
+    });
     if (!availability.canOrder) {
       // A changed stock snapshot gives the customer the more useful review
       // alert below. Otherwise preserve the existing unavailable-line error.
@@ -505,7 +528,8 @@ export async function resolveAuthoritativePrices(items) {
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
   const instoreItems = items.filter((item) => item?.product?.isExtendedRange === true);
   const standardItems = items.filter((item) => item?.product?.isExtendedRange !== true);
-  const [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems)]);
+  const standardLineIndices = items.flatMap((item, index) => item?.product?.isExtendedRange === true ? [] : [index]);
+  const [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems, standardLineIndices)]);
   let instoreIndex = 0; let standardIndex = 0;
   return items.map((item) => item?.product?.isExtendedRange === true ? resolvedInstore[instoreIndex++] : resolvedStandard[standardIndex++]);
 }

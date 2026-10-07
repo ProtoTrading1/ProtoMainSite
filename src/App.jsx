@@ -52,6 +52,7 @@ import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
 import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import { applyVerifiedSoldoutRemoval, soldoutRemovalMessage } from './lib/checkoutReview';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -1370,7 +1371,8 @@ export default function App({
       setOrderError(pending.result
         ? 'Your earlier order was received. Use Try again to finish recovery without sending another order. Your current basket will be kept if it changed.'
         : 'An earlier order request needs confirmation. Use Try again to recover that same request. Your current basket will be kept if it changed. Check My Orders or contact Proto if it cannot be recovered.');
-      setOrderChanges(pending.reviewChanges || []);
+      // The journal records intent before cart persistence; reload cannot certify removal.
+      setOrderChanges((pending.reviewChanges || []).map(change => ({ ...change, removedFromBasket: false })));
       setModalOpen(true);
     } catch (error) {
       pendingCheckoutStorageErrorRef.current = error;
@@ -1889,6 +1891,7 @@ export default function App({
             sku: item.product.sku,
             code: item.product.code,
             name: item.product.name,
+            ...(item.product.source === 'main' && item.product.isExtendedRange !== true ? { stockRemovalSource: 'main' } : {}),
             checkoutSnapshot: checkoutSnapshotForProduct(item.product),
           },
         })),
@@ -2000,12 +2003,44 @@ export default function App({
       setOrderError(err.message || 'Order could not be sent');
       if (err?.code === 'ORDER_REVIEW_REQUIRED') {
         const changes = Array.isArray(err.changes) ? err.changes : [];
-        setOrderChanges(changes);
-        // Refresh only the price/stock snapshots returned by the authoritative
-        // checkout check. We never auto-reduce a quantity: the customer must
-        // explicitly decide which line to amend before resubmitting.
+        setOrderChanges(changes.map(change => ({ ...change, removedFromBasket: false })));
+        // Only a proved first rejection and exact owned, acknowledged basket
+        // can apply the server's source-bound sold-out observation.
         if (pendingCheckoutRef.current?.confirmedRejectedBeforeCapture === true
-          && JSON.stringify(currentCartRef.current) === basketAtStart) {
+          && JSON.stringify(currentCartRef.current) === basketAtStart
+          && cartRevisionRef.current === basketRevisionAtStart
+          && cartHydratedRef.current && !cartPreviewModeRef.current && !cartConflictRef.current
+          && !cartSyncInFlightRef.current && !pendingCartSyncRef.current
+          && JSON.stringify(currentCartRef.current.items) === JSON.stringify(pendingCheckoutRef.current.items)) {
+          const removal = changes.some(change => change?.removalProof?.eligible === true)
+            ? applyVerifiedSoldoutRemoval(currentCartRef.current.items, pendingCheckoutRef.current.payload.items, changes)
+            : null;
+          if (removal?.removedCount) {
+            try {
+              // Persist the exact original request and actual notice before
+              // mutating the basket. A failed journal write retains all items.
+              pendingCheckoutRef.current = writePendingCheckout(localStorage, accountId, {
+                ...pendingCheckoutRef.current, raw: pendingCheckoutRef.current.raw,
+                reviewRequired: true, reviewChanges: removal.changes,
+              });
+              if (!ownsCheckout() || JSON.stringify(currentCartRef.current) !== basketAtStart
+                || cartRevisionRef.current !== basketRevisionAtStart) return { ok: false };
+              verifyPendingCheckout(localStorage, pendingCheckoutRef.current);
+              const activityAt = Date.now();
+              currentCartRef.current = { items: removal.items, activityAt };
+              setCartItems(removal.items);
+              setCartLastActivityAt(activityAt);
+              setOrderChanges(removal.changes);
+              const notice = soldoutRemovalMessage(removal.removedCount, removal.items.length);
+              setOrderError(notice);
+              setCartAnnouncement(notice);
+              return { ok: false, basketUpdated: true };
+            } catch (storageError) {
+              pendingCheckoutStorageErrorRef.current = storageError;
+              setOrderError(storageError.message);
+              return { ok: false };
+            }
+          }
           setCartItems((previous) => previous.map((item) => {
           const change = changes.find((candidate) => {
             const key = String(candidate?.sku || '').toUpperCase();

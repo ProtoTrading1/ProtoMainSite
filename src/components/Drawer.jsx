@@ -252,8 +252,10 @@ export default function Drawer({
         customerNotes: customerNotes.trim(),
         promo: appliedPromo,
       });
-      if (result?.ok) {
+      if (result?.ok || result?.basketUpdated === true) {
         setShowCourierPicker(false);
+      }
+      if (result?.ok) {
         setCourierChoice(null);
         setCustomerNotes('');
         setAppliedPromo(null);
