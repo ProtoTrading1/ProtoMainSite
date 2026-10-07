@@ -24,7 +24,7 @@ import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
 import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
-import { MIN_INSTORE_AVAILABLE_STOCK, stockClient } from './extended-range.js';
+import { stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
   assertOrderCaptureSchemaReady,
@@ -273,21 +273,32 @@ function availableFromBridge(row) {
 
 // Pure server boundary used by the checkout tests. Browser titles, prices and
 // quantities are not trusted: the reviewed index and fresh bridge response win.
+//
+// Instore lines are order *requests*, not reservations: live stock is not a
+// gate here (owner decision, 2026-10-07). The team confirms availability when
+// packing. The bridge row, when present, still supplies the current price and
+// is logged so short stock is visible server-side.
 export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible' } = {}) {
   const sku = textId(item?.product?.sku || item?.product?.id);
   if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
-  // A removed/misleading product photo must never make a separately approved,
-  // in-stock SKU unorderable. Image visibility is presentation-only; the
-  // normal index, duplicate, price and fresh-stock gates stay authoritative.
+  // A removed/misleading product photo must never make a separately approved
+  // SKU unorderable. Image visibility is presentation-only; the normal index,
+  // duplicate and price gates stay authoritative.
   if (indexRow?.image_source !== 'nutstore' || indexRow?.is_active !== true || indexRow?.image_review_status !== 'verified' || indexRow?.visibility_status !== 'search_only') throw orderError('Instore product is no longer approved.', 409);
   if (listingStatus === 'hidden') throw orderError('Instore product is no longer available.', 409);
-  if (textId(bridgeRow?.CODE) !== sku) throw orderError('Current Instore stock could not be verified.', 503);
   const qty = Number(item?.qty);
-  const available = availableFromBridge(bridgeRow);
-  const price = websitePriceFromExVat(Number(bridgeRow?.PRICE_A));
   if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-  if (!Number.isFinite(price) || price <= 0 || available === null || available < MIN_INSTORE_AVAILABLE_STOCK || qty > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name: cleanText(bridgeRow.DESCR, cleanText(indexRow.title, sku)), price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  const title = cleanText(indexRow.title, sku);
+  const bridgeMatches = textId(bridgeRow?.CODE) === sku;
+  const bridgePrice = bridgeMatches ? websitePriceFromExVat(Number(bridgeRow?.PRICE_A)) : NaN;
+  // Fresh Positill price first; the reviewed index price when the bridge has
+  // no row for this SKU, so a product missing from Positill can still be requested.
+  const price = Number.isFinite(bridgePrice) && bridgePrice > 0 ? bridgePrice : customerFacingCataloguePrice(indexRow?.price);
+  if (!Number.isFinite(price) || price <= 0) throw orderError(`${title} (${sku}) has no current Instore price and cannot be ordered.`, 409);
+  const available = bridgeMatches ? availableFromBridge(bridgeRow) : null;
+  if (available === null || available < qty) console.warn('send-order: Instore line requested beyond known stock', { sku, qty, available });
+  const name = bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
 async function resolveInstorePrices(items) {
@@ -299,7 +310,7 @@ async function resolveInstorePrices(items) {
   let indexRows; let normalRows; let listingControls;
   try {
     const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
-      index.from('extended_range_items').select('sku, image_source, barcode, title, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
+      index.from('extended_range_items').select('sku, image_source, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('barcode', skus),
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
@@ -320,23 +331,21 @@ async function resolveInstorePrices(items) {
   }
   const bridgeUrl = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
   const bridgeKey = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
-  if (!bridgeUrl.startsWith('https://') || !bridgeKey) throw orderError('Instore bridge is not configured.', 503);
-  const bridgeRows = await Promise.all(skus.map(async (sku) => {
-    const response = await fetch(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw orderError('Current Instore stock could not be verified.', 503);
-    return [sku, (await response.json())?.row];
-  })).catch((error) => { if (error?.status) throw error; throw orderError('Current Instore stock could not be verified.', 503); });
-  const bridgeBySku = new Map(bridgeRows);
-  const requestedBySku = new Map();
-  for (const item of items) {
-    const sku = textId(item?.product?.sku || item?.product?.id);
-    const qty = Number(item?.qty);
-    if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
-    requestedBySku.set(sku, (requestedBySku.get(sku) || 0) + qty);
-  }
-  for (const [sku, requested] of requestedBySku) {
-    const available = availableFromBridge(bridgeBySku.get(sku));
-    if (available === null || available < MIN_INSTORE_AVAILABLE_STOCK || requested > available) throw orderError('Instore product is unavailable in the requested quantity.', 409);
+  // The bridge is best-effort for price and a stock log line only: a bridge
+  // outage or an unknown SKU must not block an Instore order request.
+  const bridgeBySku = new Map();
+  if (bridgeUrl.startsWith('https://') && bridgeKey) {
+    await Promise.all(skus.map(async (sku) => {
+      try {
+        const response = await fetch(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
+        if (response.ok) bridgeBySku.set(sku, (await response.json())?.row);
+        else console.warn('send-order: Instore bridge returned', response.status, 'for', sku);
+      } catch (error) {
+        console.warn('send-order: Instore bridge unreachable for', sku, error?.message || error);
+      }
+    }));
+  } else {
+    console.warn('send-order: Instore bridge not configured; using index prices');
   }
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);

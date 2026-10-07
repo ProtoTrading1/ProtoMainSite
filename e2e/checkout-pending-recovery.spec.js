@@ -11,11 +11,12 @@ const pending = () => ({ version: 1, customerId: ACCOUNT_ID,
   items: [original], total: 1590, fingerprint: JSON.stringify([[basketLineKey(original), 20]]), options: { courierChoice: 'pickup', customerNotes: 'Original frozen notes', promo: null },
 });
 
-async function seedAndReload(page, record) {
+async function seedAndReload(page, record, { expectDialog = true } = {}) {
   await page.evaluate(({ key, record }) => localStorage.setItem(key, JSON.stringify(record)), { key, record });
   await page.reload();
-  await expect(page.getByRole('dialog', { name: 'Could not send order' })).toBeVisible();
   await expect(page.locator('.product-card').first()).toBeVisible();
+  if (expectDialog) await expect(page.getByRole('dialog', { name: 'Could not send order' })).toBeVisible();
+  else await expect(page.getByRole('dialog', { name: 'Could not send order' })).toHaveCount(0);
 }
 
 async function submitBasket(page) {
@@ -28,26 +29,24 @@ async function submitBasket(page) {
   await page.getByRole('button', { name: 'Send order request — no payment now', exact: true }).click();
 }
 
-test('reload makes no automatic POST; explicit retry restores exact request and preserves a newer basket', async ({ page, context }) => {
+test('reload makes no automatic POST and no popup; the next checkout reuses the unconfirmed reference', async ({ page, context }) => {
   await installAccessibilityServices(context, { cartItems: [newer] });
   const posts = [];
   await context.route('**/api/send-order', async route => {
     posts.push(route.request().postDataJSON());
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, orderId: 'synthetic-captured', orderNumber: 'TEST-OLD', emailDeliveryFailed: false }) });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, orderId: 'synthetic-new', orderNumber: 'TEST-NEW', emailDeliveryFailed: false }) });
   });
   await signInCatalogue(page);
-  const record = pending(); await seedAndReload(page, record);
+  const record = pending(); await seedAndReload(page, record, { expectDialog: false });
   expect(posts).toEqual([]);
-  const dialog = page.getByRole('dialog', { name: 'Could not send order' });
-  await expect(dialog.getByRole('button', { name: 'Check My Orders' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Try again' }).click();
+  await submitBasket(page);
   await expect(page.getByRole('heading', { name: 'Order request received. Thank you.' })).toBeVisible();
-  await expect(page.getByText('Your current basket was kept because it changed. Check this received order before submitting it again.', { exact: true })).toBeVisible();
-  expect(posts).toEqual([record.payload]);
+  // The current basket is sent, under the earlier reference, so the server can
+  // return the earlier order if it was captured or refuse a duplicate.
+  expect(posts).toHaveLength(1);
+  expect(posts[0].clientRef).toBe(record.payload.clientRef);
+  expect(posts[0].items.map(item => [item.product.code, item.qty, item.preference])).toEqual([[newer.product.code, 21, 'Pink']]);
   expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();
-  await page.locator('[data-cart-trigger]').filter({ visible: true }).first().click();
-  await expect(page.locator('.order-drawer').filter({ visible: true }).first().getByRole('spinbutton', { name: `Quantity for ${newer.product.code} (Pink)`, exact: true })).toHaveValue('21');
 });
 
 test('accepted recovery result finishes after reload without another API request', async ({ page, context }) => {
@@ -77,7 +76,7 @@ test('denied recovery storage prevents POST and exposes account-order resolution
   expect(posts).toBe(0);
 });
 
-test('an uncertain first submit saves intent before POST and explicit reload retry reuses it', async ({ page, context }) => {
+test('an uncertain first submit saves intent before POST and the next checkout after reload reuses it', async ({ page, context }) => {
   await installAccessibilityServices(context, { cartItems: [original] });
   const posts = []; let fail = true; let storedBeforePost;
   await context.route('**/api/send-order', async route => {
@@ -90,23 +89,48 @@ test('an uncertain first submit saves intent before POST and explicit reload ret
   await signInCatalogue(page); await submitBasket(page);
   await expect(page.getByText('Synthetic uncertain response', { exact: true })).toBeVisible();
   expect(storedBeforePost.payload).toEqual(posts[0]);
+  // An uncertain (5xx) outcome keeps the stored request, but does not lock the
+  // basket behind a popup: the next checkout sends the same request again.
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)).payload.clientRef, key)).toBe(posts[0].clientRef);
   await page.reload();
-  await expect(page.getByRole('dialog', { name: 'Could not send order' })).toBeVisible();
+  await expect(page.locator('.product-card').first()).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Could not send order' })).toHaveCount(0);
   expect(posts).toHaveLength(1);
   fail = false;
-  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await submitBasket(page);
   await expect(page.getByRole('heading', { name: 'Order request received. Thank you.' })).toBeVisible();
   expect(posts[1]).toEqual(posts[0]);
   expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
 });
 
-test('fresh checkout stays blocked while an earlier request is unresolved', async ({ page, context }) => {
+test('a definitive rejection releases the stored request so the customer can fix the basket and resend', async ({ page, context }) => {
+  await installAccessibilityServices(context, { cartItems: [original] });
+  const posts = [];
+  await context.route('**/api/send-order', async route => {
+    posts.push(route.request().postDataJSON());
+    return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic product is unavailable.' }) });
+  });
+  await signInCatalogue(page); await submitBasket(page);
+  await expect(page.getByText('Synthetic product is unavailable.', { exact: true })).toBeVisible();
+  expect(posts).toHaveLength(1);
+  expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
+  await page.reload();
+  await expect(page.locator('.product-card').first()).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Could not send order' })).toHaveCount(0);
+  await submitBasket(page);
+  await expect(page.getByText('Synthetic product is unavailable.', { exact: true })).toBeVisible();
+  expect(posts).toHaveLength(2);
+  expect(posts[1].clientRef).not.toBe(posts[0].clientRef);
+});
+
+test('a received order with unfinished cleanup still blocks a fresh checkout until recovered', async ({ page, context }) => {
   await installAccessibilityServices(context, { cartItems: [newer] });
   const posts = []; await context.route('**/api/send-order', route => { posts.push(route.request().postDataJSON()); return route.abort(); });
-  await signInCatalogue(page); await seedAndReload(page, pending());
+  await signInCatalogue(page);
+  await seedAndReload(page, { ...pending(), result: { success: true, orderId: 'already-saved', orderNumber: 'TEST-SAVED' } });
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await submitBasket(page);
-  await expect(page.getByText(/Your earlier order request still needs confirmation/)).toBeVisible();
+  await expect(page.getByText(/Your earlier order was received/)).toBeVisible();
   expect(posts).toEqual([]);
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)).payload.clientRef, key)).toBe(pending().payload.clientRef);
 });
