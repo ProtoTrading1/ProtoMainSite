@@ -55,7 +55,7 @@ test('orderability and customer-initiated live stock remain visible on mobile', 
   assert.match(card, /Choose an option above to check live stock and continue/, 'the option modal explains the next step');
   assert.match(card, /isVariantGroup && !selectedVariant \? \([\s\S]*pz-options-prompt[\s\S]*\) : \([\s\S]*pz-qty-row/, 'modal quantity and ordering wait for an explicit variant choice');
   assert.doesNotMatch(card, /initialZoomOpen && isVariantGroup/, 'the first option is never silently selected for the customer');
-  assert.match(card, /optionAvailability\.label/, 'each option exposes its own catalogue availability before the live check');
+  assert.match(card, /customerAvailabilityLabel\(optionAvailability\)/, 'each option exposes its own customer availability before the live check');
   assert.match(card, /variants\?\.scrollIntoView/, 'the mobile preview scrolls the exact choices into view');
   assert.match(app, /initialFocusOptions=\{previewOptionsFirst\}/, 'the global product preview preserves the stock-action intent');
   assert.match(siteCss, /\.product-card \.stock-check\s*\{[\s\S]*?min-height: 44px;/);

@@ -9,7 +9,7 @@ import { displayProductText } from '../lib/productText';
 import { authenticatedGetJson } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
-import { formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
+import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -175,7 +175,7 @@ function StockBadge({ product }) {
   return (
     <div className={`pc-stock-slot${product.isVariantGroup ? ' pc-stock-slot--options' : ''}`}>
       <div className={`pc-orderability pc-orderability--${badgeClass}`}>
-        <span>{availability.label}</span>
+        <span>{customerAvailabilityLabel(availability)}</span>
         <small>{availability.guidance}</small>
       </div>
       {!product.isVariantGroup && sku ? <StockCheck
@@ -245,7 +245,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
     } else if (live.state === 'low_stock') {
       readout = <span className="stock-readout stock-readout--low">Low stock: {qty} left</span>;
     } else {
-      readout = <span className={`stock-readout stock-readout--${live.canOrder ? 'in' : 'out'}`}>{live.label}</span>;
+      readout = <span className={`stock-readout stock-readout--${live.canOrder ? 'in' : 'out'}`}>{customerAvailabilityLabel(live)}</span>;
     }
   } else if (state.status === 'error') {
     readout = (
@@ -865,7 +865,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 )}
                 {modalAvailability.state === 'landed' && (
                   <p className="pz-to-order-note" style={{ margin: '10px 0 0', fontSize: 13, color: '#245aa7', fontWeight: 600 }}>
-                    🚢 This stock has landed and is being received. It can be ordered once it has been received into available stock.
+                    {modalAvailability.incomingStatus === 'landed_awaiting_grv' ? 'Stock available.' : '🚢 This stock has landed and is being received. It can be ordered once it has been received into available stock.'}
                   </p>
                 )}
                 {['incoming', 'incoming_preorder'].includes(modalAvailability.state) && (
@@ -904,7 +904,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                               <span className="pz-variant-barcode">{productBarcodeLabel(v, true)}</span>
                               {v.colour && <span className="pz-variant-colour">{v.colour}</span>}
                               <span className={`pz-variant-availability pz-variant-availability--${optionClass}`}>
-                                {optionAvailability.label}
+                                {customerAvailabilityLabel(optionAvailability)}
                               </span>
                             </div>
                             {Number(v.price) > 0 && <span className="pz-variant-price">R{Number(v.price).toFixed(2)}</span>}
