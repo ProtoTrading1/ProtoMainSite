@@ -51,7 +51,7 @@ import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
 import { markPortalWelcomeSeen } from './lib/auth';
-import { checkoutSnapshotForProduct, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import { checkoutSnapshotForProduct, isLandedStockAvailable, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import './index.css';
 
 const CATALOG_PAGE_SIZE = 60;
@@ -143,10 +143,9 @@ function productStockQtyForCart(product) {
 }
 
 function productCanOrderWhenOos(product) {
-  // Keep this narrower than availability.canOrder: a landed or incoming line
-  // may be visible/orderable after confirmation, but it is not an exception to
-  // the on-hand quantity cap. Only an explicit "To order" item is uncapped.
-  return isToOrderProduct(product);
+  // Transit/pre-order alone is insufficient; only confirmed arrived stock or
+  // an explicit To order item may request more than recorded on-hand stock.
+  return isToOrderProduct(product) || isLandedStockAvailable(product);
 }
 
 function cartQtyCapForProduct(product) {
