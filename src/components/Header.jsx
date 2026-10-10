@@ -15,6 +15,7 @@ import AboutModal from './AboutModal';
 import { authHeaders } from '../lib/authHeaders';
 import { shouldPrefetchData } from '../lib/imageUrl';
 import { catalogueSearchRoute } from '../lib/catalogueSearchRoute';
+import { searchProductAvailability } from '../../lib/search-product-availability.mjs';
 import './Header.css';
 
 // ─── Recent searches (localStorage) ─────────────────────────
@@ -146,19 +147,6 @@ function ProductRequestModal({ onClose, initialDescription = '' }) {
   );
 }
 
-function productStockState(product) {
-  const raw = product?.stockOnHand ?? product?.stockQty ?? product?.available_stock ?? product?.stock_qty;
-  const qty = raw === undefined || raw === null || raw === '' ? null : Number(raw);
-  const toOrder = product?.toOrder === true
-    || product?.to_order === true
-    || product?.orderableWhenOutOfStock === true
-    || product?.orderable_when_out_of_stock === true;
-  if (qty === 0 && toOrder) return { tone: 'order', label: 'To order', canOrder: true };
-  if (qty === 0 || product?.inStock === false) return { tone: 'out', label: 'Out of stock', canOrder: false };
-  if (Number.isFinite(qty) && qty > 0 && qty <= 5) return { tone: 'low', label: 'Low stock', canOrder: true };
-  return { tone: 'in', label: 'In stock', canOrder: true };
-}
-
 function HighlightedText({ text, query }) {
   const source = String(text || '');
   const terms = String(query || '').trim().split(/\s+/).filter((term) => term.length > 1);
@@ -184,7 +172,7 @@ function SearchProductResult({
 }) {
   const [added, setAdded] = useState(false);
   const addedTimerRef = useRef(null);
-  const stock = productStockState(product);
+  const stock = searchProductAvailability(product);
   const packLabel = product.casePack || (Number(product.minQty) > 1 ? `Min ${product.minQty}` : '');
   const sku = product.websiteSku || product.sku || product.id || '';
   const barcode = product.barcode || product.code || '';
@@ -256,7 +244,7 @@ function SearchProductResult({
           disabled={!stock.canOrder}
           onMouseDown={(event) => event.preventDefault()}
           onClick={addProduct}
-          aria-label={stock.canOrder ? `Add ${product.name} to order` : `${product.name} is out of stock`}
+          aria-label={stock.canOrder ? `Add ${product.name} to order` : `Adding ${product.name} is currently unavailable`}
         >
           {added ? 'Added ✓' : <><Plus size={14} /> Add</>}
         </button>

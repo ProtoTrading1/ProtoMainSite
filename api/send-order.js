@@ -23,7 +23,7 @@ import {
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
-import { evaluateCheckoutSnapshot, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import { evaluateCheckoutSnapshot, isLandedStockAvailable, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import { stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
@@ -437,6 +437,7 @@ async function resolveStandardPrices(items) {
       submittedSnapshot: product.checkoutSnapshot || {},
       currentPrice: price,
       currentStockQty: normaliseStockQty(availability.stockQty),
+      currentAvailability: availability,
     });
     if (review) reviewChanges.push(review);
     if (!availability.canOrder) {
@@ -483,7 +484,7 @@ async function resolveStandardPrices(items) {
   // Preferences form separate order lines but share the same physical SKU.
   // Resolve identifiers first so SKU/barcode aliases cannot split the cap.
   for (const { qty, row, availability, toOrder, submittedSnapshot } of requestedBySku.values()) {
-    if (toOrder) continue;
+    if (toOrder || isLandedStockAvailable(availability)) continue;
     const stockQty = normaliseStockQty(availability.stockQty);
     if (stockQty !== null && qty <= stockQty) continue;
     const aggregateReview = evaluateCheckoutSnapshot({

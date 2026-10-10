@@ -10,6 +10,7 @@ import { authenticatedGetJson } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
+import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -111,11 +112,11 @@ function availabilityForProduct(product) {
     toOrder: !!(product?.toOrder || product?.orderableWhenOutOfStock),
     incoming: product,
   });
-  // Stock in transit/being received can still be described to customers, but
-  // only an explicit To order line may bypass the physical on-hand cap.
+    // Confirmed arrived stock is requestable without inventing an on-hand
+    // quantity. Transit and partial receipts retain the physical-stock cap.
   const isToOrder = !!(product?.toOrder || product?.to_order || product?.orderableWhenOutOfStock || product?.orderable_when_out_of_stock);
   const stockQty = catalogStockQty(product);
-  if (!isToOrder && (stockQty === null || stockQty <= 0)) {
+    if (!isToOrder && !isLandedStockAvailable({ ...product, availability }) && (stockQty === null || stockQty <= 0)) {
     return { ...availability, canOrder: false };
   }
   return availability;
