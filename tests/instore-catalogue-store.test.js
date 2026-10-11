@@ -10,6 +10,21 @@ import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-
 
 const PAGE_SIZE = 24;
 
+test('stored identifier searches match old separated tokens without losing category scope', async () => {
+  const products = [
+    { sku: 'AB-12', barcode: '600-123456', title: 'Charger' },
+    { sku: 'AB-123', barcode: '600-1234569', title: 'Charger' },
+    { sku: 'AB12', title: 'Bag' },
+  ];
+  const client = stubStockClient({ instore_catalogue: products.map((payload, index) => ({
+    sku: payload.sku, payload, discovery_group: index === 2 ? 'Bags & wallets' : 'Electronics',
+    search_tokens: catalogueSearchTokens(payload),
+  })) });
+  assert.deepEqual((await readCatalogueSearchCandidates(client, { query: 'AB12' })).map((row) => row.sku), ['AB-12', 'AB12']);
+  assert.deepEqual((await readCatalogueSearchCandidates(client, { query: 'sku: AB-12', category: 'Electronics' })).map((row) => row.sku), ['AB-12']);
+  assert.deepEqual((await readCatalogueSearchCandidates(client, { query: '600123456' })).map((row) => row.sku), ['AB-12']);
+});
+
 // A deliberately varied source index: several browse categories, names that
 // exercise search ranking, and enough products to page.
 const NAMES = [

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { compareInstoreSearch, discoveryGroup, instoreSearchTokens, searchTermSets, searchTerms } from '../lib/instore-discovery.mjs';
+import { compareInstoreSearch, discoveryGroup, instoreSearchTokens, matchesInstoreSearch, searchTermSets, searchTerms } from '../lib/instore-discovery.mjs';
+import { isIdentifierQuery } from '../src/lib/identifierNormalize.js';
 import { readCompleteRows } from './_complete-rows.js';
 
 // The stored Instore read model (migration 070, stock project). It holds the
@@ -152,6 +153,17 @@ export async function readCatalogueOrderedPage(client, { category = '', from = 0
 // token matches first, in SKU order, which is the order the live read produced
 // and therefore the order equal-scoring products have always tied in.
 export async function readCatalogueSearchCandidates(client, { query, category = '' } = {}) {
+  if (isIdentifierQuery(query)) {
+    // Old stored tokens split separators in codes/barcodes. Read the existing
+    // eligible snapshot for exact identifiers so its punctuation cannot hide
+    // an exact match. No source/stock/visibility gates are bypassed or rebuilt.
+    const rows = await readCompleteRows(() => {
+      let request = client.from('instore_catalogue').select('sku, payload', { count: 'exact' });
+      if (category) request = request.eq('discovery_group', category);
+      return request;
+    });
+    return rows.map((row) => row.payload).filter((product) => matchesInstoreSearch(product, query));
+  }
   const patternSets = catalogueSearchPatternSets(query);
   const readPatterns = (patterns) => readCompleteRows(() => {
       let request = client.from('instore_catalogue').select('sku, payload', { count: 'exact' });

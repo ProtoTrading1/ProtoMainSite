@@ -7,7 +7,7 @@ import {
 } from './identifierNormalize.js';
 import {
   firstRelatedSearchTerm, parseSearchQuery, productMatchesSearchIntent,
-  searchQueryUsesFamily, searchQueryVariants,
+  searchQueryUsesFamily, searchQueryVariants, singularizeSearchWord,
 } from '../../lib/search-language.mjs';
 
 const SCORE = {
@@ -49,7 +49,7 @@ export function getRelatedSearchTerm(value) {
 }
 
 function words(text) {
-  return normalize(text).split(/\s+/).filter(Boolean);
+  return normalize(text).split(/\s+/).filter(Boolean).map(singularizeSearchWord);
 }
 
 function wholeWordIn(text, token) {
@@ -137,6 +137,7 @@ function productSearchText(product) {
     product.casePack,
     product.marginCue,
     product.supplier,
+    product.brand,
     pathLabels,
     ...(product.badges || []),
     ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
@@ -173,7 +174,14 @@ function getSearchIndex(product) {
     product.casePack,
     product.marginCue,
     product.supplier,
+    product.brand,
     (product.categoryPath || []).join(' '),
+    ...(product.badges || []),
+    ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
+  ].filter(Boolean).join(' '));
+  const specificKeywordText = normalize([
+    product.colour, product.size, product.style, product.casePack,
+    product.marginCue, product.supplier, product.brand,
     ...(product.badges || []),
     ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
   ].filter(Boolean).join(' '));
@@ -198,6 +206,7 @@ function getSearchIndex(product) {
     description,
     descWords,
     keywordText,
+    specificKeywordText,
     skus,
     barcodes,
     rawText: productSearchText(product),
@@ -231,7 +240,7 @@ export function prepareSearchIndex(products) {
     ]);
     for (const token of tokens) add(token, product);
   }
-  datasetIndex.set(products, { tokenMap, vocabulary: [...tokenMap.keys()] });
+  datasetIndex.set(products, { tokenMap, vocabulary: [...tokenMap.keys()], candidateMap: new Map() });
 }
 
 function intersectSets(left, right) {
@@ -250,14 +259,16 @@ function candidateProducts(products, query) {
   if (!prepared) return products;
   if (isIdentifierQuery(query)) return products;
 
-  const tokens = normalize(query).split(/\s+/).filter((token) => token.length >= 2);
+  const tokens = words(query).filter((token) => token.length >= 2);
   if (tokens.length === 0) return products;
 
   let candidates = null;
   for (const token of tokens) {
-    let tokenMatches = prepared.tokenMap.get(token);
+    let tokenMatches = prepared.candidateMap.get(token);
     if (!tokenMatches) {
-      tokenMatches = new Set();
+      // Retain lower-ranked word prefixes even when another product supplies
+      // the exact token. Candidate retrieval must not depend on catalogue mix.
+      tokenMatches = new Set(prepared.tokenMap.get(token) || []);
       for (const word of prepared.vocabulary) {
         const prefixMatch = word.startsWith(token) || token.startsWith(word);
         const typoMatch = token.length >= 4
@@ -265,10 +276,12 @@ function candidateProducts(products, query) {
           && /^[a-z]+$/.test(token)
           && /^[a-z]+$/.test(word)
           && Math.abs(token.length - word.length) <= 1
-          && typoDistance(token, word) === 1;
+          && conservativeTypoMatch(token, word);
         if (!prefixMatch && !typoMatch) continue;
         for (const product of prepared.tokenMap.get(word)) tokenMatches.add(product);
       }
+      prepared.candidateMap.set(token, tokenMatches);
+      if (prepared.candidateMap.size > 120) prepared.candidateMap.delete(prepared.candidateMap.keys().next().value);
     }
     candidates = intersectSets(candidates, tokenMatches);
     if (candidates.size === 0) break;
@@ -331,6 +344,7 @@ function scoreNameMatch(index, token, tokenCompact) {
   }
 
   if (isWholeWord) return SCORE.WHOLE_WORD_NAME;
+  if (token.length >= 4 && index.nameWords.some((word) => word.startsWith(token))) return SCORE.NAME_PREFIX;
   return 0;
 }
 
@@ -339,21 +353,32 @@ function scoreDescriptionMatch(index, token) {
   return 0;
 }
 
-function scoreKeywordMatch(index, token) {
-  if (wholeWordIn(index.keywordText, token)) return SCORE.KEYWORD;
+function scoreKeywordMatch(index, token, allowCategory) {
+  if (wholeWordIn(allowCategory ? index.keywordText : index.specificKeywordText, token)) return SCORE.KEYWORD;
   return 0;
+}
+
+function conservativeTypoMatch(token, word) {
+  if (!/^[a-z]+$/.test(token) || !/^[a-z]+$/.test(word)) return false;
+  // Short adjacent swaps recover "scraf" without turning "blush" into "brush".
+  if (token.length === word.length && token.length >= 4) {
+    for (let index = 0; index < token.length - 1; index += 1) {
+      if (token.slice(0, index) + token[index + 1] + token[index] + token.slice(index + 2) === word) return true;
+    }
+  }
+  return token.length >= 6 && word.length >= 6 && typoDistance(token, word) === 1;
 }
 
 function scoreTypoOnName(index, token) {
   if (token.length < 4) return 0;
   for (const word of index.nameWords) {
-    if (word.length >= 4 && typoDistance(token, word) === 1) return SCORE.TYPO;
+    if (conservativeTypoMatch(token, word)) return SCORE.TYPO;
   }
   return 0;
 }
 
-function scoreToken(index, token) {
-  const t = normalize(token);
+function scoreToken(index, token, allowCategory = true) {
+  const t = singularizeSearchWord(normalize(token));
   const tCompact = compact(token);
   if (!t) return 0;
 
@@ -363,7 +388,7 @@ function scoreToken(index, token) {
     || scoreIdentifierPrefix(index, t, tCompact)
     || scoreNameMatch(index, t, tCompact)
     || scoreDescriptionMatch(index, t)
-    || scoreKeywordMatch(index, t)
+    || scoreKeywordMatch(index, t, allowCategory)
     || scoreTypoOnName(index, t)
   );
 }
@@ -400,7 +425,7 @@ function scoreIdentifierQuery(product, query) {
   return score;
 }
 
-function scoreProduct(product, query) {
+function scoreProduct(product, query, allowCategory = true) {
   const q = normalize(query);
   if (!q) return 0;
 
@@ -408,7 +433,7 @@ function scoreProduct(product, query) {
     return scoreIdentifierQuery(product, query);
   }
 
-  const tokens = q.split(/\s+/).filter(Boolean);
+  const tokens = words(q);
   const significant = tokens.filter((t) => t.length >= 2);
   if (significant.length === 0) return 0;
 
@@ -416,7 +441,7 @@ function scoreProduct(product, query) {
   let total = 0;
 
   for (const token of significant) {
-    const tokenScore = scoreToken(index, token);
+    const tokenScore = scoreToken(index, token, allowCategory);
     if (tokenScore < SEARCH_MIN_CONFIDENCE) return 0;
     total += tokenScore;
   }
@@ -436,6 +461,9 @@ export function fuzzyFilter(products, query) {
   if (variants.length === 0) return eligible;
   const minimumScore = variants.length > 1 ? SCORE.KEYWORD : SEARCH_MIN_CONFIDENCE;
   const isSoftToyFamily = searchQueryUsesFamily(query, 'soft toy');
+  // A category named "Bags & wallets" must not make a backpack a wallet.
+  const objectQuery = ['wallet', 'handbag', 'backpack', 'notebook', 'hair clip', 'hair tie', 'paint brush', 'hair brush']
+    .some((family) => searchQueryUsesFamily(query, family)) || /\bbags?\b/.test(intent.text);
 
   const candidateSet = new Set();
   for (const variant of variants) {
@@ -448,10 +476,13 @@ export function fuzzyFilter(products, query) {
     .filter((product) => !isSoftToyFamily || isSoftToyProduct(product))
     .map((product) => ({
       product,
-      score: Math.max(...variants.map((variant) => scoreProduct(product, variant))),
+      exactTitle: normalize(product.name) === normalize(query),
+      score: Math.max(...variants.map((variant) => scoreProduct(product, variant, !objectQuery))),
     }))
     .filter((item) => item.score >= minimumScore)
     .sort((a, b) => {
+      const exactTitleDelta = Number(b.exactTitle) - Number(a.exactTitle);
+      if (exactTitleDelta !== 0) return exactTitleDelta;
       const scoreDelta = b.score - a.score;
       if (scoreDelta !== 0) return scoreDelta;
       return Number(isAvailable(b.product)) - Number(isAvailable(a.product));
@@ -467,7 +498,9 @@ export function getSuggestions(products, query, limit = 8) {
     cache = new Map();
     suggestionCache.set(products, cache);
   }
-  const key = `${normalize(query)}::${limit}`;
+  // Punctuation carries price intent (R28.50 versus R28 50), so it must not
+  // be erased from the cache identity before the query is parsed.
+  const key = `${String(query).trim().toLowerCase()}::${limit}`;
   if (cache.has(key)) return cache.get(key);
   const result = fuzzyFilter(products, query).slice(0, limit);
   cache.set(key, result);
