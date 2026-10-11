@@ -515,6 +515,7 @@ function applyInStockFilter(products, inStockOnly) {
 }
 
 function applyCollection(products, collection, specialIds = null) {
+  if (collection === 'just-added') return products.filter((p) => p.isNew === true);
   // Stock-based collections are no-ops in catalogue-only mode.
   if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
   // "This Week's Specials" is the union of two sources: products the admin
@@ -747,6 +748,7 @@ export async function fetchProductPage({
           getAllCached().catch(() => products));
         products = expandBarcodeSiblings(pool, products);
       }
+      if (collection === 'just-added') products = applyCollection(products, collection);
       products = applyInStockFilter(products, inStockOnly);
       products = groupProductsByBarcode(products);
       const total = products.length;
@@ -776,6 +778,8 @@ export async function fetchProductPage({
     products = applyPathFilter(products, categoryPath);
   }
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery), searchQuery);
+  // Expanded siblings must still belong to the curated new-arrival collection.
+  if (collection === 'just-added') products = applyCollection(products, collection);
 
   if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
     const sortOrders = await getSortOrders();

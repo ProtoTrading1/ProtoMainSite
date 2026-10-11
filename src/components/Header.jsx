@@ -496,7 +496,7 @@ export { AboutModal };
 export default function Header({
   cartItemCount, cartTotal,
   onMenuClick, onHome, customer, onViewProfile, onReorder, hasLastOrder, onLogout,
-  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onInstoreProducts, onCartClick, onSearchAddToCart,
+  searchQuery, setSearchQuery, navigateForSearch, onSpecials, onJustAdded, onInstoreProducts, onCartClick, onSearchAddToCart,
   previousOrderItems = [],
   categories = categoriesData,
   mobileSearchOpen: mobileSearchOpenProp, onMobileSearchOpenChange,
@@ -1124,6 +1124,9 @@ export default function Header({
             <button className="header-nav-btn header-nav-specials" type="button" onClick={onSpecials}>
               <Star size={14} className="spinning-star" />
               Specials
+            </button>
+            <button className="header-nav-btn" type="button" onClick={onJustAdded}>
+              Just Added
             </button>
           </nav>
 
