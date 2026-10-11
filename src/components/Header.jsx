@@ -1125,7 +1125,7 @@ export default function Header({
               <Star size={14} className="spinning-star" />
               Specials
             </button>
-            <button className="header-nav-btn" type="button" onClick={onJustAdded}>
+            <button className="header-nav-btn just-added-nav" type="button" onClick={onJustAdded}>
               Just Added
             </button>
           </nav>

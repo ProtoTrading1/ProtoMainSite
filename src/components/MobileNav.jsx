@@ -241,7 +241,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6' }}>
               {[["Specials", onSpecials], ["Just Added", onJustAdded]].map(([label, onClick]) => (
-                <button key={label} type="button" onClick={onClick} style={{ flex: 1, minHeight: 48, padding: '10px 12px', border: 0, background: '#fff7f7', color: '#7f1d1d', font: 'inherit', fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+                <button key={label} type="button" onClick={onClick} className={label === 'Just Added' ? 'just-added-nav' : undefined} style={{ flex: 1, minHeight: 48, padding: '10px 12px', border: 0, background: label === 'Specials' ? '#fff7f7' : undefined, color: label === 'Specials' ? '#7f1d1d' : undefined, font: 'inherit', fontWeight: 800, cursor: 'pointer' }}>{label}</button>
               ))}
             </div>
             {instoreAvailable && <button

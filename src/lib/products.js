@@ -781,7 +781,12 @@ export async function fetchProductPage({
   // Expanded siblings must still belong to the curated new-arrival collection.
   if (collection === 'just-added') products = applyCollection(products, collection);
 
-  if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
+  if (normalizedSort === 'featured' && collection === 'just-added' && !hasSearch) {
+    const sortOrders = await getSortOrders();
+    // Collection order uses the existing site-config store. Unlisted arrivals
+    // remain visible after the saved SKUs in the normal featured order.
+    products = applySkuOrder(sortCatalogProducts(products, 'featured'), sortOrders['collection:just-added']?.skuOrder);
+  } else if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
     const sortOrders = await getSortOrders();
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());
     products = skuOrder?.length ? applySkuOrder(products, skuOrder) : sortCatalogProducts(products, 'best-selling');
