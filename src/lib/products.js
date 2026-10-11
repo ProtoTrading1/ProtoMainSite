@@ -314,10 +314,11 @@ async function getSortOrders() {
   if (!_sortOrdersPromise) {
     _sortOrdersPromise = fetchJsonWithTimeout('/api/sort-orders', 8000, { cache: 'no-store' })
       .then((store) => {
-        _sortOrdersCache = store?.orders || {};
+        const orders = store?.orders || {};
+        _sortOrdersCache = orders['collection:just-added']?.unavailable ? null : orders;
         _sortOrdersCachedAt = Date.now();
         _sortOrdersPromise = null;
-        return _sortOrdersCache;
+        return orders;
       })
       .catch(() => {
         _sortOrdersPromise = null;
@@ -708,6 +709,11 @@ export async function fetchProductPage({
   specialIds = null,
   inStockOnly = false,
 } = {}) {
+  const arrivalOrder = collection === 'just-added'
+    ? (await getSortOrders())['collection:just-added'] : null;
+  if (collection === 'just-added' && (!arrivalOrder || arrivalOrder.unavailable || !Array.isArray(arrivalOrder.skuOrder))) {
+    throw new Error('Just Added is temporarily unavailable. Please retry.');
+  }
   const normalizedSort = normalizeCatalogSort(sort);
   const hasSearch = Boolean(searchQuery.trim());
   const isHomeFeatured = normalizedSort === 'featured'
@@ -782,10 +788,9 @@ export async function fetchProductPage({
   if (collection === 'just-added') products = applyCollection(products, collection);
 
   if (normalizedSort === 'featured' && collection === 'just-added' && !hasSearch) {
-    const sortOrders = await getSortOrders();
-    // Collection order uses the existing site-config store. Unlisted arrivals
+    // Collection order uses the atomic portal row. Unlisted arrivals
     // remain visible after the saved SKUs in the normal featured order.
-    products = applySkuOrder(sortCatalogProducts(products, 'featured'), sortOrders['collection:just-added']?.skuOrder);
+    products = applySkuOrder(sortCatalogProducts(products, 'featured'), arrivalOrder.skuOrder);
   } else if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
     const sortOrders = await getSortOrders();
     const skuOrder = lookupSortOrder(sortOrders, categoryPath, getActiveTaxonomy());

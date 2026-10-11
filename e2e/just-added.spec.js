@@ -11,7 +11,7 @@ const products = [
 
 async function setup(context, page, { catalogue = products, featured, arrivalOrder } = {}) {
   await installAccessibilityServices(context, { products: catalogue });
-  if (arrivalOrder) await context.route('**/api/sort-orders', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ orders: { 'collection:just-added': { skuOrder: arrivalOrder } } }) }));
+  await context.route('**/api/sort-orders', (route) => route.fulfill({ headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: JSON.stringify({ orders: { 'collection:just-added': { skuOrder: arrivalOrder || [], updatedAt: null } } }) }));
   if (featured) await context.route('**/api/featured-products', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: featured.map(({ sku }) => ({ sku })) }) }));
   await context.route('**/api/taxonomy', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ categories: [{ id: 'stationery', label: 'Stationery', children: [] }, { id: 'craft', label: 'Craft', children: [] }] }) }));
   await context.route('**/api/products?identifier=*', (route) => {
@@ -164,6 +164,53 @@ test('published exact-SKU order ranks arrivals, appends unranked arrivals and re
   await expect(names).toHaveText(['Arrival C', 'Arrival A', 'Arrival B']);
   await page.reload();
   await expect(names).toHaveText(['Arrival C', 'Arrival A', 'Arrival B']);
+});
+
+test('atomic outage shows a retryable Just Added error while Specials and category orders remain usable', async ({ page, context }) => {
+  await setup(context, page);
+  let unavailable = true;
+  let reads = 0;
+  await context.route('**/api/sort-orders', (route) => {
+    reads += 1;
+    return route.fulfill({ headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: JSON.stringify({ orders: { stationery: { skuOrder: [products[1].id, products[0].id] }, 'collection:just-added': unavailable ? { skuOrder: [], updatedAt: null, unavailable: true } : { skuOrder: [], updatedAt: 'order:recovered' } } }) });
+  });
+  await page.reload();
+  await expect(page.locator('.product-card').first()).toBeVisible();
+  await selectCollection(page, 'Just Added');
+  const grid = page.locator('.catalog-page');
+  await expect(grid.getByRole('heading', { name: "We couldn't load Just Added." })).toBeVisible();
+  await expect(grid.locator('.product-card')).toHaveCount(0);
+  await expect(grid.getByRole('button', { name: 'Retry Just Added' })).toBeVisible();
+  await selectCollection(page, 'Specials');
+  await expect(grid.getByText('Configured special only', { exact: true })).toBeVisible();
+  await page.goto('/#/stationery');
+  await expect(grid.locator('.product-card h3').first()).toHaveText('Ordinary pink notebook');
+  await selectCollection(page, 'Just Added');
+  await expect(grid.getByRole('button', { name: 'Retry Just Added' })).toBeVisible();
+  const beforeRetry = reads;
+  unavailable = false;
+  await grid.getByRole('button', { name: 'Retry Just Added' }).click();
+  await expect(grid.getByText('New blue notebook', { exact: true })).toBeVisible();
+  expect(reads).toBeGreaterThan(beforeRetry);
+  await expect(grid.getByRole('alert')).toHaveCount(0);
+});
+
+test('healthy atomic order rechecks the network after the 15-second client TTL', async ({ page, context }) => {
+  await setup(context, page);
+  let reads = 0;
+  await context.route('**/api/sort-orders', (route) => {
+    reads += 1;
+    return route.fulfill({ headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: JSON.stringify({ orders: { 'collection:just-added': { skuOrder: [], updatedAt: `order:${reads}` } } }) });
+  });
+  await page.reload();
+  await expect(page.locator('.product-card').first()).toBeVisible();
+  await selectCollection(page, 'Just Added');
+  const beforeExpiry = reads;
+  await selectCollection(page, 'Specials');
+  await page.waitForTimeout(15500);
+  await selectCollection(page, 'Just Added');
+  await expect.poll(() => reads).toBeGreaterThan(beforeExpiry);
+  await expect(page.locator('.catalog-page').getByText('New blue notebook', { exact: true })).toBeVisible();
 });
 
 test('Just Added keeps white text on teal hover and visible keyboard focus', async ({ page, context }) => {
