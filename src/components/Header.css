@@ -591,6 +591,25 @@
   color: #C89A3C;
 }
 
+.just-added-nav,
+.app-header--premium .header-nav-btn.just-added-nav {
+  background: #0f5c59;
+  color: #fff;
+  border-radius: 8px;
+}
+
+.just-added-nav:hover,
+.app-header--premium .header-nav-btn.just-added-nav:hover {
+  background: #124b49;
+  color: #fff;
+}
+
+.just-added-nav:focus-visible,
+.app-header--premium .header-nav-btn.just-added-nav:focus-visible {
+  outline: 2px solid #eac98a;
+  outline-offset: 3px;
+}
+
 .app-header--premium .header-nav-instore {
   color: #E5E5E5;
 }
@@ -871,8 +890,9 @@
   }
 
   .app-header--premium .header-nav-btn {
-    padding-inline: 6px;
-    gap: 5px;
+    padding-inline: 4px;
+    gap: 4px;
+    font-size: 13px;
   }
 
   .app-header--premium .header-actions {

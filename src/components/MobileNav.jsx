@@ -62,7 +62,7 @@ function MobileProductRequest({ onClose: closeAll }) {
   );
 }
 
-export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout, onInstoreProducts }) {
+export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout, onInstoreProducts, onSpecials, onJustAdded }) {
   const [showProductRequest, setShowProductRequest] = useState(false);
   const [categoryQuery, setCategoryQuery] = useState('');
   const dialogRef = useRef(null);
@@ -239,6 +239,11 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6' }}>
+              {[["Specials", onSpecials], ["Just Added", onJustAdded]].map(([label, onClick]) => (
+                <button key={label} type="button" onClick={onClick} className={label === 'Just Added' ? 'just-added-nav' : undefined} style={{ flex: 1, minHeight: 48, padding: '10px 12px', border: 0, background: label === 'Specials' ? '#fff7f7' : undefined, color: label === 'Specials' ? '#7f1d1d' : undefined, font: 'inherit', fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+              ))}
+            </div>
             {instoreAvailable && <button
               type="button"
               onClick={() => { onInstoreProducts?.(); onClose(); }}
@@ -247,7 +252,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
             ><Search size={17} aria-hidden="true" /> Instore Products</button>}
             <button
               onClick={() => {
-                navigate([]);
+                navigate([], {});
                 onClose();
               }}
               style={{

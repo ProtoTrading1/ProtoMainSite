@@ -215,6 +215,7 @@ function collectionLabel(collection) {
   if (collection === 'hot') return 'Hot Sellers';
   if (collection === 'clearance') return 'Clearance Stock';
   if (collection === 'specials') return "This Week's Specials";
+  if (collection === 'just-added') return 'Just Added';
   if (collection === 'instock') return 'In Stock';
   if (collection === 'soldout') return 'Out of Stock';
   return 'All Products';
@@ -234,6 +235,7 @@ export default function App({
     const next = { ...refinements };
     delete next.product;
     delete next.q;
+    delete next.collection;
     return next;
   }, [refinements]);
   const pathKey = path.join('/');
@@ -260,16 +262,21 @@ export default function App({
 
   const navigate = useCallback((newPath, newRefinements) => {
     setSearchQuery('');
-    hashNavigate(newPath, newRefinements, { scroll: true });
-  }, [hashNavigate]);
+    const collection = refinements.collection;
+    const next = newRefinements ?? (collection && !['instore-products', 'extended-range'].includes(newPath[0]) ? { collection } : {});
+    hashNavigate(newPath, next, { scroll: true });
+  }, [hashNavigate, refinements.collection]);
 
   const goAllProducts = useCallback(() => {
-    navigate([]);
+    navigate([], {});
   }, [navigate]);
 
   const navigateForSearch = useCallback((newPath, newRefinements) => {
-    hashNavigate(newPath, newRefinements, { scroll: true });
-  }, [hashNavigate]);
+    const collection = refinements.collection;
+    const next = collection && !['instore-products', 'extended-range'].includes(newPath[0])
+      ? { ...newRefinements, collection } : newRefinements;
+    hashNavigate(newPath, next, { scroll: true });
+  }, [hashNavigate, refinements.collection]);
   useEffect(() => {
     setSearchQuery((current) => (current === routeSearchQuery ? current : routeSearchQuery));
   }, [routeSearchQuery]);
@@ -357,7 +364,8 @@ export default function App({
   const pendingCheckoutStorageErrorRef = useRef(null);
   const checkoutSendingRef = useRef(false);
   const [clearedCartSnapshot, setClearedCartSnapshot] = useState(null);
-  const [activeCollection, setActiveCollection] = useState('all');
+  const activeCollection = ['hot', 'clearance', 'specials', 'just-added', 'instock', 'soldout'].includes(refinements.collection)
+    ? refinements.collection : 'all';
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [reorderModal, setReorderModal] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -438,7 +446,6 @@ export default function App({
     try { sessionStorage.removeItem(IN_STOCK_ONLY_KEY); } catch { /* ignore */ }
     try { sessionStorage.removeItem(CATALOG_SORT_KEY); } catch { /* ignore */ }
     setSearchQuery('');
-    setActiveCollection('all');
     setSort(DEFAULT_SORT);
     setInStockOnly(false);
     hashNavigate([], {}, { scroll: false });
@@ -1015,7 +1022,6 @@ export default function App({
 
   const handleResetFilters = useCallback(() => {
     setSearchQuery('');
-    setActiveCollection('all');
     setSort(DEFAULT_SORT);
     setInStockOnly(false);
     setPage(1);
@@ -1555,35 +1561,9 @@ export default function App({
   }, [removeFromCart, updateQty]);
 
   const handleShortcut = (id) => {
-    if (id === 'start') {
-      setActiveCollection('all');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'hot') {
-      setActiveCollection('hot');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'clearance') {
-      setActiveCollection('clearance');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'specials') {
-      setActiveCollection('specials');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'instock') {
-      setActiveCollection('instock');
-      setSearchQuery('');
-      navigate([]);
-    }
-    if (id === 'soldout') {
-      setActiveCollection('soldout');
-      setSearchQuery('');
-      navigate([]);
+    if (id === 'start') navigate([], {});
+    else if (['hot', 'clearance', 'specials', 'just-added', 'instock', 'soldout'].includes(id)) {
+      navigate([], { collection: id });
     }
   };
 
@@ -2244,8 +2224,8 @@ export default function App({
   const clearCatalogueSearch = useCallback(() => {
     setSearchQuery('');
     const route = catalogueSearchRoute('');
-    hashNavigate(route.path, route.refinements, { scroll: false });
-  }, [hashNavigate]);
+    hashNavigate(route.path, refinements.collection ? { collection: refinements.collection } : route.refinements, { scroll: false });
+  }, [hashNavigate, refinements.collection]);
   const customerJourneyPrompt = customerJourney ? (
     <CustomerJourneyPrompt
       state={customerJourney}
@@ -2322,6 +2302,7 @@ export default function App({
         previousOrderItems={lastOrder?.items || []}
         onLogout={onLogout}
         onSpecials={() => handleShortcut('specials')}
+        onJustAdded={() => handleShortcut('just-added')}
         onInstoreProducts={() => navigate(['instore-products'])}
         onSearchAddToCart={(product, qty) => addToCart(product, qty)}
         onCartClick={handleCartOpen}
@@ -2504,6 +2485,7 @@ export default function App({
         onLogout={onLogout}
         onHome={() => { goHome(); setMobileMenuOpen(false); }}
         onSpecials={() => { handleShortcut('specials'); setMobileMenuOpen(false); }}
+        onJustAdded={() => { handleShortcut('just-added'); setMobileMenuOpen(false); }}
         onReorder={lastOrder ? () => { setReorderModal(true); setMobileMenuOpen(false); } : null}
         onInstoreProducts={() => { navigate(['instore-products']); setMobileMenuOpen(false); }}
       />
