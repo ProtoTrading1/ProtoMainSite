@@ -871,8 +871,9 @@
   }
 
   .app-header--premium .header-nav-btn {
-    padding-inline: 6px;
-    gap: 5px;
+    padding-inline: 4px;
+    gap: 4px;
+    font-size: 13px;
   }
 
   .app-header--premium .header-actions {
