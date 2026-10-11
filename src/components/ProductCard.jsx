@@ -12,6 +12,7 @@ import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import './ProductCard.css';
+import ProductFeedbackPrompt from './ProductFeedbackPrompt';
 
 function productBarcode(product) {
   const explicitBarcode = String(
@@ -934,6 +935,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                     />
                   </div>
                 )}
+
+                <ProductFeedbackPrompt product={activeProduct} />
               </div>
 
               {/* Fixed buy bar */}
