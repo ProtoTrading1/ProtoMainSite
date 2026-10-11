@@ -124,3 +124,36 @@ test('unsupported materials, object qualifiers and bead sizes do not broaden to 
   }
   assert.equal(fuzzyFilter(rows, 'beads 0.4cm')[0]?.name, 'Bead 4mm');
 });
+
+test('technical digits and connector letters remain mandatory rather than being dropped', () => {
+  for (const [name, match, mismatch] of [
+    ['Hoco QC3.0 Charger', 'hoco qc3.0 charger', 'hoco qc3.1 charger'],
+    ['4 USB Ports Charger', '4 usb ports charger', '3 usb ports charger'],
+    ['Beads Size 11/0', 'beads 11/0', 'beads 11/1'],
+    ['Lamp 0.5W', 'lamp 0.5w', 'lamp 1.5w'],
+    ['USB-A Charger', 'usb-a charger', 'usb-c charger'],
+    ['Type A Adapter', 'type a adapter', 'type b adapter'],
+  ]) {
+    const row = { sku: 'TECH123', name, title: name };
+    assert.equal(fuzzyFilter([row], match).length, 1, match);
+    assert.equal(matchesInstoreSearch(row, match), true, match);
+    assert.deepEqual(fuzzyFilter([row], mismatch), [], mismatch);
+    assert.equal(matchesInstoreSearch(row, mismatch), false, mismatch);
+  }
+});
+
+test('technical specifications cannot borrow unrelated digits or letters from another field', () => {
+  for (const [name, query, extra] of [
+    ['Hoco QC3.0 Charger', 'hoco qc3.1 charger', 'Pack 1'],
+    ['USB-A Charger', 'usb-c charger', 'Grade C'],
+    ['Lamp 0.5W', 'lamp 1.5w', 'Pack 1'],
+    ['4 USB Ports Charger', '3 usb ports charger', 'Pack 3'],
+    ['Beads 11/0', 'beads 11/1', 'Pack 1'],
+  ]) {
+    for (const row of [{ name: `${name} ${extra}`, sku: 'TECH123' }, { name, description: extra, sku: 'TECH123' }]) {
+      assert.deepEqual(fuzzyFilter([row], query), [], query);
+      assert.equal(matchesInstoreSearch(row, query), false, query);
+    }
+  }
+  assert.equal(fuzzyFilter([{ name: 'Charger USB C 28.5W', price: 25 }], 'usb-c charger 28.5w under R28.50').length, 1);
+});

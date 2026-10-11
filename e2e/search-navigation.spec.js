@@ -273,6 +273,20 @@ test('a late response cannot replace a newer committed query', async ({ browser 
   }
 });
 
+test('rapid typing followed by Enter cancels the previous debounce on both layouts', async ({ page, context }) => {
+  await installSyntheticServices(context);
+  await signIn(page);
+  await page.clock.install();
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  await search.fill('cobalt');
+  await search.fill('amber');
+  await search.press('Enter');
+  await page.clock.runFor(1000);
+  await expect(page).toHaveURL(/q=amber/);
+  await expect(page.locator('.catalog-page').getByText('Amber synthetic result', { exact: true })).toBeVisible();
+  await expect(page.locator('.catalog-page').getByText('Cobalt synthetic result', { exact: true })).toHaveCount(0);
+});
+
 test('every Instore search image opens its matching preview without leaving the search or changing the basket', async ({ page, context }) => {
   await installSyntheticServices(context);
   await signIn(page);

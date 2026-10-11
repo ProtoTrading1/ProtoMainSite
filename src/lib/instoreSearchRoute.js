@@ -1,9 +1,11 @@
+import { SEARCH_QUERY_MAX_LENGTH } from '../../lib/search-language.mjs';
+
 const INSTORE_PATH = ['instore-products'];
 const INSTORE_QUERY_KEY = 'q';
 const INSTORE_PAGE_KEY = 'page';
 
 export function normalizeInstoreSearchQuery(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, SEARCH_QUERY_MAX_LENGTH);
 }
 
 export function instoreSearchQueryFromRefinements(refinements = {}) {

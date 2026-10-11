@@ -52,6 +52,12 @@ function words(text) {
   return normalize(text).split(/\s+/).filter(Boolean).map(singularizeSearchWord);
 }
 
+function significantWords(text) {
+  const tokens = words(text);
+  return tokens.filter((token, index) => token.length >= 2 || /^\d$/.test(token)
+    || (/^[a-z]$/.test(token) && /^(?:usb|type|class|grade|size)$/.test(tokens[index - 1] || '')));
+}
+
 function wholeWordIn(text, token) {
   if (!token) return false;
   return words(text).includes(token);
@@ -257,9 +263,9 @@ function candidateProducts(products, query) {
   prepareSearchIndex(products);
   const prepared = datasetIndex.get(products);
   if (!prepared) return products;
-  if (isIdentifierQuery(query)) return products;
+  if (isIdentifierQuery(query) || isBareModelQuery(query)) return products;
 
-  const tokens = words(query).filter((token) => token.length >= 2);
+  const tokens = significantWords(query);
   if (tokens.length === 0) return products;
 
   let candidates = null;
@@ -393,7 +399,11 @@ function scoreToken(index, token, allowCategory = true) {
   );
 }
 
-function scoreIdentifierQuery(product, query) {
+function isBareModelQuery(query) {
+  return /^(?=.*[a-z])(?=.*\d)[a-z0-9]+$/i.test(String(query || '').trim());
+}
+
+function scoreIdentifierQuery(product, query, allowModelFallback = false) {
   const queryId = normalizeIdentifier(query);
   if (!queryId) return 0;
 
@@ -422,19 +432,24 @@ function scoreIdentifierQuery(product, query) {
     }
   }
 
+  // Only a bare model token may fall back to the title. Labels, numeric
+  // identifiers and punctuation variants retain identifier-only behavior.
+  if (allowModelFallback && isBareModelQuery(query)
+    && words(`${product.name || ''} ${product.title || ''}`).includes(String(query).trim().toLowerCase())) {
+    return SCORE.WHOLE_WORD_NAME;
+  }
   return score;
 }
 
-function scoreProduct(product, query, allowCategory = true) {
+function scoreProduct(product, query, allowCategory = true, allowModelFallback = false) {
   const q = normalize(query);
   if (!q) return 0;
 
-  if (isIdentifierQuery(query)) {
-    return scoreIdentifierQuery(product, query);
+  if (isIdentifierQuery(query) || isBareModelQuery(query)) {
+    return scoreIdentifierQuery(product, query, allowModelFallback);
   }
 
-  const tokens = words(q);
-  const significant = tokens.filter((t) => t.length >= 2);
+  const significant = significantWords(q);
   if (significant.length === 0) return 0;
 
   const index = getSearchIndex(product);
@@ -476,8 +491,8 @@ export function fuzzyFilter(products, query) {
     .filter((product) => !isSoftToyFamily || isSoftToyProduct(product))
     .map((product) => ({
       product,
-      exactTitle: normalize(product.name) === normalize(query),
-      score: Math.max(...variants.map((variant) => scoreProduct(product, variant, !objectQuery))),
+      exactTitle: !isIdentifierQuery(query) && !isBareModelQuery(query) && normalize(product.name) === normalize(query),
+      score: Math.max(...variants.map((variant) => scoreProduct(product, variant, !objectQuery, isBareModelQuery(query)))),
     }))
     .filter((item) => item.score >= minimumScore)
     .sort((a, b) => {

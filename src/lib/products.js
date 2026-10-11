@@ -775,7 +775,7 @@ export async function fetchProductPage({
   if (!hasSearch && !isCategoryBrowse) {
     products = applyPathFilter(products, categoryPath);
   }
-  if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery));
+  if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery), searchQuery);
 
   if (normalizedSort === 'featured' && categoryPath.length && !hasSearch) {
     const sortOrders = await getSortOrders();

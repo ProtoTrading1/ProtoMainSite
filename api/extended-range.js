@@ -4,7 +4,7 @@ import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 import { instorePage } from '../lib/instore-page.mjs';
-import { searchQueryHasStructuredIntent } from '../lib/search-language.mjs';
+import { searchQueryHasStructuredIntent, SEARCH_QUERY_MAX_LENGTH } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
@@ -64,7 +64,7 @@ function normalizeQuery(value) {
   // Keep decimal punctuation until shared intent parsing has converted units.
   // Removing it here turned 0.5m into 05m and made equivalent measurements
   // disagree between the main catalogue and Instore search.
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9 _.,-]/g, '').slice(0, 80);
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, SEARCH_QUERY_MAX_LENGTH);
 }
 
 function normalizePage(value) {
