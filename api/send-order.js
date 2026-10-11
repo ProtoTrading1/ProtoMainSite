@@ -1,3 +1,4 @@
+import { isArchiveInstore, attachArchiveInstoreMetadata, resolveArchiveInstoreLine, verifyArchiveInstoreAllocation } from './_archive-instore-contract.js';
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
@@ -289,16 +290,17 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   const qty = Number(item?.qty);
   if (!Number.isSafeInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) throw orderError('Invalid Instore quantity.');
   const title = cleanText(indexRow.title, sku);
-  const bridgeMatches = textId(bridgeRow?.CODE) === sku;
+  const reviewed = isArchiveInstore(indexRow) ? resolveArchiveInstoreLine(item, indexRow, bridgeRow) : null;
+  const bridgeMatches = textId(bridgeRow?.CODE) === (reviewed ? textId(indexRow.barcode) || sku : sku);
   const bridgePrice = bridgeMatches ? websitePriceFromExVat(Number(bridgeRow?.PRICE_A)) : NaN;
   // Fresh Positill price first; the reviewed index price when the bridge has
   // no row for this SKU, so a product missing from Positill can still be requested.
-  const price = Number.isFinite(bridgePrice) && bridgePrice > 0 ? bridgePrice : customerFacingCataloguePrice(indexRow?.price);
+  const price = reviewed ? reviewed.price : Number.isFinite(bridgePrice) && bridgePrice > 0 ? bridgePrice : customerFacingCataloguePrice(indexRow?.price);
   if (!Number.isFinite(price) || price <= 0) throw orderError(`${title} (${sku}) has no current Instore price and cannot be ordered.`, 409);
   const available = bridgeMatches ? availableFromBridge(bridgeRow) : null;
   if (available === null || available < qty) console.warn('send-order: Instore line requested beyond known stock', { sku, qty, available });
   const name = bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: reviewed?.unitsOfIssue || 'EACH', casePack: reviewed?.unitsOfIssue || 'Each', packDescription: '', minQty: reviewed?.minQty || 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
 async function resolveInstorePrices(items) {
@@ -310,14 +312,21 @@ async function resolveInstorePrices(items) {
   let indexRows; let normalRows; let listingControls;
   try {
     const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
-      index.from('extended_range_items').select('sku, image_source, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
+      index.from('extended_range_items').select('sku, image_source, image_source_key, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('barcode', skus),
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
     ]);
     if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error;
-    indexRows = indexResult.data || [];
+    indexRows = await attachArchiveInstoreMetadata(index, indexResult.data || []);
     normalRows = [...(normalSkuResult.data || []), ...(normalBarcodeResult.data || [])];
+    const archiveIdentifiers = [...new Set(indexRows.filter(isArchiveInstore).flatMap(row => [textId(row.sku), textId(row.barcode)]).filter(Boolean))];
+    if (archiveIdentifiers.length) {
+      const byCode = await index.from('website_stock').select('sku, barcode').in('sku', archiveIdentifiers);
+      const byBarcode = await index.from('website_stock').select('sku, barcode').in('barcode', archiveIdentifiers);
+      if (byCode.error || byBarcode.error) throw byCode.error || byBarcode.error;
+      normalRows.push(...(byCode.data || []), ...(byBarcode.data || []));
+    }
     listingControls = new Map((listingResult.data || []).map((row) => [textId(row.sku), String(row.status || '').trim().toLowerCase()]));
   } catch (error) {
     console.error('send-order: Instore index lookup failed:', error?.message || error);
@@ -326,7 +335,9 @@ async function resolveInstorePrices(items) {
   const duplicates = new Map();
   for (const item of items) {
     const sku = textId(item?.product?.sku || item?.product?.id);
-    const outcome = evaluateInstoreDuplicate({ sku }, { status: 'success', complete: true, variantsIncluded: true, checkedIdentifiers: [sku], rows: normalRows });
+    const row = indexRows.find(row => textId(row.sku) === sku);
+    const barcode = isArchiveInstore(row) ? textId(row.barcode) : '';
+    const outcome = evaluateInstoreDuplicate({ sku, ...(barcode ? { barcode } : {}) }, { status: 'success', complete: true, variantsIncluded: true, checkedIdentifiers: [sku, ...(barcode ? [barcode] : [])], rows: normalRows });
     duplicates.set(sku, outcome);
   }
   const bridgeUrl = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
@@ -334,8 +345,9 @@ async function resolveInstorePrices(items) {
   // The bridge is best-effort for price and a stock log line only: a bridge
   // outage or an unknown SKU must not block an Instore order request.
   const bridgeBySku = new Map();
+  const bridgeCodes = [...new Set(indexRows.map(row => isArchiveInstore(row) ? textId(row.barcode) || textId(row.sku) : textId(row.sku)))];
   if (bridgeUrl.startsWith('https://') && bridgeKey) {
-    await Promise.all(skus.map(async (sku) => {
+    await Promise.all(bridgeCodes.map(async (sku) => {
       try {
         const response = await fetch(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
         if (response.ok) bridgeBySku.set(sku, (await response.json())?.row);
@@ -347,11 +359,12 @@ async function resolveInstorePrices(items) {
   } else {
     console.warn('send-order: Instore bridge not configured; using index prices');
   }
+  verifyArchiveInstoreAllocation(items, indexRows, bridgeBySku);
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible' });
+    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(isArchiveInstore(matching[0]) ? textId(matching[0].barcode) || sku : sku), listingStatus: listingControls.get(sku) || 'visible' });
   });
 }
 

@@ -1,3 +1,4 @@
+import { isArchiveInstore, archiveInstoreMetadata, attachArchiveInstoreMetadata, readArchiveInstoreRevision } from './_archive-instore-contract.js';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
@@ -91,7 +92,9 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const availableStock = Number(row?.available_stock);
     const customerVisibleStock = Math.floor(availableStock);
     const rawPrice = Number(row?.price);
-    const price = pricesAreInclusive
+    const reviewed = archiveInstoreMetadata(row);
+    if (isArchiveInstore(row) && !reviewed) return [];
+    const price = reviewed ? reviewed.price : pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
       : customerFacingCataloguePrice(row?.price);
     if (!sku || seen.has(sku) || listingHidden
@@ -111,7 +114,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       originalDescription: String(row?.original_description || '').trim(),
       price, image: imageUrl, images: imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
       stockQty: customerVisibleStock, stockOnHand: customerVisibleStock, inStock: true,
-      minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
+      ...(reviewed ? { unitsOfIssue: reviewed.unitsOfIssue, minQty: reviewed.minQty } : { minQty: 1 }), category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
     };
@@ -149,13 +152,13 @@ export function applyInstoreImageControls(rows, controls, listingControls = new 
 // catalogue duplicate index and the Instore controls, resolved into the
 // products a customer may see. This is the authoritative build; the stored
 // read model below is only ever a copy of its result.
-export async function loadLiveInstoreCatalogue(client, { includeStaged = false } = {}) {
+export async function loadLiveInstoreCatalogue(client, { includeStaged = false, archiveRevision = null } = {}) {
   // These two complete reads are independent. Fetch them concurrently so a
   // large staged preview cannot spend its whole serverless response window
   // waiting for the main-catalogue duplicate index to begin.
   const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
     readCompleteRows(() => client.from('extended_range_items')
-      .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
+      .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
       .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
       .eq('image_review_status', 'verified')
       .in('is_active', includeStaged ? [true, false] : [true])
@@ -166,13 +169,15 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false }
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls, listingControls), '', { includeStaged });
-  return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
+  const reviewedRows = await attachArchiveInstoreMetadata(client, rangeRows);
+  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(reviewedRows, imageControls, listingControls), '', { includeStaged });
+  if (archiveRevision && await readArchiveInstoreRevision(client) !== archiveRevision) throw new Error('Archive destination changed during catalogue read. Retry with fresh state.');
+  return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls, archiveRevision };
 }
 
-export async function storeInstoreCatalogue(client, { products, tiles, imageControls, listingControls }) {
+export async function storeInstoreCatalogue(client, { products, tiles, imageControls, listingControls, archiveRevision }) {
   try {
-    await writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls });
+    await writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls, archiveRevision });
   } catch (error) {
     // A cache that cannot be written must not fail a request that already has
     // the correct products in hand.
@@ -185,7 +190,7 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 // completely. Otherwise body is null and staleBeforeMs says how old a snapshot
 // the live read that follows may leave in place: a snapshot built under
 // superseded Instore controls is rebuilt at once rather than waited out.
-export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
+export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, archiveRevision = null }) {
   const ttlMs = catalogueTtlMs();
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
   const searchPatterns = catalogueSearchPatterns(query);
@@ -194,7 +199,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
   // A landing or category page is the whole answer in one database round trip.
   // Anything else — a search, or the full-collection payload — needs the reads
   // below, and so does a database that has not had migration 072 applied.
-  if (!searchPatterns.length && !structuredOnly && !includeCatalogue) {
+  if (!searchPatterns.length && !structuredOnly && !includeCatalogue && !archiveRevision) {
     try {
       const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
       if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
@@ -225,7 +230,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
       readInstoreListingControls(client),
     ]);
     state = stateRow;
-    fingerprint = controlsFingerprint(imageControls, listingControls);
+    fingerprint = controlsFingerprint(imageControls, listingControls, archiveRevision);
   } catch (error) {
     console.error('instore catalogue snapshot unreadable:', error?.message || error);
     return { body: null, staleBeforeMs: ttlMs };
@@ -401,6 +406,7 @@ export default async function handler(req, res) {
     }
     const includeStaged = false;
     const client = stockClient();
+    const archiveRevision = await readArchiveInstoreRevision(client);
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
@@ -410,7 +416,7 @@ export default async function handler(req, res) {
     // rebuilding the whole collection. It is only used while it is fresh and
     // was built under the Instore controls currently in force; otherwise the
     // live read below runs exactly as it always has.
-    const stored = await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
+    const stored = await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, archiveRevision });
     if (stored.body) {
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
@@ -422,11 +428,11 @@ export default async function handler(req, res) {
     // read now, not from a warm in-process copy of an earlier request's rows.
     const claimed = await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
     const live = await (claimed
-      ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
+      ? loadLiveInstoreCatalogue(client, { includeStaged, archiveRevision }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;
       })
-      : getCachedCatalogue(includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
+      : getCachedCatalogue(`${includeStaged ? 'preview' : 'production'}:${archiveRevision || 'legacy'}`, () => loadLiveInstoreCatalogue(client, { includeStaged, archiveRevision })));
     const allEligible = live.products;
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);

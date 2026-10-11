@@ -34,9 +34,9 @@ function hidden(controls) {
 
 // Only a hiding control changes what a customer sees, so only those form the
 // fingerprint: a stored 'visible' row must not force a needless rebuild.
-export function controlsFingerprint(imageControls, listingControls) {
+export function controlsFingerprint(imageControls, listingControls, archiveRevision = null) {
   return createHash('sha256')
-    .update(JSON.stringify({ image: hidden(imageControls), listing: hidden(listingControls) }))
+    .update(JSON.stringify({ ...(archiveRevision ? { archiveConsumerVersion: 1, archiveRevision } : {}), image: hidden(imageControls), listing: hidden(listingControls) }))
     .digest('hex');
 }
 
@@ -224,7 +224,7 @@ export async function releaseCatalogueRefresh(client, message) {
   if (error) console.error('instore catalogue release failed:', error.message || error);
 }
 
-export async function writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls }) {
+export async function writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls, archiveRevision = null }) {
   const rows = buildCatalogueRows(products);
   if (!rows.length) throw new Error('Instore catalogue refresh produced no products');
   const batch = randomUUID();
@@ -238,7 +238,7 @@ export async function writeCatalogueSnapshot(client, { products, tiles, imageCon
   const { data, error } = await client.rpc('instore_catalogue_commit', {
     p_batch: batch,
     p_tiles: tiles || [],
-    p_controls_fingerprint: controlsFingerprint(imageControls, listingControls),
+    p_controls_fingerprint: controlsFingerprint(imageControls, listingControls, archiveRevision),
     p_payload_fingerprint: rowsFingerprint(rows),
     p_expected_count: rows.length,
   });
