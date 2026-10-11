@@ -6,7 +6,7 @@ import ProtoLogo from './ProtoLogo';
 import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
 import { discoveryTiles } from '../../lib/instore-discovery.mjs';
 import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
-import { parseSearchQuery, searchQueryVariants } from '../../lib/search-language.mjs';
+import { parseSearchQuery, searchQueryVariants, SEARCH_QUERY_MAX_LENGTH } from '../../lib/search-language.mjs';
 import './InstoreProducts.css';
 import './InstoreDisclaimer.css';
 
@@ -39,6 +39,8 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const [retry, setRetry] = useState(0);
   const [products, setProducts] = useState([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pageSize: PAGE_SIZE });
+  const submittedQueryRef = useRef(submittedQuery);
+  useEffect(() => { submittedQueryRef.current = submittedQuery; }, [submittedQuery]);
   const [tiles, setTiles] = useState([]);
   // The complete collection, once it has been fetched in the background. While
   // it is held, every search, category and page is answered without a request.
@@ -61,8 +63,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
 
   useEffect(() => {
-    setQuery(initialQuery);
-    setSubmittedQuery(initialQuery);
+    // A local submit already committed this query. Its delayed route echo
+    // must not replace the customer's next unsubmitted edit.
+    if (submittedQueryRef.current !== initialQuery) {
+      setQuery(initialQuery);
+      setSubmittedQuery(initialQuery);
+    }
     setCategory(initialQuery ? '' : browseCategory);
     setPage(initialPage);
   }, [initialQuery, browseCategory, initialPage]);
@@ -226,7 +232,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
       <div><span className="instore-kicker">LIVE COLLECTION</span><h2>What are you looking for?</h2><p>Try everyday words, such as “wooden bracelet”.</p></div>
       <form className="instore-search" role="search" onSubmit={submit}>
         <label className="instore-sr-only" htmlFor="instore-search">Search Instore Products</label>
-        <div><Search size={18} aria-hidden="true" /><input ref={searchRef} id="instore-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try bracelets, hair clips, mugs…" maxLength={80} />{(query || submittedQuery) && <button type="button" onClick={clear} aria-label="Clear search"><X size={16} /></button>}</div>
+        <div><Search size={18} aria-hidden="true" /><input ref={searchRef} id="instore-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try bracelets, hair clips, mugs…" maxLength={SEARCH_QUERY_MAX_LENGTH} />{(query || submittedQuery) && <button type="button" onClick={clear} aria-label="Clear search"><X size={16} /></button>}</div>
         <button type="submit">Search <ArrowRight size={16} /></button>
       </form>
     </div>

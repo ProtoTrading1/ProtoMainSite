@@ -9,6 +9,17 @@ const valid = {
   image_review_status: 'verified', visibility_status: 'search_only', is_active: true,
 };
 
+test('Instore API preserves full-title qualifiers and slash-separated technical sizes', () => {
+  const prefix = 'Ldnio Lc111 USB C To Lightning Charging Cable For Iphone Fast Charging PD 30w 1m Cable ';
+  assert.ok(prefix.length > 80);
+  const rows = ['Grey', 'Black'].map((colour, index) => ({ ...valid, sku: `LONG-${index}`, title: prefix + colour, original_description: prefix + colour, available_stock: 20 }));
+  assert.deepEqual(buildExtendedRangeProducts(rows, prefix + 'Grey').map(row => row.sku), ['LONG-0']);
+  const beads = { ...valid, available_stock: 20, title: 'Beads 11/0', original_description: 'Beads 11/0' };
+  assert.equal(buildExtendedRangeProducts([beads], 'beads 11/0').length, 1);
+  assert.equal(buildExtendedRangeProducts([beads], 'beads 11/1').length, 0);
+  assert.equal(buildExtendedRangeProducts([{ ...beads, listing_control_status: 'hidden' }], 'beads 11/0').length, 0);
+});
+
 test('Instore feed includes only reviewed priced records with more than ten available units', () => {
   const products = buildExtendedRangeProducts([
     { ...valid, available_stock: 11 },

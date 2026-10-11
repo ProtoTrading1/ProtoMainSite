@@ -1,3 +1,5 @@
+import { parseSearchQuery, productMatchesSearchIntent } from '../../lib/search-language.mjs';
+
 /**
  * Grouping key for a product row. An explicit admin variant group (migration
  * 052, attached as `groupId` when catalogGrouping is on) wins over the legacy
@@ -178,7 +180,7 @@ export function groupProductsByBarcode(products) {
 }
 
 /** When search matches one variant, keep siblings that share the same barcode. */
-export function expandBarcodeSiblings(pool, matched) {
+export function expandBarcodeSiblings(pool, matched, query = '') {
   if (!Array.isArray(matched) || !matched.length) return matched || [];
 
   const keys = new Set(matched.map(variantGroupKey).filter(Boolean));
@@ -202,5 +204,9 @@ export function expandBarcodeSiblings(pool, matched) {
     out.push(product);
     seen.add(product.id);
   }
-  return out;
+  // Group alternatives must obey the same shopping promises as the match.
+  // Otherwise an image-bearing sibling can become the card representative
+  // despite exceeding the budget or having the wrong size/colour/stock.
+  const intent = parseSearchQuery(query);
+  return out.filter((product) => productMatchesSearchIntent(product, intent));
 }

@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { variantGroupKey, groupProductsByBarcode, expandBarcodeSiblings } from '../src/lib/productGroups.js';
+import { fuzzyFilter } from '../src/lib/fuzzySearch.js';
 
 // A storefront-adapted row: id/sku are the SKU, code/barcode are the barcode.
 const row = (sku, barcode, over = {}) => ({
   id: sku, sku, code: barcode, barcode, name: over.name || `Item ${sku}`, image: over.image || `${sku}.jpg`, ...over,
+});
+
+test('group representatives and alternatives cannot bypass structured search constraints', () => {
+  for (const [query, matching, excluded] of [
+    ['charger under R30', { name: 'Charger', price: 25 }, { name: 'Charger', price: 100 }],
+    ['beads 4mm', { name: 'Beads 4mm' }, { name: 'Beads 8mm' }],
+    ['in stock charger', { name: 'Charger', stockOnHand: 5 }, { name: 'Charger', stockOnHand: 0 }],
+    ['charger white', { name: 'Charger White' }, { name: 'Charger Black' }],
+  ]) {
+    const pool = [row('MATCH', 'SHARED', { ...matching, image: '' }), row('EXCLUDED', 'SHARED', excluded)];
+    const cards = groupProductsByBarcode(expandBarcodeSiblings(pool, fuzzyFilter(pool, query), query));
+    assert.equal(cards.length, 1, query);
+    assert.equal(cards[0].sku, 'MATCH', query);
+    assert.equal(cards[0].variants, undefined, query);
+    assert.equal(expandBarcodeSiblings(pool, [pool[0]]).length, 2, 'unconstrained variant browsing preserved');
+  }
 });
 
 test('variantGroupKey prefers an admin groupId, else barcode', () => {

@@ -23,6 +23,43 @@ const catalogueProducts = [
   product(102, 'Unrelated synthetic catalogue item'),
 ];
 
+test('technical titles and decimal budgets render correct results with explicit stock intent', async ({ page, context }, testInfo) => {
+  const title = 'Hoco C102a – 4 USB Ports, Max 28.5w, Qc3.0 Fast Charger';
+  const rows = [
+    { ...product(110, title), sku: '1002110432', price: 100 },
+    { ...product(111, 'Hoco C102a empty stock'), stockOnHand: 0, stockQty: 0, inStock: false },
+    { ...product(112, 'Budget Charger'), price: 28.5 },
+    { ...product(113, 'Expensive Charger'), price: 28.51 },
+  ];
+  await installSyntheticServices(context, { catalogue: rows });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await signIn(page);
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  const grid = page.locator('.catalog-page');
+  const submit = async (query) => {
+    // A committed mobile query closes the search sheet; reopen it for edits.
+    if ((page.viewportSize()?.width || 1440) < 901 && !await search.isVisible()) {
+      await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search', exact: true }).click();
+    }
+    await search.fill(query);
+    await search.press('Enter');
+  };
+  await submit(title);
+  await expect(grid.getByRole('button', { name: `View ${title}`, exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('exact-title.png'), fullPage: true });
+  await submit('hoco c102a');
+  await expect(grid.getByText('Hoco C102a empty stock', { exact: true })).toBeVisible();
+  await submit('in stock hoco c102a');
+  await expect(grid.getByRole('button', { name: `View ${title}`, exact: true })).toBeVisible();
+  await expect(grid.getByText('Hoco C102a empty stock', { exact: true })).toHaveCount(0);
+  await submit('charger under R28.50');
+  await expect(grid.getByText('Budget Charger', { exact: true })).toBeVisible();
+  await expect(grid.getByText('Expensive Charger', { exact: true })).toHaveCount(0);
+  await expect(grid.getByRole('button', { name: `View ${title}`, exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 function json(route, body, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -69,10 +106,12 @@ async function installSyntheticServices(context, { delayedCatalogueResponse, tax
       }
       const rows = query ? instoreProducts : instoreProducts;
       const start = (page - 1) * 24;
-      return json(route, {
+      try { return await json(route, {
         products: rows.slice(start, start + 24), total: rows.length, page, pageSize: 24,
         ...(includeCatalogue && !delayedCatalogueResponse ? { catalogue: rows } : {}), tiles: [],
-      });
+      }); } finally {
+        if (query.toLowerCase() === 'cobalt') delayedCatalogueResponse?.settled?.();
+      }
     }
     if (pathname === '/api/products') {
       return json(route, catalogue);
@@ -200,6 +239,52 @@ test('catalogue search remains visible and usable at 1024px', async ({ browser }
   } finally {
     await context.close();
   }
+});
+
+test('a late response cannot replace a newer committed query', async ({ browser }) => {
+  let markStarted;
+  let markSettled;
+  const delay = { resolve: null, started: () => markStarted?.(), settled: () => markSettled?.() };
+  const responseStarted = new Promise((resolve) => { markStarted = resolve; });
+  const responseSettled = new Promise((resolve) => { markSettled = resolve; });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await installSyntheticServices(context, { delayedCatalogueResponse: delay });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+    const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+    await search.fill('cobalt');
+    await search.press('Enter');
+    await responseStarted;
+    await search.fill('amber');
+    await search.press('Enter');
+    await expect(page).toHaveURL(/q=amber/);
+    await expect(page.getByText('Amber synthetic result', { exact: true })).toBeVisible();
+    delay.resolve?.();
+    // The obsolete fetch may be cancelled; observe the intercepted handler
+    // settling rather than requiring a response event on a cancelled request.
+    await responseSettled;
+    await expect(page).toHaveURL(/q=amber/);
+    await expect(page.getByText('Amber synthetic result', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cobalt synthetic result', { exact: true })).toHaveCount(0);
+  } finally {
+    delay.resolve?.();
+    await context.close();
+  }
+});
+
+test('rapid typing followed by Enter cancels the previous debounce on both layouts', async ({ page, context }) => {
+  await installSyntheticServices(context);
+  await signIn(page);
+  await page.clock.install();
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  await search.fill('cobalt');
+  await search.fill('amber');
+  await search.press('Enter');
+  await page.clock.runFor(1000);
+  await expect(page).toHaveURL(/q=amber/);
+  await expect(page.locator('.catalog-page').getByText('Amber synthetic result', { exact: true })).toBeVisible();
+  await expect(page.locator('.catalog-page').getByText('Cobalt synthetic result', { exact: true })).toHaveCount(0);
 });
 
 test('every Instore search image opens its matching preview without leaving the search or changing the basket', async ({ page, context }) => {

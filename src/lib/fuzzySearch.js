@@ -7,7 +7,7 @@ import {
 } from './identifierNormalize.js';
 import {
   firstRelatedSearchTerm, parseSearchQuery, productMatchesSearchIntent,
-  searchQueryUsesFamily, searchQueryVariants,
+  searchQueryUsesFamily, searchQueryVariants, singularizeSearchWord,
 } from '../../lib/search-language.mjs';
 
 const SCORE = {
@@ -49,7 +49,13 @@ export function getRelatedSearchTerm(value) {
 }
 
 function words(text) {
-  return normalize(text).split(/\s+/).filter(Boolean);
+  return normalize(text).split(/\s+/).filter(Boolean).map(singularizeSearchWord);
+}
+
+function significantWords(text) {
+  const tokens = words(text);
+  return tokens.filter((token, index) => token.length >= 2 || /^\d$/.test(token)
+    || (/^[a-z]$/.test(token) && /^(?:usb|type|class|grade|size)$/.test(tokens[index - 1] || '')));
 }
 
 function wholeWordIn(text, token) {
@@ -137,6 +143,7 @@ function productSearchText(product) {
     product.casePack,
     product.marginCue,
     product.supplier,
+    product.brand,
     pathLabels,
     ...(product.badges || []),
     ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
@@ -173,7 +180,14 @@ function getSearchIndex(product) {
     product.casePack,
     product.marginCue,
     product.supplier,
+    product.brand,
     (product.categoryPath || []).join(' '),
+    ...(product.badges || []),
+    ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
+  ].filter(Boolean).join(' '));
+  const specificKeywordText = normalize([
+    product.colour, product.size, product.style, product.casePack,
+    product.marginCue, product.supplier, product.brand,
     ...(product.badges || []),
     ...(product.tags || []).map((t) => (typeof t === 'string' ? t : t.label || '')),
   ].filter(Boolean).join(' '));
@@ -198,6 +212,7 @@ function getSearchIndex(product) {
     description,
     descWords,
     keywordText,
+    specificKeywordText,
     skus,
     barcodes,
     rawText: productSearchText(product),
@@ -231,7 +246,7 @@ export function prepareSearchIndex(products) {
     ]);
     for (const token of tokens) add(token, product);
   }
-  datasetIndex.set(products, { tokenMap, vocabulary: [...tokenMap.keys()] });
+  datasetIndex.set(products, { tokenMap, vocabulary: [...tokenMap.keys()], candidateMap: new Map() });
 }
 
 function intersectSets(left, right) {
@@ -248,16 +263,18 @@ function candidateProducts(products, query) {
   prepareSearchIndex(products);
   const prepared = datasetIndex.get(products);
   if (!prepared) return products;
-  if (isIdentifierQuery(query)) return products;
+  if (isIdentifierQuery(query) || isBareModelQuery(query)) return products;
 
-  const tokens = normalize(query).split(/\s+/).filter((token) => token.length >= 2);
+  const tokens = significantWords(query);
   if (tokens.length === 0) return products;
 
   let candidates = null;
   for (const token of tokens) {
-    let tokenMatches = prepared.tokenMap.get(token);
+    let tokenMatches = prepared.candidateMap.get(token);
     if (!tokenMatches) {
-      tokenMatches = new Set();
+      // Retain lower-ranked word prefixes even when another product supplies
+      // the exact token. Candidate retrieval must not depend on catalogue mix.
+      tokenMatches = new Set(prepared.tokenMap.get(token) || []);
       for (const word of prepared.vocabulary) {
         const prefixMatch = word.startsWith(token) || token.startsWith(word);
         const typoMatch = token.length >= 4
@@ -265,10 +282,12 @@ function candidateProducts(products, query) {
           && /^[a-z]+$/.test(token)
           && /^[a-z]+$/.test(word)
           && Math.abs(token.length - word.length) <= 1
-          && typoDistance(token, word) === 1;
+          && conservativeTypoMatch(token, word);
         if (!prefixMatch && !typoMatch) continue;
         for (const product of prepared.tokenMap.get(word)) tokenMatches.add(product);
       }
+      prepared.candidateMap.set(token, tokenMatches);
+      if (prepared.candidateMap.size > 120) prepared.candidateMap.delete(prepared.candidateMap.keys().next().value);
     }
     candidates = intersectSets(candidates, tokenMatches);
     if (candidates.size === 0) break;
@@ -331,6 +350,7 @@ function scoreNameMatch(index, token, tokenCompact) {
   }
 
   if (isWholeWord) return SCORE.WHOLE_WORD_NAME;
+  if (token.length >= 4 && index.nameWords.some((word) => word.startsWith(token))) return SCORE.NAME_PREFIX;
   return 0;
 }
 
@@ -339,21 +359,36 @@ function scoreDescriptionMatch(index, token) {
   return 0;
 }
 
-function scoreKeywordMatch(index, token) {
-  if (wholeWordIn(index.keywordText, token)) return SCORE.KEYWORD;
+function scoreKeywordMatch(index, token, allowCategory) {
+  if (wholeWordIn(allowCategory ? index.keywordText : index.specificKeywordText, token)) return SCORE.KEYWORD;
   return 0;
+}
+
+function conservativeTypoMatch(token, word) {
+  if (!/^[a-z]+$/.test(token) || !/^[a-z]+$/.test(word)) return false;
+  // Short adjacent swaps recover "scraf" without turning "blush" into "brush".
+  if (token.length === word.length && token.length >= 4) {
+    for (let index = 0; index < token.length - 1; index += 1) {
+      if (token.slice(0, index) + token[index + 1] + token[index] + token.slice(index + 2) === word) return true;
+    }
+  }
+  // A leading substitution can change a real product/material word entirely
+  // (leather / feather). Preserve internal edits and adjacent swaps, but
+  // require the initial letter for same-length generic substitutions.
+  if (token.length === word.length && token[0] !== word[0]) return false;
+  return token.length >= 6 && word.length >= 6 && typoDistance(token, word) === 1;
 }
 
 function scoreTypoOnName(index, token) {
   if (token.length < 4) return 0;
   for (const word of index.nameWords) {
-    if (word.length >= 4 && typoDistance(token, word) === 1) return SCORE.TYPO;
+    if (conservativeTypoMatch(token, word)) return SCORE.TYPO;
   }
   return 0;
 }
 
-function scoreToken(index, token) {
-  const t = normalize(token);
+function scoreToken(index, token, allowCategory = true) {
+  const t = singularizeSearchWord(normalize(token));
   const tCompact = compact(token);
   if (!t) return 0;
 
@@ -363,12 +398,16 @@ function scoreToken(index, token) {
     || scoreIdentifierPrefix(index, t, tCompact)
     || scoreNameMatch(index, t, tCompact)
     || scoreDescriptionMatch(index, t)
-    || scoreKeywordMatch(index, t)
+    || scoreKeywordMatch(index, t, allowCategory)
     || scoreTypoOnName(index, t)
   );
 }
 
-function scoreIdentifierQuery(product, query) {
+function isBareModelQuery(query) {
+  return /^(?=.*[a-z])(?=.*\d)[a-z0-9]+$/i.test(String(query || '').trim());
+}
+
+function scoreIdentifierQuery(product, query, allowModelFallback = false) {
   const queryId = normalizeIdentifier(query);
   if (!queryId) return 0;
 
@@ -397,26 +436,31 @@ function scoreIdentifierQuery(product, query) {
     }
   }
 
+  // Only a bare model token may fall back to the title. Labels, numeric
+  // identifiers and punctuation variants retain identifier-only behavior.
+  if (allowModelFallback && isBareModelQuery(query)
+    && words(`${product.name || ''} ${product.title || ''}`).includes(String(query).trim().toLowerCase())) {
+    return SCORE.WHOLE_WORD_NAME;
+  }
   return score;
 }
 
-function scoreProduct(product, query) {
+function scoreProduct(product, query, allowCategory = true, allowModelFallback = false) {
   const q = normalize(query);
   if (!q) return 0;
 
-  if (isIdentifierQuery(query)) {
-    return scoreIdentifierQuery(product, query);
+  if (isIdentifierQuery(query) || isBareModelQuery(query)) {
+    return scoreIdentifierQuery(product, query, allowModelFallback);
   }
 
-  const tokens = q.split(/\s+/).filter(Boolean);
-  const significant = tokens.filter((t) => t.length >= 2);
+  const significant = significantWords(q);
   if (significant.length === 0) return 0;
 
   const index = getSearchIndex(product);
   let total = 0;
 
   for (const token of significant) {
-    const tokenScore = scoreToken(index, token);
+    const tokenScore = scoreToken(index, token, allowCategory);
     if (tokenScore < SEARCH_MIN_CONFIDENCE) return 0;
     total += tokenScore;
   }
@@ -436,6 +480,9 @@ export function fuzzyFilter(products, query) {
   if (variants.length === 0) return eligible;
   const minimumScore = variants.length > 1 ? SCORE.KEYWORD : SEARCH_MIN_CONFIDENCE;
   const isSoftToyFamily = searchQueryUsesFamily(query, 'soft toy');
+  // A category named "Bags & wallets" must not make a backpack a wallet.
+  const objectQuery = ['wallet', 'handbag', 'backpack', 'notebook', 'hair clip', 'hair tie', 'paint brush', 'hair brush']
+    .some((family) => searchQueryUsesFamily(query, family)) || /\bbags?\b/.test(intent.text);
 
   const candidateSet = new Set();
   for (const variant of variants) {
@@ -448,10 +495,13 @@ export function fuzzyFilter(products, query) {
     .filter((product) => !isSoftToyFamily || isSoftToyProduct(product))
     .map((product) => ({
       product,
-      score: Math.max(...variants.map((variant) => scoreProduct(product, variant))),
+      exactTitle: !isIdentifierQuery(query) && !isBareModelQuery(query) && normalize(product.name) === normalize(query),
+      score: Math.max(...variants.map((variant) => scoreProduct(product, variant, !objectQuery, isBareModelQuery(query)))),
     }))
     .filter((item) => item.score >= minimumScore)
     .sort((a, b) => {
+      const exactTitleDelta = Number(b.exactTitle) - Number(a.exactTitle);
+      if (exactTitleDelta !== 0) return exactTitleDelta;
       const scoreDelta = b.score - a.score;
       if (scoreDelta !== 0) return scoreDelta;
       return Number(isAvailable(b.product)) - Number(isAvailable(a.product));
@@ -467,7 +517,9 @@ export function getSuggestions(products, query, limit = 8) {
     cache = new Map();
     suggestionCache.set(products, cache);
   }
-  const key = `${normalize(query)}::${limit}`;
+  // Punctuation carries price intent (R28.50 versus R28 50), so it must not
+  // be erased from the cache identity before the query is parsed.
+  const key = `${String(query).trim().toLowerCase()}::${limit}`;
   if (cache.has(key)) return cache.get(key);
   const result = fuzzyFilter(products, query).slice(0, limit);
   cache.set(key, result);
