@@ -370,7 +370,7 @@ export default function MainContent({
 
       {catalogueError ? (
         <div className="empty-state" role="alert">
-          <h3>{activeCollection === 'just-added' ? "We couldn't load Just Added." : "We couldn't load the main catalogue."}</h3>
+          <h3>{activeCollection === 'just-added' ? "We couldn't load Just Added." : 'We couldn’t load the main catalogue.'}</h3>
           <p>Check your connection, then try again. Your search and basket are still here.</p>
           <button onClick={onRetryCatalogue} type="button">{activeCollection === 'just-added' ? 'Retry Just Added' : 'Retry catalogue'}</button>
         </div>
