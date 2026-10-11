@@ -20,7 +20,7 @@ test('Instore API preserves full-title qualifiers and slash-separated technical 
   assert.equal(buildExtendedRangeProducts([{ ...beads, listing_control_status: 'hidden' }], 'beads 11/0').length, 0);
 });
 
-test('Instore feed includes only reviewed priced records with more than ten available units', () => {
+test('Instore feed includes only reviewed priced records with at least ten whole available selling units', () => {
   const products = buildExtendedRangeProducts([
     { ...valid, available_stock: 11 },
     { ...valid, sku: '8618100139', available_stock: 10.9 },
@@ -30,7 +30,7 @@ test('Instore feed includes only reviewed priced records with more than ten avai
     { ...valid, sku: '8618100136', image_review_status: 'pending' },
     { ...valid, sku: '8618100137', visibility_status: 'hidden' },
   ]);
-  assert.deepEqual(products.map((product) => product.sku), ['8618100133']);
+  assert.deepEqual(products.map((product) => product.sku), ['8618100133', '8618100139']);
   assert.equal(products[0].availability.canOrder, true);
   assert.equal(products[0].stockQty, 11);
 });
@@ -104,7 +104,7 @@ test('an explicit Instore listing removal excludes the SKU from the customer fee
   assert.equal(buildExtendedRangeProducts(rows).length, 0);
 });
 
-test('staged hidden products are preview-only and still need more than ten available units', () => {
+test('staged hidden products are preview-only and still need at least ten whole available selling units', () => {
   const staged = { ...valid, available_stock: 11, visibility_status: 'hidden', is_active: false };
   assert.equal(buildExtendedRangeProducts([staged]).length, 0);
   assert.equal(buildExtendedRangeProducts([staged], '', { includeStaged: true }).length, 1);

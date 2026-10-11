@@ -37,7 +37,7 @@ export function resolveArchiveInstoreLine(item, indexRow, bridgeRow) {
   if (rawOnhand == null || rawOnhand === '' || rawBooked == null || rawBooked === '' || !Number.isSafeInteger(onhand) || !Number.isSafeInteger(booked) || onhand < 0 || booked < 0) fail('Live selling-unit stock is unavailable.');
   const available = onhand - booked;
   const qty = Number(item.qty);
-  if (available <= 10 || !Number.isSafeInteger(qty) || qty < metadata.minQty || qty > available) fail('Current available selling units do not support this quantity. Refresh the product.');
+  if (available < 10 || !Number.isSafeInteger(qty) || qty < metadata.minQty || qty > available) fail('Current available selling units do not support this quantity. Refresh the product.');
   if (!String(bridgeRow.UNITS || '').trim() || normalizeUnitsOfIssue(bridgeRow.UNITS) !== metadata.unitsOfIssue) fail('The canonical POS selling unit changed. Refresh before ordering.');
   if (bridgeRow.website_price_source !== 'positill_website_inclusive' || Number(bridgeRow.website_price_incl_vat) !== metadata.price) fail('The authoritative inclusive website price changed or is unavailable. Refresh before ordering.');
   return metadata;

@@ -39,6 +39,9 @@ test('review metadata reads are exact and do not run for legacy-only feeds',asyn
   const [attached]=await attachArchiveInstoreMetadata(client,[row]);assert.equal(archiveInstoreMetadata(attached).price,12.61);
   await attachArchiveInstoreMetadata(client,[{sku:'LEGACY'}]);assert.equal(calls,1);
 });
-test('exactly ten remains held under the existing storefront discovery rule',()=>{
-  assert.equal(buildExtendedRangeProducts([{...row,available_stock:10}]).length,0);
+test('exactly ten selling units qualifies in discovery and checkout; nine stays held',()=>{
+  assert.equal(buildExtendedRangeProducts([{...row,available_stock:10}]).length,1);
+  assert.equal(resolveArchiveInstoreLine(item,row,{...pos,ONHAND:13,BOOKED:3}).price,12.61);
+  assert.equal(buildExtendedRangeProducts([{...row,available_stock:9}]).length,0);
+  assert.throws(()=>resolveArchiveInstoreLine(item,row,{...pos,ONHAND:12,BOOKED:3}));
 });

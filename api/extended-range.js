@@ -20,7 +20,7 @@ const PAGE_SIZE = 24;
 const MAX_PAGE = 10_000;
 // Instore is intentionally a high-availability collection. Small residual
 // quantities create disappointing customer journeys, so do not show an item
-// until there are more than ten units available to sell.
+// unless there are at least ten whole selling units available.
 export const MIN_INSTORE_AVAILABLE_STOCK = 10;
 const PREVIEW_IMAGE_BUCKET = 'preview-instore-images';
 const PREVIEW_IMAGE_URL_TTL_SECONDS = 60 * 60;
@@ -104,7 +104,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || !Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK
+      || !Number.isFinite(availableStock) || customerVisibleStock < MIN_INSTORE_AVAILABLE_STOCK
       || price <= 0) return [];
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
