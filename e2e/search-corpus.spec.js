@@ -75,3 +75,30 @@ test('Main pagination reverses correctly and a new query resets the result page'
   await expect(grid.locator('.product-card')).toHaveCount(1);
   await expect(grid).toContainText('Leather Bag 000');
 });
+
+for (const scope of ['Main', 'Instore']) {
+  test(`${scope} excludes feather gift bags from leather searches while preserving exact feather searches`, async ({ page, context }) => {
+    const products = [
+      { ...rows[0], id: 'LEATHER', sku: 'LEATHER', barcode: 'LEATHER', code: 'LEATHER', name: 'Leather Bag', title: 'Leather Bag' },
+      ...['8616500402', '8616500403'].map(sku => ({ ...rows[0], id: sku, sku, barcode: sku, code: sku, name: 'GIFT BAG FEATHER PRINT W/GLIT', title: 'GIFT BAG FEATHER PRINT W/GLIT' })),
+    ];
+    await installAccessibilityServices(context, { products: scope === 'Main' ? products : [rows[0]] });
+    await context.route('**/api/extended-range*', route => route.fulfill({ json: {
+      products: scope === 'Instore' ? products : [], catalogue: scope === 'Instore' ? products : [],
+      total: scope === 'Instore' ? products.length : 0, page: 1, pageSize: 24, tiles: [],
+    } }));
+    await signInCatalogue(page);
+    for (const query of ['Leather bag', 'Leather bags', 'bags leather', 'leathre bag', 'feather bags']) {
+      await page.goto(`/#/${scope === 'Instore' ? 'instore-products' : ''}?q=${encodeURIComponent(query)}`);
+      const grid = page.locator(scope === 'Main' ? '.catalog-page' : '.instore');
+      if (query === 'feather bags') {
+        await expect(grid.locator('.product-card')).toHaveCount(2);
+        await expect(grid).not.toContainText('Leather Bag');
+      } else {
+        await expect(grid.locator('.product-card')).toHaveCount(1);
+        await expect(grid.getByRole('button', { name: 'View Leather Bag', exact: true })).toBeVisible();
+        await expect(grid).not.toContainText('FEATHER');
+      }
+    }
+  });
+}

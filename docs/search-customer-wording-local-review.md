@@ -114,3 +114,11 @@ Release remains withheld. No source push or hosted preview was made. Full reposi
 This is bounded local evidence, not comprehensive production readiness. Hosted latency/API verification and operational catalogue decisions remain the release blockers. Branch payload includes matching/parser/grouping changes, Instore query boundaries, their regression tests and this findings matrix. Production/data guards were retained.
 
 An automatic approval review rejected a proposed `git restore` formatting cleanup because it might discard edits. It did not execute. A safer cleanup verified exact content equivalence apart from newline encoding, backed up the file and restored its original mixed newline layout while retaining the task change. No work remains blocked by that rejection.
+
+### Hosted Leather / Feather relevance follow-up
+
+The parent's browser worker reproduced `Leather bag` / `Leather bags` returning48 Main products plus Instore gift-bag SKUs8616500402 and8616500403 (`GIFT BAG FEATHER PRINT W/GLIT`). This is a separate relevance defect from the earlier2-to51 scope change. Local negative fixtures confirmed both matchers allowed a generic first-letter substitution from leather to feather, even with exact leather products present, or with no leather products at all.
+
+Both matchers now reject same-length generic substitutions of the first letter. Exact matches, plural/reordered queries, internal substitutions, missing/extra letters and adjacent swaps (including the first two letters) remain supported. This deliberately stops automatic first-letter substitutions such as leather/feather; it does not add a material alias, alter catalogue eligibility, or globally disable typo tolerance. Real feather queries still find both gift bags.
+
+New negative/positive unit regressions cover both scopes, both reported SKUs, empty relevant-result sets, exact feather wording and useful typo cases. Rendered desktop/mobile regressions cover leather/plural/reordered/adjacent-swap queries plus exact feather matching. Full unit suite:661passed. Changed-file lint and build passed. Hosted retest must use the new commit/deployment; the earlier f58f84b preview remains the baseline.

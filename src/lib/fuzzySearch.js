@@ -372,6 +372,10 @@ function conservativeTypoMatch(token, word) {
       if (token.slice(0, index) + token[index + 1] + token[index] + token.slice(index + 2) === word) return true;
     }
   }
+  // A leading substitution can change a real product/material word entirely
+  // (leather / feather). Preserve internal edits and adjacent swaps, but
+  // require the initial letter for same-length generic substitutions.
+  if (token.length === word.length && token[0] !== word[0]) return false;
   return token.length >= 6 && word.length >= 6 && typoDistance(token, word) === 1;
 }
 
