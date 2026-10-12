@@ -1,3 +1,4 @@
+import { selectArchiveMainRows, archiveMainMetadata, isArchiveMain, archiveMainPrice, readArchiveMainRevision } from './_archive-main-contract.js';
 import { createClient } from '@supabase/supabase-js';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
 import { readFileSync } from 'fs';
@@ -10,7 +11,6 @@ import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
-import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import {
   availabilityForRow,
   loadIncomingAvailabilityMap,
@@ -68,13 +68,14 @@ const CATALOG_MEMO_MAX_MS = 60_000;
 const CATALOG_MAX_STALE_MS = 10 * 60_000;
 
 async function loadCatalogVersion(supabase) {
-  const [stockResult, incomingVersion] = await Promise.all([
+  const [stockResult, incomingVersion, mainRevision] = await Promise.all([
     supabase
       .from('website_stock')
       .select('updated_at', { count: 'exact' })
       .order('updated_at', { ascending: false, nullsFirst: false })
       .limit(1),
     loadIncomingAvailabilityVersion(supabase),
+    readArchiveMainRevision(supabase),
   ]);
   if (stockResult.error) throw stockResult.error;
   const newest = stockResult.data?.[0]?.updated_at || '0';
@@ -82,7 +83,7 @@ async function loadCatalogVersion(supabase) {
   const incomingCount = incomingVersion.count;
   const bucket = Math.floor(Date.now() / CATALOG_MAX_STALE_MS);
   return {
-    stamp: `${newest}|${stockResult.count ?? 0}|${incomingNewest}|${incomingCount}|${bucket}`,
+    stamp: `${newest}|${stockResult.count ?? 0}|${incomingNewest}|${incomingCount}|${mainRevision}|${bucket}`,
     newest,
     count: stockResult.count ?? 0,
   };
@@ -103,9 +104,14 @@ async function fetchAllRows(supabase, table, selectCols = '*', filter = null, ma
   let from = 0;
   while (true) {
     const to = Math.min(from + PAGE_SIZE - 1, maxRows - 1);
-    let q = supabase.from(table).select(selectCols).range(from, to);
-    if (filter) q = filter(q);
-    const { data, error } = await q;
+    const build = query => {
+      let q = query.range(from, to);
+      if (filter) q = filter(q);
+      return q;
+    };
+    const { data, error } = table === 'website_stock'
+      ? await selectArchiveMainRows(supabase, selectCols, build)
+      : await build(supabase.from(table).select(selectCols));
     if (error) throw error;
     rows.push(...(data || []));
     if ((data || []).length < PAGE_SIZE || rows.length >= maxRows) break;
@@ -369,7 +375,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     originalDescription: row.original_description || '',
     packDescription: String(row.pack_description || '').trim(),
     unitsOfIssue,
-    price: customerFacingCataloguePrice(row.price),
+    price: archiveMainPrice(row),
     images,
     image: images[0] || '',
     secondaryImage: images[1] || '',
@@ -483,7 +489,7 @@ export default async function handler(req, res) {
         loadIncomingAvailabilityMap(supabase, rows.map((row) => row.sku).filter(Boolean)),
       ]);
       const products = rows
-        .filter(isSafeStorefrontProduct)
+        .filter(row => isSafeStorefrontProduct(row) && (!isArchiveMain(row) || archiveMainMetadata(row)))
         .map((row) => adapt(
           row,
           tree,
@@ -568,7 +574,7 @@ export default async function handler(req, res) {
     const products = rows
       // Defence in depth: invalid catalogue rows must never reach a customer,
       // even if an importer, manual edit, or future sync leaves one live.
-      .filter(isSafeStorefrontProduct)
+      .filter(row => isSafeStorefrontProduct(row) && (!isArchiveMain(row) || archiveMainMetadata(row)))
       .map((row) => adapt(
         row,
         tree,

@@ -30,7 +30,7 @@ test('leaves unrelated odd prices alone', () => {
 });
 
 test('catalogue and authoritative order pricing share the same guard', () => {
-  assert.match(productsApi, /price:\s*customerFacingCataloguePrice\(row\.price\)/);
+  assert.match(productsApi, /price:\s*archiveMainPrice\(row\)/);
   assert.match(orderApi, /const rawPrice = Number\(row\?\.price\)/);
-  assert.match(orderApi, /const price = customerFacingCataloguePrice\(rawPrice\)/);
+  assert.match(orderApi, /const price = archiveMainPrice\(row\)/);
 });

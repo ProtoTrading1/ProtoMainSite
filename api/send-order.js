@@ -1,3 +1,4 @@
+import { selectArchiveMainRows, archiveMainPrice } from './_archive-main-contract.js';
 import { isArchiveInstore, attachArchiveInstoreMetadata, resolveArchiveInstoreLine, verifyArchiveInstoreAllocation } from './_archive-instore-contract.js';
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
@@ -387,18 +388,12 @@ async function resolveStandardPrices(items) {
   const sb = getStockClient();
   try {
     if (skus.length) {
-      const { data, error } = await sb
-        .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order')
-        .in('sku', skus);
+      const { data, error } = await selectArchiveMainRows(sb, 'sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order', query => query.in('sku', skus));
       if (error) throw error;
       for (const row of data || []) productBySku.set(String(row.sku).trim().toUpperCase(), row);
     }
     if (barcodes.length) {
-      const { data, error } = await sb
-        .from('website_stock')
-        .select('sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order')
-        .in('barcode', barcodes);
+      const { data, error } = await selectArchiveMainRows(sb, 'sku, barcode, title, price, image_url_one, units_of_issue, pack_description, min_order_qty, stock_qty, available_stock, to_order', query => query.in('barcode', barcodes));
       if (error) throw error;
       for (const row of data || []) {
         if (row.barcode != null) productByBarcode.set(String(row.barcode).trim(), row);
@@ -436,7 +431,7 @@ async function resolveStandardPrices(items) {
       throw error;
     }
     const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
-    const price = customerFacingCataloguePrice(rawPrice);
+    const price = archiveMainPrice(row);
     const toOrder = isToOrderProduct(row);
     const aggregateKey = textId(row.sku);
     const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
@@ -502,7 +497,7 @@ async function resolveStandardPrices(items) {
     if (stockQty !== null && qty <= stockQty) continue;
     const aggregateReview = evaluateCheckoutSnapshot({
       sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
-      submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+      submittedSnapshot, currentPrice: archiveMainPrice(row), currentStockQty: stockQty,
     });
     const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
     if (existing.length) {
