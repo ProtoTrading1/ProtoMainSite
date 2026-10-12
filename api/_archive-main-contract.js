@@ -53,8 +53,9 @@ export async function selectArchiveMainRows(client, columns, build) {
   return { ...result, data: await attachArchiveMainMetadata(client, result.data || []) };
 }
 export async function readArchiveMainRevision(client) {
-  try {
-    const { data, error } = await client.rpc('archive_review_main_revision');
-    return !error && typeof data === 'string' ? data : 'main-contract-unavailable';
-  } catch { return 'main-contract-unavailable'; }
+  const { data, error } = await client.rpc('archive_review_main_revision');
+  if (error) throw error;
+  if (data === null) return 'main:none';
+  if (typeof data !== 'string' || !data.trim()) throw new Error('Main provenance revision is unavailable');
+  return data;
 }
