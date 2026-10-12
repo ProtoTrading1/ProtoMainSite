@@ -9,19 +9,53 @@ const products = [
   { ...catalogueProducts[0], id: 'SPECIAL-ONLY', sku: 'SPECIAL-ONLY', code: 'SPECIAL-ONLY', barcode: 'SPECIAL-ONLY', name: 'Configured special only', title: 'Configured special only', isNew: false },
 ];
 
-async function setup(context, page, { catalogue = products, featured, arrivalOrder } = {}) {
+async function setup(context, page, { catalogue = products, featured, arrivalOrder, specials = [{ productId: 'SPECIAL-ONLY', specialPrice: 10 }], taxonomy = [{ id: 'stationery', label: 'Stationery', children: [] }, { id: 'craft', label: 'Craft', children: [] }] } = {}) {
   await installAccessibilityServices(context, { products: catalogue });
   await context.route('**/api/sort-orders', (route) => route.fulfill({ headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: JSON.stringify({ orders: { 'collection:just-added': { skuOrder: arrivalOrder || [], updatedAt: null } } }) }));
   if (featured) await context.route('**/api/featured-products', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: featured.map(({ sku }) => ({ sku })) }) }));
-  await context.route('**/api/taxonomy', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ categories: [{ id: 'stationery', label: 'Stationery', children: [] }, { id: 'craft', label: 'Craft', children: [] }] }) }));
+  await context.route('**/api/taxonomy', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ categories: taxonomy }) }));
   await context.route('**/api/products?identifier=*', (route) => {
     const query = new URL(route.request().url()).searchParams.get('identifier');
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(catalogue.filter((row) => [row.sku, row.barcode].includes(query))) });
   });
-  await context.route('**/api/specials', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: [{ productId: 'SPECIAL-ONLY', specialPrice: 10 }] }) }));
+  await context.route('**/api/specials', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: specials }) }));
   await signInCatalogue(page);
   const dismiss = page.getByRole('button', { name: 'Dismiss search tip' });
   if (await dismiss.isVisible()) await dismiss.click();
+}
+
+for (const scenario of [
+  { name: 'arrival only', isNew: true, special: null, label: null },
+  { name: 'configured discount only', isNew: false, special: { deal: 'discount', discountPct: 15 }, label: '15% OFF' },
+  { name: 'arrival with configured deal', isNew: true, special: { deal: 'bogo', bogoX: 2, bogoY: 1 }, label: 'Buy 2 Get 1 Free' },
+  { name: 'configured generic special', isNew: false, special: { deal: 'none' }, label: "This Week's Special" },
+]) {
+  test(`${scenario.name} uses only configured special labels in cards and previews`, async ({ page, context }) => {
+    const product = { ...products[0], name: 'Label regression notebook', title: 'Label regression notebook', isNew: scenario.isNew, yearlySales: 10, categoryPath: ['stationery', 'notebooks'] };
+    const specials = scenario.special ? [{ productId: product.id, ...scenario.special }] : [];
+    await setup(context, page, { catalogue: [product], featured: [product], specials, taxonomy: [{ id: 'stationery', label: 'Stationery', children: [{ id: 'notebooks', label: 'Notebooks', children: [] }] }] });
+    const card = page.locator('.product-card').filter({ hasText: product.name });
+    await expect(card).toBeVisible();
+    if (scenario.label) await expect(card.locator('.pc-special-ribbon')).toHaveText(scenario.label);
+    else await expect(card.locator('.pc-special-ribbon')).toHaveCount(0);
+    await card.getByRole('button', { name: `View ${product.name}`, exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    if (scenario.label) await expect(dialog.locator('.pz-special-badge')).toHaveText(scenario.label);
+    else await expect(dialog.locator('.pz-special-badge')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    // Category-strip previews use App's separate global preview path.
+    await page.goto('/#/stationery');
+    const strip = page.locator('.strip-card').filter({ hasText: product.name }).first();
+    await expect(strip).toBeVisible();
+    await strip.getByRole('button', { name: `View ${product.name}`, exact: true }).click();
+    await expect(dialog).toBeVisible();
+    if (scenario.label) await expect(dialog.locator('.pz-special-badge')).toHaveText(scenario.label);
+    else await expect(dialog.locator('.pz-special-badge')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
 }
 
 async function selectCollection(page, name) {
