@@ -82,7 +82,7 @@ async function selectCollection(page, name) {
   }
 }
 
-test('Just Added uses curated flags; Specials still includes arrivals and configured specials; history and refresh restore scope', async ({ page, context }, testInfo) => {
+test('Just Added uses curated flags; Specials uses configured entries; history and refresh restore scope', async ({ page, context }, testInfo) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await setup(context, page);
@@ -97,7 +97,7 @@ test('Just Added uses curated flags; Specials still includes arrivals and config
   await expect(grid.getByText('Configured special only', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('just-added.png'), fullPage: true });
   await selectCollection(page, 'Specials');
-  await expect(grid.getByText('New blue notebook', { exact: true })).toBeVisible();
+  await expect(grid.getByText('New blue notebook', { exact: true })).toHaveCount(0);
   await expect(grid.getByText('Configured special only', { exact: true })).toBeVisible();
   await expect(grid.getByText('Ordinary pink notebook', { exact: true })).toHaveCount(0);
   await page.goBack();
@@ -157,6 +157,56 @@ test('category filtering preserves Just Added scope and counts', async ({ page, 
   await grid.getByRole('button', { name: 'All departments', exact: true }).click();
   await expect(page).toHaveURL(/collection=just-added/);
   await expect(grid.getByText('New unavailable pencils', { exact: true })).toBeVisible();
+});
+
+test('Specials separates arrivals, retains explicitly configured overlap, and keeps counts/search scoped', async ({ page, context }) => {
+  const both = { ...products[0], id: 'ARRIVAL-OFFER', sku: 'ARRIVAL-OFFER', code: 'ARRIVAL-OFFER', barcode: 'BOTH-1000', name: 'New offer notebook', title: 'New offer notebook', isNew: true };
+  const sibling = { ...both, id: 'OFFER-SIBLING', sku: 'OFFER-SIBLING', code: 'OFFER-SIBLING', name: 'Unconfigured sibling', title: 'Unconfigured sibling', isNew: false };
+  await setup(context, page, { catalogue: [...products, both, sibling], specials: [
+    { productId: 'SPECIAL-ONLY', deal: 'discount', discountPct: 15 },
+    { productId: both.id, deal: 'bogo', bogoX: 2, bogoY: 1 },
+  ] });
+  const grid = page.locator('.catalog-page');
+  await selectCollection(page, 'Just Added');
+  await expect(grid.getByText('New blue notebook', { exact: true })).toBeVisible();
+  await expect(grid.getByText(both.name, { exact: true })).toBeVisible();
+  await expect(grid.getByText('Configured special only', { exact: true })).toHaveCount(0);
+  await selectCollection(page, 'Specials');
+  await expect(grid.locator('.product-card')).toHaveCount(2);
+  await expect(grid.getByText(both.name, { exact: true })).toBeVisible();
+  await expect(grid.getByText('Configured special only', { exact: true })).toBeVisible();
+  await expect(grid.getByText('New blue notebook', { exact: true })).toHaveCount(0);
+  await expect(grid.getByText('New unavailable pencils', { exact: true })).toHaveCount(0);
+  const counts = await page.evaluate(async () => {
+    const { fetchCategoryCounts } = await import('/src/lib/products.js');
+    const read = async ids => (await fetchCategoryCounts({ collection: 'specials', specialIds: new Set(ids) }))[''];
+    return [await read(['SPECIAL-ONLY']), await read(['SPECIAL-ONLY', 'ARRIVAL-OFFER']), await read(['SPECIAL-ONLY'])];
+  });
+  expect(counts).toEqual([1, 2, 1]);
+  const search = page.getByRole('combobox', { name: 'Search by product name, SKU or barcode' });
+  const submit = async query => {
+    if ((page.viewportSize()?.width || 1440) < 901 && !await search.isVisible()) await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Search', exact: true }).click();
+    await search.fill(query); await search.press('Enter');
+  };
+  await submit('E2E-BLUE');
+  await expect(grid.locator('.product-card')).toHaveCount(0);
+  await submit('New offer notebook');
+  await expect(grid.locator('.product-card')).toHaveCount(1);
+  await expect(grid.getByText('Unconfigured sibling', { exact: true })).toHaveCount(0);
+  await grid.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(grid.locator('.product-card')).toHaveCount(2);
+  await page.reload();
+  await expect(grid.locator('.product-card')).toHaveCount(2);
+  await expect(page).toHaveURL(/collection=specials/);
+});
+
+test('empty configured Specials never substitutes arrival products', async ({ page, context }) => {
+  await setup(context, page, { specials: [] });
+  await selectCollection(page, 'Specials');
+  await expect(page.locator('.catalog-page .product-card')).toHaveCount(0);
+  await expect(page.locator('.catalog-page').getByRole('heading', { name: "This Week's Specials", exact: true })).toBeVisible();
+  await selectCollection(page, 'Just Added');
+  await expect(page.locator('.catalog-page').getByText('New blue notebook', { exact: true })).toBeVisible();
 });
 
 test('all curated arrivals remain reachable across pages independently of the featured home list', async ({ page, context }) => {

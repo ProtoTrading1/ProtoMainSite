@@ -13,7 +13,7 @@ const productCardSrc = readFileSync(join(root, 'src/components/ProductCard.jsx')
 test('category counts are independent from browse, page, search and sort changes', () => {
   assert.match(
     appSrc,
-    /fetchCategoryCounts\(\{ collection: activeCollection, inStockOnly \}\)[\s\S]*?\}, \[activeCollection, categories, inStockOnly, catalogRefreshKey\]\);/,
+    /fetchCategoryCounts\(\{ collection: activeCollection, inStockOnly, specialIds: collectionSpecialIds \}\)[\s\S]*?\}, \[activeCollection, categories, inStockOnly, catalogRefreshKey, collectionSpecialIds\]\);/,
     'counts refresh only when catalogue scope or taxonomy changes',
   );
   assert.equal(

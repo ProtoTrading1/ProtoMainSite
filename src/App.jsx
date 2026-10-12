@@ -376,6 +376,7 @@ export default function App({
   const [loginBasketSnapshot, setLoginBasketSnapshot] = useState(null);
   const [browseCategories, setBrowseCategories] = useState([]);
   const [specialsMap, setSpecialsMap] = useState({});
+  const collectionSpecialIds = useMemo(() => activeCollection === 'specials' ? new Set(Object.keys(specialsMap)) : null, [activeCollection, specialsMap]);
   const [bannerConfig, setBannerConfig] = useState(null);
   const [popupConfig, setPopupConfig] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
@@ -1136,7 +1137,7 @@ export default function App({
   // Refresh only when an input that can actually change a count changes.
   useEffect(() => {
     let cancelled = false;
-    void fetchCategoryCounts({ collection: activeCollection, inStockOnly })
+    void fetchCategoryCounts({ collection: activeCollection, inStockOnly, specialIds: collectionSpecialIds })
       .then((nextCounts) => {
         if (!cancelled) setCounts(nextCounts);
       })
@@ -1145,7 +1146,7 @@ export default function App({
         // not clear otherwise valid counts or block the product page.
       });
     return () => { cancelled = true; };
-  }, [activeCollection, categories, inStockOnly, catalogRefreshKey]);
+  }, [activeCollection, categories, inStockOnly, catalogRefreshKey, collectionSpecialIds]);
 
   useEffect(() => {
     let cancelled = false;

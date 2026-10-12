@@ -519,10 +519,8 @@ function applyCollection(products, collection, specialIds = null) {
   if (collection === 'just-added') return products.filter((p) => p.isNew === true);
   // Stock-based collections are no-ops in catalogue-only mode.
   if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
-  // "This Week's Specials" is the union of two sources: products the admin
-  // flagged via the Product Manager toggle (isNew, backed by is_new_arrival)
-  // and products configured in the Specials panel (specialIds from specialsMap).
-  if (collection === 'specials') return products.filter((p) => p.isNew || (specialIds && specialIds.has(p.id)));
+  // Specials uses explicit staff configuration; arrival membership is independent.
+  if (collection === 'specials') return products.filter((p) => specialIds?.has(p.id));
   return products;
 }
 
@@ -754,7 +752,7 @@ export async function fetchProductPage({
           getAllCached().catch(() => products));
         products = expandBarcodeSiblings(pool, products);
       }
-      if (collection === 'just-added') products = applyCollection(products, collection);
+      if (collection === 'just-added' || collection === 'specials') products = applyCollection(products, collection, specialIds);
       products = applyInStockFilter(products, inStockOnly);
       products = groupProductsByBarcode(products);
       const total = products.length;
@@ -784,8 +782,8 @@ export async function fetchProductPage({
     products = applyPathFilter(products, categoryPath);
   }
   if (hasSearch) products = expandBarcodeSiblings(pool, fuzzyFilter(products, searchQuery), searchQuery);
-  // Expanded siblings must still belong to the curated new-arrival collection.
-  if (collection === 'just-added') products = applyCollection(products, collection);
+  // Expanded siblings must still belong to the selected arrival or Specials list.
+  if (collection === 'just-added' || collection === 'specials') products = applyCollection(products, collection, specialIds);
 
   if (normalizedSort === 'featured' && collection === 'just-added' && !hasSearch) {
     // Collection order uses the atomic portal row. Unlisted arrivals
@@ -822,7 +820,7 @@ function collectTaxonomyNavPaths(nodes, prefix = [], out = []) {
   return out;
 }
 
-export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false } = {}) {
+export async function fetchCategoryCounts({ collection = 'all', inStockOnly = false, specialIds = null } = {}) {
   let products = await getAllCached();
   const tree = getActiveTaxonomy();
   let byTree = _categoryCountsMemo.get(products);
@@ -835,11 +833,12 @@ export async function fetchCategoryCounts({ collection = 'all', inStockOnly = fa
     byScope = new Map();
     byTree.set(tree, byScope);
   }
-  const scopeKey = `${collection}|${inStockOnly ? '1' : '0'}`;
+  const specialsKey = collection === 'specials' ? JSON.stringify([...(specialIds || [])].sort()) : '';
+  const scopeKey = `${collection}|${inStockOnly ? '1' : '0'}|${specialsKey}`;
   const memoized = byScope.get(scopeKey);
   if (memoized) return memoized;
 
-  products = applyCollection(products, collection);
+  products = applyCollection(products, collection, specialIds);
   products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
   const counts = { '': products.length };
