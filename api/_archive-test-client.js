@@ -2,6 +2,8 @@ import { createClient as sdkCreateClient } from '@supabase/supabase-js';
 export const ARCHIVE_TEST_URL = 'https://aovcrilrgistrdcgtdgl.supabase.co';
 export const ARCHIVE_TEST_BRANCH = 'agent/archive-test-readonly-main-20261012';
 const readRpcs = new Set(['archive_review_capabilities', 'archive_review_receipt', 'archive_review_state', 'archive_review_catalogue_metadata', 'archive_review_catalogue_revision', 'archive_review_main_metadata', 'archive_review_main_revision', 'get_website_product_availability', 'get_website_product_availability_version']);
+const companionReads = new Set(['/api/featured-products', '/api/sort-orders', '/api/taxonomy', '/api/banner', '/api/specials', '/api/popup-special']);
+const siteConfigReads = new Set(['featured-products.json', 'sort-orders/orders.json', 'taxonomy/categories.json', 'taxonomy/mottaro-hidden.json', 'banner.json', 'specials.json', 'popup-special.json']);
 function blocked(code) { throw Object.assign(new Error(code), { code }); }
 export function dedicatedArchiveTest(env = process.env) {
   return env.ARCHIVE_TEST_READ_ONLY === '1' || env.VERCEL_GIT_COMMIT_REF === ARCHIVE_TEST_BRANCH;
@@ -36,10 +38,27 @@ export function createClient(url, key, options) {
   if (dedicatedArchiveTest()) return createArchiveTestClient();
   return sdkCreateClient(url, key, options);
 }
+// Retained portal content is separate from the fixed stock test project. These
+// audited companion reads must never acquire the portal client's write powers.
+export function archiveTestPortalFetch(portalUrl, transport = globalThis.fetch) {
+  const origin = new URL(portalUrl).origin;
+  return async (input, init = {}) => {
+    const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+    const method = String(init.method || input?.method || 'GET').toUpperCase();
+    const prefix = '/storage/v1/object/site-config/';
+    const configRead = url.pathname.startsWith(prefix) && siteConfigReads.has(url.pathname.slice(prefix.length));
+    const orderRead = url.pathname === '/rest/v1/just_added_order_state';
+    if (url.origin !== origin || url.username || url.password || url.hash || !['GET', 'HEAD'].includes(method) || (!configRead && !orderRead)) blocked('ARCHIVE_TEST_PORTAL_READ_REJECTED');
+    let response;
+    try { response = await transport(input, { ...init, redirect: 'manual', signal: init.signal || AbortSignal.timeout(15000) }); } catch { blocked('ARCHIVE_TEST_PORTAL_TRANSPORT_FAILED'); }
+    if (response.redirected || (response.status >= 300 && response.status < 400)) blocked('ARCHIVE_TEST_REDIRECT_REJECTED');
+    return response;
+  };
+}
 export function archiveTestRequestBlock(request, env = process.env) {
   const url = new URL(request.url);
   if (request.method !== 'GET' && request.method !== 'HEAD') return { status: 403, code: 'ARCHIVE_TEST_READ_ONLY' };
-  if (!new Set(['/api/products', '/api/extended-range', '/api/customer-profile']).has(url.pathname) || url.searchParams.has('refresh')) return { status: 403, code: 'ARCHIVE_TEST_ROUTE_BLOCKED' };
+  if (!new Set(['/api/products', '/api/extended-range', '/api/customer-profile', ...companionReads]).has(url.pathname) || url.searchParams.has('refresh')) return { status: 403, code: 'ARCHIVE_TEST_ROUTE_BLOCKED' };
   try { validateArchiveTestConfig(env); } catch (error) { return { status: 503, code: error.code }; }
   return null;
 }

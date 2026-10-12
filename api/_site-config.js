@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { archiveTestPortalFetch, dedicatedArchiveTest, validateArchiveTestConfig } from './_archive-test-client.js';
 
 export const SITE_CONFIG_BUCKET = 'site-config';
 
@@ -8,7 +9,9 @@ export function getPortalAdminClient() {
   if (!url || !key) {
     throw new Error('Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  const dedicated = dedicatedArchiveTest();
+  if (dedicated) validateArchiveTestConfig();
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false }, ...(dedicated ? { global: { fetch: archiveTestPortalFetch(url) } } : {}) });
 }
 
 export async function readSiteConfigJson(file, fallback = {}) {

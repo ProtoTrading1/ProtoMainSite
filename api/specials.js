@@ -1,16 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { getPortalAdminClient } from './_site-config.js';
 import { requireAdmin } from './_auth.js';
 
 const BUCKET = 'site-config';
 const FILE = 'specials.json';
 
-function getAdminClient() {
-  return createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -18,7 +11,7 @@ export default async function handler(req, res) {
   // GET — return current specials
   if (req.method === 'GET') {
     try {
-      const supabase = getAdminClient();
+      const supabase = getPortalAdminClient();
       const { data, error } = await supabase.storage.from(BUCKET).download(FILE);
       if (error) return res.status(200).json({ items: [] });
       const text = await data.text();
@@ -36,7 +29,7 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const items = (body.items || []).slice(0, 10);
       const payload = JSON.stringify({ items, updatedAt: new Date().toISOString() });
-      const supabase = getAdminClient();
+      const supabase = getPortalAdminClient();
 
       // Try to create bucket if it doesn't exist (safe to call if already exists)
       await supabase.storage.createBucket(BUCKET, { public: false }).catch(() => {});
