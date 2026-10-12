@@ -1,5 +1,5 @@
 import { selectArchiveMainRows, archiveMainMetadata, isArchiveMain, archiveMainPrice, readArchiveMainRevision } from './_archive-main-contract.js';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from './_archive-test-client.js';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';

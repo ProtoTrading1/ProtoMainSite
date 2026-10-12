@@ -1,5 +1,5 @@
 import { isArchiveInstore, archiveInstoreMetadata, attachArchiveInstoreMetadata, readArchiveInstoreRevision } from './_archive-instore-contract.js';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from './_archive-test-client.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
@@ -272,6 +272,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
 }
 
 export function stockClient() {
+  if (process.env.ARCHIVE_TEST_READ_ONLY === '1') return createClient();
   const url = String(process.env.VITE_STOCK_SUPABASE_URL || '').trim();
   const key = String(process.env.STOCK_SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) throw new Error('Instore Products stock source is not configured');
@@ -350,6 +351,7 @@ export function isIsolatedPreviewRequest(req) {
   // checks below keep this impossible on the production domain.
   const isolatedPreviewEnabled = process.env.INSTORE_PREVIEW_ENABLED === 'true'
     || process.env.VITE_INSTORE_PREVIEW_READ_ONLY === 'true';
+  if (process.env.ARCHIVE_TEST_READ_ONLY === '1') return false;
   return process.env.VERCEL_ENV === 'preview'
     && isolatedPreviewEnabled
     && /\.vercel\.app$/i.test(host);
@@ -416,7 +418,8 @@ export default async function handler(req, res) {
     // rebuilding the whole collection. It is only used while it is fresh and
     // was built under the Instore controls currently in force; otherwise the
     // live read below runs exactly as it always has.
-    const stored = await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, archiveRevision });
+    const dedicatedReadOnly = process.env.ARCHIVE_TEST_READ_ONLY === '1';
+    const stored = dedicatedReadOnly ? { body: null, staleBeforeMs: 0 } : await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, archiveRevision });
     if (stored.body) {
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
@@ -426,7 +429,7 @@ export default async function handler(req, res) {
     // One caller rebuilds the stored collection; the rest just serve. Claiming
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
-    const claimed = await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
+    const claimed = dedicatedReadOnly ? false : await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
     const live = await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged, archiveRevision }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
