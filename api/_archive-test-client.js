@@ -1,4 +1,6 @@
 import { createClient as sdkCreateClient } from '@supabase/supabase-js';
+import checkoutBuildProof from './_archive-checkout-build-proof.js';
+import { ARCHIVE_CHECKOUT_PATH, validateArchiveCheckoutConfig } from './_archive-checkout-config.js';
 export const ARCHIVE_TEST_URL = 'https://aovcrilrgistrdcgtdgl.supabase.co';
 export const ARCHIVE_TEST_BRANCH = 'agent/archive-test-readonly-main-20261012';
 const readRpcs = new Set(['archive_review_capabilities', 'archive_review_receipt', 'archive_review_state', 'archive_review_catalogue_metadata', 'archive_review_catalogue_revision', 'archive_review_main_metadata', 'archive_review_main_revision', 'get_website_product_availability', 'get_website_product_availability_version']);
@@ -55,8 +57,13 @@ export function archiveTestPortalFetch(portalUrl, transport = globalThis.fetch) 
     return response;
   };
 }
-export function archiveTestRequestBlock(request, env = process.env) {
+export function archiveTestRequestBlock(request, env = process.env, buildProof = checkoutBuildProof) {
   const url = new URL(request.url);
+  if (url.pathname === ARCHIVE_CHECKOUT_PATH) {
+    if (request.method !== 'POST' || url.href.includes('?') || url.hash) return { status: 403, code: 'ARCHIVE_TEST_READ_ONLY' };
+    try { validateArchiveTestConfig(env); validateArchiveCheckoutConfig(env, buildProof); } catch (error) { return { status: 503, code: error.code }; }
+    return null;
+  }
   if (request.method !== 'GET' && request.method !== 'HEAD') return { status: 403, code: 'ARCHIVE_TEST_READ_ONLY' };
   if (!new Set(['/api/products', '/api/extended-range', '/api/customer-profile', ...companionReads]).has(url.pathname) || url.searchParams.has('refresh')) return { status: 403, code: 'ARCHIVE_TEST_ROUTE_BLOCKED' };
   try { validateArchiveTestConfig(env); } catch (error) { return { status: 503, code: error.code }; }

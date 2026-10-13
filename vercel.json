@@ -101,7 +101,8 @@
   },
   "git": {
     "deploymentEnabled": {
-      "agent/archive-test-readonly-main-20261012": false
+      "agent/archive-test-readonly-main-20261012": false,
+      "agent/checkout-recovery-20261013": false
     }
   }
 }
