@@ -70,5 +70,5 @@ test('redirects, private errors and malformed JSON produce safe errors', async (
 test('build rejects self-consistent Vercel metadata for an unrelated actual source checkout', () => {
   assert.throws(() => execFileSync(process.execPath, ['scripts/check-archive-test-preview-env.mjs'], {
     cwd: new URL('..', import.meta.url), env: { PATH: process.env.PATH, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
-  }), error => String(error.stderr).includes('ARCHIVE_CHECKOUT_SOURCE_TREE_REJECTED') && !String(error.stderr).includes('synthetic-private'));
+  }), error => String(error.stderr).includes('ARCHIVE_CHECKOUT_HEAD_MISMATCH') && !String(error.stderr).includes('synthetic-private'));
 });

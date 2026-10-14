@@ -1,6 +1,6 @@
 import { validateArchiveTestConfig } from '../api/_archive-test-client.js';
 import { writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { verifyArchiveCheckoutSource } from './verify-archive-checkout-source.mjs';
 import { ARCHIVE_CHECKOUT_SCOPE, validateArchiveCheckoutConfig } from '../api/_archive-checkout-config.js';
 // Vercel runs this before building. Errors contain codes only, never values.
 if (process.env.VERCEL === '1') validateArchiveTestConfig();
@@ -11,12 +11,7 @@ if (process.env.VERCEL === '1' && (process.env.ARCHIVE_TEST_CHECKOUT_SCOPE || pr
   checkoutProof = { sha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF, environment: process.env.VERCEL_ENV, url: process.env.VERCEL_URL, deploymentId: process.env.VERCEL_DEPLOYMENT_ID, scope: ARCHIVE_CHECKOUT_SCOPE };
   validateArchiveCheckoutConfig(process.env, checkoutProof);
   // Vercel metadata alone does not prove that the checked-out files match it.
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  try {
-    if (git('rev-parse', 'HEAD') !== checkoutProof.sha) throw new Error();
-    git('merge-base', '--is-ancestor', 'f262b56e8765aa3485ed5faed288d03c43a23c3a', 'HEAD');
-    if (git('status', '--porcelain', '--untracked-files=all')) throw new Error();
-  } catch { throw new Error('ARCHIVE_CHECKOUT_SOURCE_TREE_REJECTED'); }
+  verifyArchiveCheckoutSource(checkoutProof.sha);
 }
 writeFileSync(new URL('../api/_archive-checkout-build-proof.js', import.meta.url), '// Generated only by the verified build; contains no credentials.\nexport default ' + JSON.stringify(checkoutProof) + ';\n');
 const privateKey = process.env.ARCHIVE_TEST_STOCK_SERVICE_ROLE_KEY;
