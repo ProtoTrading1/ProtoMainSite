@@ -18,6 +18,7 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
   const ancestry = run(['merge-base', '--is-ancestor', baseline, 'HEAD']);
   const status = run(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
   const counts = status.ok ? { changed: 0, staged: 0, unstaged: 0, untracked: 0 } : null;
+  const categories = status.ok ? { proofFileChanged: false, packageManifestChanged: false, lockfileChanged: false, otherFileCount: 0 } : null;
   if (counts) {
     const records = status.output.split('\0');
     for (let i = 0; i < records.length; i++) {
@@ -28,9 +29,19 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
       else {
         if (record[0] !== ' ') counts.staged++;
         if (record[1] !== ' ') counts.unstaged++;
-        // Porcelain -z includes a second path for renames/copies.
-        if (/[RC]/.test(record.slice(0, 2))) i++;
       }
+      const paths = [record.slice(3)];
+      // Porcelain -z includes a second path for renames/copies. Classify
+      // both sides using fixed categories only; never report either path.
+      if (!record.startsWith('??') && /[RC]/.test(record.slice(0, 2))) paths.push(records[++i]);
+      let other = false;
+      for (const path of paths) {
+        if (path === 'api/_archive-checkout-build-proof.js') categories.proofFileChanged = true;
+        else if (path === 'package.json') categories.packageManifestChanged = true;
+        else if (path === 'package-lock.json') categories.lockfileChanged = true;
+        else other = true;
+      }
+      if (other) categories.otherFileCount++;
     }
   }
   report('ARCHIVE_CHECKOUT_SOURCE_DIAGNOSTICS ' + JSON.stringify({
@@ -38,6 +49,7 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
     shallow: shallow.ok && ['true', 'false'].includes(shallow.output.trim()) ? shallow.output.trim() === 'true' : null,
     baselineObjectAvailable: object.ok ? true : [1, 128].includes(object.status) ? false : null,
     changedFileCounts: counts,
+    changedFileCategories: categories,
   }));
   const reject = code => { throw new Error(code); };
   if (!available.ok) reject('ARCHIVE_CHECKOUT_GIT_AVAILABILITY_COMMAND_FAILED');
