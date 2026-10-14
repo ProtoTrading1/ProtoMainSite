@@ -15,12 +15,12 @@ function fixture(overrides = {}) {
     const key = args[0] === 'rev-parse' ? args.join(' ') : args[0];
     return overrides[key] || { ok: true, output: outputs[key] };
   };
-  return { logs, calls, check: () => verifyArchiveCheckoutSource(sha, { run, report: line => logs.push(line) }) };
+  return { logs, calls, check: () => verifyArchiveCheckoutSource(sha, { run, report: line => logs.push(line), inspectVercelJson: () => null }) };
 }
 test('clean checkout passes all original gates and reports no changed filenames', () => {
   const f = fixture();
   f.check();
-  assert.deepEqual(JSON.parse(f.logs[0].split(' ').slice(1).join(' ')), { gitAvailable: true, shallow: false, baselineObjectAvailable: true, changedFileCounts: { changed: 0, staged: 0, unstaged: 0, untracked: 0 }, changedFileCategories: { proofFileChanged: false, packageManifestChanged: false, lockfileChanged: false, otherFileCount: 0 }, changedTrackedFilenames: [] });
+  assert.deepEqual(JSON.parse(f.logs[0].split(' ').slice(1).join(' ')), { gitAvailable: true, shallow: false, baselineObjectAvailable: true, changedFileCounts: { changed: 0, staged: 0, unstaged: 0, untracked: 0 }, changedFileCategories: { proofFileChanged: false, packageManifestChanged: false, lockfileChanged: false, otherFileCount: 0 }, changedTrackedFilenames: [], vercelJson: null });
   assert.deepEqual(f.calls[4], ['merge-base', '--is-ancestor', 'f262b56e8765aa3485ed5faed288d03c43a23c3a', 'HEAD']);
   assert.deepEqual(f.calls[5], ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
   assert.ok(!f.logs.join('').includes('private-sentinel'));

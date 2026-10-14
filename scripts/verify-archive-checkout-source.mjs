@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { vercelJsonSourceDiagnostics } from './vercel-json-source-diagnostics.mjs';
 
 const baseline = 'f262b56e8765aa3485ed5faed288d03c43a23c3a';
 // Capture output for comparisons only. Never forward Git errors or output.
@@ -10,7 +11,7 @@ function runGit(args) {
   }
 }
 
-export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report = console.log } = {}) {
+export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report = console.log, inspectVercelJson = vercelJsonSourceDiagnostics } = {}) {
   const available = run(['--version']);
   const shallow = run(['rev-parse', '--is-shallow-repository']);
   const object = run(['cat-file', '-e', baseline + '^{commit}']);
@@ -56,6 +57,7 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
     changedFileCounts: counts,
     changedFileCategories: categories,
     changedTrackedFilenames: status.ok && tree.ok && available.ok && head.ok && head.output.trim() === expectedSha && ancestry.ok ? [...filenames].sort() : null,
+    vercelJson: status.ok && tree.ok && available.ok && head.ok && head.output.trim() === expectedSha && ancestry.ok ? inspectVercelJson(expectedSha) : null,
   }));
   const reject = code => { throw new Error(code); };
   if (!available.ok) reject('ARCHIVE_CHECKOUT_GIT_AVAILABILITY_COMMAND_FAILED');
