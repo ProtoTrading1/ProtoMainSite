@@ -15,6 +15,8 @@ import './pages/ResetPasswordPage.css';
 import './pages/TradeEmailVerification.css';
 
 const App = lazyWithRetry(() => import('./App'), 'root-app');
+const ArchiveCheckoutPanel = import.meta.env.ARCHIVE_CHECKOUT_PANEL_CONTEXT
+  ? lazyWithRetry(() => import('./components/ArchiveCheckoutPanel.jsx'), 'archive-checkout-panel') : null;
 const LoginModal = lazyWithRetry(() => import('./components/LoginModal'), 'root-login-modal');
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'), 'root-policies-page');
 const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'), 'root-profile-page');
@@ -613,6 +615,7 @@ export default function Root() {
     return (
       <PortalErrorBoundary>
         <Suspense fallback={authSurfaceFallback}>
+          {import.meta.env.ARCHIVE_CHECKOUT_PANEL_CONTEXT && <ArchiveCheckoutPanel session={session} />}
           <App
             customer={customer}
             loginSessionKey={session?.user?.last_sign_in_at || String(session?.expires_at || '')}

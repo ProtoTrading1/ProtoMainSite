@@ -1,0 +1,13 @@
+.archive-validation { margin: 16px; padding: 20px; border: 1px solid #98784a; border-radius: 12px; background: #fffaf2; color: #251b17; font: 14px/1.5 Inter, sans-serif; }
+.archive-validation h2 { margin: 0 0 8px; font-size: 20px; }
+.archive-validation p { margin: 8px 0; }
+.archive-validation-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 16px; }
+.archive-validation-controls label { display: grid; gap: 4px; }
+.archive-validation-controls select, .archive-validation-controls button { min-height: 44px; padding: 8px 12px; border: 1px solid #98784a; border-radius: 6px; font: inherit; }
+.archive-validation-controls button { background: #632b36; color: white; cursor: pointer; }
+.archive-validation-controls button:disabled { opacity: .55; cursor: default; }
+.archive-validation-controls :focus-visible { outline: 3px solid #632b36; outline-offset: 3px; }
+.archive-validation-result dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+.archive-validation-result dt { font-weight: 600; }
+.archive-validation-result dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .archive-validation-controls { align-items: stretch; flex-direction: column; } .archive-validation-result dl { grid-template-columns: 1fr; } }
