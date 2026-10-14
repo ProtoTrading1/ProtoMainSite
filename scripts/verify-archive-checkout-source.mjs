@@ -17,6 +17,9 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
   const head = run(['rev-parse', 'HEAD']);
   const ancestry = run(['merge-base', '--is-ancestor', baseline, 'HEAD']);
   const status = run(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  const tree = run(['ls-tree', '-r', '--name-only', '-z', expectedSha]);
+  const allowlist = tree.ok ? new Set(tree.output.split('\0')) : new Set();
+  const filenames = new Set();
   const counts = status.ok ? { changed: 0, staged: 0, unstaged: 0, untracked: 0 } : null;
   const categories = status.ok ? { proofFileChanged: false, packageManifestChanged: false, lockfileChanged: false, otherFileCount: 0 } : null;
   if (counts) {
@@ -32,10 +35,12 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
       }
       const paths = [record.slice(3)];
       // Porcelain -z includes a second path for renames/copies. Classify
-      // both sides using fixed categories only; never report either path.
+      // both sides; only committed, safe repository-relative tracked names
+      // may be reported. Untracked paths never enter filename diagnostics.
       if (!record.startsWith('??') && /[RC]/.test(record.slice(0, 2))) paths.push(records[++i]);
       let other = false;
       for (const path of paths) {
+        if (!record.startsWith('??') && allowlist.has(path) && /^[A-Za-z0-9._ /-]+$/.test(path) && !path.startsWith('/') && path.split('/').every(part => part.trim() && part !== '.' && part !== '..')) filenames.add(path);
         if (path === 'api/_archive-checkout-build-proof.js') categories.proofFileChanged = true;
         else if (path === 'package.json') categories.packageManifestChanged = true;
         else if (path === 'package-lock.json') categories.lockfileChanged = true;
@@ -50,6 +55,7 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
     baselineObjectAvailable: object.ok ? true : [1, 128].includes(object.status) ? false : null,
     changedFileCounts: counts,
     changedFileCategories: categories,
+    changedTrackedFilenames: status.ok && tree.ok && available.ok && head.ok && head.output.trim() === expectedSha && ancestry.ok ? [...filenames].sort() : null,
   }));
   const reject = code => { throw new Error(code); };
   if (!available.ok) reject('ARCHIVE_CHECKOUT_GIT_AVAILABILITY_COMMAND_FAILED');
@@ -57,6 +63,7 @@ export function verifyArchiveCheckoutSource(expectedSha, { run = runGit, report 
   if (head.output.trim() !== expectedSha) reject('ARCHIVE_CHECKOUT_HEAD_MISMATCH');
   if (!ancestry.ok) reject(ancestry.status === 1 ? 'ARCHIVE_CHECKOUT_ANCESTRY_REJECTED' : 'ARCHIVE_CHECKOUT_ANCESTRY_COMMAND_FAILED');
   if (!status.ok) reject('ARCHIVE_CHECKOUT_STATUS_COMMAND_FAILED');
+  if (!tree.ok) reject('ARCHIVE_CHECKOUT_TREE_COMMAND_FAILED');
   // Preserve the original fail-closed status gate, independent of counting.
   if (status.output.trim()) reject('ARCHIVE_CHECKOUT_DIRTY_WORKTREE');
 }
