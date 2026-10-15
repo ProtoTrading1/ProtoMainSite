@@ -618,7 +618,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
 
   return (
     <>
-      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
+      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`} data-product-code={product.code || product.sku || product.id || undefined}>
         {/* Image */}
         <button
           className="product-image product-image-button"
@@ -739,6 +739,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
           <div
             ref={modalRef}
             className="pz-modal"
+            data-product-code={activeProduct.code || activeProduct.sku || activeProduct.id || product.code || product.sku || product.id || undefined}
             role="dialog"
             aria-modal="true"
             aria-labelledby={`pz-name-${activeProduct.id || product.id}`}

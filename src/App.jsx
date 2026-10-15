@@ -47,6 +47,7 @@ import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-prefe
 import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
+import { startClickAnalytics } from './lib/clickAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
 import { productDetailId } from './lib/productDetailUrl';
 import { selectCustomerDashboardState } from './lib/customerDashboardState';
@@ -627,6 +628,12 @@ export default function App({
   useEffect(() => {
     if (!customer?.id) return undefined;
     return startPresenceHeartbeat();
+  }, [customer?.id]);
+
+  // Website click analytics (admin Reports → Website clicks), signed in only.
+  useEffect(() => {
+    if (!customer?.id) return undefined;
+    return startClickAnalytics();
   }, [customer?.id]);
 
   // Merge this browser's basket into the account before allowing mutations.
