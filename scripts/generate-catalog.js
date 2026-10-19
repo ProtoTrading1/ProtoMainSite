@@ -5,7 +5,7 @@
  * Vercel runs this via the build script before vite build.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -24,15 +24,21 @@ try {
   );
 } catch { /* use process.env only */ }
 
-const SUPABASE_URL = process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY;
+const stockEnv = {
+  ...envVars, ...process.env,
+  VITE_STOCK_SUPABASE_URL: process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL,
+  VITE_STOCK_SUPABASE_KEY: process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY,
+};
+const { url: SUPABASE_URL, key: SUPABASE_KEY } = Object.hasOwn(stockEnv, 'STOCK_SUPABASE_KEY')
+  ? resolveStockCredentials(stockEnv)
+  : { url: stockEnv.VITE_STOCK_SUPABASE_URL, key: stockEnv.VITE_STOCK_SUPABASE_KEY };
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('Missing VITE_STOCK_SUPABASE_URL or VITE_STOCK_SUPABASE_KEY — skipping catalog generation');
   process.exit(0);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createStockClient({ env: stockEnv });
 const PAGE_SIZE = 1000;
 
 // Must match labelToSlug in src/lib/taxonomy.js and api/products.js.

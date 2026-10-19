@@ -1,3 +1,4 @@
+import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
@@ -267,10 +268,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
 }
 
 export function stockClient() {
-  const url = String(process.env.VITE_STOCK_SUPABASE_URL || '').trim();
-  const key = String(process.env.STOCK_SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!url || !key) throw new Error('Instore Products stock source is not configured');
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createStockClient({ legacyServiceRole: true });
 }
 
 // A preview has its own catalogue run and its own Supabase project.  Keep this
