@@ -11,7 +11,7 @@
  * - Failures are logged to migration-backup/failed_images.json and the column is
  *   left NULL; one bad image never aborts the run.
  */
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -35,15 +35,19 @@ try {
   );
 } catch { /* fall back to process.env */ }
 
-const SUPABASE_URL = process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY;
+const stockEnv = {
+  ...envVars, ...process.env,
+  VITE_STOCK_SUPABASE_URL: process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL,
+  VITE_STOCK_SUPABASE_KEY: process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY,
+};
+const { url: SUPABASE_URL, key: SUPABASE_KEY } = Object.hasOwn(stockEnv, 'STOCK_SUPABASE_KEY')
+  ? resolveStockCredentials(stockEnv)
+  : { url: stockEnv.VITE_STOCK_SUPABASE_URL, key: stockEnv.VITE_STOCK_SUPABASE_KEY };
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Missing VITE_STOCK_SUPABASE_URL / VITE_STOCK_SUPABASE_KEY');
+  console.error('Missing STOCK_SUPABASE_POOLER_URL / STOCK_SUPABASE_KEY');
   process.exit(1);
 }
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const supabase = createStockClient({ env: stockEnv });
 
 const BUCKET_MARKER = `/storage/v1/object/public/${BUCKET}/`;
 

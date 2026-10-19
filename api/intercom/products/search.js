@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient } from '../../../lib/stock-supabase.mjs';
 import { requireIntercomSecret } from '../_auth.js';
 import { requireVerifiedTradeContact } from '../_contact.js';
 
@@ -6,10 +6,7 @@ const MAX_RESULTS = 25;
 const SELECT_COLS = 'sku, barcode, title, category, subcategory_one, subcategory_two, price, image_url_one, available_stock, stock_qty, keep_live_when_oos';
 
 function getStockClient() {
-  const url = process.env.VITE_STOCK_SUPABASE_URL;
-  const key = process.env.VITE_STOCK_SUPABASE_KEY;
-  if (!url || !key) throw new Error('Missing VITE_STOCK_SUPABASE_URL or VITE_STOCK_SUPABASE_KEY');
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createStockClient();
 }
 
 function escapeIlike(raw) {

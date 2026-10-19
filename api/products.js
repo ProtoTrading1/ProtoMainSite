@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient } from '../lib/stock-supabase.mjs';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -435,10 +435,7 @@ export default async function handler(req, res) {
     // used to return the entire protected catalogue to an exact-code caller.
     if (!requestedSkus && rawIdentifier !== undefined && !identifier) return res.status(200).json([]);
     const browsePath = requestedSkus || identifier ? null : parseBrowsePath(req.query?.browsePath);
-    const supabase = createClient(
-      process.env.VITE_STOCK_SUPABASE_URL,
-      process.env.VITE_STOCK_SUPABASE_KEY,
-    );
+    const supabase = createStockClient();
 
     // This response is per-customer authorized, so it must never be stored by a
     // SHARED cache (Vercel's CDN keys on URL, not on the Authorization header —
