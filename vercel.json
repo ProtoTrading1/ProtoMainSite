@@ -33,6 +33,7 @@
     }
   ],
   "rewrites": [
+    {"source":"/production-credential-check","destination":"/api/production-stock-binding"},
     {
       "source": "/(.*)",
       "destination": "/index.html"
