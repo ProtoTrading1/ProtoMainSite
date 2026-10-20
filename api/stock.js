@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient } from '../lib/stock-supabase.mjs';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
 import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
@@ -84,11 +84,7 @@ export default async function handler(req, res) {
     }
 
     const includeStaged = false;
-    const supabase = createClient(
-      process.env.VITE_STOCK_SUPABASE_URL,
-      process.env.VITE_STOCK_SUPABASE_KEY,
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    );
+    const supabase = createStockClient();
 
     // Authentication must complete first, but the independent approval and
     // stock reads can run together. This removes one full database round trip

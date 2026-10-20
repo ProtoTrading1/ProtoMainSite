@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
 import { requireApprovedCustomer } from './_auth.js';
 import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
@@ -55,7 +55,9 @@ function isPdfKitImage(url = '') {
 
 const ALLOWED_IMAGE_HOSTS = [
   process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).host : null,
-  process.env.VITE_STOCK_SUPABASE_URL ? new URL(process.env.VITE_STOCK_SUPABASE_URL).host : null,
+  Object.hasOwn(process.env, 'STOCK_SUPABASE_KEY')
+    ? new URL(resolveStockCredentials().url).host
+    : process.env.VITE_STOCK_SUPABASE_URL ? new URL(process.env.VITE_STOCK_SUPABASE_URL).host : null,
 ].filter(Boolean);
 
 async function readResponseWithLimit(response, maxBytes) {
@@ -176,11 +178,7 @@ function computeSubtotal(items) {
 }
 
 function getStockClient() {
-  return createClient(
-    process.env.VITE_STOCK_SUPABASE_URL,
-    process.env.VITE_STOCK_SUPABASE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  return createStockClient();
 }
 
 export const MAX_ORDER_LINES = 250;

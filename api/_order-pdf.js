@@ -1,14 +1,11 @@
 import PDFDocument from 'pdfkit';
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient } from '../lib/stock-supabase.mjs';
 import { getPortalAdminClient, SITE_CONFIG_BUCKET } from './_site-config.js';
 
 export const ORDER_PDF_PREFIX = 'orders';
 
 function getStockClient() {
-  const url = process.env.VITE_STOCK_SUPABASE_URL;
-  const key = process.env.VITE_STOCK_SUPABASE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createStockClient({ optional: true });
 }
 
 function cleanText(value, fallback = '') {

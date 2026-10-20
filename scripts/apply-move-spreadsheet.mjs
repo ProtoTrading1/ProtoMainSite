@@ -4,9 +4,9 @@
  * Usage:
  *   node scripts/apply-move-spreadsheet.mjs scripts/data/Move_4_fashion_accessories.xlsx
  *
- * Requires VITE_STOCK_SUPABASE_URL + VITE_STOCK_SUPABASE_KEY in .env.local or env.
+ * Requires STOCK_SUPABASE_POOLER_URL + STOCK_SUPABASE_KEY in .env.local or env.
  */
-import { createClient } from '@supabase/supabase-js';
+import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -26,8 +26,14 @@ try {
   );
 } catch { /* use process.env */ }
 
-const SUPABASE_URL = process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY;
+const stockEnv = {
+  ...envVars, ...process.env,
+  VITE_STOCK_SUPABASE_URL: process.env.VITE_STOCK_SUPABASE_URL || envVars.VITE_STOCK_SUPABASE_URL,
+  VITE_STOCK_SUPABASE_KEY: process.env.VITE_STOCK_SUPABASE_KEY || envVars.VITE_STOCK_SUPABASE_KEY,
+};
+const { url: SUPABASE_URL, key: SUPABASE_KEY } = Object.hasOwn(stockEnv, 'STOCK_SUPABASE_KEY')
+  ? resolveStockCredentials(stockEnv)
+  : { url: stockEnv.VITE_STOCK_SUPABASE_URL, key: stockEnv.VITE_STOCK_SUPABASE_KEY };
 
 const BATCH = 100;
 
@@ -76,12 +82,12 @@ async function main() {
   }
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('\nMissing VITE_STOCK_SUPABASE_URL / VITE_STOCK_SUPABASE_KEY.');
+    console.error('\nMissing STOCK_SUPABASE_POOLER_URL / STOCK_SUPABASE_KEY.');
     console.error('Apply migrations/027_move_4_fashion_accessories.sql in the stock Supabase SQL editor instead.');
     process.exit(1);
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabase = createStockClient({ env: stockEnv });
   const live = await applyTable(supabase, 'website_stock', rows);
   const archived = await applyTable(supabase, 'archived_products', rows);
 
