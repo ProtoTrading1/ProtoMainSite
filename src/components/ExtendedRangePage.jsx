@@ -20,7 +20,7 @@ export function InstoreResultCard({ product, priority = false, addToCart, cartQt
   const code = String(product?.code || product?.sku || '').trim();
   const stock = Math.max(0, Math.floor(Number(product?.stockQty ?? product?.stockOnHand) || 0));
   const image = String(product?.image || product?.images?.[0] || '').trim();
-  return <article className="instore-result-card">
+  return <article className="instore-result-card" data-product-code={code || undefined}>
     <button type="button" className="instore-result-image" aria-label={`View ${name}`} onClick={() => { trackShoppingProduct('search_result_clicked', product, { searchId: activeShoppingSearch('main'), searchSource: 'main' }); setPreviewOpen(true); }}>{image ? <img src={image} alt={name} loading={priority ? 'eager' : 'lazy'} /> : <PackageSearch size={36} aria-hidden="true" />}</button>
     <div className="instore-result-body">
       <p className="instore-result-code">{code || 'INSTORE PRODUCT'}</p><h3>{name}</h3>

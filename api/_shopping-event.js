@@ -1,4 +1,4 @@
-export const SHOPPING_EVENTS = new Set(['catalogue_viewed', 'department_viewed', 'search_results_viewed', 'product_viewed', 'search_result_clicked', 'basket_item_added', 'basket_item_removed', 'basket_quantity_changed', 'checkout_started', 'order_submitted', 'search_tip_shown', 'search_tip_dismissed', 'search_tip_search_clicked', 'personalised_tip_shown', 'personalised_tip_dismissed', 'personalised_tip_clicked']);
+export const SHOPPING_EVENTS = new Set(['catalogue_viewed', 'department_viewed', 'search_results_viewed', 'product_viewed', 'search_result_clicked', 'basket_item_added', 'basket_item_removed', 'basket_quantity_changed', 'checkout_started', 'order_submitted', 'search_tip_shown', 'search_tip_dismissed', 'search_tip_search_clicked', 'personalised_tip_shown', 'personalised_tip_dismissed', 'personalised_tip_clicked', 'site_clicked']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function uuid(value, required = false) { if (!value && !required) return null; if (!UUID.test(value || '')) throw new TypeError('Invalid identifier'); return value; }
 function integer(value) { if (value == null) return null; if (!Number.isSafeInteger(value) || value < 0 || value > 10000000) throw new TypeError('Invalid count'); return value; }
@@ -13,8 +13,9 @@ export function normalizeShoppingEvent(input) {
   if (input.eventType.startsWith('basket_') && !(input.quantity > 0)) throw new TypeError('Quantity required');
   if (input.eventType.startsWith('search_tip_') && !input.tipStage) throw new TypeError('Tip stage required');
   if (input.eventType.startsWith('personalised_tip_') && (input.tipStage !== 'arrival' || !input.productId || !input.source)) throw new TypeError('Arrival evidence required');
+  if (input.eventType === 'site_clicked' && !(typeof input.metadata?.area === 'string' && input.metadata.area.trim() && typeof input.metadata?.label === 'string' && input.metadata.label.trim())) throw new TypeError('Click evidence required');
   const metadata = {};
-  for (const key of ['department', 'collection', 'reason']) {
+  for (const key of ['department', 'collection', 'reason', 'area', 'label', 'kind']) {
     const value = input.metadata?.[key];
     if (typeof value === 'string' && value.length > 0 && value.length <= 160 && ![...value].some(character => { const code = character.charCodeAt(0); return code < 32 || (code >= 127 && code <= 159); })) metadata[key] = value;
   }
