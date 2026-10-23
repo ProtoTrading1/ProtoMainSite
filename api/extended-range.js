@@ -1,3 +1,4 @@
+import { sendInstoreResponse } from './_instore-response.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -428,10 +429,7 @@ export default async function handler(req, res) {
     const allEligible = live.products;
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
-    if (claimed) await storeInstoreCatalogue(client, { ...live, tiles });
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('Vary', 'Authorization');
-    return res.status(200).json({
+    return sendInstoreResponse(res, {
       source: SOURCE_LABEL,
       count: Math.min(PAGE_SIZE, Math.max(0, view.total - from)), page, pageSize: PAGE_SIZE,
       total: view.total, tiles, products: view.products,
@@ -439,7 +437,7 @@ export default async function handler(req, res) {
       // data used by this handler. The browser can then search and browse it
       // instantly without bypassing the stock, price, image, or duplicate gate.
       catalogue: includeCatalogue ? allEligible : undefined,
-    });
+    }, claimed ? () => storeInstoreCatalogue(client, { ...live, tiles }) : null);
   } catch (error) {
     console.error('extended range api error:', error?.message || error);
     return res.status(503).json({ error: 'Instore Products is temporarily unavailable.' });
