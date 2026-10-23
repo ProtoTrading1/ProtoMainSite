@@ -200,7 +200,7 @@ export default function MainContent({
 
   useEffect(() => {
     if (catalogueError) {
-      setResultsAnnouncement('The main catalogue is unavailable. Retry to complete your search.');
+      setResultsAnnouncement(activeCollection === 'just-added' ? 'Just Added is unavailable. Retry to load this collection.' : 'The main catalogue is unavailable. Retry to complete your search.');
       return;
     }
     if (loading || (searchKey && instoreSearch.loading)) {
@@ -370,9 +370,9 @@ export default function MainContent({
 
       {catalogueError ? (
         <div className="empty-state" role="alert">
-          <h3>We couldn’t load the main catalogue.</h3>
+          <h3>{activeCollection === 'just-added' ? "We couldn't load Just Added." : 'We couldn’t load the main catalogue.'}</h3>
           <p>Check your connection, then try again. Your search and basket are still here.</p>
-          <button onClick={onRetryCatalogue} type="button">Retry catalogue</button>
+          <button onClick={onRetryCatalogue} type="button">{activeCollection === 'just-added' ? 'Retry Just Added' : 'Retry catalogue'}</button>
         </div>
       ) : shouldShowSkeleton ? (
         <ProductGridSkeleton count={12} />
