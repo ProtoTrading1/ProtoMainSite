@@ -1,3 +1,4 @@
+import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
@@ -295,8 +296,14 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   if (!Number.isFinite(price) || price <= 0) throw orderError(`${title} (${sku}) has no current Instore price and cannot be ordered.`, 409);
   const available = bridgeMatches ? availableFromBridge(bridgeRow) : null;
   if (available === null || available < qty) console.warn('send-order: Instore line requested beyond known stock', { sku, qty, available });
+  let unit;
+  try { unit=positillUnitObservation(sku,bridgeRow); }
+  catch { throw orderError(`${title} (${sku}) needs its Positill selling unit checked before ordering.`,409); }
+  if (item.product.unitsOfIssueVerified===true && normalizeUnitsOfIssue(item.product.unitsOfIssue, '')!==unit.unitsOfIssue) {
+    throw orderError(`${title} (${sku}) has a changed Positill selling unit. Review this item before ordering.`,409);
+  }
   const name = bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), unitsOfIssue: 'EACH', casePack: 'Each', packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), ...unit, casePack: sellingUnitDetails(unit.unitsOfIssue).label, packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
 async function resolveInstorePrices(items) {

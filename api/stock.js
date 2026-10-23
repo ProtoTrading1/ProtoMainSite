@@ -1,4 +1,5 @@
 import { createStockClient } from '../lib/stock-supabase.mjs';
+import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
 import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
@@ -25,7 +26,7 @@ export function validateInstoreBridgeStock(sku, row) {
   const booked = Number(row.BOOKED);
   if (booked < 0) throw new Error('Instore bridge returned invalid booked stock');
   const qty = Math.max(0, Math.floor(onHand - booked));
-  return { qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
+  return { ...positillUnitObservation(sku, row), qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
 }
 
 async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
     if (!data || data.length === 0) {
       const instore = await readFreshInstoreStock(sku, { includeStaged });
       if (!instore) return res.status(404).json({ error: 'SKU not found' });
-      return res.status(200).json({ sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
+      return res.status(200).json({ ...instore, sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
     }
 
     const row = data[0];

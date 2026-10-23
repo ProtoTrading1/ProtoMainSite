@@ -7,7 +7,7 @@ import { updateWhatsappOptIn } from '../lib/auth';
 import { getDeliveryAddressReview } from '../lib/checkoutReview';
 import { validatePromoCode } from '../lib/promoCode';
 import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
-import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { productSellingUnit } from '../../lib/positill-selling-unit.mjs';
 import { groupCartItemsByFulfilment } from '../../lib/cart-fulfilment.mjs';
 import { basketLineKey } from '../../lib/basket-lines.mjs';
 
@@ -19,10 +19,10 @@ function CheckoutLine({ item, toOrder = false }) {
           <strong>{item.product.name}</strong>
           {toOrder && <em className="checkout-to-order-badge">To order</em>}
         </div>
-        <span>{item.product.code} · Qty {item.qty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+        <span>{item.product.code} · Qty {item.qty} × {productSellingUnit(item.product).label}</span>
         {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
         {Number(item.product.minQty) > 1
-          ? <span>Minimum order: {item.product.minQty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+          ? <span>Minimum order: {item.product.minQty} × {productSellingUnit(item.product).label}</span>
           : null}
         {toOrder && <span className="checkout-to-order-guidance">Made or sourced on request · lead time confirmed before invoicing</span>}
       </div>

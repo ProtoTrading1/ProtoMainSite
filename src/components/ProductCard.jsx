@@ -1,5 +1,5 @@
 import { trackShoppingPreview, closeShoppingPreview, releaseUnmountedPreview } from '../lib/shoppingAnalytics';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, ImageOff, Link, Loader2, Minus, PackageSearch, Plus, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
@@ -8,7 +8,7 @@ import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
 import { authenticatedGetJson } from '../lib/authHeaders';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
-import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { hasVerifiedInstoreUnit, productSellingUnit, withPositillObservation } from '../../lib/positill-selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import './ProductCard.css';
@@ -119,7 +119,7 @@ function availabilityForProduct(product) {
     if (!isToOrder && !isLandedStockAvailable({ ...product, availability }) && (stockQty === null || stockQty <= 0)) {
     return { ...availability, canOrder: false };
   }
-  return availability;
+  return product.isExtendedRange && !hasVerifiedInstoreUnit(product) ? {...availability,canOrder:false} : availability;
 }
 
 function groupedAvailability(product) {
@@ -161,13 +161,13 @@ const STOCK_BADGE_CLASS = {
 
 function orderQuantityLabel(product) {
   const minimum = Math.max(1, Number(product?.minQty) || 1);
-  const unit = sellingUnitDetails(product?.unitsOfIssue || 'EACH');
+  const unit = productSellingUnit(product);
   const parts = [`Minimum ${minimum}`];
   parts.push(unit.label);
   return parts.join(' · ');
 }
 
-function StockBadge({ product }) {
+function StockBadge({ product, onVerifiedUnit }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
   if (!product) return null;
   const availability = catalogStockState(product);
@@ -183,6 +183,7 @@ function StockBadge({ product }) {
         sku={sku}
         source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
         isInstore={Boolean(product.isExtendedRange)}
+        onVerifiedUnit={onVerifiedUnit}
       /> : null}
     </div>
   );
@@ -190,7 +191,7 @@ function StockBadge({ product }) {
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) {
+function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, onVerifiedUnit }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
 
@@ -200,6 +201,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
     const controller = new AbortController();
     requestRef.current = controller;
     setState({ status: 'loading', qty: null, availability: null });
+    if (isInstore) onVerifiedUnit?.(null);
     try {
       const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
       const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
@@ -211,6 +213,8 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
       });
       if (!response.ok) throw new Error(String(response.status));
       if (requestRef.current !== controller) return;
+      if (isInstore && !hasVerifiedInstoreUnit(data)) throw new Error('Unverified selling unit');
+      if (isInstore) onVerifiedUnit?.(data);
       setState({
         status: 'done',
         qty: Number(data.qty) || 0,
@@ -222,7 +226,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
     }
-  }, [sku, source, isInstore]);
+  }, [sku, source, isInstore, onVerifiedUnit]);
 
   useEffect(() => () => {
     requestRef.current?.abort();
@@ -251,7 +255,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
   } else if (state.status === 'error') {
     readout = (
       <span className="stock-readout stock-readout--error">
-        Could not check stock{' '}
+        {isInstore ? 'Could not verify stock and selling unit' : 'Could not check stock'}{' '}
         <button type="button" className="stock-retry" onClick={check}>Retry</button>
       </span>
     );
@@ -268,7 +272,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false }) 
         >
           {state.status === 'loading'
             ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
-            : <><PackageSearch size={14} /> {source === 'instore-preview' ? 'Confirm preview stock' : 'Check live stock'}</>}
+            : <><PackageSearch size={14} /> {source === 'instore-preview' ? 'Confirm preview stock' : isInstore ? 'Check stock and unit' : 'Check live stock'}</>}
         </button>
       ) : null}
       <span className="stock-result" role="status" aria-live="polite">{readout}</span>
@@ -388,7 +392,10 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   );
 }
 
-function ProductCard({ product, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
+function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
+  const [unitObservation,setUnitObservation]=useState(null);
+  const product=useMemo(()=>withPositillObservation(sourceProduct,unitObservation),[sourceProduct,unitObservation]);
+  const onVerifiedUnit=useCallback(observation=>setUnitObservation(observation),[]);
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
   const variantCount = product?.variantCount || variants.length;
@@ -424,6 +431,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
     ? activeProduct.images
     : null;
   const inCart = cartQty > 0;
+  const variantIdentity=useRef({id:product?.id,primaryVariantId:product?.primaryVariantId});
   const cardAvailability = catalogStockState(product);
   const modalAvailability = catalogStockState(activeProduct);
   const cardCanOrder = cardAvailability.canOrder;
@@ -432,9 +440,12 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
   const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 
   useEffect(() => {
+    const previous=variantIdentity.current;
+    if (previous.id===product?.id && previous.primaryVariantId===product?.primaryVariantId) return;
+    variantIdentity.current={id:product?.id,primaryVariantId:product?.primaryVariantId};
     setSelectedVariant(initialVariantForProduct(product));
     setActiveImageIdx(0);
-  }, [product?.id, product?.primaryVariantId]);
+  }, [product]);
 
   const selectVariant = (variant) => {
     if (!variant) return;
@@ -671,12 +682,12 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
             {activeProduct.price > 0 ? (
               <>
                 <strong className="pc-price-amount">R{Number(activeProduct.price).toFixed(2)}</strong>
-                <span className="pc-price-vat">Incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
+                <span className="pc-price-vat">Incl. VAT · {productSellingUnit(activeProduct).priceSuffix}</span>
               </>
             ) : null}
           </div>
 
-          <StockBadge product={product} />
+          <StockBadge product={product} onVerifiedUnit={onVerifiedUnit} />
 
           {preferenceSlot}
           <div className={`buy-row${isVariantGroup ? ' buy-row--options' : ''}`}>
@@ -921,7 +932,7 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                 {(!isVariantGroup || selectedVariant) && activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
                     <strong>R{Number(activeProduct.price).toFixed(2)}</strong>
-                    <span>incl. VAT · {sellingUnitDetails(activeProduct.unitsOfIssue).priceSuffix}</span>
+                    <span>incl. VAT · {productSellingUnit(activeProduct).priceSuffix}</span>
                   </div>
                 )}
 
@@ -931,6 +942,8 @@ function ProductCard({ product, addToCart, cartQty = 0, special, priority = fals
                       sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
                       autoCheck
                       isInstore={Boolean(activeProduct.isExtendedRange)}
+                      source={activeProduct.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
+                      onVerifiedUnit={onVerifiedUnit}
                     />
                   </div>
                 )}

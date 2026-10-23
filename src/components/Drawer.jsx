@@ -18,7 +18,7 @@ import CheckoutModal from './CheckoutModal';
 import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
-import { sellingUnitDetails } from '../../lib/selling-unit.mjs';
+import { productSellingUnit } from '../../lib/positill-selling-unit.mjs';
 import { basketLineKey, basketLineQuantityLimit, basketProductQuantity } from '../../lib/basket-lines.mjs';
 
 const MIN_ORDER = 1000;
@@ -432,9 +432,9 @@ export default function Drawer({
               <h3>{item.product.name}</h3>
               {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
               <span>{item.product.code}</span>
-              <span>Sold as: {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+              <span>Sold as: {productSellingUnit(item.product).label}</span>
               {Number(item.product.minQty) > 1 && (
-                <span>Minimum: {item.product.minQty} × {sellingUnitDetails(item.product.unitsOfIssue).label}</span>
+                <span>Minimum: {item.product.minQty} × {productSellingUnit(item.product).label}</span>
               )}
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
