@@ -5,7 +5,7 @@ import { resolveAuthoritativePrices, resolveInstoreOrderLine } from '../api/send
 
 const item = { qty: 2, preference: 'Dark brown if available', product: { id: '8618100133', sku: '8618100133', isExtendedRange: true, price: 0.01 } };
 const indexRow = { sku: '8618100133', image_source: 'nutstore', barcode: '', title: 'BRACELET WOODEN BEADS', image_url: 'https://images.example.test/a.jpg', image_review_status: 'verified', visibility_status: 'search_only', is_active: true, price: 11.74 };
-const bridgeRow = { CODE: '8618100133', DESCR: 'BRACELET WOODEN BEADS', PRICE_A: 11.74, ONHAND: 12, BOOKED: 1 };
+const bridgeRow = { CODE: '8618100133', UNITS: 'EACH', DESCR: 'BRACELET WOODEN BEADS', PRICE_A: 11.74, ONHAND: 12, BOOKED: 1 };
 
 test('Instore checkout rejects missing SKU identities before any stock lookup', async () => {
   await assert.rejects(() => resolveAuthoritativePrices([
@@ -35,10 +35,8 @@ test('Instore checkout accepts a request beyond live stock, below the display th
   assert.equal(resolveInstoreOrderLine(item, { indexRow, bridgeRow: { ...bridgeRow, BOOKED: null } }).product.price, 13.5);
 });
 
-test('Instore checkout falls back to the reviewed index price when Positill has no row', () => {
-  const result = resolveInstoreOrderLine(item, { indexRow, bridgeRow: undefined });
-  assert.equal(result.product.price, 13.5);
-  assert.equal(result.product.name, 'BRACELET WOODEN BEADS');
+test('Instore checkout requires an exact Positill unit even when an index price exists', () => {
+  assert.throws(() => resolveInstoreOrderLine(item, { indexRow, bridgeRow: undefined }), { status: 409, message: /selling unit checked/ });
   assert.throws(() => resolveInstoreOrderLine(item, { indexRow: { ...indexRow, price: 0 }, bridgeRow: undefined }), { status: 409, message: /no current Instore price/ });
 });
 

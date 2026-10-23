@@ -96,6 +96,12 @@ function sanitizeProduct(product, identifiers) {
     // Checkout routes Instore lines by this flag. Dropping it made a restored
     // account basket send Instore SKUs through the main-catalogue check.
     isExtendedRange: product.isExtendedRange === true,
+    // Display metadata survives a basket reload. It grants no ordering
+    // authority: send-order re-reads the exact Positill unit on the server.
+    unitsOfIssue: cleanText(product.unitsOfIssue, 40),
+    unitsOfIssueRaw: cleanText(product.unitsOfIssueRaw, 40),
+    unitsOfIssueSource: product.unitsOfIssueSource === 'positill_live' ? 'positill_live' : '',
+    unitsOfIssueVerified: product.unitsOfIssueVerified === true && product.unitsOfIssueSource === 'positill_live',
   };
 }
 

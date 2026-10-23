@@ -5,7 +5,7 @@ import { validateInstoreBridgeStock } from '../../api/stock.js';
 
 test('Instore stock requires its exact product identity and complete numeric balances', () => {
   const sku = '8618100133';
-  const row = { CODE: sku, ONHAND: '12', BOOKED: '1' };
+  const row = { CODE: sku, UNITS: 'EACH', ONHAND: '12', BOOKED: '1' };
   assert.equal(validateInstoreBridgeStock(sku, row).qty, 11);
   assert.throws(() => validateInstoreBridgeStock(sku, { ...row, CODE: '8618100134' }), /different product/);
   assert.throws(() => validateInstoreBridgeStock(sku, { ...row, CODE: null }), /different product/);
