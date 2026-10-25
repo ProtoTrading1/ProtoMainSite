@@ -1,3 +1,4 @@
+import { createCatalogueBuildCache } from './_catalogue-build.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
 import { readFileSync } from 'fs';
@@ -53,10 +54,10 @@ function parseSubcategoryExtra(raw) {
 // That gives two big wins under load: repeat requests revalidate with an ETag
 // and get a 304 (no rebuild, no body), and a warm lambda reuses the built
 // payload instead of re-scanning for every request.
-let catalogMemo = { key: null, payload: null, builtAt: 0 };
+const catalogueBuild = createCatalogueBuildCache();
 // Safety net: even if a writer ever forgets to bump updated_at, never serve a
 // memoized payload for longer than this.
-const CATALOG_MEMO_MAX_MS = 60_000;
+
 // The stamp's time bucket exists because the payload is ALSO built from inputs
 // (taxonomy JSON, feature flags, product_placements, product_groups,
 // yearly_sales) that website_stock's updated_at does not cover — without it,
@@ -526,67 +527,67 @@ export default async function handler(req, res) {
       if (etagMatches(req, etag)) {
         return res.status(304).end();
       }
-      if (
-        catalogMemo.key === etag
-        && catalogMemo.payload
-        && Date.now() - catalogMemo.builtAt < CATALOG_MEMO_MAX_MS
-      ) {
+      const cached = catalogueBuild.peek(etag);
+      if (cached) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json(catalogMemo.payload);
+        return res.status(200).json(cached);
       }
     }
 
-    const [initialRows, tree, initialSalesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
-      identifier
-        ? fetchIdentifierRows(supabase, identifier)
-        : fetchAllRows(
-          supabase,
-          'website_stock',
-          STOCK_SELECT,
-          requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
-        ),
-      loadTaxonomyTree(),
-      // A direct code lookup should stay direct: only fetch sales for the
-      // returned codes instead of scanning the entire sales catalogue.
-      loadSalesByBarcode(supabase, requestedSkus || (identifier ? [identifier] : null)),
-      // null when the feature is off — no extra query, payload unchanged.
-      loadPlacementMapIfEnabled(supabase),
-      loadGroupInfoMapIfEnabled(supabase),
-      loadIncomingAvailabilityMap(supabase),
-    ]);
-    let rows = initialRows;
-    let salesByBarcode = initialSalesByBarcode;
-    if (identifier && groupInfo) {
-      rows = await expandIdentifierAdminGroupRows(supabase, rows, groupInfo);
-      if (rows.length !== initialRows.length) {
-        salesByBarcode = await loadSalesByBarcode(supabase, rows.map((row) => row.sku).filter(Boolean));
+    const buildProducts = async () => {
+      const [initialRows, tree, initialSalesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
+        identifier
+          ? fetchIdentifierRows(supabase, identifier)
+          : fetchAllRows(
+            supabase,
+            'website_stock',
+            STOCK_SELECT,
+            requestedSkus?.length ? (q) => q.in('sku', requestedSkus) : null,
+          ),
+        loadTaxonomyTree(),
+        // A direct code lookup should stay direct: only fetch sales for the
+        // returned codes instead of scanning the entire sales catalogue.
+        loadSalesByBarcode(supabase, requestedSkus || (identifier ? [identifier] : null)),
+        // null when the feature is off — no extra query, payload unchanged.
+        loadPlacementMapIfEnabled(supabase),
+        loadGroupInfoMapIfEnabled(supabase),
+        loadIncomingAvailabilityMap(supabase),
+      ]);
+      let rows = initialRows;
+      let salesByBarcode = initialSalesByBarcode;
+      if (identifier && groupInfo) {
+        rows = await expandIdentifierAdminGroupRows(supabase, rows, groupInfo);
+        if (rows.length !== initialRows.length) {
+          salesByBarcode = await loadSalesByBarcode(supabase, rows.map((row) => row.sku).filter(Boolean));
+        }
       }
-    }
-    const products = rows
-      // Defence in depth: invalid catalogue rows must never reach a customer,
-      // even if an importer, manual edit, or future sync leaves one live.
-      .filter(isSafeStorefrontProduct)
-      .map((row) => adapt(
-        row,
-        tree,
-        salesByBarcode,
-        placements ? (placements.get(row.sku) || []) : null,
-        groupInfo ? (groupInfo.get(row.sku) || null) : null,
-        incomingBySku.get(row.sku) || null,
-      ))
-      // A product filed ONLY via a placement has no primary category label, so
-      // it must survive this filter or multi-placement would silently drop it.
-      .filter((p) => p.category
-        || (p.isMultiCategory && p.alternateCategoryPath?.length)
-        || p.placementPaths?.length);
+      const products = rows
+        // Defence in depth: invalid catalogue rows must never reach a customer,
+        // even if an importer, manual edit, or future sync leaves one live.
+        .filter(isSafeStorefrontProduct)
+        .map((row) => adapt(
+          row,
+          tree,
+          salesByBarcode,
+          placements ? (placements.get(row.sku) || []) : null,
+          groupInfo ? (groupInfo.get(row.sku) || null) : null,
+          incomingBySku.get(row.sku) || null,
+        ))
+        // A product filed ONLY via a placement has no primary category label, so
+        // it must survive this filter or multi-placement would silently drop it.
+        .filter((p) => p.category
+          || (p.isMultiCategory && p.alternateCategoryPath?.length)
+          || p.placementPaths?.length);
 
-    if (isFullCatalog && version) {
-      catalogMemo = { key: `W/"cat-${version.stamp}"`, payload: products, builtAt: Date.now() };
-    }
+      return products;
+    };
+    const products = isFullCatalog && version
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}"`, buildProducts)
+      : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
   } catch (err) {
     console.error('products api error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to fetch products' });
+    return res.status(err.code === 'CATALOGUE_BUSY' ? 503 : 500).json({ error: err.message || 'Failed to fetch products' });
   }
 }

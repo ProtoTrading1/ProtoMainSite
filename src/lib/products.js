@@ -219,7 +219,9 @@ function startCatalogFetch() {
   // If-None-Match so an unchanged catalogue answers 304 with no body and no
   // server-side rebuild. Prices/stock stay authoritative; the 6 MB payload is
   // only transferred when the catalogue has actually changed.
-  return fetchJsonWithTimeout('/api/products', 12000, { cache: 'no-cache', authenticated: true })
+  // Full-catalogue cold scans and their JSON body can exceed 12 seconds.
+  // Keep a bounded 45-second budget; exact-code/department reads stay short.
+  return fetchJsonWithTimeout('/api/products', 45000, { cache: 'no-cache', authenticated: true })
     .then((products) => {
       _lastLiveRefreshAt = Date.now();
       return products;
