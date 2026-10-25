@@ -1,4 +1,5 @@
 import { sendInstoreResponse } from './_instore-response.js';
+import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -77,7 +78,7 @@ function normalizePage(value) {
 // This is the feed eligibility rule: only reviewed Nutstore images attached to
 // an active, priced item with positive currently-synced available stock.
 // Zero or unknown stock is excluded; it never turns into an "arriving soon" card.
-export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged = false, pricesAreInclusive = false } = {}) {
+export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged = false, pricesAreInclusive = false, ignoreStockEligibility = false } = {}) {
   const query = normalizeQuery(rawQuery);
   const seen = new Set();
   return (rows || []).flatMap((row) => {
@@ -103,7 +104,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || !Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK
+      || (!ignoreStockEligibility&&(!Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK))
       || price <= 0) return [];
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
@@ -156,19 +157,22 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false }
   // large staged preview cannot spend its whole serverless response window
   // waiting for the main-catalogue duplicate index to begin.
   const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
-    readCompleteRows(() => client.from('extended_range_items')
+    readCompleteRows(() => {
+      let rangeQuery=client.from('extended_range_items')
       .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
       .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
       .eq('image_review_status', 'verified')
       .in('is_active', includeStaged ? [true, false] : [true])
-      .gt('price', 0)
-      .gte('available_stock', 0)
-      .like('image_url', 'https://%'), { allowChangingCount: includeStaged }),
+      .gt('price', 0);
+      if(!arrivedStockEnabled())rangeQuery=rangeQuery.gte('available_stock', 0);
+      return rangeQuery.like('image_url', 'https://%');
+    }, { allowChangingCount: includeStaged }),
     readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(rangeRows, imageControls, listingControls), '', { includeStaged });
+  const observedRows=await overlayArrivedStock(rangeRows,{client});
+  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(observedRows, imageControls, listingControls), '', { includeStaged });
   return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
 }
 
@@ -409,7 +413,10 @@ export default async function handler(req, res) {
     // rebuilding the whole collection. It is only used while it is fresh and
     // was built under the Instore controls currently in force; otherwise the
     // live read below runs exactly as it always has.
-    const stored = await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
+    const useArrivals=arrivedStockEnabled();
+    // The durable snapshot predates the arrival ledger. Keep it untouched and
+    // use only the existing bounded 30-second memory cache in arrival mode.
+    const stored = useArrivals?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
     if (stored.body) {
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
@@ -419,14 +426,20 @@ export default async function handler(req, res) {
     // One caller rebuilds the stored collection; the rest just serve. Claiming
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
-    const claimed = await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
+    const claimed = useArrivals?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
     const live = await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;
       })
-      : getCachedCatalogue(includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
-    const allEligible = live.products;
+      : getCachedCatalogue(useArrivals?'arrivals-production':includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
+    let allEligible = live.products;
+    if(useArrivals){
+      // Explicit image/listing removals still take effect immediately, even
+      // when quantities were observed in the bounded memory cache.
+      const [imageControls,listingControls]=await Promise.all([readInstoreImageControls(client),readInstoreListingControls(client)]);
+      allEligible=allEligible.filter(product=>listingControls.get(product.sku)!=='hidden').map(product=>imageControls.get(product.sku)==='hidden'?{...product,image:'',images:[],imageStatus:'hidden'}:product);
+    }
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
     return sendInstoreResponse(res, {

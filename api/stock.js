@@ -1,5 +1,6 @@
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
+import {readArrivedStockRecords,effectiveArrivedStock} from './_arrived-stock.js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
 import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
@@ -34,7 +35,10 @@ async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
     .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
     .eq('sku', sku).limit(1);
   if (error) throw error;
-  const product = buildExtendedRangeProducts(data || [], '', { includeStaged })[0];
+  const arrivals=await readArrivedStockRecords(stockClient(),[sku]);
+  // Only a verified server-side receipt may defer the index's stale quantity
+  // gate. Current bridge stock/unit/price still decide the actual response.
+  const product = buildExtendedRangeProducts(data || [], '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
   if (!product) return null;
   const base = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
   const key = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
@@ -42,7 +46,7 @@ async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
   const response = await fetch(`${base}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': key }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Instore bridge returned ${response.status}`);
   const row = (await response.json())?.row;
-  return validateInstoreBridgeStock(sku, row);
+  return effectiveArrivedStock(sku,row,arrivals.get(sku))||validateInstoreBridgeStock(sku, row);
 }
 
 export default async function handler(req, res) {
