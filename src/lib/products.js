@@ -519,10 +519,9 @@ function applyInStockFilter(products, inStockOnly) {
 function applyCollection(products, collection, specialIds = null) {
   // Stock-based collections are no-ops in catalogue-only mode.
   if (collection === 'hot') return [...products].sort((a, b) => b.yearlySales - a.yearlySales);
-  // "This Week's Specials" is the union of two sources: products the admin
-  // flagged via the Product Manager toggle (isNew, backed by is_new_arrival)
-  // and products configured in the Specials panel (specialIds from specialsMap).
-  if (collection === 'specials') return products.filter((p) => p.isNew || (specialIds && specialIds.has(p.id)));
+  // Only products curated in the Specials panel belong in this collection.
+  // New arrivals may be marked "New", but are never promoted to Specials.
+  if (collection === 'specials') return products.filter((p) => specialIds && specialIds.has(p.id));
   return products;
 }
 

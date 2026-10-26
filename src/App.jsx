@@ -2482,7 +2482,7 @@ export default function App({
             addToCart={addToCart}
             cartQty={cartQtyMap[previewProduct.id] || 0}
             onCartQtyChange={handleCartQtyChange}
-            special={specialsMap[previewProduct.id] || (previewProduct.isNew ? { deal: 'none' } : null)}
+            special={specialsMap[previewProduct.id] || null}
             initialZoomOpen={true}
             initialFocusOptions={previewOptionsFirst}
             onZoomClose={closeProductPreview}
