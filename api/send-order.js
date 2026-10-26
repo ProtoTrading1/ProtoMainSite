@@ -1,4 +1,5 @@
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
+import {readArrivedStockRecords,assertArrivedOrderTotals} from './_arrived-stock.js';
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
@@ -277,7 +278,7 @@ function availableFromBridge(row) {
 // gate here (owner decision, 2026-10-07). The team confirms availability when
 // packing. The bridge row, when present, still supplies the current price and
 // is logged so short stock is visible server-side.
-export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible' } = {}) {
+export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible',arrivalStock } = {}) {
   const sku = textId(item?.product?.sku || item?.product?.id);
   if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
   // A removed/misleading product photo must never make a separately approved
@@ -294,7 +295,7 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   // no row for this SKU, so a product missing from Positill can still be requested.
   const price = Number.isFinite(bridgePrice) && bridgePrice > 0 ? bridgePrice : customerFacingCataloguePrice(indexRow?.price);
   if (!Number.isFinite(price) || price <= 0) throw orderError(`${title} (${sku}) has no current Instore price and cannot be ordered.`, 409);
-  const available = bridgeMatches ? availableFromBridge(bridgeRow) : null;
+  const available = arrivalStock?.qty??(bridgeMatches ? availableFromBridge(bridgeRow) : null);
   if (available === null || available < qty) console.warn('send-order: Instore line requested beyond known stock', { sku, qty, available });
   let unit;
   try { unit=positillUnitObservation(sku,bridgeRow); }
@@ -352,11 +353,13 @@ async function resolveInstorePrices(items) {
   } else {
     console.warn('send-order: Instore bridge not configured; using index prices');
   }
+  const arrivals=await readArrivedStockRecords(index,skus);
+  const verifiedArrivals=assertArrivedOrderTotals(items,arrivals,bridgeBySku);
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible' });
+    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible',arrivalStock:verifiedArrivals.get(sku) });
   });
 }
 

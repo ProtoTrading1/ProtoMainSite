@@ -183,6 +183,8 @@ function StockBadge({ product, onVerifiedUnit }) {
         sku={sku}
         source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
         isInstore={Boolean(product.isExtendedRange)}
+        currentQty={catalogStockQty(product)}
+        currentUnitVerified={hasVerifiedInstoreUnit(product)}
         onVerifiedUnit={onVerifiedUnit}
       /> : null}
     </div>
@@ -191,7 +193,7 @@ function StockBadge({ product, onVerifiedUnit }) {
 
 // Customer-facing live stock check. Always hits /api/stock fresh on click — the
 // result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, onVerifiedUnit }) {
+function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, currentQty, currentUnitVerified, onVerifiedUnit }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
 
@@ -241,8 +243,12 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, on
     if (autoCheck) void check();
   }, [autoCheck, check]);
 
+  // A modal can replace the card's live observation. Do not leave its older
+  // successful quantity beside a newer zero/unverified availability badge.
+  const displayState = !autoCheck && isInstore && state.status === 'done'
+    && (!currentUnitVerified || currentQty !== state.qty) ? { status: 'idle' } : state;
   let readout = null;
-  if (state.status === 'done') {
+  if (displayState.status === 'done') {
     const qty = state.qty;
     const live = state.availability || resolveProductAvailability({ stockQty: qty });
     if (live.state === 'in_stock') {
@@ -252,7 +258,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, on
     } else {
       readout = <span className={`stock-readout stock-readout--${live.canOrder ? 'in' : 'out'}`}>{customerAvailabilityLabel(live)}</span>;
     }
-  } else if (state.status === 'error') {
+  } else if (displayState.status === 'error') {
     readout = (
       <span className="stock-readout stock-readout--error">
         {isInstore ? 'Could not verify stock and selling unit' : 'Could not check stock'}{' '}
@@ -263,14 +269,14 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, on
 
   return (
     <div className="stock-check">
-      {state.status === 'idle' || state.status === 'loading' ? (
+      {displayState.status === 'idle' || displayState.status === 'loading' ? (
         <button
           type="button"
           className="check-stock-btn"
           onClick={check}
-          disabled={state.status === 'loading' || !sku}
+          disabled={displayState.status === 'loading' || !sku}
         >
-          {state.status === 'loading'
+          {displayState.status === 'loading'
             ? <><Loader2 size={14} className="stock-spin" /> Checking…</>
             : <><PackageSearch size={14} /> {source === 'instore-preview' ? 'Confirm preview stock' : isInstore ? 'Check stock and unit' : 'Check live stock'}</>}
         </button>

@@ -106,6 +106,9 @@ async function instoreEvents(context) {
  await installAccessibilityServices(context);
  await context.route('**/api/shopping-events', async route => { events.push(route.request().postDataJSON()); await route.fulfill({ json: { ok: true } }); });
  await context.route('**/api/extended-range*', route => route.fulfill({ json: { products: [analyticsInstoreItem], catalogue: [analyticsInstoreItem], total: 1, page: 1, pageSize: 24, tiles: [] } }));
+ await context.route('**/api/stock*', route => route.fulfill({ json: { sku: analyticsInstoreItem.code, qty: 8, price: 12,
+  unitsOfIssue: 'PACK 10', unitsOfIssueRaw: 'PKT,10', unitsOfIssueSource: 'positill_live', unitsOfIssueVerified: true,
+  availability: { state: 'in_stock', canOrder: true, label: 'In stock' } } }));
  return events;
 }
 test('Instore department-first browsing records one visit across root return and refresh', async ({ page, context }) => {
