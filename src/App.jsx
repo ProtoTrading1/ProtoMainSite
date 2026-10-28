@@ -345,6 +345,10 @@ export default function App({
   const cartSyncRetryCountRef = useRef(0);
   const cartSyncDrainRef = useRef(null);
   const cartHydrateRetryRef = useRef(null);
+  // Focus, visibility and the 30-second safety poll can land in the same
+  // event turn. Keep one read in flight so an intermittent connection cannot
+  // create a burst of identical basket refresh failures.
+  const cartRefreshInFlightRef = useRef(false);
   const cartClearActivityAtRef = useRef(null);
   const cartClearIntentRef = useRef('normal');
   const cartRestoreFingerprintRef = useRef(null);
@@ -846,9 +850,15 @@ export default function App({
 
   const refreshAccountCart = useCallback(async () => {
     const accountId = cartAccountRef.current;
-    if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
+    if (cartPreviewModeRef.current || !accountId || !cartHydratedRef.current
+        || cartSyncInFlightRef.current || cartRefreshInFlightRef.current
+        || pendingCartSyncRef.current) return;
+    cartRefreshInFlightRef.current = true;
     const beforeFingerprint = cartFingerprint(currentCartRef.current.items);
-    if (beforeFingerprint !== lastSavedCartRef.current) return;
+    if (beforeFingerprint !== lastSavedCartRef.current) {
+      cartRefreshInFlightRef.current = false;
+      return;
+    }
     try {
       const remote = await getAccountCart();
       if (cartAccountRef.current !== accountId || cartSyncInFlightRef.current || pendingCartSyncRef.current) return;
@@ -880,6 +890,8 @@ export default function App({
         step: 'refresh',
         outcome: 'error',
       });
+    } finally {
+      cartRefreshInFlightRef.current = false;
     }
   }, []);
 

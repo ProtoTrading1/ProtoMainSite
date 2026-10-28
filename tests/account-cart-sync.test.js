@@ -279,6 +279,9 @@ describe('account basket client orchestration contract', () => {
     const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
     assert.match(app, /getAccountCart/);
+    assert.match(app, /const cartRefreshInFlightRef = useRef\(false\)/);
+    assert.match(app, /cartRefreshInFlightRef\.current = true/);
+    assert.match(app, /finally \{\s*cartRefreshInFlightRef\.current = false;/);
     assert.match(app, /visibilitychange/);
     assert.match(app, /document\.visibilityState === 'visible'/);
     assert.match(app, /window\.addEventListener\('focus'/);
