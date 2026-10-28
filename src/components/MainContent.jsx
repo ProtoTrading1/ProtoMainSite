@@ -16,10 +16,9 @@ function cartQtyForProduct(product, cartQtyMap) {
   return cartQtyMap[product.id] || 0;
 }
 
-// A flagged product (isNew, backed by is_new_arrival) that has no explicit
-// Specials-panel deal still shows the generic "This Week's Special" ribbon.
+// Specials are curated in the Specials panel. A new arrival is not a special.
 function specialForProduct(product, specialsMap) {
-  return specialsMap[product.id] || (product.isNew ? { deal: 'none' } : null);
+  return specialsMap[product.id] || null;
 }
 
 const PRIORITY_CHUNK_SIZE = 16;
