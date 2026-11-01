@@ -62,7 +62,7 @@ function MobileProductRequest({ onClose: closeAll }) {
   );
 }
 
-export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout, onInstoreProducts }) {
+export default function MobileNav({ isOpen, onClose, categories, path, navigate, counts, breadcrumb, customer, onViewProfile, onViewAdmin, onLogout, onInstoreProducts, onJustAdded }) {
   const [showProductRequest, setShowProductRequest] = useState(false);
   const [categoryQuery, setCategoryQuery] = useState('');
   const dialogRef = useRef(null);
@@ -239,6 +239,7 @@ export default function MobileNav({ isOpen, onClose, categories, path, navigate,
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <button type="button" className="just-added-nav" onClick={() => { onJustAdded?.(); onClose(); }} style={{ minHeight: 48, padding: '10px 16px', border: 0, font: 'inherit', fontWeight: 800, textAlign: 'left', cursor: 'pointer' }}>Just Added</button>
             {instoreAvailable && <button
               type="button"
               onClick={() => { onInstoreProducts?.(); onClose(); }}

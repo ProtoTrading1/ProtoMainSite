@@ -45,6 +45,7 @@ test('header controls stay within the viewport and keyboard reachable across des
         page.locator('.header-nav').getByRole('button', { name: /About Us/ }),
         page.locator('.header-nav').getByRole('button', { name: /Instore Products/ }),
         page.locator('.header-nav').getByRole('button', { name: /Specials/ }),
+        page.locator('.header-nav').getByRole('button', { name: 'Just Added', exact: true }),
         page.getByRole('button', { name: 'My Profile' }),
         page.getByRole('button', { name: 'Log out' }),
         page.getByRole('button', { name: /Open cart/ }),
@@ -75,7 +76,7 @@ test('header controls stay within the viewport and keyboard reachable across des
         await expect(page.locator('.cart-summary-amount')).toHaveText('R7870.50');
         const expectedFocus = [
           '.header-nav button:nth-child(2)', '.header-nav button:nth-child(3)',
-          '.header-nav button:nth-child(4)', '.header-actions .header-action:first-of-type',
+          '.header-nav button:nth-child(4)', '.header-nav button:nth-child(5)', '.header-actions .header-action:first-of-type',
           '.header-actions .header-action:nth-of-type(2)',
           '.cart-summary',
         ];

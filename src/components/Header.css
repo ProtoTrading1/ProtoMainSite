@@ -975,3 +975,16 @@
   }
 
 }
+.just-added-nav,
+.app-header--premium .header-nav-btn.just-added-nav {
+  background: #075b5b;
+  color: #fff;
+}
+.just-added-nav:hover { background: #064b4b; }
+.just-added-nav:focus-visible { outline: 3px solid #f0ba50; outline-offset: 2px; }
+
+@media (min-width: 1001px) and (max-width: 1100px) {
+  .app-header--premium .header-utilities { margin-left: 8px; gap: 4px; }
+  .app-header--premium .header-nav { gap: 1px; }
+  .app-header--premium .header-nav-btn { padding-inline: 3px; gap: 3px; font-size: 12px; }
+}
