@@ -211,7 +211,7 @@ export default function MainContent({
       : 0;
     const combinedTotal = total + additionalInstore;
     const message = searchKey && instoreSearch.error
-      ? `${total} main catalogue products found. Instore results are unavailable; the search is incomplete.`
+      ? `${total} main catalogue ${total === 1 ? 'product' : 'products'} found. Instore results are unavailable; the search is incomplete.`
       : combinedTotal === 0
       ? 'No products match your current filters.'
       : total === 0 && additionalInstore > 0
@@ -219,8 +219,8 @@ export default function MainContent({
         : additionalInstore > 0
           ? `${combinedTotal} matching products across Proto: ${total} in the main catalogue and ${additionalInstore} in Instore.`
       : totalPages > 1
-        ? `${total} products found. Page ${page} of ${totalPages}.`
-        : `${total} products found.`;
+        ? `${total} ${total === 1 ? 'product' : 'products'} found. Page ${page} of ${totalPages}.`
+        : `${total} ${total === 1 ? 'product' : 'products'} found.`;
 
     if (!hasAnnouncedResultsRef.current && !searchKey) {
       hasAnnouncedResultsRef.current = true;
