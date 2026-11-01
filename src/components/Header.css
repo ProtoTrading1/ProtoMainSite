@@ -975,3 +975,10 @@
   }
 
 }
+.just-added-nav,
+.app-header--premium .header-nav-btn.just-added-nav {
+  background: #075b5b;
+  color: #fff;
+}
+.just-added-nav:hover { background: #064b4b; }
+.just-added-nav:focus-visible { outline: 3px solid #f0ba50; outline-offset: 2px; }
