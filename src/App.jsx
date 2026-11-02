@@ -27,7 +27,8 @@ const ReorderModal = lazyWithRetry(() => import('./components/ReorderModal'), 'a
 import { useHashNav, buildBreadcrumb } from './hooks/useHashNav';
 import { instorePageFromRefinements, instorePageRefinements, instoreSearchQueryFromRefinements, instoreSearchRefinements, instoreSearchRoute } from './lib/instoreSearchRoute';
 import { catalogueSearchQueryFromRoute, catalogueSearchRoute } from './lib/catalogueSearchRoute';
-import { fetchCategoryCounts, fetchDistinctCategories, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
+import { fetchCategoryCounts, fetchDistinctCategories, fetchIdentifierProducts, fetchProductPage, fetchProductsBySkus, DEFAULT_SORT, normalizeCatalogSort, refreshProductCache, subscribeCatalogRefresh } from './lib/products';
+import { groupProductsByBarcode, spotlightChristmasPenCode } from './lib/productGroups';
 import { catalogueResultsForQuery } from './lib/catalogueResultQuery.js';
 import { preloadProductImages } from './lib/imageUrl';
 import { fetchLastOrder, makeClientRef } from './lib/orders';
@@ -2122,20 +2123,39 @@ export default function App({
       setPreviewOptionsFirst(false);
       return undefined;
     }
-    if (previewProductKey === productDetailKey) return undefined;
-
     const visible = visibleCatalogResults.products.find((product) => productDetailId(product) === productDetailKey);
+    // A direct product lookup can resolve before the grouped catalogue. Once
+    // the complete group arrives, replace that temporary single-SKU detail so
+    // a refreshed link still offers all styles.
+    if (previewProductKey === productDetailKey) {
+      if (visible?.groupId === 'christmas-pens-8622000156' && visible.isVariantGroup && !previewProduct?.isVariantGroup) setPreviewProduct(visible);
+      return undefined;
+    }
     if (visible) {
       setPreviewProduct(visible);
       return undefined;
     }
 
     let cancelled = false;
-    void fetchProductsBySkus([productDetailKey]).then((products) => {
+    const isChristmasPen = /^86220001(?:5[4-9]|6[0-3])$/.test(productDetailKey);
+    void (async () => {
+      if (isChristmasPen) {
+        const rows = await fetchIdentifierProducts(productDetailKey);
+        const grouped = spotlightChristmasPenCode(groupProductsByBarcode(rows), productDetailKey)
+          .find((item) => item.groupId === 'christmas-pens-8622000156' && item.isVariantGroup);
+        if (grouped) return grouped;
+      }
+      const products = await fetchProductsBySkus([productDetailKey]);
+      return products.get(productDetailKey.toUpperCase()) || null;
+    })().then((product) => {
       if (cancelled) return;
-      const product = products.get(productDetailKey.toUpperCase()) || null;
       setPreviewProduct(product);
       if (!product) {
+        // A temporary lookup failure must not destroy a shareable pen link.
+        if (isChristmasPen) {
+          setCartAnnouncement('This product could not be loaded. Please refresh and try again.');
+          return;
+        }
         const next = { ...refinements };
         delete next.product;
         setCartAnnouncement('That product is no longer available in the catalogue.');
@@ -2143,7 +2163,7 @@ export default function App({
       }
     });
     return () => { cancelled = true; };
-  }, [visibleCatalogResults.products, hashNavigate, path, previewProductKey, productDetailKey, refinements]);
+  }, [visibleCatalogResults.products, hashNavigate, path, previewProduct, previewProductKey, productDetailKey, refinements]);
 
   const handleSearchProductClick = useCallback((product, index) => {
     trackShoppingProduct('search_result_clicked', product, { position: index + 1 + (page - 1) * CATALOG_PAGE_SIZE });

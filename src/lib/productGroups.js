@@ -14,6 +14,39 @@ export function variantGroupKey(product) {
   return barcode ? `b:${barcode}` : null;
 }
 
+// An exact code search for this group should show the requested style on the
+// card, but must not turn that representation into an order selection.
+export function spotlightChristmasPenCode(products, query) {
+  const code = String(query || '').trim().toUpperCase();
+  if (!/^86220001(?:5[4-9]|6[0-3])$/.test(code)) return products;
+  return products.map((product) => {
+    if (product?.groupId !== 'christmas-pens-8622000156' || !Array.isArray(product.variants)) return product;
+    const matches = product.variants.filter((v) => [v.sku, v.websiteSku, v.barcode, v.code, v.id]
+      .some((value) => String(value || '').trim().toUpperCase() === code));
+    if (matches.length !== 1) return product;
+    const match = matches[0];
+    const image = match.image || match.localImage || match.images?.[0] || product.image;
+    return {
+      ...product,
+      name: match.name || match.title,
+      title: match.title || match.name,
+      description: match.description || match.originalDescription || '',
+      originalDescription: match.originalDescription || match.description || '',
+      packDescription: match.packDescription || '',
+      sku: match.sku || match.websiteSku || code,
+      websiteSku: match.websiteSku || match.sku || code,
+      code: match.code || match.barcode || code,
+      barcode: match.barcode || match.code || code,
+      parentSku: match.barcode || match.code || code,
+      image,
+      images: [image, ...(product.images || [])].filter((value, index, values) => value && values.indexOf(value) === index),
+      price: match.price,
+      unitsOfIssue: match.unitsOfIssue,
+      minQty: match.minQty,
+    };
+  });
+}
+
 function deriveGroupTitle(variants) {
   const names = variants.map((v) => String(v.name || v.title || '').trim()).filter(Boolean);
   if (!names.length) return null;

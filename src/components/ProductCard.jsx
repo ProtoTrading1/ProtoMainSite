@@ -51,6 +51,9 @@ function productBarcodeLabel(product, compact = false) {
 
 function initialVariantForProduct(product) {
   if (!product?.isVariantGroup || !Array.isArray(product.variants)) return null;
+  // Distinct Christmas pen styles have distinct stock and SKUs. The grouped
+  // card's representative is not a customer selection, even on a SKU search.
+  if (product.groupId === 'christmas-pens-8622000156') return null;
   const keys = [product.primaryVariantId, product.sku, product.websiteSku, product.code, product.barcode]
     .map((value) => String(value || '').trim().toUpperCase())
     .filter(Boolean);

@@ -12,7 +12,7 @@ import {
   isMotarroProduct,
   motarroPathMatchesFilter,
 } from './mottaroCategory';
-import { expandBarcodeSiblings, groupProductsByBarcode } from './productGroups';
+import { expandBarcodeSiblings, groupProductsByBarcode, spotlightChristmasPenCode } from './productGroups';
 import { getFeaturedProducts, invalidateFeaturedCache } from './featuredProducts';
 import { applySkuOrder, lookupSortOrder } from './taxonomy';
 import { preloadProductImages } from './imageUrl';
@@ -715,6 +715,14 @@ export async function fetchProductPage({
 
   if (isHomeFeatured) {
     let products = await fetchFeaturedCatalogProducts();
+    // The featured list can contain just one member of this family. Fetch the
+    // verified siblings so that member still opens as the same grouped card.
+    const featuredPen = products.find((product) => product.groupId === 'christmas-pens-8622000156');
+    if (featuredPen) {
+      const siblings = await fetchIdentifierProducts(productSkuKey(featuredPen));
+      const family = siblings.filter((product) => product.groupId === 'christmas-pens-8622000156');
+      if (family.length > 1) products = expandBarcodeSiblings(family, products);
+    }
     products = applyInStockFilter(products, inStockOnly);
     products = groupProductsByBarcode(products);
 
@@ -749,6 +757,7 @@ export async function fetchProductPage({
       if (collection === 'just-added') products = applyCollection(products, collection);
       products = applyInStockFilter(products, inStockOnly);
       products = groupProductsByBarcode(products);
+      products = spotlightChristmasPenCode(products, searchQuery);
       const total = products.length;
       const from = (page - 1) * pageSize;
       return {
@@ -790,6 +799,7 @@ export async function fetchProductPage({
 
   products = applyInStockFilter(products, inStockOnly);
   products = groupProductsByBarcode(products);
+  products = spotlightChristmasPenCode(products, searchQuery);
 
   const total = products.length;
   const from = (page - 1) * pageSize;

@@ -8,6 +8,7 @@ import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-c
 import { loadPlacementMapIfEnabled, skusMatchingBrowsePath } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
+import { withChristmasPenGroup } from './_christmas-pen-group.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
@@ -451,11 +452,12 @@ export default async function handler(req, res) {
     // placed into it. This keeps first-order navigation fast while preserving
     // the same live taxonomy and multi-placement rules as the full catalogue.
     if (browsePath) {
-      const [tree, placements, groupInfo] = await Promise.all([
+      const [tree, placements, existingGroupInfo] = await Promise.all([
         loadTaxonomyTree(),
         loadPlacementMapIfEnabled(supabase),
         loadGroupInfoMapIfEnabled(supabase),
       ]);
+      const groupInfo = withChristmasPenGroup(existingGroupInfo);
       const labels = resolveBrowseLabels(tree, browsePath);
       if (!labels) return res.status(200).json([]);
 
@@ -512,7 +514,7 @@ export default async function handler(req, res) {
       }
     }
     if (isFullCatalog && version) {
-      const etag = `W/"cat-${version.stamp}"`;
+      const etag = `W/"cat-${version.stamp}-christmas-pens-v1"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
       // (e.g. a stalled ERP sync) is observable rather than silent.
@@ -535,7 +537,7 @@ export default async function handler(req, res) {
     }
 
     const buildProducts = async () => {
-      const [initialRows, tree, initialSalesByBarcode, placements, groupInfo, incomingBySku] = await Promise.all([
+      const [initialRows, tree, initialSalesByBarcode, placements, existingGroupInfo, incomingBySku] = await Promise.all([
         identifier
           ? fetchIdentifierRows(supabase, identifier)
           : fetchAllRows(
@@ -553,6 +555,7 @@ export default async function handler(req, res) {
         loadGroupInfoMapIfEnabled(supabase),
         loadIncomingAvailabilityMap(supabase),
       ]);
+      const groupInfo = withChristmasPenGroup(existingGroupInfo);
       let rows = initialRows;
       let salesByBarcode = initialSalesByBarcode;
       if (identifier && groupInfo) {
@@ -582,7 +585,7 @@ export default async function handler(req, res) {
       return products;
     };
     const products = isFullCatalog && version
-      ? await catalogueBuild.get(`W/"cat-${version.stamp}"`, buildProducts)
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-v1"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
