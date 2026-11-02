@@ -11,6 +11,7 @@ import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { hasVerifiedInstoreUnit, productSellingUnit, withPositillObservation } from '../../lib/positill-selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
+import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -401,9 +402,20 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   );
 }
 
-function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
+function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, initialBraceletColour = null, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
   const [unitObservation,setUnitObservation]=useState(null);
-  const product=useMemo(()=>withPositillObservation(sourceProduct,unitObservation),[sourceProduct,unitObservation]);
+  const [braceletColour, setBraceletColour] = useState(() => TURTLE_BRACELET_COLOURS.find(option => option.label === initialBraceletColour || option.image === sourceProduct?.localImage)?.label || 'Brown');
+  const product=useMemo(()=>withTurtleBraceletPhoto(withPositillObservation(sourceProduct,unitObservation), braceletColour),[sourceProduct,unitObservation,braceletColour]);
+  const isBracelet = isTurtleBracelet(product);
+  const colourSelector = isBracelet && (
+    <label style={{ display: 'block', margin: '12px 0' }}>
+      Preferred colour
+      <select aria-label="Preferred bracelet colour" value={braceletColour} onChange={event => setBraceletColour(event.target.value)} style={{ display: 'block', width: '100%', marginTop: 4 }}>
+        {TURTLE_BRACELET_COLOURS.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
+      </select>
+      <small>Colour is subject to availability. All colours share one stock balance.</small>
+    </label>
+  );
   const onVerifiedUnit=useCallback(observation=>setUnitObservation(observation),[]);
   const isVariantGroup = product?.isVariantGroup === true;
   const variants = product?.variants || [];
@@ -527,7 +539,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
     if (!cardCanOrder) return;
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
-    addToCart(activeProduct, qty, pos);
+    addToCart(activeProduct, qty, pos, isBracelet ? braceletColour : undefined);
   };
 
   const shareProduct = async () => {
@@ -698,7 +710,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
 
           <StockBadge product={product} onVerifiedUnit={onVerifiedUnit} />
 
-          {preferenceSlot}
+          {!isBracelet && preferenceSlot}
+          {colourSelector}
           <div className={`buy-row${isVariantGroup ? ' buy-row--options' : ''}`}>
             {isVariantGroup ? (
               <button
@@ -937,6 +950,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                 )}
 
                 {product.tradeNote && <p className="pz-trade-note">{product.tradeNote}</p>}
+                {colourSelector}
 
                 {(!isVariantGroup || selectedVariant) && activeProduct.price > 0 && (
                   <div className="price-row" style={{ marginTop: 16, marginBottom: 0 }}>
@@ -983,7 +997,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                       disabled={!modalCanOrder}
                       onClick={() => {
                         if (!modalCanOrder) return;
-                        addToCart(activeProduct, qty, null, true);
+                        addToCart(activeProduct, qty, null, isBracelet ? braceletColour : undefined);
                         setJustAdded(true);
                         setTimeout(() => setJustAdded(false), 1800);
                       }}

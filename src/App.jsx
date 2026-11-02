@@ -45,6 +45,7 @@ import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, sa
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
+import { TURTLE_BRACELET_COLOURS, withTurtleBraceletPhoto } from '../lib/kbra2013-colours.mjs';
 import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
@@ -183,7 +184,9 @@ async function hydrateAccountCartItems(items) {
       const keys = [item.product?.id, item.product?.sku, item.product?.code]
         .map((value) => String(value || '').toUpperCase());
       const live = keys.map((key) => bySku.get(key)).find(Boolean);
-      return live ? { ...item, product: live } : item;
+      if (!live) return item;
+      const hasColour = TURTLE_BRACELET_COLOURS.some(option => option.label === item.preference);
+      return { ...item, product: hasColour ? withTurtleBraceletPhoto(live, item.preference) : live };
     });
   } catch {
     return savedItems;
@@ -2098,11 +2101,13 @@ export default function App({
 
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewOptionsFirst, setPreviewOptionsFirst] = useState(false);
+  const [previewBraceletColour, setPreviewBraceletColour] = useState(null);
   const productDetailKey = String(refinements.product || '').trim();
   const previewProductKey = productDetailId(previewProduct);
 
   const handleProductPreview = useCallback((product, { focusOptions = false } = {}) => {
     setPreviewOptionsFirst(Boolean(focusOptions));
+    setPreviewBraceletColour(TURTLE_BRACELET_COLOURS.find(option => option.image === product?.localImage)?.label || null);
     setPreviewProduct(product);
     const id = productDetailId(product);
     if (id) hashNavigate(path, { ...refinements, product: id }, { scroll: false });
@@ -2111,6 +2116,7 @@ export default function App({
   const closeProductPreview = useCallback(() => {
     setPreviewProduct(null);
     setPreviewOptionsFirst(false);
+    setPreviewBraceletColour(null);
     if (!refinements.product) return;
     const next = { ...refinements };
     delete next.product;
@@ -2498,6 +2504,7 @@ export default function App({
             special={specialsMap[previewProduct.id] || null}
             initialZoomOpen={true}
             initialFocusOptions={previewOptionsFirst}
+            initialBraceletColour={previewBraceletColour}
             onZoomClose={closeProductPreview}
           />
         </div>
