@@ -1,3 +1,4 @@
+import { isSarongiInstoreRequest } from '../../lib/sarongi-instore-requests.mjs';
 // Defensive customer-facing stock advisory. Normal catalogue lines are capped
 // before this helper is reached and validated again by the checkout API. The
 // advisory remains for a restored/stale basket while the customer reviews it.
@@ -6,7 +7,7 @@
 // remain the sole exception to the stock cap.
 
 function canOrderBeyondStock(product) {
-  return product?.toOrder === true
+  return isSarongiInstoreRequest(product) || product?.toOrder === true
     || product?.to_order === true
     || product?.orderableWhenOutOfStock === true
     || product?.orderable_when_out_of_stock === true;

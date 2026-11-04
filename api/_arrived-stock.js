@@ -1,3 +1,4 @@
+import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import {arrivedStockAvailability} from '../lib/arrived-stock-availability.mjs';
 import {positillUnitObservation} from '../lib/positill-selling-unit.mjs';
 import {websitePriceFromExVat} from '../lib/catalogue-price.mjs';
@@ -37,7 +38,7 @@ export async function overlayArrivedStock(rows,{client,env=process.env,read=read
 }
 export function assertArrivedOrderTotals(items,records,bridgeBySku){
  const totals=new Map(),verified=new Map();
- for(const item of items){const sku=String(item?.product?.sku||item?.product?.id||'').trim().toUpperCase();if(!records.has(sku))continue;const qty=Number(item.qty);if(!Number.isSafeInteger(qty)||qty<1)throw Error('Invalid arrived-stock order quantity.');totals.set(sku,(totals.get(sku)||0)+qty);}
+ for(const item of items){const sku=String(item?.product?.sku||item?.product?.id||'').trim().toUpperCase();if(!records.has(sku)||isSarongiRequestSku(sku))continue;const qty=Number(item.qty);if(!Number.isSafeInteger(qty)||qty<1)throw Error('Invalid arrived-stock order quantity.');totals.set(sku,(totals.get(sku)||0)+qty);}
  for(const [sku,qty] of totals){const current=effectiveArrivedStock(sku,bridgeBySku.get(sku),records.get(sku));if(!Number.isSafeInteger(qty)||qty>current.qty)throw Object.assign(Error(`${sku}: only ${current.qty} selling units are currently available.`),{status:409});verified.set(sku,current);}
  return verified;
 }

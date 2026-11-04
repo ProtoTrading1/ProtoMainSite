@@ -1,3 +1,4 @@
+import { instoreQuantityLimit } from '../lib/sarongi-instore-requests.mjs';
 import usePersonalisedArrivals from './hooks/usePersonalisedArrivals';
 import PersonalisedArrivalTip from './components/PersonalisedArrivalTip';
 import { trackShoppingEvent, trackShoppingSearch, trackShoppingProduct, basketQuantityChanges, clearShoppingSearch, trackCatalogueVisit, shoppingSource } from './lib/shoppingAnalytics';
@@ -152,9 +153,9 @@ function productCanOrderWhenOos(product) {
 
 function cartQtyCapForProduct(product) {
   if (!product) return 0;
-  // Instore stock is a buy-now ceiling, not a backorder request. Its fresh
-  // server-side checkout resolver repeats this cap immediately before order.
-  if (product.isExtendedRange === true) return Math.max(0, Math.floor(productStockQtyForCart(product) || 0));
+  // Exact matched Sarongi families are picked before payment. Other Instore
+  // products retain their recorded-stock ceiling.
+  if (product.isExtendedRange === true) return instoreQuantityLimit(product);
   if (productCanOrderWhenOos(product)) return CART_QTY_UNLIMITED;
 
   const qty = productStockQtyForCart(product);

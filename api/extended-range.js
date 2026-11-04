@@ -1,3 +1,5 @@
+import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
+import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
@@ -91,8 +93,8 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     // control they remove the SKU from discovery and ordering until restored.
     const listingHidden = row?.listing_control_status === 'hidden';
     const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
-    const availableStock = Number(row?.available_stock);
-    const customerVisibleStock = Math.floor(availableStock);
+    const availableStock = row?.available_stock === null || row?.available_stock === undefined || row?.available_stock === '' ? NaN : Number(row.available_stock);
+    const customerVisibleStock = Number.isFinite(availableStock) ? Math.floor(availableStock) : null;
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
@@ -104,15 +106,16 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || (!ignoreStockEligibility&&(!Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK))
+      || (!ignoreStockEligibility && !isSarongiRequestSku(sku) && (!Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK))
       || price <= 0) return [];
+    const gallery = imageHidden ? [] : sarongiInstoreGallery(sku, imageUrl);
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
       name: String(row?.title || '').trim() || sku,
       title: String(row?.title || '').trim() || sku,
       description: String(row?.original_description || '').trim(),
       originalDescription: String(row?.original_description || '').trim(),
-      price, image: imageUrl, images: imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
+      price, image: imageUrl, images: gallery.length ? gallery.map(p=>p.image) : imageUrl ? [imageUrl] : [], imageStatus: imageHidden ? 'hidden' : 'visible',
       stockQty: customerVisibleStock, stockOnHand: customerVisibleStock, inStock: true,
       minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
@@ -164,7 +167,6 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false }
       .eq('image_review_status', 'verified')
       .in('is_active', includeStaged ? [true, false] : [true])
       .gt('price', 0);
-      if(!arrivedStockEnabled())rangeQuery=rangeQuery.gte('available_stock', 0);
       return rangeQuery.like('image_url', 'https://%');
     }, { allowChangingCount: includeStaged }),
     readCompleteRows(() => client.from('website_stock').select('sku, barcode', { count: 'exact' })),
