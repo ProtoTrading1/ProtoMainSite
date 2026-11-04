@@ -10,6 +10,16 @@ import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-
 
 const PAGE_SIZE = 24;
 
+test('stored catalogue returns eligible three-letter SKU prefix matches', async () => {
+  const products = [{ sku: 'KBRA3006', title: 'BRACELET' }, { sku: 'KNEC3006', title: 'NECKLACE' }];
+  const client = stubStockClient({ instore_catalogue: products.map(payload => ({
+    sku: payload.sku, payload, discovery_group: 'Bracelets', search_tokens: catalogueSearchTokens(payload),
+  })) });
+  const candidates = await readCatalogueSearchCandidates(client, { query: 'KBR' });
+  assert.deepEqual(candidates.filter(p => matchesInstoreSearch(p, 'KBR')).map(p => p.sku), ['KBRA3006']);
+  assert.deepEqual(await readCatalogueSearchCandidates(client, { query: 'KBR', category: 'Soft toys' }), []);
+});
+
 test('colour searches include eligible old snapshot rows without broadening category or inventory', async () => {
   const { SARONGI_GALLERIES } = await import('../lib/sarongi-instore-gallery-data.mjs');
   const payload = { sku: 'KBRA3014', title: 'BRACELET DRAWSTRING 4PC', isExtendedRange: true,
