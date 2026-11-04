@@ -1,3 +1,4 @@
+import { isSarongiInstoreRequest, sarongiRequestAvailability, instoreQuantityLimit } from '../../lib/sarongi-instore-requests.mjs';
 import { trackShoppingPreview, closeShoppingPreview, releaseUnmountedPreview } from '../lib/shoppingAnalytics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -120,10 +121,11 @@ function availabilityForProduct(product) {
     // quantity. Transit and partial receipts retain the physical-stock cap.
   const isToOrder = !!(product?.toOrder || product?.to_order || product?.orderableWhenOutOfStock || product?.orderable_when_out_of_stock);
   const stockQty = catalogStockQty(product);
-    if (!isToOrder && !isLandedStockAvailable({ ...product, availability }) && (stockQty === null || stockQty <= 0)) {
+    if (!isToOrder && !isSarongiInstoreRequest(product) && !isLandedStockAvailable({ ...product, availability }) && (stockQty === null || stockQty <= 0)) {
     return { ...availability, canOrder: false };
   }
-  return product.isExtendedRange && !hasVerifiedInstoreUnit(product) ? {...availability,canOrder:false} : availability;
+  return product.isExtendedRange && !hasVerifiedInstoreUnit(product) ? {...availability,canOrder:false}
+    : isSarongiInstoreRequest(product) ? sarongiRequestAvailability(product.sku || product.id, availability) : availability;
 }
 
 function groupedAvailability(product) {
@@ -223,7 +225,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, cu
       if (isInstore) onVerifiedUnit?.(data);
       setState({
         status: 'done',
-        qty: Number(data.qty) || 0,
+        qty: data.qty === null ? null : Number(data.qty) || 0,
         availability: data.availability || null,
       });
     } catch {
@@ -734,12 +736,12 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                   >
                     <Minus size={14} />
                   </button>
-                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999} />
+                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={Math.max(1, instoreQuantityLimit(product))} />
                   <button
-                    onClick={() => setQty((current) => Math.min(product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999, current + 1))}
+                    onClick={() => setQty((current) => Math.min(Math.max(1, instoreQuantityLimit(product)), current + 1))}
                     type="button"
                     aria-label={`Increase quantity from ${qty}`}
-                    disabled={qty >= (product.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(product) || 0)) : 9999)}
+                    disabled={qty >= (Math.max(1, instoreQuantityLimit(product)))}
                   >
                     <Plus size={14} />
                   </button>
@@ -983,8 +985,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                         <button onClick={() => setQty(Math.max(activeProduct.minQty || 1, qty - 1))} type="button" aria-label="Decrease" disabled={qty <= (activeProduct.minQty || 1)}>
                           <Minus size={14} />
                         </button>
-                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} maxQty={activeProduct.isExtendedRange ? Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0)) : 9999} />
-                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase" disabled={activeProduct.isExtendedRange && qty >= Math.max(1, Math.floor(catalogStockQty(activeProduct) || 0))}>
+                        <ProductQtyInput qty={qty} setQty={setQty} minQty={activeProduct.minQty || 1} maxQty={Math.max(1, instoreQuantityLimit(activeProduct))} />
+                        <button onClick={() => setQty(qty + 1)} type="button" aria-label="Increase" disabled={qty >= Math.max(1, instoreQuantityLimit(activeProduct))}>
                           <Plus size={14} />
                         </button>
                       </div>
