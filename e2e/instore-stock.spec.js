@@ -53,8 +53,8 @@ test('Instore product-card stock checks also accept the slower fresh response', 
   await signInCatalogue(page);
   await page.goto('/#/instore-products?q=clip+on');
   const card = page.locator('.instore-grid .product-card').first();
+  await card.scrollIntoViewIfNeeded();
   await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeDisabled();
-  await card.getByRole('button', { name: 'Check stock and unit', exact: true }).click();
   await expect(card.getByText('In stock: 11')).toBeVisible({ timeout: 15000 });
   await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
 });
@@ -75,7 +75,7 @@ test('a newer modal observation removes the card previous successful quantity', 
   await signInCatalogue(page);
   await page.goto('/#/instore-products?q=clip+on');
   const card=page.locator('.instore-grid .product-card').first();
-  await card.getByRole('button',{name:'Check stock and unit',exact:true}).click();
+  await card.scrollIntoViewIfNeeded();
   await expect(card.getByText('In stock: 11')).toBeVisible();
   await context.route('**/api/stock*',route=>route.fulfill({json:checkedStock(0)}));
   await card.getByRole('button',{name:`View ${clip.name}`,exact:true}).click();
