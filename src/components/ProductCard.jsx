@@ -8,6 +8,7 @@ import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
 import { authenticatedGetJson } from '../lib/authHeaders';
+import { scheduleInstoreStockCheck } from '../lib/instoreStockQueue';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { hasVerifiedInstoreUnit, productSellingUnit, withPositillObservation } from '../../lib/positill-selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
@@ -189,6 +190,7 @@ function StockBadge({ product, onVerifiedUnit }) {
         sku={sku}
         source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
         isInstore={Boolean(product.isExtendedRange)}
+        autoVisible={Boolean(product.isExtendedRange)}
         currentQty={catalogStockQty(product)}
         currentUnitVerified={hasVerifiedInstoreUnit(product)}
         onVerifiedUnit={onVerifiedUnit}
@@ -197,11 +199,11 @@ function StockBadge({ product, onVerifiedUnit }) {
   );
 }
 
-// Customer-facing live stock check. Always hits /api/stock fresh on click — the
-// result is never baked in at page load and never cached across page loads.
-function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, currentQty, currentUnitVerified, onVerifiedUnit }) {
+// The same authenticated, no-store lookup serves automatic and manual checks.
+function StockCheck({ sku, autoCheck = false, autoVisible = false, source = '', isInstore = false, currentQty, currentUnitVerified, onVerifiedUnit }) {
   const [state, setState] = useState({ status: 'idle', qty: null, availability: null });
   const requestRef = useRef(null);
+  const containerRef = useRef(null);
 
   const check = useCallback(async () => {
     if (!sku) return;
@@ -212,16 +214,20 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, cu
     if (isInstore) onVerifiedUnit?.(null);
     try {
       const sourceQuery = source === 'instore-preview' ? '&source=instore-preview' : '';
-      const { response, data } = await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
+      const read = () => authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(sku)}${sourceQuery}`, {
         cache: 'no-store',
         signal: controller.signal,
         // Instore includes a fresh SQL bridge read (up to 15 seconds) after
         // authentication and product verification. Allow that read to finish.
         timeoutMs: isInstore ? 25000 : 10000,
       });
+      const { response, data } = await (isInstore
+        ? scheduleInstoreStockCheck(read, { signal: controller.signal })
+        : read());
       if (!response.ok) throw new Error(String(response.status));
       if (requestRef.current !== controller) return;
-      if (isInstore && !hasVerifiedInstoreUnit(data)) throw new Error('Unverified selling unit');
+      if (isInstore && (!hasVerifiedInstoreUnit(data)
+        || String(data.sku || '').trim().toUpperCase() !== String(sku).trim().toUpperCase())) throw new Error('Unverified selling unit');
       if (isInstore) onVerifiedUnit?.(data);
       setState({
         status: 'done',
@@ -244,10 +250,27 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, cu
   // A customer opening the detail view is already evaluating the product.
   // Start the same authenticated, no-store live lookup immediately so the
   // number is usually ready before they reach the quantity controls. Product
-  // cards remain click-to-check to avoid a request storm across the grid.
+  // cards check as they approach the viewport, through a bounded read queue.
   useEffect(() => {
     if (autoCheck) void check();
   }, [autoCheck, check]);
+
+  useEffect(() => {
+    if (!autoVisible || autoCheck || !sku) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      void check();
+      return undefined;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        observer.disconnect();
+        void check();
+      }
+    }, { rootMargin: '160px' });
+    const target = containerRef.current?.closest('.product-card') || containerRef.current;
+    if (target) observer.observe(target);
+    return () => observer.disconnect();
+  }, [autoVisible, autoCheck, sku, check]);
 
   // A modal can replace the card's live observation. Do not leave its older
   // successful quantity beside a newer zero/unverified availability badge.
@@ -274,7 +297,7 @@ function StockCheck({ sku, autoCheck = false, source = '', isInstore = false, cu
   }
 
   return (
-    <div className="stock-check">
+    <div className="stock-check" ref={containerRef}>
       {displayState.status === 'idle' || displayState.status === 'loading' ? (
         <button
           type="button"

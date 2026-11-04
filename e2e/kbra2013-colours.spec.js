@@ -40,7 +40,8 @@ test('Instore carries the selected colour to the same product in the basket', as
   await signInCatalogue(page);
   await page.goto('/#/instore-products?q=KBRA2013');
   const card = page.locator('.instore-grid .product-card').first();
-  await card.getByRole('button', { name: 'Check stock and unit', exact: true }).click();
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText('Minimum 1 · Each')).toBeVisible();
   await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
   await card.getByLabel('Preferred bracelet colour').selectOption('Turquoise');
   await card.getByRole('button', { name: 'Add to Cart', exact: true }).click();
@@ -61,3 +62,4 @@ test('an exact SKU link opens the brown image and all four preferences after ref
   await expect(dialog.getByLabel('Preferred bracelet colour').locator('option')).toHaveCount(4);
   await expect(dialog.locator('.pz-main-image-img')).toHaveAttribute('src', /2013brn\.jpg/);
 });
+
