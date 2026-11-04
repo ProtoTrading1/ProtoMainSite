@@ -13,18 +13,18 @@ const row = (code = sku, quantity = 0) => ({ sku: code, title: 'EXISTING TITLE',
 const bridge = (code = sku, quantity = 0) => ({ CODE: code, UNITS: code === sku ? '4PC' : 'EACH', DESCR: 'EXISTING TITLE', PRICE_A: 10, ONHAND: quantity, BOOKED: 0 });
 const item = (code = sku, qty = 20, preference = 'Purple') => ({ qty, preference, product: { sku: code, isExtendedRange: true, price: 0.01 } });
 
-test('only the exact 22 matched families receive the request policy', () => {
-  assert.equal(new Set(SARONGI_REQUEST_SKUS).size, 22);
-  for (const code of ['KANK3101', 'KBEL1001', 'KBRA2014', 'KBRA2015', 'KBRA2016', 'KBRA3005', 'KBRA3012', 'KBRA3019', 'KBRA3102', 'KBRA4010', 'KBRA3014PUR', 'OTHER']) assert.equal(isSarongiRequestSku(code), false);
+test('only the exact 137 reviewed supplier families receive the request policy', () => {
+  assert.equal(new Set(SARONGI_REQUEST_SKUS).size, 137);
+  for (const code of ['KBRA2013', 'KBRA4024', 'KEAR1041', 'KDIS1003', 'KDIS2004', 'KDIS3004', 'KBRA3014PUR', 'OTHER']) assert.equal(isSarongiRequestSku(code), false);
   assert.equal(isSarongiInstoreRequest({ sku, isExtendedRange: false }), false);
   assert.equal(isSarongiInstoreRequest({ sku, isExtendedRange: true }), true);
 });
 
-test('all 22 reviewed, active image-index rows survive discovery at zero, negative, low and unknown stock', () => {
+test('all 137 reviewed, active image-index rows survive discovery at zero, negative, low and unknown stock', () => {
   for (const quantity of [0, -80, 2, 10, null, undefined, '']) {
     const rows = SARONGI_REQUEST_SKUS.map(code => row(code, quantity));
     const products = buildExtendedRangeProducts(rows);
-    assert.equal(products.length, 22);
+    assert.equal(products.length, 137);
     for (const p of products) {
       assert.equal(p.price, 10);
       assert.equal(p.name, 'EXISTING TITLE');
@@ -35,7 +35,7 @@ test('all 22 reviewed, active image-index rows survive discovery at zero, negati
 });
 
 test('the policy does not relax ordinary Instore admission or publish unrelated Archive rows', () => {
-  assert.equal(buildExtendedRangeProducts([row('OTHER', 0), row('KBRA2014', 0)]).length, 0);
+  assert.equal(buildExtendedRangeProducts([row('OTHER', 0), row('KBRA4024', 0)]).length, 0);
   assert.equal(buildExtendedRangeProducts([row('OTHER', 11)]).length, 1);
   for (const override of [{ is_active: false }, { visibility_status: 'hidden' }, { image_review_status: 'pending' }, { price: 0 }, { image_url: '' }, { listing_control_status: 'hidden' }]) assert.equal(buildExtendedRangeProducts([{ ...row(), ...override }]).length, 0);
   assert.equal(excludeMainCatalogueProducts(buildExtendedRangeProducts([row()]), [{ sku, barcode: '' }]).length, 0);

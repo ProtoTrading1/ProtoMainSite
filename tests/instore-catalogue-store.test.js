@@ -10,6 +10,25 @@ import { loadLiveInstoreCatalogue, serveStoredCatalogue } from '../api/extended-
 
 const PAGE_SIZE = 24;
 
+test('colour searches include eligible old snapshot rows without broadening category or inventory', async () => {
+  const { SARONGI_GALLERIES } = await import('../lib/sarongi-instore-gallery-data.mjs');
+  const payload = { sku: 'KBRA3014', title: 'BRACELET DRAWSTRING 4PC', isExtendedRange: true,
+    image: `https://www.proto.co.za${SARONGI_GALLERIES.KBRA3014[0].path}` };
+  const client = stubStockClient({ instore_catalogue: [{ sku: payload.sku, payload,
+    discovery_group: 'Bracelets', search_tokens: ' bracelet drawstring 4pc kbra3014 ' }] });
+  const rows = await readCatalogueSearchCandidates(client, { query: 'purple drawstring bracelet' });
+  assert.deepEqual(rows.filter(p => matchesInstoreSearch(p, 'purple drawstring bracelet')).map(p => p.sku), ['KBRA3014']);
+  assert.deepEqual(await readCatalogueSearchCandidates(client, { query: 'purple bracelet', category: 'Soft toys' }), []);
+  assert.deepEqual(await readCatalogueSearchCandidates(stubStockClient({ instore_catalogue: [] }), { query: 'purple bracelet' }), []);
+  const ordinary = { sku: 'OTHER', title: 'PURPLE NOTEBOOK', isExtendedRange: true };
+  const mixed = stubStockClient({ instore_catalogue: [
+    { sku: payload.sku, payload, discovery_group: 'Bracelets', search_tokens: ' bracelet drawstring 4pc kbra3014 ' },
+    { sku: ordinary.sku, payload: ordinary, discovery_group: 'Stationery & art', search_tokens: ' purple notebook other ' },
+  ] });
+  const typo = await readCatalogueSearchCandidates(mixed, { query: 'purple notebok' });
+  assert.deepEqual(typo.filter(p => matchesInstoreSearch(p, 'purple notebok')).map(p => p.sku), ['OTHER']);
+});
+
 test('stored identifier searches match old separated tokens without losing category scope', async () => {
   const products = [
     { sku: 'AB-12', barcode: '600-123456', title: 'Charger' },

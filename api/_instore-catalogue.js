@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { compareInstoreSearch, discoveryGroup, instoreSearchTokens, matchesInstoreSearch, searchTermSets, searchTerms } from '../lib/instore-discovery.mjs';
 import { isIdentifierQuery } from '../src/lib/identifierNormalize.js';
 import { readCompleteRows } from './_complete-rows.js';
+import { REVIEWED_OPTION_SKUS } from '../lib/instore-option-search.mjs';
+import { parseSearchQuery } from '../lib/search-language.mjs';
 
 // The stored Instore read model (migration 070, stock project). It holds the
 // products that already passed the image, price, stock and duplicate gates, so
@@ -195,6 +197,18 @@ export async function readCatalogueSearchCandidates(client, { query, category = 
         });
       for (const row of rows) products.set(String(row.sku || row.payload?.sku || ''), row.payload);
     }
+  }
+  // Old snapshots predate option-label tokens. Supplement only already-eligible
+  // rows, after the normal typo fallback so unrelated gallery rows cannot
+  // suppress it. Never reconstruct source products or bypass category gates.
+  if (parseSearchQuery(query).colours?.length) {
+    const rows = await readCompleteRows(() => {
+      let request = client.from('instore_catalogue').select('sku, payload', { count: 'exact' })
+        .in('sku', REVIEWED_OPTION_SKUS);
+      if (category) request = request.eq('discovery_group', category);
+      return request;
+    });
+    for (const row of rows) products.set(String(row.sku || row.payload?.sku || ''), row.payload);
   }
   return [...products.values()];
 }

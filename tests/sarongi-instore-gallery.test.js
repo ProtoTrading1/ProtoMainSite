@@ -8,12 +8,12 @@ import {buildExtendedRangeProducts} from '../api/extended-range.js';
 import {addBasketLine} from '../lib/basket-lines.mjs';
 import {instoreQuantityLimit} from '../lib/sarongi-instore-requests.mjs';
 
-test('22 exact families have 75 decoded original-byte photo assets with no duplicated option identity',async()=>{
- assert.equal(Object.keys(SARONGI_GALLERIES).length,22);let count=0;
+test('38 exact families have 120 decoded original-byte photo assets with no duplicated option identity',async()=>{
+ assert.equal(Object.keys(SARONGI_GALLERIES).length,38);let count=0;
  for(const [sku,photos] of Object.entries(SARONGI_GALLERIES)){
-  assert.ok(photos.length>=2&&photos.length<=8);assert.equal(new Set(photos.map(p=>p.label)).size,photos.length);
+  assert.ok(photos.length>=1&&photos.length<=8);assert.equal(new Set(photos.map(p=>p.label)).size,photos.length);
   for(const photo of photos){assert.ok(photo.path.startsWith('/product-options/sarongi/'+sku+'/'));const bytes=await readFile(new URL('../public'+photo.path,import.meta.url));const hash=createHash('sha256').update(bytes).digest('hex');assert.ok(photo.path.endsWith('/'+hash+'.jpg')||photo.path.endsWith('/'+hash+'.png'));count++;}
- }assert.equal(count,75);
+ }assert.equal(count,120);
 });
 test('any approved main is retained first without changing the gallery, SKU, title, price or shared balance',()=>{
  for(const [sku,photos] of Object.entries(SARONGI_GALLERIES))for(const main of photos){
