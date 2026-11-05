@@ -1,6 +1,6 @@
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
-import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
+import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
 import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
@@ -158,13 +158,17 @@ export function applyInstoreImageControls(rows, controls, listingControls = new 
 // products a customer may see. This is the authoritative build; the stored
 // read model below is only ever a copy of its result.
 export async function loadLiveInstoreCatalogue(client, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null } = {}) {
-  if (websiteOnlyProvider) {
-    try { websiteOnlyRows=(await websiteOnlyProvider()).rows; }
-    catch (error) { console.error('Website-only products unavailable:', error?.message || 'source error'); websiteOnlyRows=[]; }
-  }
-  // These two complete reads are independent. Fetch them concurrently so a
-  // large staged preview cannot spend its whole serverless response window
-  // waiting for the main-catalogue duplicate index to begin.
+  // The existing catalogue and new read-only source are independent. Starting
+  // both together avoids adding the bridge latency to every cold catalogue.
+  const websiteRead=(async()=>{
+    let rows=websiteOnlyRows;
+    if (websiteOnlyProvider) {
+      try { rows=(await websiteOnlyProvider()).rows; }
+      catch (error) { console.error('Website-only products unavailable:', error?.message || 'source error'); rows=[]; }
+    }
+    return rows.length ? overlayArrivedStock(rows,{client}) : rows;
+  })();
+  const existingRead=(async()=>{
   const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
     readCompleteRows(() => {
       let rangeQuery=client.from('extended_range_items')
@@ -179,8 +183,12 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const observedRows=await overlayArrivedStock(mergeWebsiteOnlyIndex(rangeRows,websiteOnlyRows),{client});
-  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(observedRows, imageControls, listingControls), '', { includeStaged });
+  const observedRows=await overlayArrivedStock(rangeRows,{client});
+  return {observedRows,catalogue,imageControls,listingControls};
+  })();
+  const [existing,websiteRows]=await Promise.all([existingRead,websiteRead]);
+  const {observedRows,catalogue,imageControls,listingControls}=existing;
+  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(mergeWebsiteOnlyIndex(observedRows,websiteRows), imageControls, listingControls), '', { includeStaged });
   return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
 }
 
@@ -436,7 +444,9 @@ return async function handler(req, res) {
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
     const claimed = (useArrivals||websiteOnlyProvider)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
-    const live = websiteOnlyProvider ? await getCachedCatalogue('website-only-production',()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider})) : await (claimed
+    const websiteOnlyOrigin=websiteOnlyProvider?websiteOnlyRequestOrigin(req):null;
+    const providerForRequest=websiteOnlyProvider?()=>websiteOnlyProvider({origin:websiteOnlyOrigin}):null;
+    const live = websiteOnlyProvider ? await getCachedCatalogue(`website-only:${websiteOnlyOrigin}`,()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest})) : await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;

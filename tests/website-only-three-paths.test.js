@@ -59,6 +59,15 @@ test('index collisions are rejected and browsing respects removal controls',asyn
  assert.equal(await readFreshInstoreStock(sku,{websiteOnlyRows:[row],indexClient:client(duplicate),fetchBridge}),null);
 });
 
+test('existing catalogue reads begin while website-only source is pending',async()=>{
+ let release;const started=new Promise(resolve=>{release=resolve});
+ const db=client(tables()),original=db.from;
+ db.from=(name)=>{if(name==='extended_range_items')release();return original(name)};
+ const load=loadLiveInstoreCatalogue(db,{websiteOnlyProvider:async()=>{await started;return {rows:[]}}});
+ let timer;const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('catalogue reads were serialized')),1000)});
+ try {assert.equal((await Promise.race([load,timeout])).products.length,0)} finally {clearTimeout(timer)}
+});
+
 test('all 163 prepared products traverse the three integration functions using synthetic observations',async()=>{
  const {items}=JSON.parse(await readFile(new URL('../api/_website-only-manifest.json',import.meta.url),'utf8'));
  const data=items.map(x=>({sku:x.sku}));
