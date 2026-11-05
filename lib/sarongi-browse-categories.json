@@ -1,0 +1,654 @@
+{
+  "A-BRA1003": {
+    "description": "BRASS BUDDAH RECLINING 12CM",
+    "category": "Home décor"
+  },
+  "B-BOW2103": {
+    "description": "COCONUT BOWL WHITE SHELL 11CM",
+    "category": "Home & kitchen"
+  },
+  "B-BOW2104": {
+    "description": "COCONUT BOWL POWA SHELL 11CM",
+    "category": "Home & kitchen"
+  },
+  "B-BOW3004": {
+    "description": "COCONUT BOWL 14-15CM WHITE SHELL",
+    "category": "Home & kitchen"
+  },
+  "C-DUC1001": {
+    "description": "DUCK BEACH SANDLE 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1002": {
+    "description": "DUCK FLOWER 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1003": {
+    "description": "DUCK GENTLEMAN 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1004": {
+    "description": "DUCK CYCLING 25cm",
+    "category": "Home décor"
+  },
+  "C-DUC1005": {
+    "description": "DUCK SOCCER 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1006": {
+    "description": "DUCK BEACH 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1007": {
+    "description": "DUCK SURFING 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1008": {
+    "description": "DUCK CHEF 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC1009": {
+    "description": "DUCK GOLFER 25cm",
+    "category": "Home décor"
+  },
+  "C-DUC1010": {
+    "description": "DUCK FIREMAN 25CM",
+    "category": "Home décor"
+  },
+  "C-DUC2001": {
+    "description": "DUCK SAILOR HEART NECKLACE 13CM",
+    "category": "Home décor"
+  },
+  "C-DUC2002": {
+    "description": "DUCK SAILOR CAPTAIN 15cm",
+    "category": "Home décor"
+  },
+  "C-DUC2003": {
+    "description": "DUCK SAILOR RED SCARF 3PC",
+    "category": "Home décor"
+  },
+  "C-DUC2004": {
+    "description": "DUCKS WOOD LOVING 20cm",
+    "category": "Home décor"
+  },
+  "C-DUC2005": {
+    "description": "DUCKS  SWIMMING",
+    "category": "Home décor"
+  },
+  "C-PCT1360": {
+    "description": "CAT WOOD LONG TAIL 3PC 14,16,18cm",
+    "category": "Home décor"
+  },
+  "C-PCT1430": {
+    "description": "WOODEN CAT SET 3PC",
+    "category": "Home décor"
+  },
+  "C-PCT7001": {
+    "description": "CAT WOOD BIG SMILE 15CM",
+    "category": "Home décor"
+  },
+  "C-PCT7002": {
+    "description": "CAT WOOD LONG NECK 18CM",
+    "category": "Home décor"
+  },
+  "C-PCT7003": {
+    "description": "CAT WOOD LONG NECK 20CM",
+    "category": "Home décor"
+  },
+  "C-PCT7004": {
+    "description": "CAT WOOD LOVING 25cm",
+    "category": "Home décor"
+  },
+  "D-BAM2701": {
+    "description": "BAMBOO CHIME FLOWER 30CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-BAM2702": {
+    "description": "BAMBOO CHIMES 40CM FLOWER",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-BAM4002": {
+    "description": "BAMBOO CHIME 3-CATS 50CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-BAM4102": {
+    "description": "BAMBOO CHIME 1-CAT 60CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX1204": {
+    "description": "DREAM CATCHER TREE 12CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX3102": {
+    "description": "DREAM CATCHER SUEDE 9CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX6002": {
+    "description": "DREAM CATCHER 12CM STONE BEADS",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX6004": {
+    "description": "DREAM CATCHER 22CM W/STONES",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX6006": {
+    "description": "DREAM CATCHER 32CM W/STONE BEADS",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX6102": {
+    "description": "DREAM CATHER 12CM W/BEADS",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX7103": {
+    "description": "DREAM CATCHER SPIRAL BEAD 16CM",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX9101": {
+    "description": "DREAM CATCHER 24CM WEB ORANGE",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-DCX9102": {
+    "description": "DREAM CATCHER 24CM BOND BEADS",
+    "category": "Chimes & dreamcatchers"
+  },
+  "D-GKR1001": {
+    "description": "KEYRING GUITAR",
+    "category": "Keyrings"
+  },
+  "D-SAN1003": {
+    "description": "KEYRING SANDAL 8CM BEADED",
+    "category": "Keyrings"
+  },
+  "D-SAN1005": {
+    "description": "KEYRING SANDAL 8CM AIRBRUSHED",
+    "category": "Keyrings"
+  },
+  "D-SKR1008": {
+    "description": "KEYRING SURFBOARD 10CM AIRBRUSHED BLUE",
+    "category": "Keyrings"
+  },
+  "D-SKR2003": {
+    "description": "KEYRING S/BOARD SA FLAG 10CM",
+    "category": "Keyrings"
+  },
+  "D-SKR2005": {
+    "description": "KEYRING SURFBOARD BEACH HOUSE",
+    "category": "Keyrings"
+  },
+  "I-INC1001": {
+    "description": "INSENCE PACK,20",
+    "category": "Incense & holders"
+  },
+  "I-INC1004": {
+    "description": "INSENCE IN LEAF CYLINDER 20PC",
+    "category": "Incense & holders"
+  },
+  "I-SAW1001": {
+    "description": "INCENSE HOLDER SAWO WOOD",
+    "category": "Incense & holders"
+  },
+  "I-SAW2001": {
+    "description": "INCENSE HOLDER 24CM COCONUT",
+    "category": "Incense & holders"
+  },
+  "I-SAW3001": {
+    "description": "INCENSE HOLDER 24CM TEAK",
+    "category": "Incense & holders"
+  },
+  "I-SAW3002": {
+    "description": "INCENSE HOLDER 22CM TEAK",
+    "category": "Incense & holders"
+  },
+  "K-BRA4001": {
+    "description": "BRACELET PEARL BEAD",
+    "category": "Bracelets"
+  },
+  "K-BRA4004": {
+    "description": "BRACELET WOOD BEAD",
+    "category": "Bracelets"
+  },
+  "K-JWE1007": {
+    "description": "NECKLACE & EARINGS SHELL SET",
+    "category": "Jewellery"
+  },
+  "L-BIR3001": {
+    "description": "WOOD BIRD ON DRIFTWOOD SWING",
+    "category": "Home décor"
+  },
+  "L-BIR5002": {
+    "description": "SEAGULL STANDING 25CM",
+    "category": "Home décor"
+  },
+  "L-BIR5003": {
+    "description": "SEAGULL STANDING 30CM",
+    "category": "Home décor"
+  },
+  "L-BIR5101": {
+    "description": "SEAGULL ON WOOD STAND 15CM",
+    "category": "Home décor"
+  },
+  "L-BIR5202": {
+    "description": "SEAGULL ON STAND 38CM BLUE/WHITE",
+    "category": "Home décor"
+  },
+  "L-OWL4004": {
+    "description": "CALENDAR WOODEN OWL (8X14CM)",
+    "category": "Stationery & art"
+  },
+  "M-MAS5010": {
+    "description": "MASK WOODEN 50CM WITH ANIMAL",
+    "category": "Home décor"
+  },
+  "M-SUR5002": {
+    "description": "KOMBI W/SURFBOARD 30CM",
+    "category": "Home décor"
+  },
+  "M-SUR6026": {
+    "description": "SURFBOARD AIRBRUSHED 50CM BIG 5",
+    "category": "Home décor"
+  },
+  "N-DRU1003B": {
+    "description": "DRUM 30CM DARK  CARVED",
+    "category": "Musical instruments"
+  },
+  "N-DRU1003C": {
+    "description": "DRUM 30CM LIGHT DOT PAINT",
+    "category": "Musical instruments"
+  },
+  "N-DRU2002": {
+    "description": "DRUM 20CM  DJEMBE DEEP CARVING",
+    "category": "Musical instruments"
+  },
+  "N-FLU1001": {
+    "description": "BAMBOO FLUTE PLAIN 30CM",
+    "category": "Musical instruments"
+  },
+  "N-FLU1002": {
+    "description": "BAMBOO FLUTE PRINT 30CM",
+    "category": "Musical instruments"
+  },
+  "N-FLU2003": {
+    "description": "BAMBOO FLUTE PRINTED POLISHED 30cm",
+    "category": "Musical instruments"
+  },
+  "N-FLU2004": {
+    "description": "BAMBOO FLUTE 40CM",
+    "category": "Musical instruments"
+  },
+  "N-KAL1001": {
+    "description": "KALIMBA THUMB PIANO 14cm",
+    "category": "Musical instruments"
+  },
+  "N-PAN2001": {
+    "description": "FLUTE BAMBOO 11CM PAINTED",
+    "category": "Musical instruments"
+  },
+  "N-PAN2002": {
+    "description": "FLUTE BAMBOO 17CM PAINTED",
+    "category": "Musical instruments"
+  },
+  "N-RAI1004": {
+    "description": "RAINSTICK 60CM",
+    "category": "Musical instruments"
+  },
+  "N-SHA1001": {
+    "description": "EGG SHAKER",
+    "category": "Musical instruments"
+  },
+  "N-SHA1005": {
+    "description": "SHAKER COCONUT 20CM DOT PAINTING",
+    "category": "Musical instruments"
+  },
+  "N-SHA1012": {
+    "description": "EGG SHAKER DOTTED 13CM",
+    "category": "Musical instruments"
+  },
+  "N-SHA1015": {
+    "description": "MARAKAS SHAKER DOT PAINTED",
+    "category": "Musical instruments"
+  },
+  "N-SHA1016": {
+    "description": "SHAKER COCONUT 28CM W/KNOCKER",
+    "category": "Musical instruments"
+  },
+  "N-SHA1017": {
+    "description": "SHAKER CYLINDER DOT PAINT",
+    "category": "Musical instruments"
+  },
+  "N-TWI1006": {
+    "description": "RATTLE DRUM 24CM DOT PAINTING",
+    "category": "Musical instruments"
+  },
+  "N-WHI1002": {
+    "description": "BAMBOO WHISTLE PAINTED",
+    "category": "Musical instruments"
+  },
+  "N-WHI1003": {
+    "description": "BAMBOO WHISTLE PAINTED 20CM",
+    "category": "Musical instruments"
+  },
+  "O-ANC1007": {
+    "description": "ANCHOR HANGING 50X34CM",
+    "category": "Home décor"
+  },
+  "O-ANC1008": {
+    "description": "WELCOME ANCHOR 50CM",
+    "category": "Home décor"
+  },
+  "O-ANC1009": {
+    "description": "ANCHOR WITH HOOK 40CM",
+    "category": "Home décor"
+  },
+  "O-BOA2021": {
+    "description": "BOAT W/FLOWER SAIL 13X13CM",
+    "category": "Home décor"
+  },
+  "O-BOA2022": {
+    "description": "BOAT W/STRIPED SAIL 17X13CM",
+    "category": "Home décor"
+  },
+  "O-BUO1004": {
+    "description": "BU0Y WOOD 30CM LIFES A BEACH",
+    "category": "Home décor"
+  },
+  "O-BUO1010": {
+    "description": "BUOY WOOD RING 30CM ASSORT BEACH HOUSE",
+    "category": "Home décor"
+  },
+  "O-CHI1005": {
+    "description": "CHIME 67CM FISH/L.HOUSE/SEAHORSE",
+    "category": "Chimes & dreamcatchers"
+  },
+  "O-DST1002": {
+    "description": "DRIFTWOOD HEARTS 150CM",
+    "category": "Home décor"
+  },
+  "O-DST1004": {
+    "description": "DRIFTWOOD STRING W/ FRANGIPANI 85CM",
+    "category": "Home décor"
+  },
+  "O-DST2001": {
+    "description": "DRIFTWOOD STRING W/HEART LOVE",
+    "category": "Home décor"
+  },
+  "O-FIS4104": {
+    "description": "FISH BONE WOOD 37CM",
+    "category": "Home décor"
+  },
+  "O-FIS4105": {
+    "description": "HANGING FISH 50CM WOODEN",
+    "category": "Home décor"
+  },
+  "O-FIS4106": {
+    "description": "FISH HANGING 70CM",
+    "category": "Home décor"
+  },
+  "O-FIS4107": {
+    "description": "FISH HANGING WOOD 40CM WHITE",
+    "category": "Home décor"
+  },
+  "O-FIS4109": {
+    "description": "HANGING WOODEN FISH  36CM",
+    "category": "Home décor"
+  },
+  "O-FIS4201": {
+    "description": "WOODEN FISH W/DRIFTWOOD (40X13)",
+    "category": "Home décor"
+  },
+  "O-FIS4303": {
+    "description": "FISH WOODEN 40CM LIFES BETTER",
+    "category": "Home décor"
+  },
+  "O-FIS5001": {
+    "description": "WOODEN FISH SET 14/16/20CM",
+    "category": "Home décor"
+  },
+  "O-FIS5007": {
+    "description": "FISH SET,3 WOOD (15,20,22CM)",
+    "category": "Home décor"
+  },
+  "O-FIS5010": {
+    "description": "FISH SET 3PC WOODEN 15,20,22CM",
+    "category": "Home décor"
+  },
+  "O-FIS5011": {
+    "description": "FISH WOOD SET 2PC 15,20cm",
+    "category": "Home décor"
+  },
+  "O-FIS6001": {
+    "description": "FISH SET ANGEL/MOORISH",
+    "category": "Home décor"
+  },
+  "O-FIS6006": {
+    "description": "FISH ANGEL 3PC SET (8,9,10CM)",
+    "category": "Home décor"
+  },
+  "O-FIS6101": {
+    "description": "FISH SET LDENIM",
+    "category": "Home décor"
+  },
+  "O-HAN2010": {
+    "description": "HANGER NAUTICAL 5/HOOK 50CM",
+    "category": "Home décor"
+  },
+  "O-HAN3006": {
+    "description": "SIGN LIFE IS BETTER IN F/FLOPS 50CM",
+    "category": "Home décor"
+  },
+  "O-HAN3036": {
+    "description": "WOOD HANGER FISH 2 HOOKS 40X20CM",
+    "category": "Home décor"
+  },
+  "O-HAN3037": {
+    "description": "WOODEN ANCHOR HANGER 40CM",
+    "category": "Home décor"
+  },
+  "O-HAN7030": {
+    "description": "HANGING BOAT X2 HOOKS 30X25CM",
+    "category": "Home décor"
+  },
+  "O-HFS3006": {
+    "description": "TRUMPET FISH SET,2",
+    "category": "Home décor"
+  },
+  "O-HFS3007": {
+    "description": "FISH SET 2 LDENIM 33cm",
+    "category": "Home décor"
+  },
+  "O-HFS3008": {
+    "description": "HANGING FISH 37CM",
+    "category": "Home décor"
+  },
+  "O-HFS3101": {
+    "description": "HANGING FISH W/GLASS EYE 37cm",
+    "category": "Home décor"
+  },
+  "O-HFS4006": {
+    "description": "FISH HANGING 3PCS (17/23/25)",
+    "category": "Home décor"
+  },
+  "O-HFS4008": {
+    "description": "HANGING FISH SET 40CM",
+    "category": "Home décor"
+  },
+  "O-HFS4013": {
+    "description": "FISH SET 3 HANGING BONES",
+    "category": "Home décor"
+  },
+  "O-HFS4014": {
+    "description": "FISH STRING 3PCS BONDI BLUE 19/24/30CM",
+    "category": "Home décor"
+  },
+  "O-HFS4015": {
+    "description": "FISH STRING SET,3",
+    "category": "Home décor"
+  },
+  "O-HFS5002": {
+    "description": "HANGING FISH 3 25X45CM",
+    "category": "Home décor"
+  },
+  "O-HFS5003": {
+    "description": "HANGING FISH 35X28CM",
+    "category": "Home décor"
+  },
+  "O-HUI2001": {
+    "description": "HUISE BY DIE SEE SIGN 40X15",
+    "category": "Home décor"
+  },
+  "O-HUI4001": {
+    "description": "HOUSE HANGER 55CM 5HOOK",
+    "category": "Home décor"
+  },
+  "O-KEY4002": {
+    "description": "KEYRING SANDAL/STARFISH/ACHOR/HEART",
+    "category": "Keyrings"
+  },
+  "O-LIG3001": {
+    "description": "LIGHTHOUSE 30CM WOOD",
+    "category": "Home décor"
+  },
+  "O-LIG3002": {
+    "description": "LIGHTHOUSE 36CM WOOD (DOOR)",
+    "category": "Home décor"
+  },
+  "O-LIG3005": {
+    "description": "LIGHTHOUSE 35CM W/ANCHOR",
+    "category": "Home décor"
+  },
+  "O-LIG3006": {
+    "description": "LIGHTHOUSE WITH OUTLOOK 30CM WOOD",
+    "category": "Home décor"
+  },
+  "O-LIG3007": {
+    "description": "LIGHTHOUSE W/OUTLOOK 30cm",
+    "category": "Home décor"
+  },
+  "O-MER1005": {
+    "description": "MERMAID WITH SHELLS",
+    "category": "Home décor"
+  },
+  "O-MER2005": {
+    "description": "MERMAID WITH STAR 50CM",
+    "category": "Home décor"
+  },
+  "O-MES4012": {
+    "description": "MESSAGE HANGING BEACH 55CM",
+    "category": "Home décor"
+  },
+  "O-MES6004": {
+    "description": "MESSAGE WOODEN  45CM HOUSE/BOAT",
+    "category": "Home décor"
+  },
+  "O-PAD1004": {
+    "description": "WOOD PADDLE 50X10CM",
+    "category": "Home décor"
+  },
+  "O-SAN3001": {
+    "description": "SANDAL HANGER 3X HOOKS 16X28",
+    "category": "Home décor"
+  },
+  "O-SIG2105": {
+    "description": "SIGN DRIFTWOOD AT THE BEACH W/SANDALS",
+    "category": "Home décor"
+  },
+  "O-SIG2301": {
+    "description": "SIGN 40X20CM BEACH/BEACH HOUSE",
+    "category": "Home décor"
+  },
+  "O-STA1002": {
+    "description": "STRING 18CM STARFISH SET,3",
+    "category": "Home décor"
+  },
+  "O-STA2001": {
+    "description": "STARFISH WOODEN 25CM",
+    "category": "Home décor"
+  },
+  "O-STR1010": {
+    "description": "FISH ON STRING 10PC (120CM)",
+    "category": "Home décor"
+  },
+  "O-STR2101": {
+    "description": "DRIFTWOOD STRING 90CM ASSORTED",
+    "category": "Home décor"
+  },
+  "O-STR2106": {
+    "description": "DRIFTWOOD STRING FISH 90CM",
+    "category": "Home décor"
+  },
+  "O-STR2401": {
+    "description": "STRING 85CM DOLPHIN/FISH/BOAT LDENIM",
+    "category": "Home décor"
+  },
+  "O-STR2501": {
+    "description": "FISH STRING 90CM  BONDI BLUE",
+    "category": "Home décor"
+  },
+  "O-STR2601": {
+    "description": "DOLPHIN ON STRING 3PC (20,25,30CM)",
+    "category": "Home décor"
+  },
+  "O-STR2701": {
+    "description": "HEARTS ON STRING (1M)",
+    "category": "Home décor"
+  },
+  "O-STR3004": {
+    "description": "FISH STRING MULTI COL (90cm)",
+    "category": "Home décor"
+  },
+  "O-STR6101": {
+    "description": "HEARTS ON STRING W/STONES (130cm)",
+    "category": "Home décor"
+  },
+  "O-STR6102": {
+    "description": "BIRDS HANGING W/STONES 130cm",
+    "category": "Home décor"
+  },
+  "O-STR6202": {
+    "description": "DRIFTWOOD STRING 100cm 3X BIRDS/HEARTS",
+    "category": "Home décor"
+  },
+  "O-WEL1007": {
+    "description": "SIGN WELCOME BONY FISH 28X40CM",
+    "category": "Home décor"
+  },
+  "O-WEL1009": {
+    "description": "WELCOME SIGN W/FISH 30X40CM",
+    "category": "Home décor"
+  },
+  "O-WHA1001": {
+    "description": "WHALE SET,3 WOOD",
+    "category": "Home décor"
+  },
+  "X-BUD6101": {
+    "description": "BUDDHA 17CM GANESHA RESIN",
+    "category": "Home décor"
+  },
+  "X-BUD6106": {
+    "description": "BUDHA 18CM RESIN GANESHA ON BASE",
+    "category": "Home décor"
+  },
+  "X-BUD6201": {
+    "description": "BUDHA GANESHA RELAXING ON BASE 12CM",
+    "category": "Home décor"
+  },
+  "X-CAL1005": {
+    "description": "CALENDER PENCIL BOX BOAT /DOLPHIN",
+    "category": "Stationery & art"
+  },
+  "X-CAL5002": {
+    "description": "WOOD CALENDAR MINI KOMBI 10X5cm",
+    "category": "Stationery & art"
+  },
+  "X-CAL5003": {
+    "description": "CALENDAR KOMBIE",
+    "category": "Stationery & art"
+  },
+  "X-CAL5004": {
+    "description": "CALENDAR BEETLE",
+    "category": "Stationery & art"
+  },
+  "X-CAL5202": {
+    "description": "CALENDAR MUSHROOM",
+    "category": "Stationery & art"
+  }
+}

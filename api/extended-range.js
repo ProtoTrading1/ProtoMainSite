@@ -1,4 +1,6 @@
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
+import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
+import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
 import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
@@ -155,7 +157,11 @@ export function applyInstoreImageControls(rows, controls, listingControls = new 
 // catalogue duplicate index and the Instore controls, resolved into the
 // products a customer may see. This is the authoritative build; the stored
 // read model below is only ever a copy of its result.
-export async function loadLiveInstoreCatalogue(client, { includeStaged = false } = {}) {
+export async function loadLiveInstoreCatalogue(client, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null } = {}) {
+  if (websiteOnlyProvider) {
+    try { websiteOnlyRows=(await websiteOnlyProvider()).rows; }
+    catch (error) { console.error('Website-only products unavailable:', error?.message || 'source error'); websiteOnlyRows=[]; }
+  }
   // These two complete reads are independent. Fetch them concurrently so a
   // large staged preview cannot spend its whole serverless response window
   // waiting for the main-catalogue duplicate index to begin.
@@ -173,7 +179,7 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false }
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const observedRows=await overlayArrivedStock(rangeRows,{client});
+  const observedRows=await overlayArrivedStock(mergeWebsiteOnlyIndex(rangeRows,websiteOnlyRows),{client});
   const eligible = buildExtendedRangeProducts(applyInstoreImageControls(observedRows, imageControls, listingControls), '', { includeStaged });
   return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
 }
@@ -355,9 +361,10 @@ export function isIsolatedPreviewRequest(req) {
     && /\.vercel\.app$/i.test(host);
 }
 
-export default async function handler(req, res) {
+export function createExtendedRangeHandler({authorize=requireApprovedCustomer,getClient=stockClient,websiteOnlyProvider=null}={}) {
+return async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const access = await requireApprovedCustomer(req, res);
+  const access = await authorize(req, res);
   if (!access) return;
   try {
     const page = normalizePage(req.query?.page);
@@ -405,7 +412,7 @@ export default async function handler(req, res) {
       });
     }
     const includeStaged = false;
-    const client = stockClient();
+    const client = getClient();
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
@@ -418,7 +425,7 @@ export default async function handler(req, res) {
     const useArrivals=arrivedStockEnabled();
     // The durable snapshot predates the arrival ledger. Keep it untouched and
     // use only the existing bounded 30-second memory cache in arrival mode.
-    const stored = useArrivals?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
+    const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
     if (stored.body) {
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
@@ -428,15 +435,15 @@ export default async function handler(req, res) {
     // One caller rebuilds the stored collection; the rest just serve. Claiming
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
-    const claimed = useArrivals?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
-    const live = await (claimed
+    const claimed = (useArrivals||websiteOnlyProvider)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
+    const live = websiteOnlyProvider ? await getCachedCatalogue('website-only-production',()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider})) : await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;
       })
       : getCachedCatalogue(useArrivals?'arrivals-production':includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
     let allEligible = live.products;
-    if(useArrivals){
+    if(useArrivals||websiteOnlyProvider){
       // Explicit image/listing removals still take effect immediately, even
       // when quantities were observed in the bounded memory cache.
       const [imageControls,listingControls]=await Promise.all([readInstoreImageControls(client),readInstoreListingControls(client)]);
@@ -458,3 +465,6 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Instore Products is temporarily unavailable.' });
   }
 }
+}
+
+export default createExtendedRangeHandler({websiteOnlyProvider:runtimeWebsiteOnlyProvider});

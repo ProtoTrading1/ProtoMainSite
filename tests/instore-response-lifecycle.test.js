@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate as nextTurn } from 'node:timers/promises';
-import handler from '../api/extended-range.js';
+import {createExtendedRangeHandler} from '../api/extended-range.js';
+// This test exercises the original durable snapshot path in isolation.
+const handler=createExtendedRangeHandler();
 import { sendInstoreResponse } from '../api/_instore-response.js';
 
 const reply = () => ({

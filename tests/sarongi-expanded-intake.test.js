@@ -8,7 +8,7 @@ import { resolveInstoreOrderLine } from '../api/send-order.js';
 import { matchesInstoreSearch } from '../lib/instore-discovery.mjs';
 
 test('all exact reviewed supplier codes work through feed, live stock and server order validation', () => {
-  assert.equal(SARONGI_REQUEST_SKUS.length, 137);
+  assert.equal(SARONGI_REQUEST_SKUS.length, 300);
   for (const sku of SARONGI_REQUEST_SKUS) for (const qty of [-7, 0, 2, 100]) {
     const row = { sku, barcode: sku, title: 'UNCHANGED TITLE', original_description: 'UNCHANGED TITLE',
       image_source: 'nutstore', image_url: 'https://example.test/reviewed.jpg', image_review_status: 'verified',
