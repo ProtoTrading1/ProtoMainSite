@@ -43,19 +43,6 @@ test('server rejects blank/wrong-type required fields before provider, rate-limi
   }
 });
 
-test('thrown account, profile and cleanup exceptions return the same neutral receipt without mail effects',async()=>{
-  const previous=process.env.BREVO_API_KEY;process.env.BREVO_API_KEY='inert-fixture';
-  try {
-    for(const outcome of ['create','profile','cleanup']) {
-      let mails=0,floor,created=0,deleted=0;
-      const client={auth:{admin:{createUser:async()=>{created++;if(outcome==='create')throw Error('private-provider');return {data:{user:{id}}};},deleteUser:async()=>{deleted++;throw Error('private-cleanup');}}},from:()=>({select(){return this;},limit:async()=>({error:null}),upsert:async()=>{if(outcome==='profile')throw Error('private-profile');return {error:{message:'private-upsert'}};}})};
-      const handler=createRegisterTradeHandler({createServiceClient:()=>client,rateLimit:allowed,sendAdmin:async()=>{mails++;},sendVerification:async()=>{mails++;},now:()=>0,wait:async ms=>{floor=ms;}});
-      const res=response();await handler({method:'POST',headers:{},body:payload()},res);
-      assert.equal(created,1);assert.equal(res.statusCode,200);assert.deepEqual(res.body,registrationReceipt());assert.equal(floor,1400);assert.equal(mails,0);assert.equal(deleted,outcome==='cleanup'?1:0);
-    }
-  }finally{if(previous===undefined)delete process.env.BREVO_API_KEY;else process.env.BREVO_API_KEY=previous;}
-});
-
 test('syntax-only email check returns no existence facts and accepts normalized ordinary email',async()=>{
   const buckets=[];
   const handler=createRegistrationEmailCheckHandler({rateLimit:async x=>{buckets.push(x.bucket);return {allowed:true};}});
@@ -64,23 +51,6 @@ test('syntax-only email check returns no existence facts and accepts normalized 
     assert.deepEqual(res.body,{ok:true,validationOnly:true});assert.equal(res.statusCode,200);
   }
   assert.equal(buckets.length,4);
-});
-
-test('new, duplicate, provider failure and unsent-mail outcomes have identical public receipts without touching duplicate accounts',async()=>{
-  const previous=process.env.BREVO_API_KEY;process.env.BREVO_API_KEY='inert-fixture';
-  try {
-    for(const outcome of ['new','duplicate','provider-failure','missing-user','mail-not-sent']) {
-      const counts={create:0,profile:0,adminMail:0,verificationMail:0};let floor;
-      const client={auth:{admin:{createUser:async()=>{counts.create++;return outcome==='duplicate'?{error:{code:'email_exists'}}:outcome==='provider-failure'?{error:{code:'unexpected_failure'}}:outcome==='missing-user'?{data:{user:null}}:{data:{user:{id}}};}}},from:()=>({select(){return this;},eq(){return this;},limit:async()=>({error:null,data:[]}),upsert:async()=>{counts.profile++;return {};},single:async()=>({data:{id}})})};
-      const handler=createRegisterTradeHandler({createServiceClient:()=>client,rateLimit:allowed,sendAdmin:async()=>{counts.adminMail++;},sendVerification:async()=>{counts.verificationMail++;return {sent:outcome!=='mail-not-sent'};},now:()=>0,wait:async ms=>{floor=ms;}});
-      const res=response();await handler({method:'POST',headers:{},body:payload()},res);
-      assert.equal(res.statusCode,200);assert.deepEqual(res.body,registrationReceipt());assert.equal(floor,1400);
-      assert.equal(isConfirmedTradeApplication(res.body),true);
-      assert.doesNotMatch(JSON.stringify(res.body),/profile|customerCode|verificationEmailSent|email_exists|access_token|fixture.invalid/);
-      if(['duplicate','provider-failure','missing-user'].includes(outcome)) assert.deepEqual(counts,{create:1,profile:0,adminMail:0,verificationMail:0});
-      else assert.deepEqual(counts,{create:1,profile:1,adminMail:1,verificationMail:1});
-    }
-  }finally{if(previous===undefined)delete process.env.BREVO_API_KEY;else process.env.BREVO_API_KEY=previous;}
 });
 
 test('unrecognized server field text cannot become customer guidance or a safe resend',()=>{

@@ -323,7 +323,7 @@ function Questionnaire({ onLogin }) {
     .map(([key, detail]) => [key, detail.message]));
   const visibleErrors = Object.fromEntries(Object.entries({ ...fieldErrors, ...activeServerErrors }).filter(([key]) => (
     currentValidation[key] || activeServerErrors[key] || (key === 'email' && ['existing', 'error'].includes(emailCheck.status))
-  )).map(([key, message]) => [key, currentValidation[key] || (key === 'email' ? emailError : '') || message]));
+  )).map(([key, message]) => [key, activeServerErrors[key] || currentValidation[key] || (key === 'email' ? emailError : '') || message]));
   const fieldError = (key) => visibleErrors[key] || (key === 'email' ? emailError : '') || '';
   const fieldFeedback = (key, helpId) => ({
     'aria-invalid': Boolean(fieldError(key)),
@@ -509,7 +509,7 @@ function Questionnaire({ onLogin }) {
       setOutcomeUnknown(unknown);
       setSubmitCode(err.code || 'REGISTRATION_OUTCOME_UNKNOWN');
       setShowAccountRecovery(!storageBlocked && (unknown || err.recovery === 'SIGN_IN_OR_RESET_PASSWORD'));
-      const knownCodes = ['REGISTRATION_STORAGE_UNAVAILABLE', 'REGISTRATION_OUTCOME_UNKNOWN', 'REGISTRATION_VALIDATION_FAILED', 'REGISTRATION_RATE_LIMITED', 'REGISTRATION_UNAVAILABLE', 'EMAIL_ALREADY_REGISTERED'];
+      const knownCodes = ['REGISTRATION_STORAGE_UNAVAILABLE', 'REGISTRATION_OUTCOME_UNKNOWN', 'REGISTRATION_VALIDATION_FAILED', 'REGISTRATION_RATE_LIMITED', 'REGISTRATION_UNAVAILABLE', 'REGISTRATION_CONFIRMATION_UNAVAILABLE', 'ACCOUNT_CREATION_FAILED', 'EMAIL_ALREADY_REGISTERED'];
       setSubmitError(knownCodes.includes(err.code) ? err.message : unknown
         ? 'We cannot confirm whether your application was saved. Check your inbox and spam folder for confirmation. Please do not submit another application while the result is uncertain.'
         : err.code === 'EMAIL_ALREADY_REGISTERED'
@@ -518,11 +518,10 @@ function Questionnaire({ onLogin }) {
       if (!unknown) {
         setStep(1);
         const knownFields = Object.entries(err.fieldErrors || {}).filter(([key]) => REGISTRATION_FIELD_IDS[key]);
-        // Keep only nonsecret field values in memory so editing a rejected field
-        // clears its server feedback. A failed password is always cleared.
-        setServerFields(Object.fromEntries(knownFields.filter(([key]) => key !== 'password')
-          .map(([key, message]) => [key, { message, value: formValues[key] }])));
-        setFieldErrors({ password: `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` });
+        // Preserve provider guidance until editing; never retain a rejected password.
+        setServerFields(Object.fromEntries(knownFields
+          .map(([key, message]) => [key, { message, value: key === 'password' ? '' : formValues[key] }])));
+        setFieldErrors({ password: err.fieldErrors?.password || `Create a password of at least ${MIN_PASSWORD_LENGTH} characters.` });
       }
       trackJourneyEvent('registration_failed', {
         journey: 'registration',
@@ -552,8 +551,8 @@ function Questionnaire({ onLogin }) {
     return (
       <div className="lp-quiz-success" ref={successRef} tabIndex={-1} role="region" aria-labelledby="trade-application-success">
         <CheckCircle2 size={48} />
-        <h3 id="trade-application-success">Check your email or sign in</h3>
-        <p>Thank you, {contactName}. Your request has been checked. If this is a new application, use any confirmation email you receive at {email.trim()} before signing in. If you already have an online account, sign in or reset your password. New trade applications still need review by our team.</p>
+        <h3 id="trade-application-success">Check your email</h3>
+        <p>Thank you, {contactName}. Your application has been received. Use the confirmation email sent to {email.trim()} to confirm your email address before signing in. New trade applications still need review by our team.</p>
         <p>If no email arrives, check your spam folder, request a confirmation link, or contact Proto so we can help you confirm the result.</p>
         {<button type="button" disabled={resending} onClick={async () => {
           if (resendLockRef.current) return;

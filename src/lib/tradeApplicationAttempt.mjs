@@ -3,7 +3,8 @@ import { MIN_PASSWORD_LENGTH } from './passwordPolicy.js';
 import { safeServerRegistrationFields } from './registrationServerGuidance.mjs';
 
 const ATTEMPT_KEY = 'proto.trade-application-attempt.v1';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isConfirmedTradeApplication } from './registrationResult.mjs';
+export { isConfirmedTradeApplication } from './registrationResult.mjs';
 const UNKNOWN_MESSAGE = 'We could not confirm whether your application was received. Check your inbox and spam folder, then use Sign in or Forgot password if you may already have registered. To avoid submitting twice, this page will not send another application.';
 const SAFE_VALIDATION = new Map([
   ['Please complete all required fields', {}],
@@ -23,17 +24,6 @@ function attemptError(message, code, { retrySafe = false, fieldErrors = {} } = {
   return Object.assign(new Error(message), { code, retrySafe, outcomeUnknown: !retrySafe, fieldErrors });
 }
 
-export function isConfirmedTradeApplication(result) {
-  if (result?.receipt === 'CHECK_EMAIL_OR_SIGN_IN') {
-    return result.ok === true && result.instantAccess === false && result.emailVerificationRequired === true;
-  }
-  // Accept the previous endpoint envelope during a rolling release. The UI
-  // uses neutral guidance for both versions, never account/mail delivery claims.
-  return result?.ok === true && result.instantAccess === false
-    && result.emailVerificationRequired === true && typeof result.verificationEmailSent === 'boolean'
-    && typeof result.profile?.id === 'string' && UUID.test(result.profile.id);
-}
-
 // Only status + a fixed, known pre-account response permits another POST.
 // Provider creation failures, 5xx, aborted/lost bodies and malformed success
 // envelopes cannot establish whether an account was already created.
@@ -43,6 +33,12 @@ export function applicationFailure(error) {
       && error?.data?.error === 'Check the highlighted application details.') {
     const fieldErrors = safeServerRegistrationFields(error.data.fieldErrors);
     if (fieldErrors) return attemptError('Check the highlighted details before submitting again. Your other entries are still here; enter your password again.', 'REGISTRATION_VALIDATION_FAILED', { retrySafe: true, fieldErrors });
+  }
+  if (status === 503 && error?.code === 'REGISTRATION_CONFIRMATION_UNAVAILABLE') {
+    return attemptError('Your application was saved, but we could not send the confirmation email. Request a confirmation email or contact Proto. Please do not register again.', 'REGISTRATION_CONFIRMATION_UNAVAILABLE');
+  }
+  if (status === 400 && error?.code === 'ACCOUNT_CREATION_FAILED') {
+    return Object.assign(attemptError('We could not create a new account with these details. If you have registered before, sign in or reset your password. Otherwise contact Proto for help.', 'ACCOUNT_CREATION_FAILED'), { recovery: 'SIGN_IN_OR_RESET_PASSWORD' });
   }
   if (status === 409 && error?.code === 'EMAIL_ALREADY_REGISTERED') {
     return Object.assign(attemptError('An online account may already use these details. Use Sign in or Forgot password to continue.', 'EMAIL_ALREADY_REGISTERED', { retrySafe: true }), { recovery: 'SIGN_IN_OR_RESET_PASSWORD' });

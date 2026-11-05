@@ -60,7 +60,7 @@ export function isExistingEmailError(error) {
 }
 
 export function existingEmailResponse() {
-  return registrationReceipt();
+  return accountCreationFailureResponse();
 }
 
 // New-signup notifications go to the Proto team. The old default pointed at
@@ -243,9 +243,9 @@ return async function handler(req, res) {
     unitNumber,
   } = req.body || {};
 
-  // Honeypot — bots that fill hidden fields get a fake success response.
+  // Rejected submissions must never produce a registration confirmation.
   if (company_fax) {
-    return publicReceipt();
+    return res.status(400).json(accountCreationFailureResponse());
   }
 
   const fieldErrors = registrationFieldErrors(req.body);
@@ -360,13 +360,20 @@ return async function handler(req, res) {
 
   if (error) {
     console.error('Registration account creation did not complete');
-    // Never reset, resend to or update an existing account here. Provider
-    // outcomes share the same public receipt as a new application.
-    return publicReceipt();
+    // Password rejection is a correctable field error, before any account or mail.
+    if (error.code === 'weak_password' || error.name === 'AuthWeakPasswordError'
+        || (error.status === 422 && error.message === 'Password is known to be weak and easy to guess, please choose a different one.')) {
+      return res.status(400).json({
+        error: 'Check the highlighted application details.', code: 'REGISTRATION_VALIDATION_FAILED',
+        fieldErrors: { password: 'This password is too weak or has appeared in a data breach. Choose a stronger, unique password.' },
+      });
+    }
+    // Do not alter an existing account or claim a new registration succeeded.
+    return res.status(400).json(accountCreationFailureResponse());
   }
 
   const userId = data?.user?.id;
-  if (!userId) return publicReceipt();
+  if (!userId) throw new Error('Registration account confirmation did not complete');
   const allocatedCustomerCode = null;
 
   const shouldApprove = false;
@@ -504,7 +511,7 @@ return async function handler(req, res) {
     if (custError) {
       console.error('Registration profile write did not complete');
       await supabase.auth.admin.deleteUser(userId);
-      return publicReceipt();
+      throw new Error('Registration profile write did not complete');
     }
 
     const { data: savedProfile } = await supabase
@@ -513,7 +520,7 @@ return async function handler(req, res) {
       .eq('id', userId)
       .single();
     if (!savedProfile) {
-      console.error('Registration profile confirmation did not complete');
+      throw new Error('Registration profile confirmation did not complete');
     }
 
     // Verification is sent below after the profile is safely persisted.
@@ -547,9 +554,11 @@ return async function handler(req, res) {
 
   if (process.env.BREVO_API_KEY && userId) {
     try {
-      await sendVerification({ client: supabase, userId, email: normalizedEmail, name: normalizedContactName });
+      const delivery = await sendVerification({ client: supabase, userId, email: normalizedEmail, name: normalizedContactName });
+      if (delivery?.sent !== true) throw new Error('Registration verification email was not accepted');
     } catch {
       console.error('Registration verification email could not be sent');
+      return res.status(503).json({ error: 'Your application was saved, but we could not send the confirmation email. Request a confirmation email or contact Proto. Please do not register again.', code: 'REGISTRATION_CONFIRMATION_UNAVAILABLE' });
     }
   }
 
@@ -557,6 +566,7 @@ return async function handler(req, res) {
     // Provider/transport exceptions carry no public account-existence facts.
     // Never retry, reset or mutate an existing account after an uncertain result.
     console.error('Registration processing did not complete');
+    return res.status(503).json({ error: 'We could not confirm your registration. Contact Proto before submitting again.', code: 'REGISTRATION_OUTCOME_UNKNOWN' });
   }
   return publicReceipt();
 };

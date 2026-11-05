@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applicationFailure, createTradeApplicationAttempt, isConfirmedTradeApplication } from '../src/lib/tradeApplicationAttempt.mjs';
 
-const confirmed = () => ({ ok: true, instantAccess: false, emailVerificationRequired: true, verificationEmailSent: true, profile: { id: '00000000-0000-4000-8000-000000000001' } });
+const confirmed = () => ({ ok: true, receipt: 'REGISTRATION_SUCCEEDED', instantAccess: false, emailVerificationRequired: true, verificationEmailSent: true, profile: { id: '00000000-0000-4000-8000-000000000001' } });
 function storage() {
   const values = new Map();
   return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
@@ -68,13 +68,13 @@ test('storage denied or silently dropped refuses a POST', async () => {
 test('only matching confirmed profile and verification flags allow success', () => {
   assert.equal(isConfirmedTradeApplication(confirmed()), true);
   assert.equal(isConfirmedTradeApplication({ ...confirmed(), verificationEmailSent: false }), true);
-  for (const result of [{ ok: true, instantAccess: true, customerCode: 'XXXXXX' }, { ...confirmed(), profile: null }, { ...confirmed(), emailVerificationRequired: false }, { ...confirmed(), verificationEmailSent: 'true' }, { ...confirmed(), profile: { id: 'invalid' } }, {}]) {
+  for (const result of [{ ok: true, instantAccess: true, customerCode: 'XXXXXX' }, { ...confirmed(), receipt: 'CHECK_EMAIL_OR_SIGN_IN' }, { ...confirmed(), emailVerificationRequired: false }, { ...confirmed(), ok: false }, { ...confirmed(), receipt: undefined }, {}]) {
     assert.equal(isConfirmedTradeApplication(result), false);
   }
 });
 
 test('malformed 200 or profile readback miss holds unknown without a retry', async () => {
-  for (const result of [{ ok: true }, { ...confirmed(), profile: null }]) {
+  for (const result of [{ ok: true }, { ...confirmed(), receipt: 'CHECK_EMAIL_OR_SIGN_IN' }]) {
     let sends = 0;
     const attempt = createTradeApplicationAttempt({ storage: storage(), send: async () => { sends++; return result; } });
     await assert.rejects(attempt.submit({}), { code: 'REGISTRATION_OUTCOME_UNKNOWN' });

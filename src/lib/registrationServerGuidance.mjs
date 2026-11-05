@@ -6,7 +6,7 @@ const fields = {
   companyName: ['Enter your company name.', 'Check your business and address details.'],
   phone: ['Enter your phone number.', 'Enter a phone number with at least 8 digits, including your area or country code.'],
   email: ['Enter your email address.'],
-  password: ['Enter a password as text.', `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, 'Enter matching passwords.'],
+  password: ['This password is too weak or has appeared in a data breach. Choose a stronger, unique password.', 'Enter a password as text.', `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, 'Enter matching passwords.'],
   whatsappOptIn: ['Choose Yes or No for WhatsApp updates.'],
   billingStreet: ['Enter your billing address.'],
   streetName: ['Enter your delivery address.', 'Enter your delivery street name and number.'],

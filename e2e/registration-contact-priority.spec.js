@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/**', route => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(new URL(route.request().url()).pathname==='/api/check-registration-email'?{ok:true,validationOnly:true}:{ok:true,receipt:'CHECK_EMAIL_OR_SIGN_IN',instantAccess:false,emailVerificationRequired:true}) }));
+  await page.route('**/api/**', route => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(new URL(route.request().url()).pathname==='/api/check-registration-email'?{ok:true,validationOnly:true}:{ok:true,receipt:'REGISTRATION_SUCCEEDED',instantAccess:false,emailVerificationRequired:true}) }));
 });
 
 async function contact(page) {
@@ -83,9 +83,9 @@ test('neutral application receipt offers recovery without asserting account crea
   await page.getByRole('button',{name:'Art, craft & beads',exact:true}).click();
   await page.getByPlaceholder(/Gifts and party supplies sold/).fill('Synthetic gifts supplied to local shops.');
   await page.getByRole('button',{name:'Submit application',exact:true}).click();
-  const receipt=page.getByRole('region',{name:'Check your email or sign in'});
+  const receipt=page.getByRole('region',{name:'Check your email'});
   await expect(receipt).toBeVisible();await expect(receipt).toBeFocused();
-  await expect(receipt).toContainText('If this is a new application');
+  await expect(receipt).toContainText('Your application has been received');
   await expect(receipt).not.toContainText('account has been created');
   await expect(receipt.getByRole('button',{name:'Reset password',exact:true})).toBeVisible();
   await capture(page,testInfo,'neutral-receipt');expect(applications).toBe(1);
