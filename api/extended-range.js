@@ -1,6 +1,6 @@
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
-import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
+import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
 import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
@@ -436,7 +436,9 @@ return async function handler(req, res) {
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
     const claimed = (useArrivals||websiteOnlyProvider)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
-    const live = websiteOnlyProvider ? await getCachedCatalogue('website-only-production',()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider})) : await (claimed
+    const websiteOnlyOrigin=websiteOnlyProvider?websiteOnlyRequestOrigin(req):null;
+    const providerForRequest=websiteOnlyProvider?()=>websiteOnlyProvider({origin:websiteOnlyOrigin}):null;
+    const live = websiteOnlyProvider ? await getCachedCatalogue(`website-only:${websiteOnlyOrigin}`,()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest})) : await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;

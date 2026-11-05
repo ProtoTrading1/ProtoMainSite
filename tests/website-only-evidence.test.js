@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCatalogueControlsReader,createReadOnlyEvidenceReader,createWebsiteIdentifiersReader,createLiveReadOnlyEvidenceReader} from '../api/_website-only-evidence.js';
 import {createWebsiteOnlyProvider} from '../api/_website-only-provider.js';
-import {createRuntimeWebsiteOnlyProvider} from '../api/_website-only-runtime.js';
+import {createRuntimeWebsiteOnlyProvider,websiteOnlyRequestOrigin} from '../api/_website-only-runtime.js';
 
 function fakeClient(tables) {return {from(name){
  if(!(name in tables))throw Error('Unexpected table');
@@ -89,4 +89,22 @@ test('runtime provider reads the real batch manifest through read-only adapters'
  assert.equal(found.rows[0].price,105);assert.equal(found.rows[0].available_stock,1);
  assert.match(found.rows[0].image_url,/^https:\/\/protoportal-main-test-proto-team\.vercel\.app\/product-options\/website-only-163\//);
  assert.deepEqual((await runtime({skus:['L-TON1104','KDIS1001']})).rows,[]);
+});
+
+test('production staging uses only its own trusted asset host',async()=>{
+ const env={VERCEL_ENV:'production',VERCEL_URL:'protoportal-main-test-proto-team.vercel.app'};
+ assert.equal(websiteOnlyRequestOrigin({headers:{host:env.VERCEL_URL}},env),'https://'+env.VERCEL_URL);
+ assert.equal(websiteOnlyRequestOrigin({headers:{host:'www.proto.co.za'}},env),'https://www.proto.co.za');
+ assert.equal(websiteOnlyRequestOrigin({headers:{host:'attacker.example'}},env),'https://www.proto.co.za');
+ assert.equal(websiteOnlyRequestOrigin({headers:{host:'protoportal-main-other-proto-team.vercel.app'}},env),'https://www.proto.co.za');
+ const tables={extended_range_items:[],website_stock:[],instore_listing_controls:[],instore_image_controls:[]};
+ const runtime=createRuntimeWebsiteOnlyProvider({stockClient:fakeClient(tables),websiteClient:fakeClient({products:[]}),
+ env:{...env,STOCK_SQL_BRIDGE_URL:'https://test.invalid',STOCK_SQL_BRIDGE_KEY:'synthetic'},now:()=>1000,
+ transport:async()=>({ok:true,json:async()=>({row:{CODE:'A-BRA1003',DESCR:'BRASS BUDDAH RECLINING 12CM',UNITS:'EACH',PRICE_A:91.3,ONHAND:1,BOOKED:0}})})});
+ const staged=await runtime({skus:['A-BRA1003'],origin:'https://'+env.VERCEL_URL});
+ const live=await runtime({skus:['A-BRA1003'],origin:'https://www.proto.co.za'});
+ const forged=await runtime({skus:['A-BRA1003'],origin:'https://attacker.example'});
+ assert.ok(staged.rows[0].image_url.startsWith('https://'+env.VERCEL_URL+'/'));
+ assert.ok(live.rows[0].image_url.startsWith('https://www.proto.co.za/'));
+ assert.ok(forged.rows[0].image_url.startsWith('https://www.proto.co.za/'));
 });
