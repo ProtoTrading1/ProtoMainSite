@@ -8,12 +8,15 @@ import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.m
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
 import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
+import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
 import { buildOrderPdfBuffer } from './_order-pdf.js';
 import { escapeHtml } from './_escape-html.js';
 import { getPortalAdminClient, readOrderNotifyLog, saveOrderNotifyLog } from './_site-config.js';
+import websiteOnlyManifest from './_website-only-manifest.json' with { type: 'json' };
+import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
 import {
   claimPromoRedemption,
   finalisePromoRedemption,
@@ -307,12 +310,13 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), ...unit, casePack: sellingUnitDetails(unit.unitsOfIssue).label, packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
-async function resolveInstorePrices(items) {
+export async function resolveInstorePrices(items, { websiteOnlyRows = [], websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (!items.length) return [];
   const itemSkus = items.map((item) => textId(item?.product?.sku || item?.product?.id));
   if (itemSkus.some((sku) => !sku)) throw orderError('Each Instore order line needs a product code.');
   const skus = [...new Set(itemSkus)];
-  const index = stockClient();
+  if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus})).rows;
+  index ||= stockClient();
   let indexRows; let normalRows; let listingControls;
   try {
     const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
@@ -322,7 +326,7 @@ async function resolveInstorePrices(items) {
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
     ]);
     if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error;
-    indexRows = indexResult.data || [];
+    indexRows = mergeWebsiteOnlyIndex(indexResult.data || [], websiteOnlyRows.filter(row=>skus.includes(textId(row.sku))));
     normalRows = [...(normalSkuResult.data || []), ...(normalBarcodeResult.data || [])];
     listingControls = new Map((listingResult.data || []).map((row) => [textId(row.sku), String(row.status || '').trim().toLowerCase()]));
   } catch (error) {
@@ -335,15 +339,15 @@ async function resolveInstorePrices(items) {
     const outcome = evaluateInstoreDuplicate({ sku }, { status: 'success', complete: true, variantsIncluded: true, checkedIdentifiers: [sku], rows: normalRows });
     duplicates.set(sku, outcome);
   }
-  const bridgeUrl = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
-  const bridgeKey = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
+  const bridgeUrl = String(bridgeEnv.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
+  const bridgeKey = String(bridgeEnv.STOCK_SQL_BRIDGE_KEY || '').trim();
   // The bridge is best-effort for price and a stock log line only: a bridge
   // outage or an unknown SKU must not block an Instore order request.
   const bridgeBySku = new Map();
   if (bridgeUrl.startsWith('https://') && bridgeKey) {
     await Promise.all(skus.map(async (sku) => {
       try {
-        const response = await fetch(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
+        const response = await fetchBridge(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
         if (response.ok) bridgeBySku.set(sku, (await response.json())?.row);
         else console.warn('send-order: Instore bridge returned', response.status, 'for', sku);
       } catch (error) {
@@ -364,6 +368,7 @@ async function resolveInstorePrices(items) {
 }
 
 async function resolveStandardPrices(items) {
+  if (!items.length) return [];
   if (items.length > MAX_ORDER_LINES) {
     const error = new Error(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
     error.status = 400;
@@ -523,10 +528,19 @@ async function resolveStandardPrices(items) {
 // catalogue (by SKU or barcode) but is in the Instore index is an Instore line.
 // Lookup failures fall back to the browser flag so checkout is never blocked
 // by this reclassification step alone.
-export async function detectUnflaggedInstoreSkus(items, client = null) {
+export async function detectUnflaggedInstoreSkus(items, client = null, { websiteOnlyRows = [], websiteOnlyProvider = null } = {}) {
   const unflagged = items.filter((item) => item?.product?.isExtendedRange !== true);
   const skus = [...new Set(unflagged.map((item) => textId(item?.product?.sku || item?.product?.id)).filter(Boolean))];
   if (!skus.length) return new Set();
+  const websiteOnlyCodes = new Set(websiteOnlyManifest.items.map(item => textId(item.sku)));
+  const requestedWebsiteOnly = websiteOnlyProvider ? skus.filter(sku => websiteOnlyCodes.has(sku)) : [];
+  if (websiteOnlyProvider) {
+    websiteOnlyRows=(await websiteOnlyProvider({skus})).rows;
+    const verifiedCodes = new Set(websiteOnlyRows.map(row => textId(row.sku)));
+    if (requestedWebsiteOnly.some(sku => !verifiedCodes.has(sku))) {
+      throw orderError('An Instore item could not be verified. Please try again.', 409);
+    }
+  }
   const barcodes = [...new Set(unflagged.map((item) => String(item?.product?.code || item?.product?.barcode || '').trim()).filter(Boolean))];
   try {
     client = client || getStockClient();
@@ -538,7 +552,7 @@ export async function detectUnflaggedInstoreSkus(items, client = null) {
     if (bySku.error || byBarcode.error || instore.error) throw bySku.error || byBarcode.error || instore.error;
     const mainSkus = new Set((bySku.data || []).map((row) => textId(row.sku)));
     const mainBarcodes = new Set((byBarcode.data || []).map((row) => String(row.barcode ?? '').trim()));
-    const instoreSkus = new Set((instore.data || []).map((row) => textId(row.sku)));
+    const instoreSkus = new Set(mergeWebsiteOnlyIndex(instore.data || [],websiteOnlyRows.filter(row=>skus.includes(textId(row.sku)))).map((row) => textId(row.sku)));
     const detected = new Set();
     for (const item of unflagged) {
       const sku = textId(item?.product?.sku || item?.product?.id);
@@ -548,20 +562,21 @@ export async function detectUnflaggedInstoreSkus(items, client = null) {
     return detected;
   } catch (error) {
     console.error('send-order: Instore line classification failed:', error?.message || error);
+    if (requestedWebsiteOnly.length) throw orderError('An Instore item could not be verified. Please try again.', 409);
     return new Set();
   }
 }
 
-export async function resolveAuthoritativePrices(items, { classify = detectUnflaggedInstoreSkus } = {}) {
+export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
-  const detectedInstore = await classify(items);
+  const detectedInstore = await (classify ? classify(items) : detectUnflaggedInstoreSkus(items,index,{websiteOnlyProvider}));
   const isInstore = (item) => item?.product?.isExtendedRange === true
     || detectedInstore.has(textId(item?.product?.sku || item?.product?.id));
   const instoreItems = items.filter(isInstore);
   const standardItems = items.filter((item) => !isInstore(item));
   let resolvedInstore; let resolvedStandard;
   try {
-    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems), resolveStandardPrices(standardItems)]);
+    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems,{websiteOnlyProvider,index,fetchBridge,bridgeEnv}), resolveStandardPrices(standardItems)]);
   } catch (error) {
     // Line numbers inside each resolver count only that group; report the
     // basket's own line number to the customer.
@@ -1780,4 +1795,4 @@ export function createSendOrderHandler(overrides = {}) {
 
 }
 
-export default createSendOrderHandler();
+export default createSendOrderHandler({resolveAuthoritativePrices:items=>resolveAuthoritativePrices(items,{websiteOnlyProvider:runtimeWebsiteOnlyProvider})});

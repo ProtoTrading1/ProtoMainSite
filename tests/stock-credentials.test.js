@@ -52,7 +52,7 @@ test('actual SDK mock read uses modern apikey without secret bearer, no live net
 });
 test('scoped runtime clients and manual scripts share server module; browser code has no import', async () => {
  for (const file of ['api/products.js', 'api/stock.js', 'api/send-order.js', 'api/_order-pdf.js', 'api/extended-range.js']) {
-  const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8'); assert.match(source, /createStockClient\(/);
+  const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8'); assert.match(source, file==='api/stock.js' ? /getClient=createStockClient/ : /createStockClient\(/);
   assert.doesNotMatch(source, /createClient\(\s*process.env.VITE_STOCK_SUPABASE/);
  }
  for (const file of ['sync-website-from-products.mjs','migrate-product-images.mjs','import-website-stock.mjs','apply-move-spreadsheet.mjs','generate-catalog.js','backup-stock-tables.mjs']) {

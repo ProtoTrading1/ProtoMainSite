@@ -23,12 +23,14 @@ const readSource = (relativePath) => readFile(new URL(`../../${relativePath}`, i
 test('live stock keeps authentication first and overlaps approval with the stock read', async () => {
   const source = await readSource('api/stock.js');
 
-  const authIndex = source.indexOf('await requireAuth(req, res)');
+  assert.match(source, /authenticate=requireAuth/);
+  assert.match(source, /approve=getApprovedCustomer/);
+  const authIndex = source.indexOf('await authenticate(req, res)');
   const parallelIndex = source.indexOf('await Promise.all([');
   // The isolated Instore preview has its own approval/read path before the
   // normal catalogue flow. Assert the normal flow specifically, rather than
   // treating the first preview reference as the live-stock implementation.
-  const approvalIndex = source.lastIndexOf('getApprovedCustomer(user, res)');
+  const approvalIndex = source.lastIndexOf('approve(user, res)');
   const stockIndex = source.lastIndexOf(".from('website_stock')");
 
   assert.ok(authIndex >= 0, 'the caller is authenticated');

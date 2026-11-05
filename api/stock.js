@@ -1,4 +1,7 @@
 import { isSarongiRequestSku, sarongiRequestAvailability } from '../lib/sarongi-instore-requests.mjs';
+import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
+import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
+import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,effectiveArrivedStock} from './_arrived-stock.js';
@@ -38,20 +41,33 @@ export function validateInstoreBridgeStock(sku, row) {
   return { ...positillUnitObservation(sku, row), qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
 }
 
-async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
-  const { data, error } = await stockClient().from('extended_range_items')
+export async function readFreshInstoreStock(sku, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, indexClient = stockClient(), fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+  if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus:[sku]})).rows;
+  const { data, error } = await indexClient.from('extended_range_items')
     .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
     .eq('sku', sku).limit(1);
   if (error) throw error;
-  const arrivals=await readArrivedStockRecords(stockClient(),[sku]);
+  const arrivals=await readArrivedStockRecords(indexClient,[sku]);
   // Only a verified server-side receipt may defer the index's stale quantity
   // gate. Current bridge stock/unit/price still decide the actual response.
-  const product = buildExtendedRangeProducts(data || [], '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
+  const extra=websiteOnlyRows.filter(row=>String(row.sku||'').trim().toUpperCase()===sku);
+  if (extra.length) {
+    const controlReads=Promise.all([
+      indexClient.from('website_stock').select('sku, barcode').in('sku',[sku]),
+      indexClient.from('website_stock').select('sku, barcode').in('barcode',[sku]),
+      indexClient.from('instore_listing_controls').select('sku, status').in('sku',[sku]),
+    ]);
+    const [bySku,byBarcode,controls]=await controlReads;
+    if (bySku.error||byBarcode.error||controls.error) throw new Error('Website-only controls unavailable');
+    const duplicate=evaluateInstoreDuplicate({sku,barcode:sku},{status:'success',complete:true,variantsIncluded:true,checkedIdentifiers:[sku],rows:[...(bySku.data||[]),...(byBarcode.data||[])]});
+    if (duplicate.decision!=='eligible'||(controls.data||[]).some(row=>String(row.status).toLowerCase()==='hidden')) return null;
+  }
+  const product = buildExtendedRangeProducts(mergeWebsiteOnlyIndex(data || [],extra), '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
   if (!product) return null;
-  const base = String(process.env.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
-  const key = String(process.env.STOCK_SQL_BRIDGE_KEY || '').trim();
+  const base = String(bridgeEnv.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
+  const key = String(bridgeEnv.STOCK_SQL_BRIDGE_KEY || '').trim();
   if (!base.startsWith('https://') || !key) throw new Error('Instore bridge is not configured');
-  const response = await fetch(`${base}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': key }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
+  const response = await fetchBridge(`${base}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': key }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Instore bridge returned ${response.status}`);
   const row = (await response.json())?.row;
   const current = isSarongiRequestSku(sku) ? validateInstoreBridgeStock(sku, row)
@@ -59,7 +75,8 @@ async function readFreshInstoreStock(sku, { includeStaged = false } = {}) {
   return { ...current, availability: sarongiRequestAvailability(sku, current.availability) };
 }
 
-export default async function handler(req, res) {
+export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env}={}) {
+return async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   if (req.method !== 'GET') {
@@ -72,14 +89,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const user = await requireAuth(req, res);
+    const user = await authenticate(req, res);
     if (!user) return;
 
     // A preview product always uses the isolated snapshot. It is deliberately
     // unable to fall back to website_stock or the SQL bridge.
     if (req.query.source === 'instore-preview') {
       if (!isIsolatedPreviewRequest(req)) return res.status(404).json({ error: 'Preview stock is not available here' });
-      const access = await getApprovedCustomer(user, res);
+      const access = await approve(user, res);
       if (!access) return;
       const { client, runId } = previewCatalogueClient();
       const { data: run, error: runError } = await client.from('preview_instore_runs')
@@ -99,13 +116,13 @@ export default async function handler(req, res) {
     }
 
     const includeStaged = false;
-    const supabase = createStockClient();
+    const supabase = getClient();
 
     // Authentication must complete first, but the independent approval and
     // stock reads can run together. This removes one full database round trip
     // from every live stock check without caching or weakening either rule.
     const [access, stockResult] = await Promise.all([
-      getApprovedCustomer(user, res),
+      approve(user, res),
       supabase
         .from('website_stock')
         .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order')
@@ -118,7 +135,7 @@ export default async function handler(req, res) {
 
     if (error) throw error;
     if (!data || data.length === 0) {
-      const instore = await readFreshInstoreStock(sku, { includeStaged });
+      const instore = await readFreshInstoreStock(sku, { includeStaged,websiteOnlyProvider,indexClient:supabase,fetchBridge,bridgeEnv });
       if (!instore) return res.status(404).json({ error: 'SKU not found' });
       return res.status(200).json({ ...instore, sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
     }
@@ -145,3 +162,6 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Stock lookup failed' });
   }
 }
+}
+
+export default createStockHandler({websiteOnlyProvider:runtimeWebsiteOnlyProvider});
