@@ -21,19 +21,10 @@ test('account creation failures provide a generic recovery response', () => {
   assert.doesNotMatch(JSON.stringify(response), /already registered|user exists|duplicate/i);
 });
 
-test('known duplicate response shares the neutral request receipt', () => {
-  assert.equal(isExistingEmailError({ code: 'email_exists' }), true);
-  assert.equal(isExistingEmailError({ code: 'unexpected_failure' }), false);
-  assert.deepEqual(existingEmailResponse(), {
-    ok: true, receipt: 'CHECK_EMAIL_OR_SIGN_IN', instantAccess: false, emailVerificationRequired: true,
-  });
-  assert.doesNotMatch(JSON.stringify(existingEmailResponse()), /already registered|EMAIL_ALREADY|profile|verificationEmailSent/);
-});
-
-test('registration source exposes no duplicate-email status or body', () => {
-  const source = read('api/register-trade.js');
-  assert.doesNotMatch(source, /status\(409\)|EMAIL_ALREADY_REGISTERED/);
-  assert.match(source, /return publicReceipt\(\)/);
+test('duplicate accounts return failure guidance, never a registration receipt', () => {
+  assert.equal(isExistingEmailError({code:'email_exists'}),true);
+  assert.deepEqual(existingEmailResponse(),accountCreationFailureResponse());
+  assert.equal(existingEmailResponse().ok,undefined);
 });
 
 test('registration client preserves structured recovery details', async (t) => {

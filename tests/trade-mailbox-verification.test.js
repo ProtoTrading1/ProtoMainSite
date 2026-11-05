@@ -78,7 +78,7 @@ test('registration never auto-approves an unverified legacy email, and sends no 
     assert.equal(profile.is_approved,false);assert.equal(profile.trade_email_verification_required,true);
     assert.equal(profile.sales_last_12_months,null);assert.equal(profile.customer_code,null);
     assert.equal(res.body.instantAccess,false);assert.equal(res.body.emailVerificationRequired,true);
-    assert.equal(res.body.receipt,'CHECK_EMAIL_OR_SIGN_IN');assert.equal(verification,1);assert.equal(res.body.verificationEmailSent,undefined);
+    assert.equal(res.body.receipt,'REGISTRATION_SUCCEEDED');assert.equal(verification,1);assert.equal(res.body.verificationEmailSent,undefined);
     assert.doesNotMatch(JSON.stringify(res.body),/token_hash|access_token|synthetic-key/);
   }finally{if(prior===undefined)delete process.env.BREVO_API_KEY;else process.env.BREVO_API_KEY=prior;}
 });

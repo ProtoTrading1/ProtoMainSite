@@ -341,6 +341,14 @@ export default function RegisterPage({ onLogin, standalone = false }) {
     } catch (submitErr) {
       setSubmitError(submitErr.message || 'Something went wrong. Please try again.');
       setShowAccountRecovery(submitErr.recovery === 'SIGN_IN_OR_RESET_PASSWORD');
+      if (submitErr.code === 'REGISTRATION_VALIDATION_FAILED' && submitErr.data?.fieldErrors?.password) {
+        setPassword('');
+        setConfirmPassword('');
+        setShowPw(false);
+        setShowConfirmPw(false);
+        setValidationIssues([{ key: 'password', message: submitErr.message, section: 'contact' }]);
+        setStandaloneStep(0);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -351,8 +359,8 @@ export default function RegisterPage({ onLogin, standalone = false }) {
             {done ? (
               <div className="lp-quiz-success">
                 <CheckCircle2 size={48} />
-                  <h3>Check your email or sign in</h3>
-                  <p>Thank you, {contactName.trim()}. Your request has been checked. If this is a new application, use any confirmation email you receive before signing in. If you already have an online account, sign in or reset your password. Check your spam folder or contact Proto if you cannot confirm the result.</p>
+                  <h3>Check your email</h3>
+                  <p>Thank you, {contactName.trim()}. Your application has been received. Use the confirmation email to confirm your email address before signing in. New trade applications still need review by our team. Check your spam folder or contact Proto if no email arrives.</p>
                 {!standalone && (
                   <button type="button" onClick={onLogin}>
                     Go to sign in
