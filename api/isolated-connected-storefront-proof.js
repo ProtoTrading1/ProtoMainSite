@@ -27,7 +27,7 @@ export function createConnectedStorefrontProof({env=process.env,authenticate=req
   try{
    const user=await authenticate(req,res);if(!user)return;
    if(!owners.has(String(user.email||'').trim().toLowerCase())||!/^Bearer [A-Za-z0-9._-]{20,8192}$/.test(req.headers.authorization||''))return res.status(403).json({error:'Owner account required'});
-   phase='admin-read';const response=await transport(adminUrl,{method:'GET',headers:{authorization:req.headers.authorization},redirect:'error',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});upstreamStatus=response.status??null;
+   phase='admin-read';const response=await transport(adminUrl,{method:'GET',headers:{authorization:req.headers.authorization},redirect:'manual',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});upstreamStatus=response.status??null;
    if(!response.ok)throw Error('Test source unavailable');
    const raw=await response.text();if(raw.length>8192)throw Error('Test response too large');
    phase='test-record';const product=JSON.parse(raw)?.product;
