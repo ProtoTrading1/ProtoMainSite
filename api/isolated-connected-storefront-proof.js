@@ -23,22 +23,23 @@ export function createConnectedStorefrontProof({env=process.env,authenticate=req
    res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
    return res.status(200).send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connected Test</title></head><body><h1>Connected storefront Test</h1><p>Sign in using the storefront Test page first. This reads one synthetic product and places no order.</p><button id="check">Run connected Test</button><p id="status" role="status"></p><script>document.getElementById('check').onclick=async()=>{const status=document.getElementById('status');status.textContent='Checking…';try{const s=JSON.parse(localStorage.getItem('sb-kyodrsqnmihwoplkhwwf-auth-token')||'null');if(!s?.access_token)throw Error('Sign in on this preview first.');const r=await fetch(location.pathname,{headers:{Authorization:'Bearer '+s.access_token,Accept:'application/json'},cache:'no-store'});const data=await r.json();if(!r.ok||data.confirmed!==true)throw Error('Connected Test could not be confirmed.');status.textContent='Connected Test passed: '+data.description;}catch(e){status.textContent=e.message||'Connected Test could not be confirmed.';}};</script></body></html>`);
   }
+  let phase='owner',upstreamStatus=null;
   try{
    const user=await authenticate(req,res);if(!user)return;
    if(!owners.has(String(user.email||'').trim().toLowerCase())||!/^Bearer [A-Za-z0-9._-]{20,8192}$/.test(req.headers.authorization||''))return res.status(403).json({error:'Owner account required'});
-   const response=await transport(adminUrl,{method:'GET',headers:{authorization:req.headers.authorization},redirect:'error',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});
+   phase='admin-read';const response=await transport(adminUrl,{method:'GET',headers:{authorization:req.headers.authorization},redirect:'error',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});upstreamStatus=response.status??null;
    if(!response.ok)throw Error('Test source unavailable');
    const raw=await response.text();if(raw.length>8192)throw Error('Test response too large');
-   const product=JSON.parse(raw)?.product;
+   phase='test-record';const product=JSON.parse(raw)?.product;
    if(product?.sku!==sku||product?.barcode!==sku||typeof product.title!=='string'||!product.title.trim()||product.title.length>200)throw Error('Test product mismatch');
    const metadataProvider=async()=>({complete:true,overlays:[{sku,description:product.title,barcode:sku}]});
    const client=syntheticClient(),fetchBridge=async()=>({ok:true,json:async()=>({row:bridge})}),bridgeEnv={STOCK_SQL_BRIDGE_URL:'https://synthetic.invalid',STOCK_SQL_BRIDGE_KEY:'synthetic'};
-   const browse=await loadLiveInstoreCatalogue(client,{websiteOnlyRows:[row],metadataProvider});
+   phase='storefront';const browse=await loadLiveInstoreCatalogue(client,{websiteOnlyRows:[row],metadataProvider});
    const stock=await readFreshInstoreStock(sku,{websiteOnlyRows:[row],metadataProvider,indexClient:client,fetchBridge,bridgeEnv});
    const [order]=await resolveInstorePrices([{qty:1,product:{sku,isExtendedRange:true}}],{websiteOnlyRows:[row],metadataProvider,index:client,fetchBridge,bridgeEnv});
    if(browse.products?.[0]?.title!==product.title||stock?.qty!==19||order?.product?.name!==product.title||order?.product?.price!==11.5||order?.product?.code!==sku)throw Error('Test path mismatch');
    return res.status(200).json({confirmed:true,sku,description:product.title,stock:stock.qty,orderDescription:order.product.name,barcode:sku});
-  }catch{return res.status(503).json({error:'The connected Test could not be confirmed.'});}
+  }catch{console.warn('connected_test_held',JSON.stringify({phase,upstreamStatus}));return res.status(503).json({error:'The connected Test could not be confirmed.',stage:phase,upstreamStatus});}
  };
 }
 export default createConnectedStorefrontProof();
