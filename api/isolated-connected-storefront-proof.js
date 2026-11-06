@@ -18,6 +18,11 @@ export function createConnectedStorefrontProof({env=process.env,authenticate=req
  return async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   if(env.VERCEL_ENV!=='preview'||env.VERCEL_PROJECT_ID!=='prj_tKIHSgHSenXJuEf8DdpKUYPVZhnu'||env.VERCEL_GIT_COMMIT_REF!=='codex/isolated-storefront-workflow-20261106'||req.method!=='GET'||req.url!=='/api/isolated-connected-storefront-proof'||!/^protoportal-main-[a-z0-9-]+-proto-team\.vercel\.app$/.test(String(req.headers.host||'')))return res.status(404).json({error:'Test unavailable'});
+  if(String(req.headers.accept||'').includes('text/html')){
+   res.setHeader('Content-Type','text/html; charset=utf-8');
+   res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
+   return res.status(200).send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connected Test</title></head><body><h1>Connected storefront Test</h1><p>Sign in using the storefront Test page first. This reads one synthetic product and places no order.</p><button id="check">Run connected Test</button><p id="status" role="status"></p><script>document.getElementById('check').onclick=async()=>{const status=document.getElementById('status');status.textContent='Checking…';try{const s=JSON.parse(localStorage.getItem('sb-kyodrsqnmihwoplkhwwf-auth-token')||'null');if(!s?.access_token)throw Error('Sign in on this preview first.');const r=await fetch(location.pathname,{headers:{Authorization:'Bearer '+s.access_token,Accept:'application/json'},cache:'no-store'});const data=await r.json();if(!r.ok||data.confirmed!==true)throw Error('Connected Test could not be confirmed.');status.textContent='Connected Test passed: '+data.description;}catch(e){status.textContent=e.message||'Connected Test could not be confirmed.';}};</script></body></html>`);
+  }
   try{
    const user=await authenticate(req,res);if(!user)return;
    if(!owners.has(String(user.email||'').trim().toLowerCase())||!/^Bearer [A-Za-z0-9._-]{20,8192}$/.test(req.headers.authorization||''))return res.status(403).json({error:'Owner account required'});
