@@ -1,0 +1,8 @@
+// Never-merge owner-only Test page. Credentials stay in the normal auth flow.
+import {getSession,signIn} from './lib/auth.js';
+const form=document.querySelector('#login'),button=document.querySelector('#check'),status=document.querySelector('#status');
+async function showSession(){const session=await getSession();form.hidden=!!session;button.hidden=!session;return session;}
+form.addEventListener('submit',async event=>{event.preventDefault();status.textContent='Signing in…';try{await signIn(document.querySelector('#email').value,document.querySelector('#password').value);document.querySelector('#password').value='';await showSession();status.textContent='Signed in. You can check the connection.';}catch{status.textContent='Sign-in could not be confirmed.';}});
+button.addEventListener('click',async()=>{button.disabled=true;status.textContent='Checking the read-only connection…';try{const session=await getSession();if(!session?.access_token)throw Error();const response=await fetch('/api/instore-editor-source?sku=KBRA3006',{headers:{Authorization:`Bearer ${session.access_token}`},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(60000)});const data=await response.json();if(!response.ok||data.complete!==true||!Array.isArray(data.rows)||data.rows.length!==1||data.rows[0].sku!=='KBRA3006')throw Error();status.textContent='Storefront owner connection passed for KBRA3006. No stock or products were changed.';}catch{status.textContent='The storefront connection could not be confirmed.';}finally{button.disabled=false;}});
+showSession().catch(()=>{status.textContent='The session could not be confirmed.';});
+
