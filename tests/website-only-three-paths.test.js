@@ -5,6 +5,7 @@ import {loadLiveInstoreCatalogue,createExtendedRangeHandler} from '../api/extend
 import {readFreshInstoreStock,createStockHandler} from '../api/stock.js';
 import {resolveInstorePrices,detectUnflaggedInstoreSkus,resolveAuthoritativePrices} from '../api/send-order.js';
 import {createWebsiteOnlyProvider} from '../api/_website-only-provider.js';
+import {applyWebsiteMetadata} from '../api/_instore-website-metadata.js';
 
 const sku='TEST-SAR-001';
 const row={sku,barcode:sku,title:'TEST DRUM',original_description:'TEST DRUM',price:11.5,available_stock:19,
@@ -38,7 +39,7 @@ test('website-only row traverses actual catalogue, fresh stock and order-resolut
   const stock=await readFreshInstoreStock(sku,{websiteOnlyRows:[row],indexClient:db,fetchBridge});
   assert.equal(stock.qty,19);assert.equal(stock.unitsOfIssue,'EACH');
   const result=await resolveInstorePrices([{qty:1,preference:'Blue',product:{sku,isExtendedRange:true,price:0.01}}],{websiteOnlyRows:[row],index:db,fetchBridge});
-  assert.equal(result[0].product.sku,sku);assert.equal(result[0].product.price,11.5);assert.equal(result[0].preference,'Blue');
+  assert.equal(result[0].product.sku,sku);assert.equal(result[0].product.name,'TEST DRUM');assert.equal(result[0].product.price,11.5);assert.equal(result[0].preference,'Blue');
   const recovered=await detectUnflaggedInstoreSkus([{product:{sku,code:sku}}],db,{websiteOnlyRows:[row]});
   assert.equal(recovered.has(sku),true);
   assert.deepEqual(row,original);
@@ -46,6 +47,32 @@ test('website-only row traverses actual catalogue, fresh stock and order-resolut
   if(oldUrl===undefined)delete process.env.STOCK_SQL_BRIDGE_URL;else process.env.STOCK_SQL_BRIDGE_URL=oldUrl;
   if(oldKey===undefined)delete process.env.STOCK_SQL_BRIDGE_KEY;else process.env.STOCK_SQL_BRIDGE_KEY=oldKey;
  }
+});
+
+test('website metadata crosses catalogue, stock and order paths without changing source stock, SKU or price',async()=>{
+ const metadataProvider=async()=>({complete:true,overlays:[{sku,description:'Edited website drum',barcode:sku}]});
+ const db=client(tables()),original=structuredClone(row),bridgeEnv={STOCK_SQL_BRIDGE_URL:'https://test.invalid',STOCK_SQL_BRIDGE_KEY:'synthetic'};
+ const browse=await loadLiveInstoreCatalogue(db,{websiteOnlyRows:[row],metadataProvider});
+ assert.equal(browse.products.length,1);assert.equal(browse.products[0].sku,sku);
+ assert.equal(browse.products[0].title,'Edited website drum');assert.equal(browse.products[0].barcode,sku);assert.equal(browse.products[0].code,sku);
+ const stock=await readFreshInstoreStock(sku,{websiteOnlyRows:[row],metadataProvider,indexClient:db,fetchBridge,bridgeEnv});
+ assert.equal(stock.qty,19);
+ const [order]=await resolveInstorePrices([{qty:1,product:{sku,isExtendedRange:true}}],{websiteOnlyRows:[row],metadataProvider,index:db,fetchBridge,bridgeEnv});
+ assert.equal(order.product.sku,sku);assert.equal(order.product.code,sku);assert.equal(order.product.name,'Edited website drum');assert.equal(order.product.price,11.5);
+ assert.deepEqual(row,original);
+});
+
+test('incomplete website metadata fails closed in all three paths',async()=>{
+ const metadataProvider=async()=>({complete:false,overlays:[]}),db=client(tables());
+ await assert.rejects(loadLiveInstoreCatalogue(db,{websiteOnlyRows:[row],metadataProvider}),/metadata unavailable/);
+ await assert.rejects(readFreshInstoreStock(sku,{websiteOnlyRows:[row],metadataProvider,indexClient:db,fetchBridge}),/metadata unavailable/);
+ await assert.rejects(resolveInstorePrices([{qty:1,product:{sku,isExtendedRange:true}}],{websiteOnlyRows:[row],metadataProvider,index:db,fetchBridge}),/could not be verified/);
+});
+
+test('description overrides cannot alter a source barcode',async()=>{
+ const provider=async()=>({complete:true,overlays:[{sku,description:'Edited drum',barcode:'ALT-123'}]});
+ await assert.rejects(applyWebsiteMetadata([row],provider),/barcode does not match source/);
+ assert.equal(row.barcode,sku);
 });
 
 test('index collisions are rejected and browsing respects removal controls',async()=>{
@@ -146,3 +173,4 @@ test('real authenticated browse and stock handlers use the provider with read-on
   const [resolved]=await resolveAuthoritativePrices([{qty:1,product:{sku,isExtendedRange:true}}],{websiteOnlyProvider:provider,index:db,fetchBridge});assert.equal(resolved.product.price,11.5);
  } finally {if(oldUrl===undefined)delete process.env.STOCK_SQL_BRIDGE_URL;else process.env.STOCK_SQL_BRIDGE_URL=oldUrl;if(oldKey===undefined)delete process.env.STOCK_SQL_BRIDGE_KEY;else process.env.STOCK_SQL_BRIDGE_KEY=oldKey;}
 });
+

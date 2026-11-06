@@ -1,5 +1,7 @@
 import { isSarongiRequestSku, sarongiRequestAvailability } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
+import { applyWebsiteMetadata } from './_instore-website-metadata.js';
+import { websiteMetadataRuntime } from './_instore-website-metadata-runtime.js';
 import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { createStockClient } from '../lib/stock-supabase.mjs';
@@ -41,7 +43,7 @@ export function validateInstoreBridgeStock(sku, row) {
   return { ...positillUnitObservation(sku, row), qty, availability: qty > 0 ? { state: 'in_stock', label: 'In stock', canOrder: true } : { state: 'out_of_stock', label: 'Out of stock', canOrder: false } };
 }
 
-export async function readFreshInstoreStock(sku, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, indexClient = stockClient(), fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+export async function readFreshInstoreStock(sku, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, metadataProvider = null, indexClient = stockClient(), fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus:[sku]})).rows;
   const { data, error } = await indexClient.from('extended_range_items')
     .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
@@ -62,7 +64,8 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
     const duplicate=evaluateInstoreDuplicate({sku,barcode:sku},{status:'success',complete:true,variantsIncluded:true,checkedIdentifiers:[sku],rows:[...(bySku.data||[]),...(byBarcode.data||[])]});
     if (duplicate.decision!=='eligible'||(controls.data||[]).some(row=>String(row.status).toLowerCase()==='hidden')) return null;
   }
-  const product = buildExtendedRangeProducts(mergeWebsiteOnlyIndex(data || [],extra), '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
+  const indexed=await applyWebsiteMetadata(mergeWebsiteOnlyIndex(data || [],extra),metadataProvider);
+  const product = buildExtendedRangeProducts(indexed, '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
   if (!product) return null;
   const base = String(bridgeEnv.STOCK_SQL_BRIDGE_URL || '').trim().replace(/\/$/, '');
   const key = String(bridgeEnv.STOCK_SQL_BRIDGE_KEY || '').trim();
@@ -75,7 +78,7 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
   return { ...current, availability: sarongiRequestAvailability(sku, current.availability) };
 }
 
-export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env}={}) {
+export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,metadataProvider=null,fetchBridge=fetch,bridgeEnv=process.env}={}) {
 return async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -135,7 +138,7 @@ return async function handler(req, res) {
 
     if (error) throw error;
     if (!data || data.length === 0) {
-      const instore = await readFreshInstoreStock(sku, { includeStaged,websiteOnlyProvider,indexClient:supabase,fetchBridge,bridgeEnv });
+      const instore = await readFreshInstoreStock(sku, { includeStaged,websiteOnlyProvider,metadataProvider,indexClient:supabase,fetchBridge,bridgeEnv });
       if (!instore) return res.status(404).json({ error: 'SKU not found' });
       return res.status(200).json({ ...instore, sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
     }
@@ -164,4 +167,5 @@ return async function handler(req, res) {
 }
 }
 
-export default createStockHandler({websiteOnlyProvider:runtimeWebsiteOnlyProvider});
+export default createStockHandler({websiteOnlyProvider:runtimeWebsiteOnlyProvider,metadataProvider:websiteMetadataRuntime()});
+

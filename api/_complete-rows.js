@@ -5,8 +5,8 @@ export const MAX_COMPLETE_CATALOGUE_ROWS = 100_000;
 
 // Read every page before making an eligibility decision. A partial normal
 // catalogue read would make the "not already on main site" rule unsafe.
-export async function readCompleteRows(makeQuery, { allowChangingCount = false } = {}) {
-  const page = (offset) => makeQuery().order('sku', { ascending: true }).range(offset, offset + 999);
+export async function readCompleteRows(makeQuery, { allowChangingCount = false, orderColumn = 'sku' } = {}) {
+  const page = (offset) => makeQuery().order(orderColumn, { ascending: true }).range(offset, offset + 999);
   const first = await page(0);
   if (first.error) throw new Error(`Catalogue lookup incomplete: ${first.error.message || 'initial query failed'}`);
   if (!Array.isArray(first.data)) throw new Error('Catalogue lookup incomplete: initial data was not an array');
@@ -29,3 +29,4 @@ export async function readCompleteRows(makeQuery, { allowChangingCount = false }
   if (!allowChangingCount && rows.length !== first.count) throw new Error('Catalogue lookup truncated');
   return rows;
 }
+

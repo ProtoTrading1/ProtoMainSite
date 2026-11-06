@@ -9,6 +9,8 @@ import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/cata
 import path from 'node:path';
 import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
+import { applyWebsiteMetadata } from './_instore-website-metadata.js';
+import { websiteMetadataRuntime } from './_instore-website-metadata-runtime.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { resolveOrderNotifyRecipients } from './_order-email-recipients.js';
 import { runOrderTeamNotify } from './_order-notify-core.js';
@@ -306,11 +308,11 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
   if (item.product.unitsOfIssueVerified===true && normalizeUnitsOfIssue(item.product.unitsOfIssue, '')!==unit.unitsOfIssue) {
     throw orderError(`${title} (${sku}) has a changed Positill selling unit. Review this item before ordering.`,409);
   }
-  const name = bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
+  const name = indexRow.websiteDescriptionOverride === true ? title : bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
   return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), ...unit, casePack: sellingUnitDetails(unit.unitsOfIssue).label, packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
-export async function resolveInstorePrices(items, { websiteOnlyRows = [], websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+export async function resolveInstorePrices(items, { websiteOnlyRows = [], websiteOnlyProvider = null, metadataProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (!items.length) return [];
   const itemSkus = items.map((item) => textId(item?.product?.sku || item?.product?.id));
   if (itemSkus.some((sku) => !sku)) throw orderError('Each Instore order line needs a product code.');
@@ -326,7 +328,7 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
     ]);
     if (indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error) throw indexResult.error || normalSkuResult.error || normalBarcodeResult.error || listingResult.error;
-    indexRows = mergeWebsiteOnlyIndex(indexResult.data || [], websiteOnlyRows.filter(row=>skus.includes(textId(row.sku))));
+    indexRows = await applyWebsiteMetadata(mergeWebsiteOnlyIndex(indexResult.data || [], websiteOnlyRows.filter(row=>skus.includes(textId(row.sku)))),metadataProvider);
     normalRows = [...(normalSkuResult.data || []), ...(normalBarcodeResult.data || [])];
     listingControls = new Map((listingResult.data || []).map((row) => [textId(row.sku), String(row.status || '').trim().toLowerCase()]));
   } catch (error) {
@@ -567,7 +569,7 @@ export async function detectUnflaggedInstoreSkus(items, client = null, { website
   }
 }
 
-export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, metadataProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
   const detectedInstore = await (classify ? classify(items) : detectUnflaggedInstoreSkus(items,index,{websiteOnlyProvider}));
   const isInstore = (item) => item?.product?.isExtendedRange === true
@@ -576,7 +578,7 @@ export async function resolveAuthoritativePrices(items, { classify = null, websi
   const standardItems = items.filter((item) => !isInstore(item));
   let resolvedInstore; let resolvedStandard;
   try {
-    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems,{websiteOnlyProvider,index,fetchBridge,bridgeEnv}), resolveStandardPrices(standardItems)]);
+    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems,{websiteOnlyProvider,metadataProvider,index,fetchBridge,bridgeEnv}), resolveStandardPrices(standardItems)]);
   } catch (error) {
     // Line numbers inside each resolver count only that group; report the
     // basket's own line number to the customer.
@@ -1795,4 +1797,5 @@ export function createSendOrderHandler(overrides = {}) {
 
 }
 
-export default createSendOrderHandler({resolveAuthoritativePrices:items=>resolveAuthoritativePrices(items,{websiteOnlyProvider:runtimeWebsiteOnlyProvider})});
+export default createSendOrderHandler({resolveAuthoritativePrices:items=>resolveAuthoritativePrices(items,{websiteOnlyProvider:runtimeWebsiteOnlyProvider,metadataProvider:websiteMetadataRuntime()})});
+
