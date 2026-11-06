@@ -1,12 +1,12 @@
 // NEVER MERGE. This proof reads one synthetic record through the protected
-// Admin Test endpoint. It cannot select a host, SKU, or storage destination.
+// Test-only storage RPC. It cannot select a host, SKU, or storage destination.
 import {requireAuth} from './_auth.js';
 import {loadLiveInstoreCatalogue} from './extended-range.js';
 import {readFreshInstoreStock} from './stock.js';
 import {resolveInstorePrices} from './send-order.js';
 
 const sku='TEST-ONLY-001';
-const adminUrl='https://protoportal-admin-6uy7t4b23-proto-team.vercel.app/api/isolated-storefront-proof';
+const testUrl='https://pyrwimlmmruxtuxhdsom.supabase.co/rest/v1/rpc/codex_synthetic_storefront_read_20261107';
 const owners=new Set(['danieljoffeinfo@gmail.com','george@proto.co.za','online@proto.co.za']);
 const row={sku,barcode:sku,title:'Synthetic bracelet',original_description:'Synthetic bracelet',price:11.5,available_stock:19,category:'Test',image_url:'https://example.test/test.jpg',image_source:'nutstore',image_review_status:'verified',visibility_status:'search_only',is_active:true};
 const bridge={CODE:sku,DESCR:'Synthetic bracelet',UNITS:'EACH',PRICE_A:10,ONHAND:20,BOOKED:1};
@@ -27,7 +27,9 @@ export function createConnectedStorefrontProof({env=process.env,authenticate=req
   try{
    const user=await authenticate(req,res);if(!user)return;
    if(!owners.has(String(user.email||'').trim().toLowerCase())||!/^Bearer [A-Za-z0-9._-]{20,8192}$/.test(req.headers.authorization||''))return res.status(403).json({error:'Owner account required'});
-   phase='admin-read';const response=await transport(adminUrl,{method:'GET',headers:{authorization:req.headers.authorization},redirect:'manual',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});upstreamStatus=response.status??null;
+   const capability=String(env.PROTO_ISOLATED_TEST_READ_TOKEN||''),key=String(env.PROTO_ISOLATED_TEST_ANON_KEY||'');
+   if(!/^[a-f0-9]{64}$/.test(capability)||!key)throw Error('Test binding unavailable');
+   phase='test-storage-read';const response=await transport(testUrl,{method:'POST',headers:{apikey:key,...(key.startsWith('sb_publishable_')?{}:{authorization:`Bearer ${key}`}), 'content-type':'application/json'},body:JSON.stringify({p_token:capability}),redirect:'manual',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(30000)});upstreamStatus=response.status??null;
    if(!response.ok)throw Error('Test source unavailable');
    const raw=await response.text();if(raw.length>8192)throw Error('Test response too large');
    phase='test-record';const product=JSON.parse(raw)?.product;
