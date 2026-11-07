@@ -15,6 +15,7 @@ import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailabilit
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import './ProductCard.css';
+import ProductFeedbackPrompt from './ProductFeedbackPrompt';
 
 function productBarcode(product) {
   const explicitBarcode = String(
@@ -995,6 +996,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                     />
                   </div>
                 )}
+
+                <ProductFeedbackPrompt product={activeProduct} />
               </div>
 
               {/* Fixed buy bar */}
