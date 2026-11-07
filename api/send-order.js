@@ -418,6 +418,7 @@ async function resolveStandardPrices(items) {
 
   const reviewChanges = [];
   const requestedBySku = new Map();
+  const requestedByBarcode = new Map();
   const authItems = items.map((item, index) => {
     const product = item.product || {};
     const sku = String(product.sku || product.id || '').trim().toUpperCase();
@@ -442,6 +443,18 @@ async function resolveStandardPrices(items) {
     const aggregate = requestedBySku.get(aggregateKey) || { qty: 0, row, availability, toOrder, submittedSnapshot: product.checkoutSnapshot || {} };
     aggregate.qty += qty;
     requestedBySku.set(aggregateKey, aggregate);
+    // Distinct website variants can point at one Positill product. Their
+    // capped quantities must not each consume the full shared balance.
+    const sharedBarcode = textId(row.barcode).toUpperCase();
+    if (sharedBarcode && !toOrder && !isLandedStockAvailable(availability)) {
+      const group=requestedByBarcode.get(sharedBarcode)||{qty:0,stockQty:null,hasUnknown:false,variants:new Map(),units:new Set()};
+      const stock=normaliseStockQty(availability.stockQty);
+      group.qty+=qty;group.hasUnknown||=stock===null;
+      if(stock!==null)group.stockQty=group.stockQty===null?stock:Math.min(group.stockQty,stock);
+      group.variants.set(aggregateKey,{row,snapshot:product.checkoutSnapshot||{}});
+      group.units.add(normalizeUnitsOfIssue(row.units_of_issue||'EACH'));
+      requestedByBarcode.set(sharedBarcode,group);
+    }
     const review = evaluateCheckoutSnapshot({
       sku: row.sku,
       name: cleanText(row.title, `Product on line ${index + 1}`),
@@ -509,6 +522,20 @@ async function resolveStandardPrices(items) {
       for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
     } else if (aggregateReview) {
       reviewChanges.push(aggregateReview);
+    }
+  }
+
+  for (const group of requestedByBarcode.values()) {
+    if(group.variants.size>1 && group.units.size>1){
+      const error=new Error('These product options have different selling units and need to be checked before ordering.');
+      error.status=409;error.code='SHARED_STOCK_UNIT_MISMATCH';throw error;
+    }
+    if (group.variants.size<2 || (!group.hasUnknown && group.stockQty!==null && group.qty<=group.stockQty)) continue;
+    for (const {row,snapshot} of group.variants.values()) {
+      const change=evaluateCheckoutSnapshot({sku:row.sku,name:cleanText(row.title,row.sku),quantity:group.qty,submittedSnapshot:snapshot,currentPrice:customerFacingCataloguePrice(Number(row.price)),currentStockQty:group.hasUnknown?null:group.stockQty});
+      const existing=reviewChanges.find(entry=>textId(entry.sku)===textId(row.sku));
+      if(existing)Object.assign(existing,{requestedQty:group.qty,quantityExceedsStock:true});
+      else if(change)reviewChanges.push(change);
     }
   }
 
@@ -1796,3 +1823,4 @@ export function createSendOrderHandler(overrides = {}) {
 }
 
 export default createSendOrderHandler({resolveAuthoritativePrices:items=>resolveAuthoritativePrices(items,{websiteOnlyProvider:runtimeWebsiteOnlyProvider})});
+
