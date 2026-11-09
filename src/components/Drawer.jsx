@@ -124,6 +124,8 @@ export default function Drawer({
   priceChanges = [],
   onDismissPriceChanges,
   onRetryCartSync,
+  onResolveCartConflict,
+  cartConflict = false,
   cartReady = true,
   onClose,
   onContinueShopping,
@@ -392,7 +394,9 @@ export default function Drawer({
             <span>{cartSyncIssue?.detail || 'We cannot confirm this basket on your account. Retry before switching devices.'}</span>
             {cartSyncIssue?.code && <span>Support code: {cartSyncIssue.code}</span>}
           </div>
-          <button type="button" onClick={onRetryCartSync}>Retry sync</button>
+          {cartConflict
+            ? <button type="button" onClick={onResolveCartConflict}>Keep these items and sync</button>
+            : <button type="button" onClick={onRetryCartSync}>Retry sync</button>}
         </div>
       )}
 
@@ -492,11 +496,15 @@ export default function Drawer({
             <div style={{ width: `${progress}%` }} />
           </div>
         </div>
-        {syncFailed ? (
+        {syncFailed ? (cartConflict ? (
+          <button className="primary-order-button" type="button" onClick={onResolveCartConflict}>
+            Keep these items and sync
+          </button>
+        ) : (
           <button className="primary-order-button" type="button" onClick={onRetryCartSync}>
             Retry account basket sync
           </button>
-        ) : basketLoading ? (
+        )) : basketLoading ? (
           <button className="primary-order-button" type="button" disabled>
             <Loader2 size={17} className="spin" />
             Loading account basket…
