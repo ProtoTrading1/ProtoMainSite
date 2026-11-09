@@ -4,6 +4,7 @@ import {
   readPendingCart,
   writePendingCart,
   clearPendingCart,
+  backupCartConflict,
 } from '../src/lib/cartSyncJournal.mjs';
 
 function memoryStorage() {
@@ -102,4 +103,38 @@ test('clear removes only the requested account journal and leaves other storage 
   assert.equal(storage.getItem('proto_cart'), 'synthetic-device-basket');
   clearPendingCart(storage, accountA);
   assert.equal(storage.getItem(key(accountB)), otherAccountBefore);
+});
+
+test('conflict recovery keeps separate full local and remote baskets without combining colour preferences', () => {
+  const storage = memoryStorage();
+  const local = { items: saveOperation().items, activityAt };
+  const remote = { items: [{ product: { id: 'REMOTE-ONLY' }, qty: 2 }], revision: 9, activityAt: activityAt - 100 };
+  assert.equal(backupCartConflict(storage, accountA, local, remote), true);
+  // Observe the saved values through the storage boundary, including multiple
+  // recoveries at the same millisecond and a different account.
+  let writes = [];
+  const recordingStorage = { ...storage, setItem(k, v) { writes.push([k, v]); storage.setItem(k, v); } };
+  assert.equal(backupCartConflict(recordingStorage, accountA, local, remote), true);
+  assert.equal(backupCartConflict(recordingStorage, accountA, local, remote), true);
+  assert.equal(backupCartConflict(recordingStorage, accountB, local, remote), true);
+  assert.equal(new Set(writes.map(([k]) => k)).size, 3);
+  for (const [k, raw] of writes) {
+    const copy = JSON.parse(raw);
+    assert.deepEqual(copy.local, local);
+    assert.deepEqual(copy.remote, remote);
+    assert.ok(k.startsWith(`proto_cart_recovery_${copy.accountId}_`));
+    clearPendingCart(storage, copy.accountId);
+    assert.equal(storage.getItem(k), raw);
+  }
+});
+
+test('conflict recovery refuses a missing backup or invalid remote revision', () => {
+  const local = { items: saveOperation().items, activityAt };
+  const remote = { items: [], revision: 7 };
+  const full = { getItem() { return null; }, setItem() { throw new Error('QuotaExceeded'); } };
+  assert.equal(backupCartConflict(full, accountA, local, remote), false);
+  const storage = memoryStorage();
+  for (const revision of [-1, undefined, '7', 1.5]) {
+    assert.equal(backupCartConflict(storage, accountA, local, { ...remote, revision }), false);
+  }
 });

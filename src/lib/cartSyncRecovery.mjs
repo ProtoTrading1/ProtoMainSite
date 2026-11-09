@@ -5,7 +5,7 @@ export function cartSyncFailure(error) {
   let detail = 'We cannot confirm this basket on your account. Retry before switching devices.';
   if (status === 409) {
     code = 'cart_conflict';
-    detail = 'Another device saved a different basket. Your unsaved copy is kept on this device. Contact Proto before replacing either basket.';
+    detail = 'Your account has a different saved basket. Choose “Keep these items and sync” to save the items and quantities shown here to your account. A recovery copy of both baskets will be kept on this device.';
   } else if (error?.code === 'cart_timeout') {
     code = 'cart_timeout';
     detail = 'The basket connection timed out. Your items remain on this device. Retry sync without clearing your basket.';

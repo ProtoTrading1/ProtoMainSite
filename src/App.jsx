@@ -44,7 +44,7 @@ import { useLiveTaxonomy } from './lib/useLiveTaxonomy';
 import { scrollToTop, scrollToTopSmooth } from './lib/scrollToTop';
 import { cartFingerprint, clearAccountCart, getAccountCart, mergeAccountCart, saveAccountCart } from './lib/accountCart';
 import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
-import { readPendingCart, writePendingCart, clearPendingCart } from './lib/cartSyncJournal.mjs';
+import { readPendingCart, writePendingCart, clearPendingCart, backupCartConflict } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { TURTLE_BRACELET_COLOURS, withTurtleBraceletPhoto } from '../lib/kbra2013-colours.mjs';
 import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
@@ -325,6 +325,7 @@ export default function App({
   const [cartClock, setCartClock] = useState(0);
   const [cartSyncStatus, setCartSyncStatus] = useState('loading');
   const [cartSyncIssue, setCartSyncIssue] = useState(null);
+  const [cartHasConflict, setCartHasConflict] = useState(false);
   const [cartHydrated, setCartHydrated] = useState(false);
   const [cartPreviewMode, setCartPreviewMode] = useState(false);
   const [flyAnim, setFlyAnim] = useState(null);
@@ -530,6 +531,7 @@ export default function App({
           || currentCartRef.current.activityAt !== dispatchedActivityAt;
         if (hasNewerLocalIntent()) {
           cartConflictRef.current = true;
+          setCartHasConflict(true);
           setCartSyncIssue(cartSyncFailure(error));
           setCartSyncStatus('error');
           return;
@@ -538,6 +540,7 @@ export default function App({
         if (cartAccountRef.current !== accountId) return;
         if (hasNewerLocalIntent()) {
           cartConflictRef.current = true;
+          setCartHasConflict(true);
           setCartSyncIssue(cartSyncFailure(error));
           setCartSyncStatus('error');
           return;
@@ -564,6 +567,7 @@ export default function App({
           acknowledged = true;
         } else {
           cartConflictRef.current = true;
+          setCartHasConflict(true);
           pendingCartSyncRef.current ||= operation;
           setCartSyncIssue(cartSyncFailure(error));
           setCartSyncStatus('error');
@@ -658,6 +662,7 @@ export default function App({
     cartAccountRef.current = uid;
     cartHydratedRef.current = false;
     cartConflictRef.current = false;
+    setCartHasConflict(false);
     cartAutomaticRetryBlockedRef.current = false;
     cartPreviewModeRef.current = false;
     setCartPreviewMode(false);
@@ -720,6 +725,7 @@ export default function App({
           setCartHydrated(true);
           if (accountCart.revision !== pendingDraft.baseRevision) {
             cartConflictRef.current = true;
+            setCartHasConflict(true);
             setCartSyncIssue(cartSyncFailure({ status: 409 }));
             setCartSyncStatus('error');
           } else {
@@ -906,6 +912,49 @@ export default function App({
       cartRefreshInFlightRef.current = false;
     }
   }, []);
+
+  const cartConflictRecoveryRef = useRef(false);
+  const resolveCartConflict = useCallback(async () => {
+    const accountId = cartAccountRef.current;
+    if (!accountId || !cartConflictRef.current || cartConflictRecoveryRef.current
+      || cartSyncInFlightRef.current || cartPreviewModeRef.current) return;
+    cartConflictRecoveryRef.current = true;
+    setCartSyncStatus('saving');
+    try {
+      // Read the current revision immediately before the customer's chosen
+      // replacement. The server still rejects any intervening write with 409.
+      const remote = await getAccountCart();
+      if (cartAccountRef.current !== accountId) return;
+      const latest = currentCartRef.current;
+      const operation = makeCartSyncOperation(accountId, latest.items, latest.activityAt,
+        cartClearActivityAtRef.current, 'normal');
+      operation.baseRevision = remote.revision;
+      if (!backupCartConflict(localStorage, accountId, latest, remote)
+        || !writePendingCart(localStorage, accountId, operation, remote.revision)) {
+        setCartSyncIssue({ code: 'cart_backup', detail: 'We could not keep a recovery copy on this device. Your items are still here. Free some browser storage, then try keeping these items again, or contact Proto.' });
+        setCartSyncStatus('error');
+        return;
+      }
+      cartRevisionRef.current = remote.revision;
+      lastSavedCartRef.current = cartFingerprint(remote.items);
+      pendingCartSyncRef.current = operation;
+      cartRestoreFingerprintRef.current = null;
+      cartClearIntentRef.current = 'normal';
+      cartConflictRef.current = false;
+      setCartHasConflict(false);
+      cartAutomaticRetryBlockedRef.current = false;
+      cartSyncRetryCountRef.current = 0;
+      setCartSyncIssue(null);
+      setCartAnnouncement('Both baskets have a recovery copy on this device. Saving the items shown here to your account.');
+      scheduleCartSync(0);
+    } catch (error) {
+      if (cartAccountRef.current !== accountId) return;
+      setCartSyncIssue(cartSyncFailure(error));
+      setCartSyncStatus('error');
+    } finally {
+      cartConflictRecoveryRef.current = false;
+    }
+  }, [scheduleCartSync]);
 
   const retryCartSync = useCallback(() => {
     if (!customer?.id) return;
@@ -2456,6 +2505,8 @@ export default function App({
             priceChanges={cartPriceChanges}
             onDismissPriceChanges={() => setCartPriceChanges([])}
             onRetryCartSync={retryCartSync}
+            onResolveCartConflict={resolveCartConflict}
+            cartConflict={cartHasConflict}
             cartReady={cartHydrated}
             onClose={() => closeDesktopCart({ restoreFocus: cartDrawerOpen })}
             onContinueShopping={() => closeDesktopCart({ restoreFocus: true })}
@@ -2578,6 +2629,8 @@ export default function App({
                 priceChanges={cartPriceChanges}
                 onDismissPriceChanges={() => setCartPriceChanges([])}
                 onRetryCartSync={retryCartSync}
+                onResolveCartConflict={resolveCartConflict}
+                cartConflict={cartHasConflict}
                 cartReady={cartHydrated}
                 onContinueShopping={() => setMobileCartOpen(false)}
                 revealItemRequest={cartRevealRequest}

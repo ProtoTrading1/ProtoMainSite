@@ -202,7 +202,9 @@ test('edit while restore is in flight survives 409 and blocks further writes', a
     await expectLocalQuantity(page, drawer, 16);
     await expect(drawer.locator(`[data-cart-product-id="${remoteItems[0].product.id}"]`)).toHaveCount(0);
     await expect(drawer.getByRole('button', { name: 'Review order request', exact: true })).toHaveCount(0);
-    await drawer.getByRole('button', { name: 'Retry account basket sync', exact: true }).dispatchEvent('click');
+    // A conflict now offers an explicit basket choice. Merely focusing the
+    // page must still never replace the account basket without that choice.
+    await expect(drawer.getByRole('button', { name: 'Keep these items and sync', exact: true })).toHaveCount(2);
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await page.clock.runFor(3500);
     expect(mutations).toHaveLength(2);
