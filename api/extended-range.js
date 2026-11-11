@@ -146,19 +146,26 @@ async function readInstoreListingControls(client) {
   return new Map((data || []).map((row) => [String(row?.sku || '').trim().toUpperCase(), String(row?.status || '').trim()]));
 }
 
-async function readPrivateReviewGalleries(client) {
+export async function readPrivateReviewGalleries(client, {timeoutMs = 1500} = {}) {
   if (process.env.PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED !== '1') return [];
+  const controller = new AbortController();
+  let timer;
   try {
-    const rows = await readCompleteRows(() => client.from('private_review_instore_galleries').select('sku, image_urls', {count: 'exact'}));
-    if (!rows.length) return [];
-    const skus = [...new Set(rows.map(row => String(row?.sku || '').trim()).filter(Boolean))];
-    if (!skus.length) return [];
-    const current = await readCompleteRows(() => client.from('extended_range_items').select('sku, image_url', {count: 'exact'}).in('sku', skus));
-    const mainBySku = new Map(current.map(row => [String(row.sku).trim().toUpperCase(), row.image_url]));
-    return rows.map(row => ({...row, current_image: mainBySku.get(String(row.sku).trim().toUpperCase())}));
+    const read = async () => {
+      const rows = await readCompleteRows(() => client.from('private_review_instore_galleries').select('sku, image_urls', {count: 'exact'}).abortSignal(controller.signal));
+      if (!rows.length) return [];
+      const skus = [...new Set(rows.map(row => String(row?.sku || '').trim()).filter(Boolean))];
+      if (!skus.length) return [];
+      const current = await readCompleteRows(() => client.from('extended_range_items').select('sku, image_url', {count: 'exact'}).in('sku', skus).abortSignal(controller.signal));
+      const mainBySku = new Map(current.map(row => [String(row.sku).trim().toUpperCase(), row.image_url]));
+      return rows.map(row => ({...row, current_image: mainBySku.get(String(row.sku).trim().toUpperCase())}));
+    };
+    return await Promise.race([read(), new Promise(resolve => {timer = setTimeout(() => {controller.abort();resolve([]);}, timeoutMs);})]);
   } catch (error) {
     console.error('Instore gallery unavailable:', error?.message || 'query failed');
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 
