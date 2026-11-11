@@ -149,7 +149,13 @@ async function readInstoreListingControls(client) {
 async function readPrivateReviewGalleries(client) {
   if (process.env.PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED !== '1') return [];
   try {
-    return await readCompleteRows(() => client.from('private_review_instore_galleries').select('sku, image_urls', {count: 'exact'}));
+    const rows = await readCompleteRows(() => client.from('private_review_instore_galleries').select('sku, image_urls', {count: 'exact'}));
+    if (!rows.length) return [];
+    const skus = [...new Set(rows.map(row => String(row?.sku || '').trim()).filter(Boolean))];
+    if (!skus.length) return [];
+    const current = await readCompleteRows(() => client.from('extended_range_items').select('sku, image_url', {count: 'exact'}).in('sku', skus));
+    const mainBySku = new Map(current.map(row => [String(row.sku).trim().toUpperCase(), row.image_url]));
+    return rows.map(row => ({...row, current_image: mainBySku.get(String(row.sku).trim().toUpperCase())}));
   } catch (error) {
     console.error('Instore gallery unavailable:', error?.message || 'query failed');
     return [];
