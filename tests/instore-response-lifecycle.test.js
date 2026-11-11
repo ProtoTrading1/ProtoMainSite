@@ -55,14 +55,15 @@ test('unclaimed maintenance schedules nothing and failed responses start no cach
 });
 
 test('actual authenticated API returns eligible products before an unresponsive snapshot-stage RPC', async () => {
-  const envNames = ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'STOCK_SUPABASE_POOLER_URL', 'STOCK_SUPABASE_KEY', 'VERCEL_ENV'];
+  const envNames = ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'STOCK_SUPABASE_POOLER_URL', 'STOCK_SUPABASE_KEY', 'VERCEL_ENV', 'PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED'];
   const saved = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
   const oldFetch = globalThis.fetch;
   const calls = [];
   let releaseStage, notifyStage;
   const stageStarted = new Promise(resolve => { notifyStage = resolve; });
   const heldStage = new Promise(resolve => { releaseStage = resolve; });
-  const source = { sku: '8781830003', image_source: 'nutstore', barcode: '8781830003', title: 'TOOTHPICK 3PC', original_description: 'TOOTHPICK 3PC', price: 9.5, available_stock: 600, category: 'Homeware', image_url: 'https://images.example.test/8781830003.jpg', image_review_status: 'verified', visibility_status: 'search_only', is_active: true };
+  const gallery = Array.from({length: 17}, (_,i) => `https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/existing-review/synthetic/${i}.jpg`);
+  const source = { sku: '8781830003', image_source: 'nutstore', barcode: '8781830003', title: 'TOOTHPICK 3PC', original_description: 'TOOTHPICK 3PC', price: 9.5, available_stock: 600, category: 'Homeware', image_url: gallery[0], image_review_status: 'verified', visibility_status: 'search_only', is_active: true };
   function json(data, count) {
     return new Response(JSON.stringify(data), { status: 200, headers: { 'content-type': 'application/json', ...(count === undefined ? {} : { 'content-range': count ? `0-${count - 1}/${count}` : '*/0' }) } });
   }
@@ -72,6 +73,7 @@ test('actual authenticated API returns eligible products before an unresponsive 
     process.env.STOCK_SUPABASE_POOLER_URL = 'https://yiqsvwajozafvalwcero.supabase.co';
     process.env.STOCK_SUPABASE_KEY = 'sb_secret_SYNTHETIC_RECOVERY_FIXTURE_12345';
     process.env.VERCEL_ENV = 'production';
+    process.env.PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED = '1';
     globalThis.fetch = async (input) => {
       const url = new URL(String(input)); calls.push(url.pathname);
       if (url.pathname === '/auth/v1/user') return json({ id: '00000000-0000-4000-8000-000000000001' });
@@ -81,6 +83,7 @@ test('actual authenticated API returns eligible products before an unresponsive 
       if (url.pathname === '/rest/v1/rpc/instore_catalogue_stage') { notifyStage(); await heldStage; return json(1); }
       if (url.pathname === '/rest/v1/rpc/instore_catalogue_commit') return json({ product_count: 1 });
       if (url.pathname === '/rest/v1/extended_range_items') return json([source], 1);
+      if (url.pathname === '/rest/v1/private_review_instore_galleries') return json([{sku:source.sku,image_urls:gallery}], 1);
       if (['products', 'website_stock', 'instore_image_controls', 'instore_listing_controls'].some(name => url.pathname === `/rest/v1/${name}`)) return json([], 0);
       throw Error(`Unexpected synthetic request: ${url.pathname}`);
     };
@@ -92,6 +95,7 @@ test('actual authenticated API returns eligible products before an unresponsive 
     assert.equal(res.body.products[0].sku, source.sku);
     assert.equal(res.body.products[0].price, 9.5);
     assert.equal(res.body.products[0].stockQty, 600);
+    assert.deepEqual(res.body.products[0].images, gallery);
     assert.equal(res.writes, 1);
     await running;
     releaseStage(); await nextTurn(); await nextTurn();
