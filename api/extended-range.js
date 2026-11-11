@@ -2,6 +2,7 @@ import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
 import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
+import { attachPrivateReviewGalleries } from '../lib/private-review-galleries.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
@@ -143,6 +144,16 @@ async function readInstoreListingControls(client) {
     .select('sku, status');
   if (error) throw new Error(`Instore listing controls unavailable: ${error.message || 'query failed'}`);
   return new Map((data || []).map((row) => [String(row?.sku || '').trim().toUpperCase(), String(row?.status || '').trim()]));
+}
+
+async function readPrivateReviewGalleries(client) {
+  if (process.env.PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED !== '1') return [];
+  try {
+    return await readCompleteRows(() => client.from('private_review_instore_galleries').select('sku, image_urls', {count: 'exact'}));
+  } catch (error) {
+    console.error('Instore gallery unavailable:', error?.message || 'query failed');
+    return [];
+  }
 }
 
 export function applyInstoreImageControls(rows, controls, listingControls = new Map()) {
@@ -435,9 +446,12 @@ return async function handler(req, res) {
     // use only the existing bounded 30-second memory cache in arrival mode.
     const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
     if (stored.body) {
+      const galleries = await readPrivateReviewGalleries(client);
+      const body = {...stored.body, products: attachPrivateReviewGalleries(stored.body.products, galleries)};
+      if (Array.isArray(stored.body.catalogue)) body.catalogue = attachPrivateReviewGalleries(stored.body.catalogue, galleries);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
-      return res.status(200).json({ source: SOURCE_LABEL, ...stored.body });
+      return res.status(200).json({ source: SOURCE_LABEL, ...body });
     }
 
     // One caller rebuilds the stored collection; the rest just serve. Claiming
@@ -459,6 +473,7 @@ return async function handler(req, res) {
       const [imageControls,listingControls]=await Promise.all([readInstoreImageControls(client),readInstoreListingControls(client)]);
       allEligible=allEligible.filter(product=>listingControls.get(product.sku)!=='hidden').map(product=>imageControls.get(product.sku)==='hidden'?{...product,image:'',images:[],imageStatus:'hidden'}:product);
     }
+    allEligible = attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client));
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
     return sendInstoreResponse(res, {
@@ -478,3 +493,4 @@ return async function handler(req, res) {
 }
 
 export default createExtendedRangeHandler({websiteOnlyProvider:runtimeWebsiteOnlyProvider});
+
