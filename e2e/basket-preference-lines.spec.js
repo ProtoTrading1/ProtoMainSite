@@ -73,7 +73,7 @@ test('legacy merged quantity above 9999 stays visible until the customer explici
   const drawer = page.locator('.order-drawer').filter({ visible: true }).first();
   const retained = drawer.getByRole('spinbutton', { name: `Quantity for ${product.code} (Red)`, exact: true });
   await expect(retained).toHaveValue('12000');
-  await expect(drawer.getByText(/reduce by 11990/)).toBeVisible();
+  await expect(drawer.getByText(/11990 subject to confirmation/)).toBeVisible();
   expect(writes.filter((body) => body.mode === 'save')).toHaveLength(0);
   await retained.fill('10');
   await retained.press('Enter');
