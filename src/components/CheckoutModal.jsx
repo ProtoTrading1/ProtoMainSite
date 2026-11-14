@@ -9,9 +9,12 @@ import { validatePromoCode } from '../lib/promoCode';
 import { isWhatsappConsentUnset } from '../lib/whatsappConsent';
 import { productSellingUnit } from '../../lib/positill-selling-unit.mjs';
 import { groupCartItemsByFulfilment } from '../../lib/cart-fulfilment.mjs';
+import { stockAdvisoryForQty } from '../lib/stockAdvisory';
+import { basketProductQuantity } from '../../lib/basket-lines.mjs';
 import { basketLineKey } from '../../lib/basket-lines.mjs';
 
-function CheckoutLine({ item, toOrder = false }) {
+function CheckoutLine({ item, toOrder = false, cartItems = [] }) {
+  const shortage = stockAdvisoryForQty(item.product, basketProductQuantity(cartItems, item.product));
   return (
     <div className={`checkout-review-line${toOrder ? ' checkout-review-line--to-order' : ''}`}>
       <div>
@@ -20,6 +23,7 @@ function CheckoutLine({ item, toOrder = false }) {
           {toOrder && <em className="checkout-to-order-badge">To order</em>}
         </div>
         <span>{item.product.code} · Qty {item.qty} × {productSellingUnit(item.product).label}</span>
+        {shortage.isOverOrder && <span role="note">{shortage.availableStock} in stock; requested quantity exceeds stock by {shortage.shortfall}. You can send this request. Proto will confirm availability before invoicing.</span>}
         {item.preference && <span style={{ overflowWrap: 'anywhere' }}>Preferred colour/design: {item.preference} (subject to availability)</span>}
         {Number(item.product.minQty) > 1
           ? <span>Minimum order: {item.product.minQty} × {productSellingUnit(item.product).label}</span>
@@ -247,15 +251,16 @@ export default function CheckoutModal({
               <strong>Products</strong>
               <span>{cartItems.length} line{cartItems.length === 1 ? '' : 's'}</span>
             </div>
+            <p role="note">Orders are requests. Stock is shared across colour options and may change. Proto will confirm shortages and availability before invoicing; submitting does not guarantee supply or delivery.</p>
             <div className="checkout-review-lines">
               {groupedItems.available.length > 0 && (
                 <section className="checkout-review-group" aria-labelledby="checkout-available-heading">
                   <div className="checkout-review-group-heading" id="checkout-available-heading">
-                    <strong>Available products</strong>
+                    <strong>Products requested</strong>
                     <span>{groupedItems.available.length} line{groupedItems.available.length === 1 ? '' : 's'}</span>
                   </div>
                   {groupedItems.available.map((item) => (
-                    <CheckoutLine item={item} key={basketLineKey(item)} />
+                    <CheckoutLine cartItems={cartItems} item={item} key={basketLineKey(item)} />
                   ))}
                 </section>
               )}
@@ -269,7 +274,7 @@ export default function CheckoutModal({
                     <span>{groupedItems.toOrder.length} line{groupedItems.toOrder.length === 1 ? '' : 's'}</span>
                   </div>
                   {groupedItems.toOrder.map((item) => (
-                    <CheckoutLine item={item} toOrder key={basketLineKey(item)} />
+                    <CheckoutLine cartItems={cartItems} item={item} toOrder key={basketLineKey(item)} />
                   ))}
                   <p className="checkout-to-order-note">
                     We’ll confirm the expected lead time before invoicing. No payment is taken now.
