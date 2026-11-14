@@ -24,7 +24,7 @@ test('checkout keeps available lines first and made-to-order lines last', () => 
 
 test('checkout explains the separated to-order section before submission', () => {
   const checkoutSource = fs.readFileSync(new URL('../src/components/CheckoutModal.jsx', import.meta.url), 'utf8');
-  assert.match(checkoutSource, /Available products/);
+  assert.match(checkoutSource, /Products requested/);
   assert.match(checkoutSource, /Not currently in stock/);
   assert.match(checkoutSource, /lead time confirmed before invoicing/);
   assert.match(checkoutSource, /We’ll confirm the expected lead time before invoicing\. No payment is taken now\./);

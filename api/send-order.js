@@ -29,6 +29,7 @@ import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
 import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
 import { evaluateCheckoutSnapshot, isLandedStockAvailable, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
+import { stockRequestNote } from '../lib/stock-request-note.mjs';
 import { stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import {
@@ -463,17 +464,15 @@ async function resolveStandardPrices(items) {
       submittedSnapshot: product.checkoutSnapshot || {},
       currentPrice: price,
       currentStockQty: normaliseStockQty(availability.stockQty),
+      allowKnownStockRequests: true,
       currentAvailability: availability,
     });
-    if (review) reviewChanges.push(review);
-    if (!availability.canOrder) {
-      // A changed stock snapshot gives the customer the more useful review
-      // alert below. Otherwise preserve the existing unavailable-line error.
-      if (!review) {
-        const error = new Error(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`);
-        error.status = 409;
-        throw error;
-      }
+    if (review && (review.priceChanged || review.stockUnavailable)) reviewChanges.push(review);
+    if (!availability.canOrder && !(availability.state === 'out_of_stock' && normaliseStockQty(availability.stockQty) !== null)) {
+      if (!review) throw orderError(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`, 409);
+      // Unknown stock or disallowed incoming states must not be silently
+      // treated as ordinary known-stock shortages.
+      if (!review.priceChanged && !review.stockUnavailable) throw orderError('This item is not currently eligible for an order request.', 409);
     }
     const minQty = Math.max(1, Math.min(MAX_QTY_PER_LINE, Math.floor(Number(row.min_order_qty) || 1)));
     if (qty < minQty) {
@@ -515,12 +514,12 @@ async function resolveStandardPrices(items) {
     if (stockQty !== null && qty <= stockQty) continue;
     const aggregateReview = evaluateCheckoutSnapshot({
       sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
-      submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+      allowKnownStockRequests: true, submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
     });
     const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
     if (existing.length) {
-      for (const change of existing) Object.assign(change, { requestedQty: qty, quantityExceedsStock: true });
-    } else if (aggregateReview) {
+      for (const change of existing) Object.assign(change, { requestedQty: qty });
+    } else if (aggregateReview && (aggregateReview.priceChanged || aggregateReview.stockUnavailable)) {
       reviewChanges.push(aggregateReview);
     }
   }
@@ -532,10 +531,10 @@ async function resolveStandardPrices(items) {
     }
     if (group.variants.size<2 || (!group.hasUnknown && group.stockQty!==null && group.qty<=group.stockQty)) continue;
     for (const {row,snapshot} of group.variants.values()) {
-      const change=evaluateCheckoutSnapshot({sku:row.sku,name:cleanText(row.title,row.sku),quantity:group.qty,submittedSnapshot:snapshot,currentPrice:customerFacingCataloguePrice(Number(row.price)),currentStockQty:group.hasUnknown?null:group.stockQty});
+      const change=evaluateCheckoutSnapshot({sku:row.sku,name:cleanText(row.title,row.sku),quantity:group.qty,allowKnownStockRequests:true,submittedSnapshot:snapshot,currentPrice:customerFacingCataloguePrice(Number(row.price)),currentStockQty:group.hasUnknown?null:group.stockQty});
       const existing=reviewChanges.find(entry=>textId(entry.sku)===textId(row.sku));
-      if(existing)Object.assign(existing,{requestedQty:group.qty,quantityExceedsStock:true});
-      else if(change)reviewChanges.push(change);
+      if(existing)Object.assign(existing,{requestedQty:group.qty});
+      else if(change && (change.priceChanged || change.stockUnavailable))reviewChanges.push(change);
     }
   }
 
@@ -547,6 +546,17 @@ async function resolveStandardPrices(items) {
     throw error;
   }
 
+  // Preserve every requested quantity. A shortage is an order request for staff
+  // review, not a reservation, stock adjustment, backorder or fulfilment promise.
+  for (const item of authItems) {
+    const aggregate = requestedBySku.get(textId(item.product.sku));
+    const shared = requestedByBarcode.get(textId(item.product.barcode).toUpperCase());
+    const total = shared?.variants.size > 1 ? shared.qty : aggregate.qty;
+    const stock = shared?.variants.size > 1 ? shared.stockQty : normaliseStockQty(aggregate.availability.stockQty);
+    if (!aggregate.toOrder && !isLandedStockAvailable(aggregate.availability) && stock !== null && total > stock) {
+      item.product.stockRequest = { availableQty: stock, requestedQty: total, shortfallQty: total - stock, sharedStock: shared?.variants.size > 1 };
+    }
+  }
   return authItems;
 }
 
@@ -700,7 +710,7 @@ function drawInternalPdfProductRow(doc, item, rowNumber, y, rowHeight = ORDER_PD
   const lineTotal = qty * price;
   const sku = cleanText(product.sku || product.id);
   const unitLabel = sellingUnitDetails(product.unitsOfIssue).label;
-  const productDescription = `${cleanText(product.name, 'Unnamed product')} · ${unitLabel}${sku ? ` [SKU: ${sku}]` : ''}`;
+  const productDescription = `${product.stockRequest ? `STOCK SHORTAGE: ${product.stockRequest.shortfallQty} subject to confirmation. ` : ''}${cleanText(product.name, 'Unnamed product')} · ${unitLabel}${sku ? ` [SKU: ${sku}]` : ''}`;
   const verticalOffset = Math.max(0, (rowHeight - ORDER_PDF_ROW_HEIGHT) / 2);
 
   doc.font('Helvetica').fontSize(9).fillColor('#64748b')
@@ -1034,6 +1044,7 @@ function buildOrderEmailRows(items) {
     const code = escapeHtml(cleanText(product.code, '—'));
     const name = escapeHtml(cleanText(product.name, 'Product'));
     const preference = normalizeItemPreference(item.preference);
+    const stockHtml = stockRequestNote(product) ? `<br><strong style="color:#92400e">${escapeHtml(stockRequestNote(product))}</strong>` : '';
     const preferenceHtml = preference ? `<br><span style="color:#64748b;font-size:11px;font-weight:600;">Preferred colour/design: ${escapeHtml(preference)} (subject to availability)</span>` : '';
     const unitLabel = escapeHtml(sellingUnitDetails(product.unitsOfIssue).label);
     const img = cleanText(product.image || product.remoteImage || '');
@@ -1045,7 +1056,7 @@ function buildOrderEmailRows(items) {
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#94a3b8;font-size:13px;font-weight:700;text-align:center;">${i + 1}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;">${imgCell}</td>
         <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;white-space:nowrap;">${code}</td>
-        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}<br><span style="color:#64748b;font-size:11px;font-weight:600;">Sold as: ${unitLabel}</span>${preferenceHtml}</td>
+        <td style="padding:12px 10px;border-bottom:1px solid #ececec;color:#0f172a;font-size:13px;font-weight:600;line-height:1.4;">${name}<br><span style="color:#64748b;font-size:11px;font-weight:600;">Sold as: ${unitLabel}</span>${preferenceHtml}${stockHtml}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:14px;font-weight:800;text-align:center;">${qty}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#475569;font-size:12px;font-weight:700;text-align:right;white-space:nowrap;">${money(unitPrice)}</td>
         <td style="padding:12px 7px;border-bottom:1px solid #ececec;color:#0f172a;font-size:12px;font-weight:800;text-align:right;white-space:nowrap;">${money(lineTotal)}</td>
@@ -1311,6 +1322,7 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
         unitsOfIssue: normalizeUnitsOfIssue(product.unitsOfIssue || 'EACH'),
         sellingUnit: sellingUnitDetails(product.unitsOfIssue).label,
         packDescription: cleanText(product.packDescription),
+        ...(product.stockRequest ? { stockRequest: product.stockRequest, stockNote: stockRequestNote(product) } : {}),
       };
     });
 
@@ -1325,6 +1337,7 @@ export async function captureOrderRow({ supabase, userId, items, subtotal, deliv
       total_ex_vat: subtotal,
       delivery_method: deliveryMethod,
       ...(customerNotes ? { customer_notes: customerNotes } : {}),
+      ...(items.some(item => item.product?.stockRequest) ? { order_change_notes: items.filter(item => item.product?.stockRequest).map(item => `${item.product.sku}: ${stockRequestNote(item.product)}`).join('\n') } : {}),
       ...(promo?.code ? {
         promo_code: promo.code,
         discount_pct: promo.discountPct,
@@ -1398,6 +1411,7 @@ export function createSendOrderHandler(overrides = {}) {
           code: item.product.code,
           name: item.preference ? `${item.product.name} — ${item.preference}` : item.product.name,
           qty: item.qty,
+          stockNote: stockRequestNote(item.product),
         })),
       });
       pdfSource = 'fulfilment-fallback';

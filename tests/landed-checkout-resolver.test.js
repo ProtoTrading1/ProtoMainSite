@@ -41,15 +41,17 @@ test('authoritative resolver accepts landed negative-POS requests and SKU aliase
 });
 
 test('browser availability cannot grant a request without an authoritative arrived marker', async () => {
-  for (const incoming of [[], [{ ...marker, incoming_qty: 0 }], [{ ...marker, incoming_status: 'partially_received' }], [{ ...marker, incoming_status: 'customs' }]]) {
-    await assert.rejects(() => resolve([item], { incoming }), error => error.code === 'ORDER_REVIEW_REQUIRED' && error.changes[0].quantityExceedsStock);
+  for (const incoming of [[{ ...marker, incoming_status: 'customs' }]]) {
+    await assert.rejects(() => resolve([item], { incoming }), error => error.status === 409);
   }
   await assert.rejects(() => resolve([item], { stock: { ...row, available_stock: null, stock_qty: null } }), { code: 'ORDER_REVIEW_REQUIRED' });
 });
 
-test('positive POS stock keeps aggregate cap and landed requests retain authoritative price review', async () => {
+test('positive POS shortage retains requested quantity and landed requests retain price review', async () => {
   const positive = { ...row, available_stock: 2, stock_qty: 2 };
   const snap = { ...item.product, checkoutSnapshot: { unitPrice: 49.5, stockQty: 2 } };
-  await assert.rejects(() => resolve([{ qty: 2, product: snap }, { qty: 1, product: snap }], { stock: positive }), error => error.code === 'ORDER_REVIEW_REQUIRED' && error.changes[0].requestedQty === 3);
+  const shortage = await resolve([{ qty: 2, product: snap }, { qty: 1, product: snap }], { stock: positive });
+  assert.equal(shortage[0].product.stockRequest.shortfallQty, 1);
+  assert.equal(shortage.reduce((sum, line) => sum + line.qty, 0), 3);
   await assert.rejects(() => resolve([item], { stock: { ...row, price: 50 } }), error => error.code === 'ORDER_REVIEW_REQUIRED' && error.changes[0].priceChanged);
 });

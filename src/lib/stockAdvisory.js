@@ -1,10 +1,7 @@
 import { isSarongiInstoreRequest } from '../../lib/sarongi-instore-requests.mjs';
-// Defensive customer-facing stock advisory. Normal catalogue lines are capped
-// before this helper is reached and validated again by the checkout API. The
-// advisory remains for a restored/stale basket while the customer reviews it.
-//
-// It deliberately shows NO warning for genuine "to order" products, which
-// remain the sole exception to the stock cap.
+// Customer-facing warning for existing baskets. Catalogue add limits are
+// unchanged; checkout accepts known-stock shortages as requests for confirmation.
+// Explicit to-order and in-store request products retain their own messaging.
 
 function canOrderBeyondStock(product) {
   return isSarongiInstoreRequest(product) || product?.toOrder === true
@@ -22,7 +19,7 @@ function availableStockOf(product) {
 
 /**
  * @returns {{ availableStock: number|null, isOverOrder: boolean, shortfall: number }}
- *   isOverOrder is true only when stock is a known positive number, the product
+ *   isOverOrder is true only when stock is a known number, the product
  *   is not "to order"/backorder, and the requested quantity exceeds stock.
  *   shortfall is how many units beyond stock were requested (0 when not over).
  */
@@ -31,12 +28,11 @@ export function stockAdvisoryForQty(product, qty) {
   const requested = Number(qty) || 0;
   if (
     availableStock === null
-    || availableStock <= 0
     || canOrderBeyondStock(product)
-    || requested <= availableStock
+    || requested <= Math.max(0, availableStock)
   ) {
     return { availableStock, isOverOrder: false, shortfall: 0 };
   }
-  const inStock = Math.floor(availableStock);
+  const inStock = Math.max(0, Math.floor(availableStock));
   return { availableStock: inStock, isOverOrder: true, shortfall: requested - inStock };
 }

@@ -158,7 +158,7 @@ export function buildOrderPdfBuffer({ order, customer, items, categoryMap = {} }
     const visible = items.filter((it) => !it.removed);
     visible.forEach((item, index) => {
       const code = cleanText(item.code, '—');
-      const productName = cleanText(item.name, 'Unnamed product');
+      const productName = cleanText(item.name, 'Unnamed product') + (item.stockNote ? ` — ${cleanText(item.stockNote)}` : '');
       const category = cleanText(categoryMap[item.productId], 'Other') || 'Other';
       const qty = String(Number(item.finalQty ?? item.qty ?? 0));
 

@@ -244,7 +244,7 @@ test('real authoritative resolver rejects changed stock/prices and never accepts
   }
 });
 
-test('handler rejects forged/restored preference lines whose combined resolved SKU quantity exceeds stock', async () => {
+test('handler accepts combined preference stock shortages once and preserves both lines', async () => {
   const previousFetch = globalThis.fetch; const previousUrl = process.env.VITE_STOCK_SUPABASE_URL; const previousKey = process.env.VITE_STOCK_SUPABASE_KEY;
   process.env.VITE_STOCK_SUPABASE_URL = 'https://synthetic-stock.example.invalid'; process.env.VITE_STOCK_SUPABASE_KEY = 'synthetic-only';
   const row = { sku: 'SKU-1', barcode: '1001', title: 'Server notebook', price: 10, units_of_issue: 'EACH', min_order_qty: 1, stock_qty: 10, available_stock: 10, to_order: false };
@@ -259,16 +259,39 @@ test('handler rejects forged/restored preference lines whose combined resolved S
     // authoritative SKU and must not receive a second independent stock cap.
     blue.product.sku = ''; blue.product.id = ''; input.items.push(blue);
     const f = fixture({ resolve: items => resolveAuthoritativePrices(items) });
-    const rejected = await f.invoke(input);
-    assert.equal(rejected.statusCode, 409); assert.equal(rejected.body.code, 'ORDER_REVIEW_REQUIRED');
-    assert.equal(rejected.body.changes[0].requestedQty, 12); assert.equal(rejected.body.changes[0].currentStockQty, 10);
-    assert.equal(f.orders.length, 0); assert.equal(f.calls.team.length, 0); assert.equal(f.calls.ack.length, 0);
-    input.items[0].qty = 4; const accepted = await f.invoke(input);
-    assert.equal(accepted.statusCode, 200); assert.equal(f.orders[0].items.length, 2);
+    const accepted = await f.invoke(input);
+    assert.equal(accepted.statusCode, 200); assert.equal(f.orders.length, 1);
+    assert.equal(f.orders[0].items.length, 2);
     assert.deepEqual(f.orders[0].items.map(item => item.preference), ['Red', 'Blue']);
+    assert.ok(f.orders[0].items.every(item => item.stockRequest.requestedQty === 12 && item.stockRequest.shortfallQty === 2));
+    assert.match(f.orders[0].order_change_notes, /Stock shortage/);
+    assert.equal(f.calls.team.length, 1); assert.equal(f.calls.ack.length, 1);
+    const replay = await f.invoke(input);
+    assert.equal(replay.statusCode, 200); assert.deepEqual(replay.body, accepted.body);
+    assert.equal(f.orders.length, 1); assert.equal(f.calls.team.length, 1); assert.equal(f.calls.ack.length, 1);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousUrl === undefined) delete process.env.VITE_STOCK_SUPABASE_URL; else process.env.VITE_STOCK_SUPABASE_URL = previousUrl;
     if (previousKey === undefined) delete process.env.VITE_STOCK_SUPABASE_KEY; else process.env.VITE_STOCK_SUPABASE_KEY = previousKey;
   }
+});
+
+test('a fresh checkout after a completed order creates a new order rather than replaying the old purchase', async () => {
+  const f = fixture();
+  const original = body();
+  const first = await f.invoke(original);
+  assert.equal(first.statusCode, 200);
+  const fresh = body();
+  fresh.items[0].qty = 3;
+  const next = await f.invoke(fresh);
+  assert.equal(next.statusCode, 200);
+  assert.notEqual(next.body.orderId, first.body.orderId);
+  assert.equal(f.orders.length, 2);
+  assert.equal(f.orders[1].items[0].qty, 3);
+  assert.equal(f.calls.team.length, 2);
+  assert.equal(f.calls.ack.length, 2);
+  const retry = await f.invoke(fresh);
+  assert.equal(retry.body.orderId, next.body.orderId);
+  assert.equal(f.orders.length, 2);
+  assert.equal(f.calls.team.length, 2);
 });
