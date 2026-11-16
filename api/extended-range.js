@@ -14,6 +14,7 @@ import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.m
 import { instorePage } from '../lib/instore-page.mjs';
 import { searchQueryHasStructuredIntent, SEARCH_QUERY_MAX_LENGTH } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
+import { normalizeIdentifier, isAlphabeticSuffixVariant } from '../src/lib/identifierNormalize.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
   controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
@@ -22,6 +23,7 @@ import {
 } from './_instore-catalogue.js';
 
 export { readCompleteRows };
+const matchesExactCode = (value, code) => { const id=normalizeIdentifier(value); return id===code || isAlphabeticSuffixVariant(id,code); };
 
 const PAGE_SIZE = 24;
 const MAX_PAGE = 10_000;
@@ -181,15 +183,16 @@ export function applyInstoreImageControls(rows, controls, listingControls = new 
 // catalogue duplicate index and the Instore controls, resolved into the
 // products a customer may see. This is the authoritative build; the stored
 // read model below is only ever a copy of its result.
-export async function loadLiveInstoreCatalogue(client, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null } = {}) {
+export async function loadLiveInstoreCatalogue(client, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, exactSku = '' } = {}) {
   // The existing catalogue and new read-only source are independent. Starting
   // both together avoids adding the bridge latency to every cold catalogue.
   const websiteRead=(async()=>{
     let rows=websiteOnlyRows;
     if (websiteOnlyProvider) {
-      try { rows=(await websiteOnlyProvider()).rows; }
+      try { rows=(await websiteOnlyProvider(exactSku ? {baseSku:exactSku} : undefined)).rows; }
       catch (error) { console.error('Website-only products unavailable:', error?.message || 'source error'); rows=[]; }
     }
+    if (exactSku) rows=rows.filter(row=>matchesExactCode(row.sku,exactSku));
     return rows.length ? overlayArrivedStock(rows,{client}) : rows;
   })();
   const existingRead=(async()=>{
@@ -207,7 +210,8 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const observedRows=await overlayArrivedStock(rangeRows,{client});
+  const selectedRows=exactSku ? rangeRows.filter(row=>[row.sku,row.barcode].some(value=>matchesExactCode(value,exactSku))) : rangeRows;
+  const observedRows=await overlayArrivedStock(selectedRows,{client});
   return {observedRows,catalogue,imageControls,listingControls};
   })();
   const [existing,websiteRows]=await Promise.all([existingRead,websiteRead]);
@@ -449,6 +453,17 @@ return async function handler(req, res) {
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
     const from = (page - 1) * PAGE_SIZE;
+
+    // An exact-code fallback checks only matching arrival records, but still
+    // applies the full catalogue duplicate and listing-control gates.
+    if (req.query?.exact === '1' && /^\d{10}$/.test(query)) {
+      const origin=websiteOnlyProvider ? websiteOnlyRequestOrigin(req) : null;
+      const provider=websiteOnlyProvider ? (options)=>websiteOnlyProvider({...options,origin}) : null;
+      const live=await loadLiveInstoreCatalogue(client,{websiteOnlyProvider:provider,exactSku:query.toUpperCase()});
+      const products=attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client));
+      const view=instorePage(products,{query,category,page,pageSize:PAGE_SIZE});
+      return sendInstoreResponse(res,{source:SOURCE_LABEL,count:view.products.length,page,pageSize:PAGE_SIZE,total:view.total,tiles:[],products:view.products});
+    }
 
     // The stored read model answers browsing from one small page instead of
     // rebuilding the whole collection. It is only used while it is fresh and

@@ -1,6 +1,7 @@
 // Local integration candidate. The evidence source must be a trusted server
 // adapter; this module performs no SQL writes, HTTP requests or order actions.
 import {prepareWebsiteOnlyRows} from './_website-only-validation.mjs';
+import {normalizeIdentifier,isAlphabeticSuffixVariant} from '../src/lib/identifierNormalize.js';
 
 export function createWebsiteOnlyProvider({manifest,readEvidence,origin,now=Date.now,maxAgeMs=300000}) {
   if (!Array.isArray(manifest?.items) || typeof readEvidence !== 'function' || typeof now !== 'function') throw Error('Invalid provider setup');
@@ -12,9 +13,12 @@ export function createWebsiteOnlyProvider({manifest,readEvidence,origin,now=Date
     if(!k || allKeys.has(k)) throw Error('Duplicate manifest identifier');
     allKeys.add(k);
   }
-  return async function readWebsiteOnlyIndex({skus}={}) {
+  return async function readWebsiteOnlyIndex({skus,baseSku}={}) {
     const wanted=skus ? new Set(skus.map(s=>String(s||'').trim().toUpperCase())) : null;
-    const selected=manifest.items.filter(item=>!wanted || wanted.has(String(item.sku||'').trim().toUpperCase()));
+    const selected=manifest.items.filter(item=>{
+      const raw=String(item.sku||'').trim().toUpperCase(),id=normalizeIdentifier(raw);
+      return (!wanted || wanted.has(raw)) && (!baseSku || id===baseSku || isAlphabeticSuffixVariant(id,baseSku));
+    });
     if (!selected.length) return {rows:[],held:[]};
     const evidence=await readEvidence({skus:selected.map(x=>x.sku)});
     if (!evidence?.existing?.complete || !evidence?.controls?.complete || !Array.isArray(evidence.observations)
