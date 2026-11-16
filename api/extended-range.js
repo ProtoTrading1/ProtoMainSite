@@ -100,6 +100,9 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const imageUrl = imageHidden ? '' : String(row?.image_url || '').trim();
     const availableStock = row?.available_stock === null || row?.available_stock === undefined || row?.available_stock === '' ? NaN : Number(row.available_stock);
     const customerVisibleStock = Number.isFinite(availableStock) ? Math.floor(availableStock) : null;
+    // Legacy imports may also have minimum_stock = 1. Require Archive provenance.
+    const archiveStockOverride = row?.minimum_stock === 1 && /^archive-publication-v1:[a-f0-9]{64}$/.test(row?.image_source_key || '');
+    const stockEligible = archiveStockOverride ? customerVisibleStock >= 1 : customerVisibleStock > MIN_INSTORE_AVAILABLE_STOCK;
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
@@ -111,7 +114,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || (!ignoreStockEligibility && !isSarongiRequestSku(sku) && (!Number.isFinite(availableStock) || customerVisibleStock <= MIN_INSTORE_AVAILABLE_STOCK))
+      || (!ignoreStockEligibility && !isSarongiRequestSku(sku) && !stockEligible)
       || price <= 0) return [];
     const gallery = imageHidden ? [] : sarongiInstoreGallery(sku, imageUrl);
     const product = {
@@ -199,7 +202,7 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
   const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
     readCompleteRows(() => {
       let rangeQuery=client.from('extended_range_items')
-      .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
+      .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
       .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
       .eq('image_review_status', 'verified')
       .in('is_active', includeStaged ? [true, false] : [true])

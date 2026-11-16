@@ -40,6 +40,19 @@ test('plain language discovery search does not loosen eligibility', () => {
   assert.equal(buildExtendedRangeProducts([{ ...valid, available_stock: 0 }], 'bracelet').length, 0);
 });
 
+test('the Archive override makes only positive verified stock eligible below the normal threshold', () => {
+  const archived = { ...valid, minimum_stock: 1, image_source_key: `archive-publication-v1:${'a'.repeat(64)}` };
+  for (const quantity of [1, 9, 10]) {
+    const [product] = buildExtendedRangeProducts([{ ...archived, available_stock: quantity }], archived.sku);
+    assert.equal(product.stockQty, quantity);
+    assert.equal(product.availability.canOrder, true);
+  }
+  for (const fields of [{available_stock:0}, {available_stock:null}, {listing_control_status:'hidden'},
+    {minimum_stock:10}, {image_source_key:'other-source'}]) {
+    assert.deepEqual(buildExtendedRangeProducts([{ ...archived, ...fields }]), []);
+  }
+});
+
 test('extended-range search applies structured customer intent after eligibility', () => {
   const rows = [
     { ...valid, sku: '8626110059', title: 'SOFT TOY BLUE DOLPHIN ±50CM', original_description: 'SOFT TOY BLUE DOLPHIN ±50CM', category: 'SOFT TOYS', price: 89.99, available_stock: 14 },
