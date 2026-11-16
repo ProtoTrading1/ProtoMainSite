@@ -44,7 +44,7 @@ export function validateInstoreBridgeStock(sku, row) {
 export async function readFreshInstoreStock(sku, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, indexClient = stockClient(), fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus:[sku]})).rows;
   const { data, error } = await indexClient.from('extended_range_items')
-    .select('sku, image_source, barcode, title, original_description, price, available_stock, category, image_url, image_review_status, visibility_status, is_active')
+    .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active')
     .eq('sku', sku).limit(1);
   if (error) throw error;
   const arrivals=await readArrivedStockRecords(indexClient,[sku]);
