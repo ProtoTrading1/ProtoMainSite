@@ -8,6 +8,13 @@ it('customer availability uses selling packs, negative-stock sales and bookings 
 it('holds unavailable/mismatched source instead of trusting receipt prices or browser units',()=>{for(const row of [{...bridge(),CODE:'OTHER'},{...bridge(),UNITS:''},{...bridge(),PRICE_A:0},{...bridge(),ONHAND:null}])assert.throws(()=>effectiveArrivedStock(arrival.code,row,arrival));});
 it('uses recorded stock alone after receiving, without resurrecting an exhausted allowance',()=>{assert.equal(effectiveArrivedStock(arrival.code,bridge(20,2),{...arrival,status:'receiving-recorded'}).qty,18);assert.equal(effectiveArrivedStock(arrival.code,bridge(0,0),{...arrival,status:'receiving-recorded'}).qty,0);});
 it('does not infer receiving completion from a positive balance',()=>{assert.throws(()=>effectiveArrivedStock(arrival.code,bridge(20,0),arrival),/Confirm receiving/);});
+it('uses the verified balloon pack unit after receiving without bypassing the receipt safeguard',()=>{
+ const code='8640000227',row={CODE:code,DESCR:'BALLOONS 12INCH PKT,100 WHITE',UNITS:'PKT,00',ONHAND:99,BOOKED:0,PRICE_A:51.74};
+ const receipt={...arrival,code,units:'PACK 100',quantity:100};
+ assert.throws(()=>effectiveArrivedStock(code,row,{...receipt,status:'active'}),/Confirm receiving/);
+ const observed=effectiveArrivedStock(code,row,{...receipt,status:'receiving-recorded'});
+ assert.equal(observed.unitsOfIssue,'PACK 100');assert.equal(observed.qty,99);
+});
 it('does not call the receipt backend when disabled',async()=>{let called=0;const client={rpc:()=>{called++;}};assert.equal((await readArrivedStockRecords(client,[arrival.code],{env:{}})).size,0);assert.equal(called,0);});
 it('does not silently fall back when the receipt backend is unavailable',async()=>{await assert.rejects(()=>readArrivedStockRecords({rpc:async()=>({error:Error('offline')})},[arrival.code],{env}));});
 it('applies the same calculation to discovery and holds only affected rows on a source failure',async()=>{

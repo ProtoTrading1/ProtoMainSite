@@ -17,7 +17,7 @@ export function effectiveArrivedStock(sku,row,arrival){
  if(arrival.code!==sku||!['active','receiving-recorded'].includes(arrival.status))throw Error('Arrived stock does not match this product.');
  for(const field of ['ONHAND','BOOKED'])if(!['number','string'].includes(typeof row?.[field])||String(row[field]).trim()==='')throw Error('Current Positill stock is missing.');
  const onHand=Number(row.ONHAND),booked=Number(row.BOOKED);
- const stock=arrivedStockAvailability(arrival,{canonicalCode:sku,unitsRaw:row.UNITS,onHand,booked,available:onHand-booked},{receivingRecorded:arrival.status==='receiving-recorded'});
+ const stock=arrivedStockAvailability(arrival,{canonicalCode:sku,unitsRaw:unit.unitsOfIssue,onHand,booked,available:onHand-booked},{receivingRecorded:arrival.status==='receiving-recorded'});
  const price=websitePriceFromExVat(Number(row.PRICE_A));if(!Number.isFinite(price)||price<=0)throw Error('A current Positill price is required.');
  return {...unit,qty:stock.available,price,availability:{state:stock.available>0?'in_stock':'out_of_stock',label:stock.available>0?'In stock':'Out of stock',canOrder:stock.available>0}};
 }
