@@ -9,6 +9,7 @@ import { loadPlacementMapIfEnabled, skusMatchingBrowsePath } from './_placements
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
 import { withChristmasPenGroup } from './_christmas-pen-group.js';
+import { withServietteColourGroup, servietteBaseGroupId } from './_serviette-colour-group.js';
 import { requireApprovedCustomer } from './_auth.js';
 import { isSafeStorefrontProduct } from '../lib/catalogue-safety.mjs';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
@@ -281,7 +282,7 @@ function normalizeSkuKey(sku) {
   return String(sku || '').trim().toUpperCase();
 }
 
-async function expandIdentifierAdminGroupRows(supabase, rows, groupInfo) {
+export async function expandIdentifierAdminGroupRows(supabase, rows, groupInfo, identifier) {
   if (!groupInfo || !Array.isArray(rows) || !rows.length) return rows;
 
   const matchedSkus = rows.map((row) => normalizeSkuKey(row.sku)).filter(Boolean);
@@ -290,6 +291,8 @@ async function expandIdentifierAdminGroupRows(supabase, rows, groupInfo) {
       .map((sku) => groupInfo.get(sku)?.groupId)
       .filter(Boolean),
   );
+  const servietteGroupId = servietteBaseGroupId(identifier, groupInfo);
+  if (servietteGroupId) groupIds.add(servietteGroupId);
   if (!groupIds.size) return rows;
 
   const memberSkus = [];
@@ -457,7 +460,7 @@ export default async function handler(req, res) {
         loadPlacementMapIfEnabled(supabase),
         loadGroupInfoMapIfEnabled(supabase),
       ]);
-      const groupInfo = withChristmasPenGroup(existingGroupInfo);
+      const groupInfo = withServietteColourGroup(withChristmasPenGroup(existingGroupInfo));
       const labels = resolveBrowseLabels(tree, browsePath);
       if (!labels) return res.status(200).json([]);
 
@@ -514,7 +517,7 @@ export default async function handler(req, res) {
       }
     }
     if (isFullCatalog && version) {
-      const etag = `W/"cat-${version.stamp}-christmas-pens-v1"`;
+      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-v1"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
       // (e.g. a stalled ERP sync) is observable rather than silent.
@@ -555,11 +558,11 @@ export default async function handler(req, res) {
         loadGroupInfoMapIfEnabled(supabase),
         loadIncomingAvailabilityMap(supabase),
       ]);
-      const groupInfo = withChristmasPenGroup(existingGroupInfo);
+      const groupInfo = withServietteColourGroup(withChristmasPenGroup(existingGroupInfo));
       let rows = initialRows;
       let salesByBarcode = initialSalesByBarcode;
       if (identifier && groupInfo) {
-        rows = await expandIdentifierAdminGroupRows(supabase, rows, groupInfo);
+        rows = await expandIdentifierAdminGroupRows(supabase, rows, groupInfo, identifier);
         if (rows.length !== initialRows.length) {
           salesByBarcode = await loadSalesByBarcode(supabase, rows.map((row) => row.sku).filter(Boolean));
         }
@@ -585,7 +588,7 @@ export default async function handler(req, res) {
       return products;
     };
     const products = isFullCatalog && version
-      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-v1"`, buildProducts)
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-v1"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
