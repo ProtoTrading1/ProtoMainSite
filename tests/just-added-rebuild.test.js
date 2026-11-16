@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyCollection } from '../src/lib/collectionFilter.js';
+import { sortNewArrivals } from '../src/lib/newArrivalOrder.js';
+
+test('new arrivals appear newest first without changing the source', () => {
+  const products = [{ id: 'older', createdAt: '2026-10-20T10:00:00Z' }, { id: 'newer', createdAt: '2026-11-16T10:00:00Z' }];
+  assert.deepEqual(sortNewArrivals(products).map((p) => p.id), ['newer', 'older']);
+  assert.equal(products[0].id, 'older');
+});
 
 test('new arrivals and curated specials remain separate collections', () => {
   const arrivals = [
