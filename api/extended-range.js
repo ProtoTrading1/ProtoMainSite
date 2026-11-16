@@ -14,6 +14,7 @@ import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.m
 import { instorePage } from '../lib/instore-page.mjs';
 import { searchQueryHasStructuredIntent, SEARCH_QUERY_MAX_LENGTH } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
+import { normalizeIdentifier, isAlphabeticSuffixVariant } from '../src/lib/identifierNormalize.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
   controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
@@ -22,6 +23,7 @@ import {
 } from './_instore-catalogue.js';
 
 export { readCompleteRows };
+const matchesExactCode = (value, code) => { const id=normalizeIdentifier(value); return id===code || isAlphabeticSuffixVariant(id,code); };
 
 const PAGE_SIZE = 24;
 const MAX_PAGE = 10_000;
@@ -187,10 +189,10 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
   const websiteRead=(async()=>{
     let rows=websiteOnlyRows;
     if (websiteOnlyProvider) {
-      try { rows=(await websiteOnlyProvider(exactSku ? {skus:[exactSku]} : undefined)).rows; }
+      try { rows=(await websiteOnlyProvider(exactSku ? {baseSku:exactSku} : undefined)).rows; }
       catch (error) { console.error('Website-only products unavailable:', error?.message || 'source error'); rows=[]; }
     }
-    if (exactSku) rows=rows.filter(row=>String(row.sku||'').trim().toUpperCase()===exactSku);
+    if (exactSku) rows=rows.filter(row=>matchesExactCode(row.sku,exactSku));
     return rows.length ? overlayArrivedStock(rows,{client}) : rows;
   })();
   const existingRead=(async()=>{
@@ -208,7 +210,7 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
     readInstoreImageControls(client),
     readInstoreListingControls(client),
   ]);
-  const selectedRows=exactSku ? rangeRows.filter(row=>[row.sku,row.barcode].some(value=>String(value||'').trim().toUpperCase()===exactSku)) : rangeRows;
+  const selectedRows=exactSku ? rangeRows.filter(row=>[row.sku,row.barcode].some(value=>matchesExactCode(value,exactSku))) : rangeRows;
   const observedRows=await overlayArrivedStock(selectedRows,{client});
   return {observedRows,catalogue,imageControls,listingControls};
   })();

@@ -23,15 +23,15 @@ const fetchBridge=async()=>({ok:true,json:async()=>({row:bridge})});
 
 test('exact-code catalogue lookup keeps duplicate and hiding safeguards while selecting one code',async()=>{
  const code='8781830015',other='8781830038',t=tables();
- t.extended_range_items.push({...row,sku:code,barcode:code},{...row,sku:other,barcode:other});
+ t.extended_range_items.push({...row,sku:code,barcode:code},{...row,sku:`${code}A`,barcode:`${code}A`},{...row,sku:other,barcode:other});
  let wanted;
  const provider=async options=>{wanted=options;return {rows:[]}};
  const result=await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider});
- assert.deepEqual(wanted,{skus:[code]});assert.deepEqual(result.products.map(x=>x.sku),[code]);
+ assert.deepEqual(wanted,{baseSku:code});assert.deepEqual(result.products.map(x=>x.sku),[code,`${code}A`]);
  t.instore_listing_controls.push({sku:code,status:'hidden'});
- assert.equal((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.length,0);
+ assert.deepEqual((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.map(x=>x.sku),[`${code}A`]);
  t.instore_listing_controls.length=0;t.website_stock.push({sku:code,barcode:code});
- assert.equal((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.length,0);
+ assert.deepEqual((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.map(x=>x.sku),[`${code}A`]);
 });
 
 test('authenticated exact-code endpoint returns only the requested eligible listing',async()=>{

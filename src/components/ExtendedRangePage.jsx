@@ -119,10 +119,11 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     // A view this tab has already seen is painted at once and replaced as soon
     // as the fresh response lands, so returning to Instore Products does not
     // start again from an empty grid.
-    const stored = storedExtendedRange(submittedQuery, { page, category });
+    const exact = /^\d{10}$/.test(submittedQuery.trim()) && !category && page === 1;
+    const stored = storedExtendedRange(submittedQuery, { page, category, exact });
     if (stored) apply(stored);
     setLoading(!stored); setError(false);
-    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category, exact: /^\d{10}$/.test(submittedQuery.trim()) && !category && page === 1 })
+    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category, exact })
       .then((data) => {
         if (controller.signal.aborted) return;
         apply(data);
@@ -148,13 +149,13 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   // before this page is opened. Joining the same load covers a customer who
   // arrives before it has finished, or whose boot prefetch did not run.
   useEffect(() => {
-    if (catalogue) return undefined;
+    if (catalogue || (/^\d{10}$/.test(submittedQuery.trim()) && !category && page === 1)) return undefined;
     let cancelled = false;
     prefetchInstoreCatalogue().then((collection) => {
       if (!cancelled && collection) setCatalogue(collection);
     });
     return () => { cancelled = true; };
-  }, [catalogue, retry]);
+  }, [catalogue, retry, submittedQuery, category, page]);
 
   useEffect(() => {
     if (browseCategory) window.requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));

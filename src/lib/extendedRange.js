@@ -162,7 +162,7 @@ export function storedExtendedRange(query = '', options = {}) {
 }
 
 export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, exact = false } = {}) {
-  const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue }) + (exact ? '&exact=1' : '');
+  const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue, exact });
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
   // The preview may be reading a few thousand staged products. Give its
@@ -262,6 +262,10 @@ export function instoreCatalogue() {
  */
 export function prefetchInstoreCatalogue() {
   return hydrateInstoreCatalogue().then((local) => {
+    // Do not compete with a focused code lookup by starting a full refresh.
+    const hash = typeof window === 'undefined' ? '' : window.location.hash;
+    const query = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)).get('q') : '';
+    if (/^\d{10}$/.test(String(query || '').trim())) return local;
     if (local) {
       // Refresh behind the customer so the next view is current.
       void fetchWhenIdle();
