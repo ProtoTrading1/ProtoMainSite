@@ -75,7 +75,7 @@ test('the page answers locally once it holds the collection, and prefetches out 
   // own store has been consulted.
   assert.match(page, /if \(catalogue \|\| !localChecked\) return undefined;\s*const controller = new AbortController\(\)/);
   // A previously seen view is painted before the network answers.
-  assert.match(page, /const stored = storedExtendedRange\(submittedQuery, \{ page, category \}\)/);
+  assert.match(page, /const stored = storedExtendedRange\(submittedQuery, \{ page, category, exact \}\)/);
   assert.match(page, /setLoading\(!stored\)/);
   // The page joins the boot load rather than starting a second one.
   assert.match(page, /prefetchInstoreCatalogue\(\)\.then\(\(collection\) => \{/);
