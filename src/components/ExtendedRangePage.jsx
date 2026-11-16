@@ -83,13 +83,29 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     // already-verified products it sent, so a locally answered view is the
     // view the server would have returned.
     const view = instorePage(catalogue, { query: submittedQuery, category, page, pageSize: PAGE_SIZE });
+    const code = submittedQuery.trim();
+    if (!view.total && /^\d{10}$/.test(code) && !category && page === 1) {
+      const controller = new AbortController();
+      setLoading(true); setError(false);
+      fetchExtendedRange(code, {signal:controller.signal, page, exact:true})
+        .then(data => {
+          if (controller.signal.aborted) return;
+          setProducts(Array.isArray(data?.products) ? data.products : []);
+          setTiles(localTiles || []);
+          setMeta({total:Math.max(0,Number(data?.total)||0),page:1,pageSize:PAGE_SIZE});
+          setAnalyticsResultsKey(JSON.stringify([submittedQuery, category]));
+        })
+        .catch(() => { if (!controller.signal.aborted) setError(true); })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      return () => controller.abort();
+    }
     setProducts(view.products);
     setTiles(localTiles || []);
     setMeta({ total: view.total, page, pageSize: PAGE_SIZE });
     setAnalyticsResultsKey(JSON.stringify([submittedQuery, category]));
     setError(false);
     setLoading(false);
-  }, [catalogue, localTiles, submittedQuery, category, page]);
+  }, [catalogue, localTiles, submittedQuery, category, page, retry]);
 
   useEffect(() => {
     if (catalogue || !localChecked) return undefined;
@@ -106,7 +122,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     const stored = storedExtendedRange(submittedQuery, { page, category });
     if (stored) apply(stored);
     setLoading(!stored); setError(false);
-    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category })
+    fetchExtendedRange(submittedQuery, { signal: controller.signal, page, category, exact: /^\d{10}$/.test(submittedQuery.trim()) && !category && page === 1 })
       .then((data) => {
         if (controller.signal.aborted) return;
         apply(data);

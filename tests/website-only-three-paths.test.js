@@ -21,6 +21,28 @@ function client(tables) {return {from(name){
 const tables=()=>({extended_range_items:[],website_stock:[],instore_image_controls:[],instore_listing_controls:[]});
 const fetchBridge=async()=>({ok:true,json:async()=>({row:bridge})});
 
+test('exact-code catalogue lookup keeps duplicate and hiding safeguards while selecting one code',async()=>{
+ const code='8781830015',other='8781830038',t=tables();
+ t.extended_range_items.push({...row,sku:code,barcode:code},{...row,sku:other,barcode:other});
+ let wanted;
+ const provider=async options=>{wanted=options;return {rows:[]}};
+ const result=await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider});
+ assert.deepEqual(wanted,{skus:[code]});assert.deepEqual(result.products.map(x=>x.sku),[code]);
+ t.instore_listing_controls.push({sku:code,status:'hidden'});
+ assert.equal((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.length,0);
+ t.instore_listing_controls.length=0;t.website_stock.push({sku:code,barcode:code});
+ assert.equal((await loadLiveInstoreCatalogue(client(t),{exactSku:code,websiteOnlyProvider:provider})).products.length,0);
+});
+
+test('authenticated exact-code endpoint returns only the requested eligible listing',async()=>{
+ const code='8781830015',other='8781830038',t=tables();
+ t.extended_range_items.push({...row,sku:code,barcode:code},{...row,sku:other,barcode:other});
+ const db=client(t),res={code:0,body:null,setHeader(){},status(n){this.code=n;return this},json(x){this.body=x;return this}};
+ const handler=createExtendedRangeHandler({authorize:async()=>({user:{id:'test'}}),getClient:()=>db});
+ await handler({method:'GET',headers:{},query:{q:code,exact:'1'}},res);
+ assert.equal(res.code,200);assert.deepEqual(res.body.products.map(x=>x.sku),[code]);
+});
+
 test('a restored basket cannot silently classify an unverified prepared item as a standard product', async()=>{
  const item={product:{sku:'A-BRA1003',code:'A-BRA1003'}};
  await assert.rejects(detectUnflaggedInstoreSkus([item],client(tables()),{websiteOnlyProvider:async()=>({rows:[],held:[{sku:'A-BRA1003'}]})}),/could not be verified/);

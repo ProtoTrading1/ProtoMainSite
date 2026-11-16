@@ -161,8 +161,8 @@ export function storedExtendedRange(query = '', options = {}) {
   return readStored(key);
 }
 
-export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false } = {}) {
-  const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue });
+export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, exact = false } = {}) {
+  const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue }) + (exact ? '&exact=1' : '');
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
   // The preview may be reading a few thousand staged products. Give its
