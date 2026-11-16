@@ -32,7 +32,7 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
   assert.match(productsApiSrc, /async function expandIdentifierAdminGroupRows/, 'identifier lookup can expand an admin group server-side');
   assert.match(
     productsApiSrc,
-    /if \(identifier && groupInfo\) \{[\s\S]*expandIdentifierAdminGroupRows\(supabase, rows, groupInfo\)/,
+    /if \(identifier && groupInfo\) \{[\s\S]*expandIdentifierAdminGroupRows\(supabase, rows, groupInfo, identifier\)/,
     'exact code lookups do not depend on a stale browser catalogue to show every admin-group option',
   );
   assert.match(

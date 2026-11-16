@@ -8,6 +8,16 @@ import {parseCartMutation,cartPayload} from '../api/account-cart.js';
 const sku='8781830003';
 const row={CODE:sku,DESCR:'TOOTHPICK 3PC',UNITS:'PKT',ONHAND:600,BOOKED:0,PRICE_A:8.26};
 const index={sku,image_source:'nutstore',title:row.DESCR,price:9.5,image_review_status:'verified',visibility_status:'search_only',is_active:true};
+test('white balloons resolve the confirmed hundred pack and other zero packs fail closed',()=>{
+ const code='8640000227', source={CODE:code,DESCR:'BALLOONS 12INCH PKT,100 WHITE',UNITS:'PKT,00',ONHAND:99,BOOKED:0,PRICE_A:51.74};
+ assert.equal(validateInstoreBridgeStock(code,source).unitsOfIssue,'PACK 100');
+ assert.equal(positillUnitObservation(code,source).unitsOfIssueRaw,'PKT,00');
+ const order=resolveInstoreOrderLine({qty:2,product:{sku:code,id:code,isExtendedRange:true}}, {indexRow:{...index,sku:code,title:source.DESCR,price:59.5},bridgeRow:source});
+ assert.equal(order.product.unitsOfIssue,'PACK 100');
+ assert.equal(order.qty,2);
+ assert.throws(()=>positillUnitObservation(code,{...source,DESCR:'OTHER'}),/verification/);
+ assert.throws(()=>positillUnitObservation(sku,{...source,CODE:sku}),/verification/);
+});
 test('8781830003 keeps Positill PKT without inferring three sellable pieces from the title',()=>{
  const stock=validateInstoreBridgeStock(sku,row);
  const product=withPositillObservation({sku,isExtendedRange:true,price:9.5},stock);
