@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { customerAvailabilityLabel, resolveProductAvailability } from '../lib/product-availability.mjs';
-import { showroomAvailabilityGuidance } from '../lib/showroom-availability-copy.mjs';
+import { showroomAvailabilityGuidance, showroomAvailabilityLabel } from '../lib/showroom-availability-copy.mjs';
 
 const readSource = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -49,6 +49,18 @@ test('confirmed Showroom stock keeps its orderable badge and omits the card guid
   assert.equal(showroomAvailabilityGuidance({ sku: 'MKT3551328' }, booked), booked.guidance);
   const partiallyReceived = resolveProductAvailability({ stockQty: 0, incoming: { incomingStatus: 'partially_received', incomingQty: 1 } });
   assert.equal(showroomAvailabilityGuidance({ sku: 'MKB240119' }, partiallyReceived), partiallyReceived.guidance);
+});
+
+test('DIRT TRUCK uses Stock available on its Showroom card while it is in stock', () => {
+  const sku = 'MKTI562787';
+  const inStock = resolveProductAvailability({ stockQty: 12 });
+  assert.equal(showroomAvailabilityLabel({ sku }, inStock), 'Stock available');
+  assert.equal(inStock.canOrder, true);
+  assert.equal(showroomAvailabilityLabel({ sku, isExtendedRange: true }, inStock), 'In stock');
+  assert.equal(showroomAvailabilityLabel({ sku, isVariantGroup: true }, inStock), 'In stock');
+  assert.equal(showroomAvailabilityLabel({ sku: 'MKC645585' }, inStock), 'In stock');
+  assert.equal(showroomAvailabilityLabel({ sku }, resolveProductAvailability({ stockQty: 2 })), 'Low stock');
+  assert.equal(showroomAvailabilityLabel({ sku }, resolveProductAvailability({ stockQty: 0 })), 'Out of stock');
 });
 
 test('availability follows one explicit priority order', () => {

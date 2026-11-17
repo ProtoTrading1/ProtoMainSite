@@ -1,10 +1,31 @@
 import { expect, test } from '@playwright/test';
+import { resolveProductAvailability } from '../lib/product-availability.mjs';
 import { installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
 
 // Synthetic responses only. Deliberately retain old cached/API copy so client
 // presentation proves consistency without altering source quantities.
 const availability = { state: 'landed', label: 'Landed - being received', guidance: 'Available subject to confirmation', canOrder: true, stockQty: 0, incomingStatus: 'landed_awaiting_grv', incomingQty: 0.001, allowPreorder: false };
 const product = { id: 'SR0002', code: '8611100002N', sku: 'SR0002', barcode: '8611100002N', name: 'SYNTHETIC SR0002 LABEL REVIEW', title: 'SYNTHETIC SR0002 LABEL REVIEW', image: '/bag_black.png', price: 1, stockQty: 0, stockOnHand: 0, keepLiveWhenOos: true, minQty: 1, unitsOfIssue: 'Each', ...availability, availability };
+
+test('DIRT TRUCK shows Stock available with an enabled cart button and real stock count', async ({ page, context }) => {
+  const sku = 'MKTI562787';
+  const qty = 12;
+  const stock = resolveProductAvailability({ stockQty: qty });
+  const truck = {
+    ...product, id: sku, code: sku, sku, barcode: sku, name: 'DIRT TRUCK', title: 'DIRT TRUCK',
+    stockQty: qty, stockOnHand: qty, availability: stock,
+  };
+  await installAccessibilityServices(context, { products: [truck] });
+  await context.route('**/api/stock*', route => route.fulfill({ json: { qty, availability: stock } }));
+  await signInCatalogue(page);
+
+  const card = page.locator('.product-card').first();
+  await expect(card.locator('.pc-orderability > span')).toHaveText('Stock available');
+  await expect(card).not.toContainText('Available subject to confirmation');
+  await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
+  await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
+  await expect(card.locator('.stock-readout')).toHaveText('In stock: 12');
+});
 
 test('SR0002 cached badge and live result consistently say Stock available', async ({ page, context }, testInfo) => {
   await installAccessibilityServices(context, { products: [product] });
