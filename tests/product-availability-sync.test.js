@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { customerAvailabilityLabel, resolveProductAvailability } from '../lib/product-availability.mjs';
+import { showroomAvailabilityGuidance } from '../lib/showroom-availability-copy.mjs';
 
 const readSource = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -23,6 +24,24 @@ test('other incoming and receiving statuses retain their labels and ordering rul
   }
   const partial = resolveProductAvailability({ stockQty: 0, incoming: { incomingStatus: 'partially_received', incomingQty: 1 } });
   assert.equal(customerAvailabilityLabel(partial), 'Landed — being received'); assert.equal(partial.canOrder, true);
+});
+
+test('confirmed Showroom stock keeps its orderable badge and omits the card guidance', () => {
+  const incoming = { incomingStatus: 'landed_awaiting_grv', incomingQty: 0.001 };
+  for (const [sku, stockQty] of [['MKB240119', 0], ['MKT3551328', -1]]) {
+    const landed = resolveProductAvailability({ stockQty, incoming });
+    assert.equal(showroomAvailabilityGuidance({ sku }, landed), null);
+    assert.equal(customerAvailabilityLabel(landed), 'Stock available');
+    assert.equal(landed.canOrder, true);
+    assert.equal(showroomAvailabilityGuidance({ sku, isExtendedRange: true }, landed), landed.guidance);
+    assert.equal(showroomAvailabilityGuidance({ sku, isVariantGroup: true }, landed), landed.guidance);
+  }
+  const unrelated = resolveProductAvailability({ stockQty: 0, incoming });
+  assert.equal(showroomAvailabilityGuidance({ sku: 'SR0002' }, unrelated), unrelated.guidance);
+  const booked = resolveProductAvailability({ stockQty: -1 });
+  assert.equal(showroomAvailabilityGuidance({ sku: 'MKT3551328' }, booked), booked.guidance);
+  const partiallyReceived = resolveProductAvailability({ stockQty: 0, incoming: { incomingStatus: 'partially_received', incomingQty: 1 } });
+  assert.equal(showroomAvailabilityGuidance({ sku: 'MKB240119' }, partiallyReceived), partiallyReceived.guidance);
 });
 
 test('availability follows one explicit priority order', () => {

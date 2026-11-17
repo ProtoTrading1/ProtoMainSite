@@ -12,6 +12,7 @@ import { scheduleInstoreStockCheck } from '../lib/instoreStockQueue';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { hasVerifiedInstoreUnit, productSellingUnit, withPositillObservation } from '../../lib/positill-selling-unit.mjs';
 import { customerAvailabilityLabel, formatIncomingEta, resolveProductAvailability } from '../../lib/product-availability.mjs';
+import { showroomAvailabilityGuidance } from '../../lib/showroom-availability-copy.mjs';
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import './ProductCard.css';
@@ -179,12 +180,13 @@ function StockBadge({ product, onVerifiedUnit }) {
   if (!product) return null;
   const availability = catalogStockState(product);
   const badgeClass = STOCK_BADGE_CLASS[availability.state] || 'out';
+  const guidance = showroomAvailabilityGuidance(product, availability);
 
   return (
     <div className={`pc-stock-slot${product.isVariantGroup ? ' pc-stock-slot--options' : ''}`}>
       <div className={`pc-orderability pc-orderability--${badgeClass}`}>
         <span>{customerAvailabilityLabel(availability)}</span>
-        <small>{availability.guidance}</small>
+        {guidance && <small>{guidance}</small>}
       </div>
       {!product.isVariantGroup && sku ? <StockCheck
         sku={sku}
