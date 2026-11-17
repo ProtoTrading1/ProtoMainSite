@@ -28,21 +28,26 @@ test('SR0002 cached badge and live result consistently say Stock available', asy
   expect(errors).toEqual([]);
 });
 
-test('received Showroom items show the badge and can be ordered without the extra guidance', async ({ page, context }) => {
-  const sku = 'MKT3551328';
-  const stock = { ...availability, stockQty: -1 };
-  const received = {
-    ...product, id: sku, code: sku, sku, barcode: sku, name: 'SYNTHETIC TRACTOR', title: 'SYNTHETIC TRACTOR',
-    stockQty: -1, stockOnHand: -1, availability: stock,
-  };
-  await installAccessibilityServices(context, { products: [received] });
-  await context.route('**/api/stock*', route => route.fulfill({ json: { qty: -1, availability: stock } }));
-  await signInCatalogue(page);
+for (const [sku, name, stockQty] of [
+  ['MKT3551328', 'SYNTHETIC TRACTOR', -1],
+  ['MKT645585', 'DOLL DREAMS GIRL W/ACCESSORIES', 0],
+  ['MKW657957', 'SPEED BOAT BATTERY OPERATED', -1],
+]) {
+  test(`received Showroom item ${sku} keeps its orderable badge without the extra guidance`, async ({ page, context }) => {
+    const stock = { ...availability, stockQty };
+    const received = {
+      ...product, id: sku, code: sku, sku, barcode: sku, name, title: name,
+      stockQty, stockOnHand: stockQty, availability: stock,
+    };
+    await installAccessibilityServices(context, { products: [received] });
+    await context.route('**/api/stock*', route => route.fulfill({ json: { qty: stockQty, availability: stock } }));
+    await signInCatalogue(page);
 
-  const card = page.locator('.product-card').first();
-  await expect(card.locator('.pc-orderability > span')).toHaveText('Stock available');
-  await expect(card).not.toContainText('Available subject to confirmation');
-  await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
-  await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
-  await expect(card.locator('.stock-readout')).toHaveText('Stock available');
-});
+    const card = page.locator('.product-card').first();
+    await expect(card.locator('.pc-orderability > span')).toHaveText('Stock available');
+    await expect(card).not.toContainText('Available subject to confirmation');
+    await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
+    await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
+    await expect(card.locator('.stock-readout')).toHaveText('Stock available');
+  });
+}

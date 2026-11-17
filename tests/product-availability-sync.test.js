@@ -28,9 +28,15 @@ test('other incoming and receiving statuses retain their labels and ordering rul
 
 test('confirmed Showroom stock keeps its orderable badge and omits the card guidance', () => {
   const incoming = { incomingStatus: 'landed_awaiting_grv', incomingQty: 0.001 };
-  for (const [sku, stockQty] of [['MKB240119', 0], ['MKT3551328', -1]]) {
+  const zeroBalanceSkus = [
+    'MKB240119', 'MKB378350', 'MKB421946', 'MKB421964', 'MKB450044',
+    'MKB454913', 'MKB455003', 'MKB478664', 'MKB487061', 'MKB495422',
+    'MKB495431', 'MKT645585', 'MKV177268', 'MKW675759', 'MKW675768', 'MKY493408',
+  ];
+  const cases = [...zeroBalanceSkus.map(sku => [sku, 0]), ['MKT3551328', -1], ['MKW657957', -1]];
+  for (const [sku, stockQty] of cases) {
     const landed = resolveProductAvailability({ stockQty, incoming });
-    assert.equal(showroomAvailabilityGuidance({ sku }, landed), null);
+    assert.equal(showroomAvailabilityGuidance({ sku }, landed), null, sku);
     assert.equal(customerAvailabilityLabel(landed), 'Stock available');
     assert.equal(landed.canOrder, true);
     assert.equal(showroomAvailabilityGuidance({ sku, isExtendedRange: true }, landed), landed.guidance);
@@ -38,6 +44,7 @@ test('confirmed Showroom stock keeps its orderable badge and omits the card guid
   }
   const unrelated = resolveProductAvailability({ stockQty: 0, incoming });
   assert.equal(showroomAvailabilityGuidance({ sku: 'SR0002' }, unrelated), unrelated.guidance);
+  assert.equal(showroomAvailabilityGuidance({ sku: 'MKC645585' }, unrelated), unrelated.guidance);
   const booked = resolveProductAvailability({ stockQty: -1 });
   assert.equal(showroomAvailabilityGuidance({ sku: 'MKT3551328' }, booked), booked.guidance);
   const partiallyReceived = resolveProductAvailability({ stockQty: 0, incoming: { incomingStatus: 'partially_received', incomingQty: 1 } });
