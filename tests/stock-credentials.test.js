@@ -62,3 +62,12 @@ test('scoped runtime clients and manual scripts share server module; browser cod
  assert.match(preview, /createClient\(url, key, \{ auth: \{ autoRefreshToken: false, persistSession: false \} \}\)/);
  assert.match(preview, /INSTORE_PREVIEW_SUPABASE_URL/);
 });
+
+test('legacy service credentials require HTTPS before constructing a client',()=>{
+ for(const url of ['http://yiqsvwajozafvalwcero.supabase.co','http://127.0.0.1:54321','//yiqsvwajozafvalwcero.supabase.co']){
+  const env={VITE_STOCK_SUPABASE_URL:url,STOCK_SUPABASE_SERVICE_ROLE_KEY:'synthetic-service-only'};
+  assert.throws(()=>resolveStockCredentials(env,{legacyServiceRole:true}),/Invalid server stock URL/);
+  let calls=0;assert.throws(()=>createStockClient({env,legacyServiceRole:true,factory:()=>{calls++;}}),/Invalid server stock URL/);assert.equal(calls,0);
+ }
+ assert.throws(()=>resolveStockCredentials({},{legacyServiceRole:true}),/Instore Products stock source is not configured/);
+});
