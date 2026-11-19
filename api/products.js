@@ -1,3 +1,4 @@
+import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { createCatalogueBuildCache } from './_catalogue-build.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
@@ -498,9 +499,9 @@ export default async function handler(req, res) {
         ))
         .filter((product) => productMatchesBrowsePath(product, browsePath, labels));
 
-      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'));
+      return res.status(200).json(await applyFloralLiveStock(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website')));
     }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
@@ -518,7 +519,8 @@ export default async function handler(req, res) {
       }
     }
     if (isFullCatalog && version) {
-      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-v2"`;
+      const baseEtag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3"`;
+      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3-${Math.floor(Date.now() / FLORAL_REFRESH_MS)}"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
       // (e.g. a stalled ERP sync) is observable rather than silent.
@@ -533,10 +535,10 @@ export default async function handler(req, res) {
       if (etagMatches(req, etag)) {
         return res.status(304).end();
       }
-      const cached = catalogueBuild.peek(etag);
+      const cached = catalogueBuild.peek(baseEtag);
       if (cached) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json(cached);
+        return res.status(200).json(await applyFloralLiveStock(cached));
       }
     }
 
@@ -589,10 +591,10 @@ export default async function handler(req, res) {
       return attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website');
     };
     const products = isFullCatalog && version
-      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-v2"`, buildProducts)
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(products);
+    return res.status(200).json(await applyFloralLiveStock(products));
   } catch (err) {
     console.error('products api error:', err);
     return res.status(err.code === 'CATALOGUE_BUSY' ? 503 : 500).json({ error: err.message || 'Failed to fetch products' });
