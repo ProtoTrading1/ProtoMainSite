@@ -212,7 +212,7 @@ test('a new catalogue query hides prior-query results while its Instore response
     await responseStarted;
     await expect(page.getByText('Amber synthetic result', { exact: true })).toHaveCount(0);
     await expect(page.locator('.catalog-page > [role="status"]')).toHaveText('Searching products…');
-    await expect(page.locator('.catalog-instore-heading')).toContainText('Searching Instore…');
+    await expect(page.locator('.catalog-instore-status--searching')).toContainText('Searching Instore…');
     await expect(page.locator('.catalog-instore-heading')).not.toContainText('0 additional');
     delay.resolve?.();
     await expect(page.getByText('Cobalt synthetic result', { exact: true })).toBeVisible();

@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
-import { discoveryTiles, matchesInstoreSearch } from '../lib/instore-discovery.mjs';
+import { discoveryTiles, prepareInstoreSearch } from '../lib/instore-discovery.mjs';
 import { instorePage } from '../lib/instore-page.mjs';
 import { searchQueryHasStructuredIntent, SEARCH_QUERY_MAX_LENGTH } from '../lib/search-language.mjs';
 import { readCompleteRows } from './_complete-rows.js';
@@ -88,6 +88,7 @@ function normalizePage(value) {
 // Zero or unknown stock is excluded; it never turns into an "arriving soon" card.
 export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged = false, pricesAreInclusive = false, ignoreStockEligibility = false } = {}) {
   const query = normalizeQuery(rawQuery);
+  const search = prepareInstoreSearch(query);
   const seen = new Set();
   return (rows || []).flatMap((row) => {
     const sku = String(row?.sku || '').trim().toUpperCase();
@@ -130,7 +131,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
     };
-    if (!matchesInstoreSearch(product, query)) return [];
+    if (!search.matches(product)) return [];
     seen.add(sku);
     return [product];
   });
