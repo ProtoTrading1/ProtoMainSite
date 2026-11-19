@@ -28,8 +28,9 @@ test('a cached 5,000-product Instore catalogue searches without a network round 
     await input.press('Enter');
     if (total === 'No matches') await expect(page.getByRole('heading', { name: `No products match “${query}”` })).toBeVisible();
     else {
-      await expect(page.locator('.instore-summary')).toContainText(total);
+      await expect(page.locator('.instore-summary strong')).toHaveText(new RegExp(`^\\d+–\\d+ of ${total} products for “${query}”$`));
       await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
+      if (query === 'K100032') await expect(page.locator('.instore-grid .pc-sku-code')).toHaveText('SKU: K100032 | BARCODE: 8600000032');
     }
     const elapsed = Date.now() - started;
     timings.push({ query, elapsed });
