@@ -276,6 +276,28 @@ test('handler accepts combined preference stock shortages once and preserves bot
   }
 });
 
+test('unknown stock is sent once as an order request with a team warning', async () => {
+  const previousFetch = globalThis.fetch; const previousUrl = process.env.VITE_STOCK_SUPABASE_URL; const previousKey = process.env.VITE_STOCK_SUPABASE_KEY;
+  process.env.VITE_STOCK_SUPABASE_URL = 'https://synthetic-stock.example.invalid'; process.env.VITE_STOCK_SUPABASE_KEY = 'synthetic-only';
+  const row = { sku: 'SKU-1', barcode: '1001', title: 'Server notebook', price: 10, units_of_issue: 'EACH', min_order_qty: 1, stock_qty: null, available_stock: null, to_order: false };
+  globalThis.fetch = async url => {
+    assert.equal(new URL(url).hostname, 'synthetic-stock.example.invalid');
+    return new Response(JSON.stringify(String(url).includes('/rpc/') ? [] : [row]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const input = body(); const f = fixture({ resolve: items => resolveAuthoritativePrices(items) });
+    const accepted = await f.invoke(input);
+    assert.equal(accepted.statusCode, 200); assert.equal(f.orders.length, 1);
+    assert.equal(f.orders[0].items[0].qty, input.items[0].qty);
+    assert.match(f.orders[0].order_change_notes, /Stock could not be verified/);
+    assert.equal((await f.invoke(input)).statusCode, 200); assert.equal(f.orders.length, 1);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.VITE_STOCK_SUPABASE_URL; else process.env.VITE_STOCK_SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.VITE_STOCK_SUPABASE_KEY; else process.env.VITE_STOCK_SUPABASE_KEY = previousKey;
+  }
+});
+
 test('a fresh checkout after a completed order creates a new order rather than replaying the old purchase', async () => {
   const f = fixture();
   const original = body();
