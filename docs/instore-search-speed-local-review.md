@@ -1,7 +1,9 @@
 # Instore search speed — local verification, 19 November 2026
 
 Prepared on `agent/instore-search-speed`, based on production `e77f275`.
-No public branch upload, PR, deployment, database or product change yet.
+The user approved public upload of this named branch and generic payload.
+Draft PR/preview preparation is authorized; no production release, database or
+product change is included.
 
 ## Cause and correction
 
@@ -64,8 +66,8 @@ production entry and use synthetic authentication only.
   its resource and filesystem searches. Inspected repository, clean initial
   worktree, branch, refreshed origin/main, repository instructions and actual
   `www.proto.co.za` deployment mapping directly instead.
-- Obtain approval for the generic source upload to the public repository before
-  pushing this new branch; then create a draft PR/preview for hosted acceptance.
+- The user approved generic source upload to the public repository and a draft
+  PR/preview for hosted acceptance.
   Any go-live for this separate performance change remains a later release step.
 - On an approved preview, verify cold and warm main/Instore searches, exact SKU,
   description, structured constraints, no-results, clear, gallery and ordering
