@@ -40,11 +40,14 @@ test('authoritative resolver accepts landed negative-POS requests and SKU aliase
   assert.equal(marker.incoming_qty, 0.001);
 });
 
-test('browser availability cannot grant a request without an authoritative arrived marker', async () => {
+test('browser availability cannot claim stock arrived without an authoritative marker', async () => {
   for (const incoming of [[{ ...marker, incoming_status: 'customs' }]]) {
-    await assert.rejects(() => resolve([item], { incoming }), error => error.status === 409);
+    const result = await resolve([item], { incoming });
+    assert.notEqual(result[0].product.availabilityState, 'landed');
+    assert.equal(result[0].product.stockRequest.shortfallQty, 1);
   }
-  await assert.rejects(() => resolve([item], { stock: { ...row, available_stock: null, stock_qty: null } }), { code: 'ORDER_REVIEW_REQUIRED' });
+  const unknown = await resolve([item], { stock: { ...row, available_stock: null, stock_qty: null } });
+  assert.equal(unknown[0].product.stockRequest.stockUnverified, true);
 });
 
 test('positive POS shortage retains requested quantity and landed requests retain price review', async () => {

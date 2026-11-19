@@ -7,6 +7,14 @@ import {
   isLandedStockAvailable,
   normaliseStockQty,
 } from '../lib/order-stock-guard.mjs';
+import { stockRequestNote } from '../lib/stock-request-note.mjs';
+
+test('unverified stock remains a request for team confirmation without hiding a price change', () => {
+  const input = { sku: '8626000794', quantity: 40, submittedSnapshot: { unitPrice: 16.5, stockQty: 0 }, currentPrice: 16.5, currentStockQty: null, allowUnknownStockRequests: true };
+  assert.equal(evaluateCheckoutSnapshot(input), null);
+  assert.equal(evaluateCheckoutSnapshot({ ...input, currentPrice: 17 }).priceChanged, true);
+  assert.match(stockRequestNote({ stockRequest: { stockUnverified: true, requestedQty: 40 } }), /Stock could not be verified.*40 requested.*team confirmation/);
+});
 
 test('ordinary products are capped to whole current stock while To order remains the exception', () => {
   assert.equal(normaliseStockQty(4.9), 4);
