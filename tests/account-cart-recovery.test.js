@@ -56,3 +56,13 @@ test('support guidance classifies failures without exposing raw basket details',
   }
   assert.equal(cartSyncFailure({ code: 'cart_timeout' }).code, 'cart_timeout');
 });
+
+test('a local identity hold explains recovery without retrying an unchanged invalid import', () => {
+  for (const error of [{ code: 'cart_identity' }, { status: 400, data: { code: 'cart_identity' } }]) {
+    const failure = cartSyncFailure(error);
+    assert.equal(failure.code, 'cart_identity');
+    assert.equal(failure.retryable, false);
+    assert.match(failure.detail, /remain on this device/);
+    assert.match(failure.detail, /Remove the flagged lines/);
+  }
+});

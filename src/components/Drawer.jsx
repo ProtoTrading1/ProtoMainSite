@@ -19,7 +19,7 @@ import { optimizedImageUrl } from '../lib/imageUrl';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { normalizeCartQuantity, stepCartQuantity } from '../lib/cartQuantity';
 import { productSellingUnit } from '../../lib/positill-selling-unit.mjs';
-import { basketLineKey, basketLineQuantityLimit, basketProductQuantity } from '../../lib/basket-lines.mjs';
+import { basketLineKey, basketLineQuantityLimit, basketProductQuantity, newBasketProductKey } from '../../lib/basket-lines.mjs';
 
 const MIN_ORDER = 1000;
 
@@ -440,6 +440,7 @@ export default function Drawer({
               {Number(item.product.minQty) > 1 && (
                 <span>Minimum: {item.product.minQty} × {productSellingUnit(item.product).label}</span>
               )}
+              {!newBasketProductKey(item.product) && <p className="drawer-line-stock-note">This product option needs checking with Proto.</p>}
               <div className="drawer-line-footer">
                 <strong>R{(item.product.price * item.qty).toFixed(2)}</strong>
                 <QuantityStepper item={item} cartItems={cartItems} quantityCapForProduct={quantityCapForProduct} updateQty={updateQty} disabled={basketLoading} />

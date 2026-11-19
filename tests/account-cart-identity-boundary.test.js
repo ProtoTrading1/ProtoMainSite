@@ -71,3 +71,30 @@ test('valid variants/preferences save; conflict and ignored merge contracts rema
   assert.equal((await call([legacy], { existing, mode: 'merge' })).statusCode, 200);
   assert.equal(writes.length, 0);
 });
+
+test('raw group and secondary identity evidence survives sanitation and cannot be added as a leaf', async () => {
+  for (const extra of [{ isVariantGroup: true }, { websiteSku: '[OBJECT OBJECT]' }, { websiteSku: {} }]) {
+    for (const mode of ['save', 'merge']) {
+      const response = await call([{ product: { ...product, ...extra }, qty: 1 }], { mode });
+      assert.equal(response.statusCode, 400);
+      assert.equal(writes.length, 0);
+    }
+  }
+  const existing = { items: [legacy], revision: 3, activity_at: Date.now() };
+  for (const extra of [{ isVariantGroup: true }, { websiteSku: '[OBJECT OBJECT]' }]) {
+    assert.equal((await call([{ ...legacy, product: { ...legacy.product, ...extra } }], { existing })).statusCode, 400);
+    assert.equal(writes.length, 0);
+  }
+});
+
+test('a retained historical invalid secondary SKU or group remains readable/saveable unchanged', async () => {
+  for (const extra of [{ websiteSku: '[OBJECT OBJECT]' }, { isVariantGroup: true }]) {
+    const item = { product: { ...product, ...extra }, qty: 2 };
+    const existing = { items: [item], revision: 3, activity_at: Date.now() };
+    const read = await call([], { existing, method: 'GET' });
+    assert.equal(read.statusCode, 200);
+    assert.deepEqual(Object.fromEntries(Object.keys(extra).map(key => [key, read.body.items[0].product[key]])), extra);
+    assert.equal((await call(read.body.items, { existing })).statusCode, 200);
+    assert.equal(writes.length, 1);
+  }
+});

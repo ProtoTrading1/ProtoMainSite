@@ -80,6 +80,10 @@ function cleanNumber(value, { minimum = Number.NEGATIVE_INFINITY, fallback = nul
 function sanitizeProduct(product, identifiers) {
   const primary = identifiers.primary;
   return {
+    // Keep identity evidence through sanitation so new-add validation cannot
+    // accept a group container or a malformed secondary SKU as a leaf.
+    ...(product.isVariantGroup === true ? { isVariantGroup: true } : {}),
+    ...(product.websiteSku != null ? { websiteSku: identifierText(product.websiteSku, 'websiteSku') } : {}),
     id: identifiers.id || primary,
     sku: identifiers.sku || primary,
     code: identifiers.code || primary,
