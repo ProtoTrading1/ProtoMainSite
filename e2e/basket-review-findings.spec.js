@@ -160,3 +160,23 @@ test('rapid same-event adds reserve stock once and reject the excess without suc
   await expect.poll(() => events.length).toBe(2);
   expect(events.map(event => event.metadata.qty)).toEqual([1, 1]);
 });
+
+for (const [label, websiteSku] of [['structured', {}], ['overlength', 'X'.repeat(161)]]) {
+  test(`historical ${label} secondary identity stays readable and can be explicitly removed`, async ({ page, context }) => {
+    const product = catalogueProducts[0];
+    const saved = { product: { ...product, websiteSku }, qty: 2 };
+    await setup(context, [product], [saved]);
+    await signInCatalogue(page);
+    const drawer = await openCart(page);
+    await expect(drawer.getByText('This product option needs checking with Proto.', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('spinbutton', { name: `Quantity for ${product.code}`, exact: true })).toHaveValue('2');
+    expect(current.items[0].product.websiteSku).toEqual(websiteSku);
+    expect(writes).toHaveLength(0);
+    await drawer.getByRole('button', { name: `Remove ${product.name} from cart`, exact: true }).click();
+    await expect.poll(() => current.items.length).toBe(0);
+    await page.reload();
+    await expect(page.locator('.product-card').first()).toBeVisible();
+    const reopened = await openCart(page);
+    await expect(reopened.getByText('Your basket is empty', { exact: true })).toBeVisible();
+  });
+}

@@ -98,3 +98,29 @@ test('a retained historical invalid secondary SKU or group remains readable/save
     assert.equal(writes.length, 1);
   }
 });
+
+test('invalid historical secondary evidence can be read, retained, reduced and explicitly removed', async () => {
+  for (const extra of [{ websiteSku: {} }, { websiteSku: 'X'.repeat(161) }, { isVariantGroup: {} }]) {
+    const item = { product: { ...product, ...extra }, qty: 2 };
+    const existing = { items: [item], revision: 3, activity_at: Date.now() };
+    const read = await call([], { existing, method: 'GET' });
+    assert.equal(read.statusCode, 200);
+    for (const key of Object.keys(extra)) assert.deepEqual(read.body.items[0].product[key], extra[key]);
+    for (const qty of [2, 1]) {
+      assert.equal((await call([{ ...read.body.items[0], qty }], { existing })).statusCode, 200);
+      assert.equal(writes.length, 1);
+    }
+    assert.equal((await call([], { existing })).statusCode, 200);
+    assert.deepEqual(writes[0].items, []);
+    assert.equal((await call(read.body.items)).statusCode, 400);
+    assert.equal(writes.length, 0);
+  }
+});
+
+test('a different structured secondary identity cannot impersonate a retained legacy value', async () => {
+  const item = { product: { ...product, websiteSku: {} }, qty: 2 };
+  const existing = { items: [item], revision: 3, activity_at: Date.now() };
+  const changed = { ...item, product: { ...item.product, websiteSku: { sku: 'GUESS' } } };
+  assert.equal((await call([changed], { existing })).statusCode, 400);
+  assert.equal(writes.length, 0);
+});

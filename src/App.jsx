@@ -178,10 +178,14 @@ async function hydrateAccountCartItems(items) {
   const savedItems = mergeBasketLines(items);
   if (!savedItems.length) return [];
   try {
-    const bySku = await fetchProductsBySkus(savedItems.map((item) => (
+    const identifiedItems = savedItems.filter(item => newBasketProductKey(item.product));
+    if (!identifiedItems.length) return savedItems;
+    const bySku = await fetchProductsBySkus(identifiedItems.map((item) => (
       item.product?.id || item.product?.sku || item.product?.code
     )));
     return savedItems.map((item) => {
+      // Keep unresolved legacy identity evidence, not a guessed live match.
+      if (!newBasketProductKey(item.product)) return item;
       const keys = [item.product?.id, item.product?.sku, item.product?.code]
         .map((value) => String(value || '').toUpperCase());
       const live = keys.map((key) => bySku.get(key)).find(Boolean);

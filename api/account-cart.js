@@ -82,8 +82,10 @@ function sanitizeProduct(product, identifiers) {
   return {
     // Keep identity evidence through sanitation so new-add validation cannot
     // accept a group container or a malformed secondary SKU as a leaf.
-    ...(product.isVariantGroup === true ? { isVariantGroup: true } : {}),
-    ...(product.websiteSku != null ? { websiteSku: identifierText(product.websiteSku, 'websiteSku') } : {}),
+    // Preserve raw legacy evidence for the context-aware save guard below.
+    // Decoding an old row must not prevent reading or removing that line.
+    ...(product.isVariantGroup != null ? { isVariantGroup: product.isVariantGroup } : {}),
+    ...(product.websiteSku != null ? { websiteSku: product.websiteSku } : {}),
     id: identifiers.id || primary,
     sku: identifiers.sku || primary,
     code: identifiers.code || primary,
