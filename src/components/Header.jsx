@@ -181,7 +181,7 @@ function SearchProductResult({
     event.preventDefault();
     event.stopPropagation();
     if (!stock.canOrder || !onAdd) return;
-    onAdd(product, Math.max(1, Number(product.minQty) || 1));
+    if (onAdd(product, Math.max(1, Number(product.minQty) || 1)) === false) return;
     setAdded(true);
     window.clearTimeout(addedTimerRef.current);
     addedTimerRef.current = window.setTimeout(() => setAdded(false), 1400);

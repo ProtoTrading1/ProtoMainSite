@@ -47,7 +47,7 @@ import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart, backupCartConflict } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { TURTLE_BRACELET_COLOURS, withTurtleBraceletPhoto } from '../lib/kbra2013-colours.mjs';
-import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
+import { addBasketLine, basketLineKey, basketProductKey, newBasketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
@@ -1501,16 +1501,20 @@ export default function App({
   }, [clearedCartSnapshot]);
 
   const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
+    if (!newBasketProductKey(product)) {
+      setCartAnnouncement('This product option needs checking before it can be added. Please choose another option or contact Proto.');
+      return false;
+    }
     if (!cartHydratedRef.current) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
-      return;
+      return false;
     }
     const maxQty = cartQtyCapForProduct(product);
-    if (maxQty <= 0) return;
+    if (maxQty <= 0) return false;
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     if (maxQty < minimumQty) {
       setCartAnnouncement(`Only ${maxQty} available for ${product.name}; its minimum order is ${minimumQty}.`);
-      return;
+      return false;
     }
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
     const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
@@ -1543,6 +1547,7 @@ export default function App({
       setDrawerPeek(false);
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
+    return true;
   }, [markCartActivity, searchQuery]);
 
   const handleCartRevealHandled = useCallback((token) => {

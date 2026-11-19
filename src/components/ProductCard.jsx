@@ -1024,7 +1024,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                       disabled={!modalCanOrder}
                       onClick={() => {
                         if (!modalCanOrder) return;
-                        addToCart(activeProduct, qty, null, isBracelet ? braceletColour : undefined);
+                        if (addToCart(activeProduct, qty, null, isBracelet ? braceletColour : undefined) === false) return;
                         setJustAdded(true);
                         setTimeout(() => setJustAdded(false), 1800);
                       }}
