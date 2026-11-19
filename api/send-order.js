@@ -465,15 +465,10 @@ async function resolveStandardPrices(items) {
       currentPrice: price,
       currentStockQty: normaliseStockQty(availability.stockQty),
       allowKnownStockRequests: true,
+      allowUnknownStockRequests: true,
       currentAvailability: availability,
     });
     if (review && (review.priceChanged || review.stockUnavailable)) reviewChanges.push(review);
-    if (!availability.canOrder && !(availability.state === 'out_of_stock' && normaliseStockQty(availability.stockQty) !== null)) {
-      if (!review) throw orderError(`${cleanText(row.title, `Product on line ${index + 1}`)} is ${availability.label.toLowerCase()} and cannot currently be ordered.`, 409);
-      // Unknown stock or disallowed incoming states must not be silently
-      // treated as ordinary known-stock shortages.
-      if (!review.priceChanged && !review.stockUnavailable) throw orderError('This item is not currently eligible for an order request.', 409);
-    }
     const minQty = Math.max(1, Math.min(MAX_QTY_PER_LINE, Math.floor(Number(row.min_order_qty) || 1)));
     if (qty < minQty) {
       const unitLabel = sellingUnitDetails(row.units_of_issue || 'EACH').label.toLowerCase();
@@ -514,7 +509,7 @@ async function resolveStandardPrices(items) {
     if (stockQty !== null && qty <= stockQty) continue;
     const aggregateReview = evaluateCheckoutSnapshot({
       sku: row.sku, name: cleanText(row.title, row.sku), quantity: qty,
-      allowKnownStockRequests: true, submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
+      allowKnownStockRequests: true, allowUnknownStockRequests: true, submittedSnapshot, currentPrice: customerFacingCataloguePrice(Number(row.price)), currentStockQty: stockQty,
     });
     const existing = reviewChanges.filter(change => textId(change.sku) === textId(row.sku));
     if (existing.length) {
@@ -531,7 +526,7 @@ async function resolveStandardPrices(items) {
     }
     if (group.variants.size<2 || (!group.hasUnknown && group.stockQty!==null && group.qty<=group.stockQty)) continue;
     for (const {row,snapshot} of group.variants.values()) {
-      const change=evaluateCheckoutSnapshot({sku:row.sku,name:cleanText(row.title,row.sku),quantity:group.qty,allowKnownStockRequests:true,submittedSnapshot:snapshot,currentPrice:customerFacingCataloguePrice(Number(row.price)),currentStockQty:group.hasUnknown?null:group.stockQty});
+      const change=evaluateCheckoutSnapshot({sku:row.sku,name:cleanText(row.title,row.sku),quantity:group.qty,allowKnownStockRequests:true,allowUnknownStockRequests:true,submittedSnapshot:snapshot,currentPrice:customerFacingCataloguePrice(Number(row.price)),currentStockQty:group.hasUnknown?null:group.stockQty});
       const existing=reviewChanges.find(entry=>textId(entry.sku)===textId(row.sku));
       if(existing)Object.assign(existing,{requestedQty:group.qty});
       else if(change && (change.priceChanged || change.stockUnavailable))reviewChanges.push(change);
@@ -552,8 +547,10 @@ async function resolveStandardPrices(items) {
     const aggregate = requestedBySku.get(textId(item.product.sku));
     const shared = requestedByBarcode.get(textId(item.product.barcode).toUpperCase());
     const total = shared?.variants.size > 1 ? shared.qty : aggregate.qty;
-    const stock = shared?.variants.size > 1 ? shared.stockQty : normaliseStockQty(aggregate.availability.stockQty);
-    if (!aggregate.toOrder && !isLandedStockAvailable(aggregate.availability) && stock !== null && total > stock) {
+    const stock = shared?.variants.size > 1 ? (shared.hasUnknown ? null : shared.stockQty) : normaliseStockQty(aggregate.availability.stockQty);
+    if (!aggregate.toOrder && !isLandedStockAvailable(aggregate.availability) && stock === null) {
+      item.product.stockRequest = { stockUnverified: true, requestedQty: total, sharedStock: shared?.variants.size > 1 };
+    } else if (!aggregate.toOrder && !isLandedStockAvailable(aggregate.availability) && stock !== null && total > stock) {
       item.product.stockRequest = { availableQty: stock, requestedQty: total, shortfallQty: total - stock, sharedStock: shared?.variants.size > 1 };
     }
   }
@@ -710,7 +707,7 @@ function drawInternalPdfProductRow(doc, item, rowNumber, y, rowHeight = ORDER_PD
   const lineTotal = qty * price;
   const sku = cleanText(product.sku || product.id);
   const unitLabel = sellingUnitDetails(product.unitsOfIssue).label;
-  const productDescription = `${product.stockRequest ? `STOCK SHORTAGE: ${product.stockRequest.shortfallQty} subject to confirmation. ` : ''}${cleanText(product.name, 'Unnamed product')} · ${unitLabel}${sku ? ` [SKU: ${sku}]` : ''}`;
+  const productDescription = `${stockRequestNote(product) ? `${stockRequestNote(product)} ` : ''}${cleanText(product.name, 'Unnamed product')} · ${unitLabel}${sku ? ` [SKU: ${sku}]` : ''}`;
   const verticalOffset = Math.max(0, (rowHeight - ORDER_PDF_ROW_HEIGHT) / 2);
 
   doc.font('Helvetica').fontSize(9).fillColor('#64748b')

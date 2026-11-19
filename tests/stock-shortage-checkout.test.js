@@ -39,13 +39,15 @@ test('zero/negative and partial stock accept exact basket quantities with server
   assert.equal((await resolve({ ...row, available_stock: 10, stock_qty: 10 }))[0].product.stockRequest, undefined);
 });
 
-test('unknown stock, missing product, changed price, invalid quantity and MOQ remain protected', async () => {
-  await assert.rejects(() => resolve({ ...row, available_stock: null, stock_qty: null }), { code: 'ORDER_REVIEW_REQUIRED' });
+test('unknown stock remains a request, while product, price, quantity and MOQ checks remain protected', async () => {
+  const unknown = await resolve({ ...row, available_stock: null, stock_qty: null });
+  assert.equal(unknown[0].qty, 4);
+  assert.match(stockRequestNote(unknown[0].product), /Stock could not be verified/);
   await assert.rejects(() => resolve(null), /unavailable/);
   await assert.rejects(() => resolve({ ...row, price: 20 }), error => error.code === 'ORDER_REVIEW_REQUIRED' && error.changes[0].priceChanged && !error.changes[0].quantityExceedsStock);
   await assert.rejects(() => resolve({ ...row, min_order_qty: 5 }), /minimum order/);
   await assert.rejects(() => resolve(row, [], [{ ...item, qty: 0 }]), /Invalid quantity/);
-  await assert.rejects(() => resolve(row, [{ sku: row.sku, incoming_status: 'customs', incoming_qty: 20, allow_preorder: false }]), { status: 409 });
+  assert.equal((await resolve(row, [{ sku: row.sku, incoming_status: 'customs', incoming_qty: 20, allow_preorder: false }]))[0].qty, 4);
 });
 
 test('snapshot policy opts in only for known stock and does not waive prices', () => {
