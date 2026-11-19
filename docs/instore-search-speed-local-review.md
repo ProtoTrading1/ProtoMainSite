@@ -74,3 +74,15 @@ production entry and use synthetic authentication only.
   controls with the normal authorized account. Do not change product or stock
   data to test search. Check both desktop and mobile and compare timings against
   the current production version under the same network and cache conditions.
+
+## Preview handoff
+
+Draft PR: https://github.com/ProtoTrading1/ProtoMainSite/pull/308
+
+Verified READY preview for source 5a111242a800ca66e39a3c5bf23498829f82824e:
+https://protoportal-main-ihyeuyo83-proto-team.vercel.app
+
+The CodeRabbit repository app explicitly skipped the draft under its default
+policy. No CodeRabbit review has run; Release safety CI is pending. Production
+www.proto.co.za remains on dpl_DZuAN8jW7ECisdrJNBJBTNL4ZTV2. The preview build
+uses ordinary project access; no sharing link or protection change was created.
