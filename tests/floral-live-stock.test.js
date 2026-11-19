@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFloralLiveStock, FLORAL_LIVE_CODES, readFloralLiveStock } from '../lib/floral-live-stock.mjs';
+import { createStockHandler } from '../api/stock.js';
 const bridgeEnv = { STOCK_SQL_BRIDGE_URL: 'https://read-only.example', STOCK_SQL_BRIDGE_KEY: 'test' };
 const incoming = { incomingStatus: 'landed_awaiting_grv', incomingQty: 0.001, incomingEta: '2026-07-30' };
 test('all five exact codes read current balances without mutating input or markers', async () => {
@@ -37,4 +38,20 @@ test('fresh reads can change including a verified zero; no success is cached ind
   const options={bridgeEnv,fetchBridge:async()=>({ok:true,json:async()=>({row:{CODE:FLORAL_LIVE_CODES[0],ONHAND:qty,BOOKED:0}})})};
   assert.equal((await readFloralLiveStock(FLORAL_LIVE_CODES[0],options)).qty,72);
   qty=0; assert.equal((await readFloralLiveStock(FLORAL_LIVE_CODES[0],options)).qty,0);
+});
+
+test('approved customer stock endpoint reads Positill and preserves receipt metadata', async () => {
+  const code = FLORAL_LIVE_CODES[0];
+  const row = {sku:code,barcode:code,available_stock:0,stock_qty:0};
+  const client = {
+    from(table) { assert.equal(table,'website_stock'); return {select(){return this;},or(){return this;},limit:async()=>({data:[row]})}; },
+    async rpc(name) { assert.equal(name,'get_website_product_availability'); return {data:[{sku:code,incoming_status:incoming.incomingStatus,incoming_qty:incoming.incomingQty}]}; },
+  };
+  const response = {headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.code=n;return this;},json(body){this.body=body;return this;}};
+  await createStockHandler({authenticate:async()=>({id:'test'}),approve:async()=>true,getClient:()=>client,bridgeEnv,fetchBridge:async()=>({ok:true,json:async()=>({row:{CODE:code,ONHAND:72,BOOKED:0}})})})({method:'GET',query:{sku:code}},response);
+  assert.equal(response.code,200); assert.equal(response.body.qty,72);
+  assert.equal(response.body.stock_source,'live_positill');
+  assert.equal(response.body.availability.incomingQty,0.001);
+  assert.equal(response.headers['Cache-Control'],'no-store');
+  assert.equal(row.stock_qty,0);
 });
