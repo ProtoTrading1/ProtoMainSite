@@ -1,3 +1,4 @@
+import { applyFloralLiveStock, isFloralLiveCode } from '../lib/floral-live-stock.mjs';
 import { isSarongiRequestSku, sarongiRequestAvailability } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
@@ -141,6 +142,13 @@ return async function handler(req, res) {
     }
 
     const row = data[0];
+    const code = String(row.barcode || row.sku || '').trim().toUpperCase();
+    if (isFloralLiveCode(code)) {
+      const incoming = await loadIncomingAvailability(supabase, row.sku);
+      const [live] = await applyFloralLiveStock([{ barcode: code, toOrder: !!row.to_order, availability: incoming }], { fetchBridge, bridgeEnv });
+      return res.status(200).json({ sku, qty: live.stockQty, available_stock: live.stockQty, stock_qty: live.stockQty, keep_live_when_oos: !!row.keep_live_when_oos, to_order: !!row.to_order, availability: live.availability, stock_source: live.stockSource, checked_at: live.stockCheckedAt });
+    }
+
     // available_stock is SOH (what Bladerunner/cron writes); stock_qty is the raw figure.
     const avail = Number(row.available_stock);
     const raw = Number(row.stock_qty);
