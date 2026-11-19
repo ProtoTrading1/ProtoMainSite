@@ -30,7 +30,9 @@ test('site-wide results disclose complete catalogue coverage before the preview 
   assert.match(mainContent, /matching products across Proto/);
   assert.match(mainContent, /in the main catalogue/);
   assert.match(mainContent, /loading \? 'Searching the main catalogue…'/);
-  assert.match(mainContent, /instoreSearch.loading \? 'Searching Instore…'/);
+  // The browser suite covers the dedicated visible status, its single label,
+  // reduced-motion treatment and pending/empty/error transitions.
+  assert.match(mainContent, /Searching Instore…/);
   assert.match(mainContent, /Instore results unavailable/);
   assert.match(mainContent, /See all \{instoreSearchTotal\.toLocaleString\(\)\} Instore matches/);
   assert.match(mainContent, /Showing the first/);

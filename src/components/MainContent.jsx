@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  LoaderCircle,
   Search,
 } from 'lucide-react';
 import ProductCard from './ProductCard';
@@ -442,11 +443,13 @@ export default function MainContent({
 
       {searchQuery && (
         <section className="catalog-instore-results" aria-labelledby="catalog-instore-title">
-          <div className="catalog-instore-heading"><div><span>INSTORE PRODUCTS</span><h2 id="catalog-instore-title">More matching products across Proto</h2><p>{catalogueError ? 'Main catalogue unavailable' : loading ? 'Searching the main catalogue…' : `${resultsTotal.toLocaleString()} in the main catalogue`} · {instoreSearch.loading ? 'Searching Instore…' : instoreSearch.error ? 'Instore results unavailable' : `${instoreSearchTotal.toLocaleString()} additional Instore matches with more than 10 units available.`}</p></div>{instoreSearchTotal > 0 && <button type="button" onClick={onViewAllInstore}>See all {instoreSearchTotal.toLocaleString()} Instore matches</button>}</div>
-          {instoreSearch.loading && <p className="catalog-instore-status" role="status">Searching the Instore collection…</p>}
+          <div className="catalog-instore-heading"><div><span>INSTORE PRODUCTS</span><h2 id="catalog-instore-title">More matching products across Proto</h2><p>{catalogueError ? 'Main catalogue unavailable' : loading ? 'Searching the main catalogue…' : `${resultsTotal.toLocaleString()} in the main catalogue`}{!instoreSearch.loading && <> · {instoreSearch.error ? 'Instore results unavailable' : `${instoreSearchTotal.toLocaleString()} additional Instore matches with more than 10 units available.`}</>}</p></div>{instoreSearchTotal > 0 && <button type="button" onClick={onViewAllInstore}>See all {instoreSearchTotal.toLocaleString()} Instore matches</button>}</div>
+          {instoreSearch.loading && <div className="catalog-instore-status catalog-instore-status--searching" role="status" aria-live="polite" aria-atomic="true"><LoaderCircle className="catalog-instore-spinner" size={26} aria-hidden="true"/><div><strong>Searching Instore…</strong><p>Checking matches for “{searchQuery}”. Main catalogue results remain available.</p></div></div>}
+          <div className="catalog-instore-results-content" aria-busy={instoreSearch.loading}>
           {!instoreSearch.loading && instoreSearch.error && <p className="catalog-instore-status catalog-instore-status--error">Instore results are temporarily unavailable. Main catalogue results above are unaffected.</p>}
           {!instoreSearch.loading && !instoreSearch.error && instoreSearch.total === 0 && <p className="catalog-instore-status">No additional Instore matches found.</p>}
           {!instoreSearch.loading && !instoreSearch.error && instoreSearch.products.length > 0 && <><p className="catalog-instore-preview-count">Showing the first {instoreSearch.products.length.toLocaleString()} matches.</p><div className="catalog-instore-grid">{instoreSearch.products.map((product, index) => <InstoreResultCard key={product.id} product={product} priority={index < 4} addToCart={addToCart} cartQty={cartQtyMap[product.id] || 0} />)}</div></>}
+          </div>
         </section>
       )}
 
