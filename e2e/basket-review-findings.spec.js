@@ -166,10 +166,22 @@ for (const [label, websiteSku] of [['structured', {}], ['overlength', 'X'.repeat
     const product = catalogueProducts[0];
     const saved = { product: { ...product, websiteSku }, qty: 2 };
     await setup(context, [product], [saved]);
+    await context.addInitScript(({ saved, accountId }) => {
+      if (localStorage.getItem('synthetic-alias-seeded')) return;
+      localStorage.setItem('synthetic-alias-seeded', 'true');
+      const product = { ...saved.product };
+      delete product.sku;
+      delete product.code;
+      localStorage.setItem('proto_cart', JSON.stringify([{ ...saved, product }]));
+      localStorage.setItem('proto_cart_owner', accountId);
+      localStorage.setItem('proto_cart_last_activity_at', String(Date.now()));
+    }, { saved, accountId: ACCOUNT_ID });
     await signInCatalogue(page);
     const drawer = await openCart(page);
     await expect(drawer.getByText('This product option needs checking with Proto.', { exact: true })).toBeVisible();
     await expect(drawer.getByRole('spinbutton', { name: `Quantity for ${product.code}`, exact: true })).toHaveValue('2');
+    await expect(drawer.getByText('Saved to account', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('Support code: cart_identity', { exact: true })).toHaveCount(0);
     expect(current.items[0].product.websiteSku).toEqual(websiteSku);
     expect(writes).toHaveLength(0);
     await drawer.getByRole('button', { name: `Remove ${product.name} from cart`, exact: true }).click();

@@ -50,3 +50,17 @@ test('legacy literal lines remain readable and saveable without permitting new m
   assert.equal(hasNewInvalidBasketIdentity([{ ...parsed.items[0], preference: 'Guessed replacement' }], stored.items), true);
   assert.throws(() => parseCartMutation({ mode: 'save', items: [line({ ...leaf, id: {} })], revision: 0, activityAt: Date.now() }), /must be text/);
 });
+
+
+test('legacy allowance matches server-normalized aliases without accepting a new or changed identity', () => {
+  for (const partial of [{ id: 'LEAF' }, { sku: 'LEAF' }, { code: 'LEAF' }, { id: ' ', sku: ' leaf ' }]) {
+    const local = line({ ...partial, websiteSku: {} }, 2);
+    const saved = cartPayload({ items: [local], revision: 3, activity_at: Date.now() }).items;
+    assert.equal(hasNewInvalidBasketIdentity([local], saved), false);
+    assert.equal(hasNewInvalidBasketIdentity([{ ...local, qty: 1 }], saved), false);
+    assert.equal(hasNewInvalidBasketIdentity([{ ...local, qty: 3 }], saved), true);
+    assert.equal(hasNewInvalidBasketIdentity([local], []), true);
+    assert.equal(hasNewInvalidBasketIdentity([{ ...local, product: { ...local.product, code: 'OTHER' } }], saved), true);
+    assert.equal(hasNewInvalidBasketIdentity([{ ...local, product: { ...local.product, websiteSku: { sku: 'GUESS' } } }], saved), true);
+  }
+});
