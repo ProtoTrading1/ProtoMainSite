@@ -47,12 +47,12 @@ function parseSubcategoryExtra(raw) {
   }
 }
 
-// â”€â”€ Catalogue version + warm-instance memo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Catalogue version + warm-instance memo ────────────────────────────────
 // Building the full catalogue is expensive (paginated scan of website_stock +
 // a sales lookup). It is identical for every approved customer, so we key it on
 // a cheap version stamp: the newest updated_at plus the row count. Every writer
-// bumps updated_at â€” admin edits and the ERP price/stock sync both set
-// `updated_at = now()` (migrations 016 / 031) â€” and archive/create changes the
+// bumps updated_at — admin edits and the ERP price/stock sync both set
+// `updated_at = now()` (migrations 016 / 031) — and archive/create changes the
 // count, so the stamp moves whenever the catalogue actually changes.
 //
 // That gives two big wins under load: repeat requests revalidate with an ETag
@@ -64,12 +64,12 @@ const catalogueBuild = createCatalogueBuildCache();
 
 // The stamp's time bucket exists because the payload is ALSO built from inputs
 // (taxonomy JSON, feature flags, product_placements, product_groups,
-// yearly_sales) that website_stock's updated_at does not cover â€” without it,
+// yearly_sales) that website_stock's updated_at does not cover — without it,
 // changing one of those would pin clients on a 304 forever. But at 60s the
 // bucket rotated the ETag every minute, which made 304s impossible in practice
 // and re-shipped the full ~6MB catalogue on nearly every visit. 10 minutes
 // bounds those secondary changes while letting unchanged catalogues answer
-// 304 + empty body â€” stock edits still bust the ETag instantly via updated_at.
+// 304 + empty body — stock edits still bust the ETag instantly via updated_at.
 const CATALOG_MAX_STALE_MS = 10 * 60_000;
 
 async function loadCatalogVersion(supabase) {
@@ -362,7 +362,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     websiteSku: row.sku,
     sku: row.sku,
     parentSku: row.barcode || null,
-    // Variant grouping (migration 052) â€” null unless catalogGrouping is on AND
+    // Variant grouping (migration 052) — null unless catalogGrouping is on AND
     // this sku is a group member. Client-side variantGroupKey collapses on it.
     ...(groupInfo ? {
       groupId: groupInfo.groupId,
@@ -445,7 +445,7 @@ export default async function handler(req, res) {
     const supabase = createStockClient();
 
     // This response is per-customer authorized, so it must never be stored by a
-    // SHARED cache (Vercel's CDN keys on URL, not on the Authorization header â€”
+    // SHARED cache (Vercel's CDN keys on URL, not on the Authorization header —
     // an s-maxage here could hand the protected catalogue to an unauthenticated
     // request). Private + revalidate keeps it in the user's own browser cache
     // only, and the ETag below makes that revalidation cheap.
@@ -509,7 +509,7 @@ export default async function handler(req, res) {
     let version = null;
     if (isFullCatalog) {
       // Defensive: the version stamp is an OPTIMISATION. If it can't be read we
-      // must still serve the catalogue â€” degrade to the previous always-rebuild
+      // must still serve the catalogue — degrade to the previous always-rebuild
       // behaviour rather than failing the request.
       try {
         version = await loadCatalogVersion(supabase);
@@ -528,7 +528,7 @@ export default async function handler(req, res) {
         res.setHeader('X-Catalog-As-Of', String(version.newest));
         const ageMs = Date.now() - new Date(version.newest).getTime();
         if (Number.isFinite(ageMs) && ageMs > 6 * 60 * 60 * 1000) {
-          console.warn(`products api: catalogue stale â€” newest updated_at is ${Math.round(ageMs / 60000)} min old (ERP sync may be down)`);
+          console.warn(`products api: catalogue stale — newest updated_at is ${Math.round(ageMs / 60000)} min old (ERP sync may be down)`);
         }
       }
 
@@ -556,7 +556,7 @@ export default async function handler(req, res) {
         // A direct code lookup should stay direct: only fetch sales for the
         // returned codes instead of scanning the entire sales catalogue.
         loadSalesByBarcode(supabase, requestedSkus || (identifier ? [identifier] : null)),
-        // null when the feature is off â€” no extra query, payload unchanged.
+        // null when the feature is off — no extra query, payload unchanged.
         loadPlacementMapIfEnabled(supabase),
         loadGroupInfoMapIfEnabled(supabase),
         loadIncomingAvailabilityMap(supabase),
