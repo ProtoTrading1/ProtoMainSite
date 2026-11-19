@@ -172,7 +172,7 @@ test('the collection survives a reload without downloading again', async () => {
   // Nothing stale, nothing shaped for older code, and nothing left at sign-out.
   assert.match(range, /if \(!Array\.isArray\(entry\?\.data\) \|\| !entry\.data\.length\) return null;/);
   assert.match(range, /request\.transaction\.objectStore\(IDB_STORE\)\.clear\(\)/);
-  assert.match(range, /void clearPersistedCollection\(\)/);
+  // Runtime clear/pending-response behavior is covered by instore-gallery-refresh.spec.js.
 });
 
 test('the API and the browser share one page definition', async () => {

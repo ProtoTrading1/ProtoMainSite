@@ -23,6 +23,21 @@ const responseCache = new Map();
 let catalogueRequest = null;
 let catalogueProducts = null;
 let hydration = null;
+let collectionGeneration = 0;
+let persistenceClear = Promise.resolve();
+const catalogueListeners = new Set();
+
+function notifyCatalogue() {
+  for (const listener of catalogueListeners) listener(catalogueProducts);
+}
+
+// A mounted view must receive the background refresh too, not just the copy
+// returned immediately from this browser's cache.
+export function subscribeInstoreCatalogue(listener) {
+  catalogueListeners.add(listener);
+  listener(catalogueProducts);
+  return () => catalogueListeners.delete(listener);
+}
 
 function openCollectionDb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
@@ -53,9 +68,12 @@ async function readPersistedCollection() {
   return Number.isFinite(age) && age >= 0 && age < PERSISTED_COLLECTION_MAX_AGE_MS ? entry.data : null;
 }
 
-async function writePersistedCollection(products) {
+async function writePersistedCollection(products, generation = collectionGeneration) {
+  await persistenceClear;
+  if (generation !== collectionGeneration) return;
   const db = await openCollectionDb();
   if (!db) return;
+  if (generation !== collectionGeneration) { db.close(); return; }
   await new Promise((resolve) => {
     const transaction = db.transaction(IDB_STORE, 'readwrite');
     transaction.objectStore(IDB_STORE).put({ data: products, ts: Date.now() }, IDB_KEY);
@@ -92,11 +110,13 @@ function storage() {
 // same for every approved customer, but the store is still cleared on sign-out
 // so nothing of one session is left for the next.
 export function clearStoredInstoreResponses() {
+  collectionGeneration += 1;
   responseCache.clear();
   catalogueRequest = null;
   catalogueProducts = null;
   hydration = null;
-  void clearPersistedCollection().catch(() => {});
+  notifyCatalogue();
+  persistenceClear = persistenceClear.then(() => clearPersistedCollection()).catch(() => {});
   const store = storage();
   if (!store) return;
   try {
@@ -162,6 +182,7 @@ export function storedExtendedRange(query = '', options = {}) {
 }
 
 export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, exact = false } = {}) {
+  const generation = collectionGeneration;
   const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue, exact });
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
@@ -169,6 +190,7 @@ export async function fetchExtendedRange(query = '', { signal, page = 1, categor
   // protected, server-side eligibility checks enough time to finish instead
   // of turning a slow-but-valid response into a false loading failure.
   const { response, data } = await authenticatedGetJson(`/api/extended-range?${cacheKey}`, { signal, timeoutMs: 45000 });
+  if (generation !== collectionGeneration) throw new Error('The Instore collection changed. Please retry.');
   if (!response.ok) throw new Error('Unable to load Instore Products. Please try again.');
   if (!signal?.aborted) {
     responseCache.set(cacheKey, { data, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
@@ -201,14 +223,17 @@ function preloadLandingImages(products) {
 }
 
 async function fetchCollection() {
+  const generation = collectionGeneration;
   const data = await fetchExtendedRange('', { page: 1, includeCatalogue: true });
+  if (generation !== collectionGeneration) return null;
   const products = Array.isArray(data?.catalogue) && data.catalogue.length ? data.catalogue : null;
   if (products) {
     catalogueProducts = products;
+    notifyCatalogue();
     preloadLandingImages(products);
-    await writePersistedCollection(products).catch(() => {});
+    await writePersistedCollection(products, generation).catch(() => {});
   }
-  return products;
+  return generation === collectionGeneration ? products : null;
 }
 
 /**
@@ -219,10 +244,13 @@ async function fetchCollection() {
 export function hydrateInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
   if (!hydration) {
-    hydration = readPersistedCollection()
+    const generation = collectionGeneration;
+    hydration = persistenceClear.then(() => generation === collectionGeneration ? readPersistedCollection() : null)
       .then((persisted) => {
+        if (generation !== collectionGeneration) return null;
         if (persisted && !catalogueProducts) {
           catalogueProducts = persisted;
+          notifyCatalogue();
           preloadLandingImages(persisted);
         }
         return catalogueProducts;
@@ -237,13 +265,16 @@ function fetchWhenIdle() {
   const connection = typeof navigator === 'undefined' ? null : navigator.connection;
   // Nothing optional on a connection the customer pays for by the megabyte.
   if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return Promise.resolve(catalogueProducts);
-  catalogueRequest = new Promise((resolve) => {
-    const start = () => resolve(fetchCollection().catch(() => null));
+  const generation = collectionGeneration;
+  const pending = new Promise((resolve) => {
+    const start = () => resolve(generation === collectionGeneration ? fetchCollection().catch(() => null) : null);
     if (typeof window === 'undefined') start();
     else if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 5000 });
     else window.setTimeout(start, 1200);
-  }).finally(() => { catalogueRequest = null; });
-  return catalogueRequest;
+  });
+  const tracked = pending.finally(() => { if (catalogueRequest === tracked) catalogueRequest = null; });
+  catalogueRequest = tracked;
+  return tracked;
 }
 
 export function instoreCatalogue() {
@@ -261,7 +292,9 @@ export function instoreCatalogue() {
  * so a page can join a load already running instead of starting a second one.
  */
 export function prefetchInstoreCatalogue() {
+  const generation = collectionGeneration;
   return hydrateInstoreCatalogue().then((local) => {
+    if (generation !== collectionGeneration) return null;
     // Do not compete with a focused code lookup by starting a full refresh.
     const hash = typeof window === 'undefined' ? '' : window.location.hash;
     const query = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)).get('q') : '';
