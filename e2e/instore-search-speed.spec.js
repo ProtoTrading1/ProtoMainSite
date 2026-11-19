@@ -22,12 +22,15 @@ test('a cached 5,000-product Instore catalogue searches without a network round 
   await expect(page.locator('.instore-summary')).toContainText('5,000');
   const input = page.getByRole('searchbox', { name: 'Search Instore Products' });
   const timings = [];
-  for (const [query, total] of [['bracelets', '278'], ['hair clips', '278'], ['K100032', '1'], ['doesnotexist', 'No matches']]) {
+  for (const [query, total, name] of [['bracelets', '278', 'DRAWSTRING BRACELET ORANGE'], ['hair clips', '278', 'HAIR CLIP PURPLE'], ['K100032', '1', 'T SHIRT XL GREY'], ['doesnotexist', 'No matches', null]]) {
     await input.fill(query);
     const started = Date.now();
     await input.press('Enter');
     if (total === 'No matches') await expect(page.getByRole('heading', { name: `No products match “${query}”` })).toBeVisible();
-    else await expect(page.locator('.instore-summary')).toContainText(total);
+    else {
+      await expect(page.locator('.instore-summary')).toContainText(total);
+      await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
+    }
     const elapsed = Date.now() - started;
     timings.push({ query, elapsed });
     // Broad enough for CI variance, but catches the original multi-second matcher.
