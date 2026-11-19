@@ -1,3 +1,4 @@
+import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
@@ -463,7 +464,7 @@ return async function handler(req, res) {
       const origin=websiteOnlyProvider ? websiteOnlyRequestOrigin(req) : null;
       const provider=websiteOnlyProvider ? (options)=>websiteOnlyProvider({...options,origin}) : null;
       const live=await loadLiveInstoreCatalogue(client,{websiteOnlyProvider:provider,exactSku:query.toUpperCase()});
-      const products=attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client));
+      const products=await attachArchivePublicationGalleries(attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client)),client,'instore');
       const view=instorePage(products,{query,category,page,pageSize:PAGE_SIZE});
       return sendInstoreResponse(res,{source:SOURCE_LABEL,count:view.products.length,page,pageSize:PAGE_SIZE,total:view.total,tiles:[],products:view.products});
     }
@@ -478,8 +479,8 @@ return async function handler(req, res) {
     const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
     if (stored.body) {
       const galleries = await readPrivateReviewGalleries(client);
-      const body = {...stored.body, products: attachPrivateReviewGalleries(stored.body.products, galleries)};
-      if (Array.isArray(stored.body.catalogue)) body.catalogue = attachPrivateReviewGalleries(stored.body.catalogue, galleries);
+      const body = {...stored.body, products: await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.products, galleries),client,'instore')};
+      if (Array.isArray(stored.body.catalogue)) body.catalogue = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.catalogue, galleries),client,'instore');
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({ source: SOURCE_LABEL, ...body });
@@ -504,7 +505,7 @@ return async function handler(req, res) {
       const [imageControls,listingControls]=await Promise.all([readInstoreImageControls(client),readInstoreListingControls(client)]);
       allEligible=allEligible.filter(product=>listingControls.get(product.sku)!=='hidden').map(product=>imageControls.get(product.sku)==='hidden'?{...product,image:'',images:[],imageStatus:'hidden'}:product);
     }
-    allEligible = attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client));
+    allEligible = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client)),client,'instore');
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
     return sendInstoreResponse(res, {

@@ -1,3 +1,4 @@
+import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { createCatalogueBuildCache } from './_catalogue-build.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
@@ -499,7 +500,7 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json(products);
+      return res.status(200).json(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'));
     }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
@@ -517,7 +518,7 @@ export default async function handler(req, res) {
       }
     }
     if (isFullCatalog && version) {
-      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-v1"`;
+      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-v2"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
       // (e.g. a stalled ERP sync) is observable rather than silent.
@@ -585,10 +586,10 @@ export default async function handler(req, res) {
           || (p.isMultiCategory && p.alternateCategoryPath?.length)
           || p.placementPaths?.length);
 
-      return products;
+      return attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website');
     };
     const products = isFullCatalog && version
-      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-v1"`, buildProducts)
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-v2"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(products);
