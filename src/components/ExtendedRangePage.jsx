@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, PackageSearch, RefreshCw, Search, Store, X } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProtoLogo from './ProtoLogo';
-import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange } from '../lib/extendedRange';
+import { fetchExtendedRange, hydrateInstoreCatalogue, instoreCatalogue, prefetchInstoreCatalogue, storedExtendedRange, subscribeInstoreCatalogue } from '../lib/extendedRange';
 import { discoveryTiles } from '../../lib/instore-discovery.mjs';
 import { INSTORE_PAGE_SIZE, instorePage } from '../../lib/instore-page.mjs';
 import { withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
@@ -61,6 +61,12 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
   const resultsRef = useRef(null);
   const internalSearchRef = useRef(null);
   const searchRef = searchInputRef || internalSearchRef;
+
+  useEffect(() => {
+    const unsubscribe = subscribeInstoreCatalogue(setCatalogue);
+    void prefetchInstoreCatalogue();
+    return unsubscribe;
+  }, []);
 
   const localTiles = useMemo(() => (catalogue ? discoveryTiles(catalogue) : null), [catalogue]);
 
@@ -139,7 +145,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     if (catalogue) return undefined;
     let cancelled = false;
     hydrateInstoreCatalogue()
-      .then((local) => { if (!cancelled && local) setCatalogue(local); })
+      .then((local) => { if (!cancelled && local) setCatalogue(instoreCatalogue()); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLocalChecked(true); });
     return () => { cancelled = true; };
@@ -152,7 +158,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
     if (catalogue || (/^\d{10}$/.test(submittedQuery.trim()) && !category && page === 1)) return undefined;
     let cancelled = false;
     prefetchInstoreCatalogue().then((collection) => {
-      if (!cancelled && collection) setCatalogue(collection);
+      if (!cancelled && collection) setCatalogue(instoreCatalogue());
     });
     return () => { cancelled = true; };
   }, [catalogue, retry, submittedQuery, category, page]);
