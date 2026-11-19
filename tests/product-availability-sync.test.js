@@ -105,7 +105,7 @@ test('catalogue, live-stock and order verification consume the shared contract',
 
   assert.match(productsApi, /availability:\s*availabilityForRow\(row, incoming\)/);
   assert.match(stockApi, /const availability = availabilityForRow\(row, incoming\)/);
-  assert.match(orderApi, /if \(!availability\.canOrder &&/);
+  assert.match(orderApi, /const availability = availabilityForRow\(row, incomingBySku\.get\(row\.sku\)/);
   assert.match(orderApi, /availabilityState:\s*availability\.state/);
   assert.match(card, /data\.availability \|\| null/);
 });
