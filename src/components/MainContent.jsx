@@ -9,6 +9,7 @@ import { ProductGridSkeleton } from './ProductCardSkeleton';
 import CategoryLanding from './CategoryLanding';
 import { InstoreResultCard } from './ExtendedRangePage';
 import { slugToLabel } from '../lib/taxonomy';
+import { searchRecoveryTerms } from '../../lib/search-language.mjs';
 
 function cartQtyForProduct(product, cartQtyMap) {
   if (product?.isVariantGroup && Array.isArray(product.variants) && product.variants.length) {
@@ -381,6 +382,12 @@ export default function MainContent({
         <div className="empty-state">
           <Search size={32} />
           <h3>No products match your current filters.</h3>
+          {searchQuery && <p>Try a shorter product name or an exact stock code.</p>}
+          {searchRecoveryTerms(searchQuery).length > 0 && <p>
+            Suggested searches (availability may vary):{' '}
+            {searchRecoveryTerms(searchQuery).map(term => <a key={term} href={`/#/?q=${encodeURIComponent(term)}`} style={{ marginRight: 12 }}>{term}</a>)}
+          </p>}
+          {searchQuery && <p><a href="/#/">Browse all products</a></p>}
           <button onClick={onResetFilters} type="button">
             Reset Filters
           </button>

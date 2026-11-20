@@ -256,21 +256,32 @@ function applyIdentifierFilter(query, identifier) {
   ).order('sku', { ascending: true });
 }
 
-async function fetchIdentifierRows(supabase, identifier) {
+export async function fetchIdentifierRows(supabase, identifier, rawIdentifier = identifier) {
   // Exact SKU/barcode is the overwhelmingly common operational lookup. Give it
   // an index-friendly query first; only pay for prefix matching when no exact
   // row exists. The previous OR mixed eq + ilike in one query, which forced
   // exact scans through the slower prefix plan too.
+  // A supplier model may omit only the final numeric-suffix hyphen. Query
+  // those two spellings case-insensitively, retaining collisions for ranking.
+  const suffix = /^([A-Z]{2,}\d{2,})(\d)$/.exec(identifier);
+  const barcodeFilter = /^\d+$/.test(identifier) ? `barcode.eq.${identifier}` : `barcode.ilike.${identifier}`;
+  const exactFilter = suffix
+    ? `sku.ilike.${identifier},sku.ilike.${suffix[1]}-${suffix[2]},${barcodeFilter}`
+    : `sku.ilike.${identifier},${barcodeFilter}`;
   const exact = await fetchAllRows(
     supabase,
     'website_stock',
     STOCK_SELECT,
     (q) => q
-      .or(`sku.eq.${identifier},barcode.eq.${identifier}`)
+      .or(exactFilter)
       .order('sku', { ascending: true }),
     10,
   );
-  if (exact.length) return exact;
+  if (exact.length) {
+    const literal = String(rawIdentifier).trim().toUpperCase();
+    return exact.sort((a, b) => Number(String(b.sku).toUpperCase() === literal)
+      - Number(String(a.sku).toUpperCase() === literal));
+  }
   return fetchAllRows(
     supabase,
     'website_stock',
@@ -545,7 +556,7 @@ export default async function handler(req, res) {
     const buildProducts = async () => {
       const [initialRows, tree, initialSalesByBarcode, placements, existingGroupInfo, incomingBySku] = await Promise.all([
         identifier
-          ? fetchIdentifierRows(supabase, identifier)
+          ? fetchIdentifierRows(supabase, identifier, rawIdentifier)
           : fetchAllRows(
             supabase,
             'website_stock',

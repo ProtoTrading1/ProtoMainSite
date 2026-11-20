@@ -338,6 +338,7 @@ export default function App({
   const searchTrackRef = useRef({ rowId: null, searchedAt: null, term: '' });
   const instoreSearchInputRef = useRef(null);
   const lastSearchLogKeyRef = useRef('');
+  const searchLogRequestRef = useRef(null);
   const hasInitializedCartAnnouncementRef = useRef(false);
   const prevCartSnapshotRef = useRef({ count: 0, total: 0 });
   const cartHydratedRef = useRef(false);
@@ -1324,6 +1325,7 @@ export default function App({
     if (!routeSearchQuery.trim()) {
       searchTrackRef.current = { rowId: null, searchedAt: null, term: '' };
       lastSearchLogKeyRef.current = '';
+      searchLogRequestRef.current = null;
       return;
     }
     if (catalogueResultsPending || catalogError) return;
@@ -1341,16 +1343,23 @@ export default function App({
     if (path.length) filtersApplied.push(...path);
 
     const timer = setTimeout(() => {
-      void logSearch({
-        searchTerm: term,
-        resultsFound: visibleCatalogResults.total,
-        customerId: customer?.id ?? null,
-        customerEmail: customer?.email ?? null,
-        filtersApplied,
-      }).then((id) => {
+      // One user search keeps its pending request across catalogue refreshes.
+      // The current effect may adopt its row ID without submitting it again.
+      if (searchLogRequestRef.current?.key !== logKey) {
+        searchLogRequestRef.current = { key: logKey, searchedAt, promise: logSearch({
+          searchTerm: term,
+          resultsFound: visibleCatalogResults.total,
+          customerId: customer?.id ?? null,
+          customerEmail: customer?.email ?? null,
+          filtersApplied,
+        }) };
+      }
+      const request = searchLogRequestRef.current;
+      void request.promise.then((id) => {
+        if (!id && searchLogRequestRef.current === request) searchLogRequestRef.current = null;
         if (!cancelled && id) {
           lastSearchLogKeyRef.current = logKey;
-          searchTrackRef.current = { rowId: id, searchedAt, term };
+          searchTrackRef.current = { rowId: id, searchedAt: request.searchedAt, term };
         }
       });
     }, 900);

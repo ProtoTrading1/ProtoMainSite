@@ -611,3 +611,15 @@ test('an empty collection is never published over a working one', async () => {
     /produced no products/,
   );
 });
+
+test('compound searches include old eligible token spellings even beside fresh exact candidates', async () => {
+  for (const [query, old, fresh] of [['key rings', 'key ring', 'keyring'], ['note book', 'note book', 'notebook'], ['table cloth', 'table cloth', 'tablecloth']]) {
+    const products = [old, fresh].map((title, i) => ({ sku: `OLD-${i}`, title }));
+    const client = stubStockClient({ instore_catalogue: products.map((payload, i) => ({
+      sku: payload.sku, payload, discovery_group: 'Stationery & art', search_tokens: ` ${i ? fresh : old} `,
+    })) });
+    const candidates = await readCatalogueSearchCandidates(client, { query });
+    assert.deepEqual(candidates.filter(p => matchesInstoreSearch(p, query)).map(p => p.sku).sort(), ['OLD-0', 'OLD-1']);
+    assert.deepEqual(await readCatalogueSearchCandidates(client, { query, category: 'Soft toys' }), []);
+  }
+});
