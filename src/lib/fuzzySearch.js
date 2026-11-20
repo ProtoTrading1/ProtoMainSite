@@ -7,7 +7,7 @@ import {
 } from './identifierNormalize.js';
 import {
   firstRelatedSearchTerm, parseSearchQuery, productMatchesSearchIntent,
-  searchQueryUsesFamily, searchQueryVariants, singularizeSearchWord,
+  searchQueryUsesFamily, searchQueryVariants, singularizeSearchWord, normalizeSearchCompounds, searchTypoMatch,
 } from '../../lib/search-language.mjs';
 
 const SCORE = {
@@ -49,7 +49,7 @@ export function getRelatedSearchTerm(value) {
 }
 
 function words(text) {
-  return normalize(text).split(/\s+/).filter(Boolean).map(singularizeSearchWord);
+  return normalize(normalizeSearchCompounds(text)).split(/\s+/).filter(Boolean).map(singularizeSearchWord);
 }
 
 function significantWords(text) {
@@ -81,39 +81,6 @@ function phraseHead(name) {
 function isLeadingCompoundModifier(name, token) {
   const ws = primaryNameWords(name);
   return ws.length === 2 && ws[0] === token && ws[1] !== token;
-}
-
-function editDistance(a, b) {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  const curr = new Array(b.length + 1);
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      curr[j] = a[i - 1] === b[j - 1]
-        ? prev[j - 1]
-        : 1 + Math.min(prev[j], curr[j - 1], prev[j - 1]);
-    }
-    prev.splice(0, prev.length, ...curr);
-  }
-  return prev[b.length];
-}
-
-/** Adjacent transposition counts as one edit (scraf → scarf). */
-function typoDistance(a, b) {
-  if (a === b) return 0;
-  if (Math.abs(a.length - b.length) > 1) return editDistance(a, b);
-  const d = editDistance(a, b);
-  if (d <= 1) return d;
-  if (a.length >= 2 && b.length >= 2) {
-    for (let i = 0; i < a.length - 1; i++) {
-      const swapped = a.slice(0, i) + a[i + 1] + a[i] + a.slice(i + 2);
-      if (swapped === b) return 1;
-    }
-  }
-  return d;
 }
 
 function skuValues(product) {
@@ -281,8 +248,8 @@ function candidateProducts(products, query) {
           && word.length >= 4
           && /^[a-z]+$/.test(token)
           && /^[a-z]+$/.test(word)
-          && Math.abs(token.length - word.length) <= 1
-          && conservativeTypoMatch(token, word);
+          && Math.abs(token.length - word.length) <= 2
+          && searchTypoMatch(token, word);
         if (!prefixMatch && !typoMatch) continue;
         for (const product of prepared.tokenMap.get(word)) tokenMatches.add(product);
       }
@@ -350,7 +317,7 @@ function scoreNameMatch(index, token, tokenCompact) {
   }
 
   if (isWholeWord) return SCORE.WHOLE_WORD_NAME;
-  if (token.length >= 4 && index.nameWords.some((word) => word.startsWith(token))) return SCORE.NAME_PREFIX;
+  if ((token.length >= 4 || token === 'dia') && index.nameWords.some((word) => word.startsWith(token))) return SCORE.NAME_PREFIX;
   return 0;
 }
 
@@ -364,25 +331,10 @@ function scoreKeywordMatch(index, token, allowCategory) {
   return 0;
 }
 
-function conservativeTypoMatch(token, word) {
-  if (!/^[a-z]+$/.test(token) || !/^[a-z]+$/.test(word)) return false;
-  // Short adjacent swaps recover "scraf" without turning "blush" into "brush".
-  if (token.length === word.length && token.length >= 4) {
-    for (let index = 0; index < token.length - 1; index += 1) {
-      if (token.slice(0, index) + token[index + 1] + token[index] + token.slice(index + 2) === word) return true;
-    }
-  }
-  // A leading substitution can change a real product/material word entirely
-  // (leather / feather). Preserve internal edits and adjacent swaps, but
-  // require the initial letter for same-length generic substitutions.
-  if (token.length === word.length && token[0] !== word[0]) return false;
-  return token.length >= 6 && word.length >= 6 && typoDistance(token, word) === 1;
-}
-
 function scoreTypoOnName(index, token) {
   if (token.length < 4) return 0;
   for (const word of index.nameWords) {
-    if (conservativeTypoMatch(token, word)) return SCORE.TYPO;
+    if (searchTypoMatch(token, word)) return SCORE.TYPO;
   }
   return 0;
 }
@@ -395,7 +347,7 @@ function scoreToken(index, token, allowCategory = true) {
   return (
     scoreExactSku(index, t, tCompact)
     || scoreExactBarcode(index, t, tCompact)
-    || scoreIdentifierPrefix(index, t, tCompact)
+    || (!/^20\d{2}$/.test(t) && scoreIdentifierPrefix(index, t, tCompact))
     || scoreNameMatch(index, t, tCompact)
     || scoreDescriptionMatch(index, t)
     || scoreKeywordMatch(index, t, allowCategory)
@@ -410,6 +362,10 @@ function isBareModelQuery(query) {
 function scoreIdentifierQuery(product, query, allowModelFallback = false) {
   const queryId = normalizeIdentifier(query);
   if (!queryId) return 0;
+
+  const literal = String(query).trim().toLowerCase();
+  if (skuValues(product).some(value => value.trim().toLowerCase() === literal)) return SCORE.EXACT_SKU + 2;
+  if (barcodeValues(product).some(value => value.trim().toLowerCase() === literal)) return SCORE.EXACT_BARCODE + 2;
 
   const index = getSearchIndex(product);
   let score = 0;
@@ -491,15 +447,23 @@ export function fuzzyFilter(products, query) {
     }
   }
 
+  const yearIdentifier = /^20\d{2}$/.test(String(query).trim()) ? normalizeIdentifier(query) : null;
   const scored = [...candidateSet]
     .filter((product) => !isSoftToyFamily || isSoftToyProduct(product))
     .map((product) => ({
       product,
+      exactYearCode: yearIdentifier !== null && [...skuValues(product), ...barcodeValues(product)]
+        .some(value => normalizeIdentifier(value) === yearIdentifier),
       exactTitle: !isIdentifierQuery(query) && !isBareModelQuery(query) && normalize(product.name) === normalize(query),
-      score: Math.max(...variants.map((variant) => scoreProduct(product, variant, !objectQuery, isBareModelQuery(query)))),
+      score: Math.max(...variants.map((variant, index) => {
+        const score = scoreProduct(product, isIdentifierQuery(query) ? query : variant, !objectQuery, isBareModelQuery(query));
+        return score > 0 ? score + (index === 0 ? 15 : 0) : 0;
+      })),
     }))
     .filter((item) => item.score >= minimumScore)
     .sort((a, b) => {
+      const exactYearCodeDelta = Number(b.exactYearCode) - Number(a.exactYearCode);
+      if (exactYearCodeDelta !== 0) return exactYearCodeDelta;
       const exactTitleDelta = Number(b.exactTitle) - Number(a.exactTitle);
       if (exactTitleDelta !== 0) return exactTitleDelta;
       const scoreDelta = b.score - a.score;

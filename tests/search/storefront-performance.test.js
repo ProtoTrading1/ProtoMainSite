@@ -42,7 +42,7 @@ test('exact identifier lookup is coalesced and uses an exact-first server query'
   );
   assert.match(
     productsApiSrc,
-    /if \(exact\.length\) return exact;[\s\S]*applyIdentifierFilter\(q, identifier\)/,
+    /if \(exact\.length\) \{[\s\S]*return exact\.sort[\s\S]*applyIdentifierFilter\(q, identifier\)/,
     'prefix matching is only used when exact SKU/barcode matching is empty',
   );
   assert.match(

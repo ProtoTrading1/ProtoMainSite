@@ -25,6 +25,9 @@ export function isIdentifierQuery(query) {
   if (/^\d+(?:[.,]\d+)?\s*(?:mm|cm|m|ml|l|g|kg)$/i.test(candidate)) return false;
   if (/^[a-z]\d+\s+\S/i.test(candidate)) return false;
 
+  // Four-digit years are also title words. Exact identifier scoring still wins.
+  if (!labelled && /^20\d{2}$/.test(candidate)) return false;
+
   const id = normalizeIdentifier(candidate);
   if (id.length < 4 || !/^[A-Z0-9]+$/.test(id)) return false;
 

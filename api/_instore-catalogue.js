@@ -63,7 +63,13 @@ export function catalogueSearchPatterns(query) {
 }
 
 export function catalogueSearchPatternSets(query) {
-  return searchTermSets(query).map((terms) => [...new Set(terms)].map((term) => `% ${term}%`));
+  const sets = searchTermSets(query);
+  // Existing eligible snapshots may predate compound normalization. Read both
+  // token spellings until their ordinary refresh; never rewrite source rows.
+  const compounds = new Map([['keyring', ['key', 'ring']], ['notebook', ['note', 'book']], ['tablecloth', ['table', 'cloth']], ['christmas', ['christma']]]);
+  const legacy = sets.map(terms => terms.flatMap(term => compounds.get(term) || [term]));
+  return [...new Map([...sets, ...legacy].map(terms => [terms.join(' '), terms])).values()]
+    .map((terms) => [...new Set(terms)].map((term) => `% ${term}%`));
 }
 
 // sort_index is the default (no search term) customer ordering, so the
@@ -185,7 +191,7 @@ export async function readCatalogueSearchCandidates(client, { query, category = 
   // only runs after a zero-candidate read, never on a successful search.
   if (!products.size && patternSets.length === 1) {
     const terms = searchTermSets(query)[0] || [];
-    const typoTerms = terms.filter((term) => /^[a-z]{6,}$/.test(term));
+    const typoTerms = terms.filter((term) => /^[a-z]{5,}$/.test(term));
     for (const typoTerm of typoTerms) {
       const remaining = terms.filter((term) => term !== typoTerm);
       const rows = remaining.length
