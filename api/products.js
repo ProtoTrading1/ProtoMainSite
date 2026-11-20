@@ -1,5 +1,6 @@
 import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
+import {attachInstoreMoveGalleries} from '../lib/instore-move-galleries.mjs';
 import { createCatalogueBuildCache } from './_catalogue-build.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNormalize.js';
@@ -30,7 +31,7 @@ const STOCK_SELECT = [
   'image_url_one', 'image_url_two', 'image_url_three', 'image_url_four',
   'stock_qty', 'available_stock', 'keep_live_when_oos', 'to_order', 'created_at',
   'units_of_issue', 'pack_description', 'min_order_qty',
-  'is_new_arrival',
+  'is_new_arrival', 'moved_from',
   'category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four', 'subcategory_extra',
   'mottaro_path',
 ].join(', ');
@@ -378,6 +379,7 @@ function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, gro
     unitsOfIssue,
     price: customerFacingCataloguePrice(row.price),
     images,
+    ...(row.moved_from === 'instore' ? {hasPreservedInstoreGallery:true} : {}),
     image: images[0] || '',
     secondaryImage: images[1] || '',
     stockQty: Number(row.stock_qty) || 0,
@@ -501,7 +503,7 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json(await applyFloralLiveStock(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website')));
+      return res.status(200).json(await applyFloralLiveStock(await attachInstoreMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'),()=>createStockClient({legacyServiceRole:true}))));
     }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
@@ -519,8 +521,8 @@ export default async function handler(req, res) {
       }
     }
     if (isFullCatalog && version) {
-      const baseEtag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3"`;
-      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3-${Math.floor(Date.now() / FLORAL_REFRESH_MS)}"`;
+      const baseEtag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3-moves-v1"`;
+      const etag = `W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3-moves-v1-${Math.floor(Date.now() / FLORAL_REFRESH_MS)}"`;
       res.setHeader('ETag', etag);
       // Freshness signal: how old the newest catalogue row is, so staleness
       // (e.g. a stalled ERP sync) is observable rather than silent.
@@ -588,10 +590,10 @@ export default async function handler(req, res) {
           || (p.isMultiCategory && p.alternateCategoryPath?.length)
           || p.placementPaths?.length);
 
-      return attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website');
+      return attachInstoreMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'),()=>createStockClient({legacyServiceRole:true}));
     };
     const products = isFullCatalog && version
-      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3"`, buildProducts)
+      ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3-moves-v1"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(await applyFloralLiveStock(products));
