@@ -1,3 +1,4 @@
+import { manualGeneratedPlacementPaths } from '../../lib/taxonomy-generated.mjs';
 import { fuzzyFilter } from './fuzzySearch';
 import { applyCollection } from './collectionFilter.js';
 import { sortNewArrivals } from './newArrivalOrder.js';
@@ -541,6 +542,7 @@ function productMatchesNavPath(product, tree, navPath) {
   if (!Array.isArray(navPath) || !navPath.length) return true;
 
   if (isMotarroBrowsePath(navPath)) {
+    if (manualGeneratedPlacementPaths(product, tree).some(path => navPath.every((id,i) => path[i] === id))) return true;
     if (!isMotarroProduct(product)) return false;
     const mottaroPath = product.alternateCategoryPath?.length
       ? product.alternateCategoryPath
@@ -864,6 +866,13 @@ export async function fetchCategoryCounts({ collection = 'all', inStockOnly = fa
     for (const productPath of productPaths(product)) {
       for (let depth = 1; depth <= productPath.length; depth += 1) {
         const entry = standardByResolvedPath.get(productPath.slice(0, depth).join('/'));
+        if (entry) matchedEntries.add(entry);
+      }
+    }
+
+    for (const path of manualGeneratedPlacementPaths(product, tree)) {
+      for (let depth = 1; depth <= path.length; depth += 1) {
+        const entry = mottaroByNavPath.get(path.slice(0, depth).join('/'));
         if (entry) matchedEntries.add(entry);
       }
     }

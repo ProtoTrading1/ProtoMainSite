@@ -1,3 +1,4 @@
+import { materializeTaxonomy } from '../lib/taxonomy-generated.mjs';
 import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { createCatalogueBuildCache } from './_catalogue-build.js';
@@ -6,7 +7,7 @@ import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNor
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
-import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
+import { enrichMotarroCategoryFields } from './_mottaro-category.js';
 import { loadPlacementMapIfEnabled, skusMatchingBrowsePath } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
@@ -139,17 +140,13 @@ async function loadHiddenMottaroIds() {
 }
 
 async function loadTaxonomyTree() {
-  const hidden = await loadHiddenMottaroIds();
-  try {
-    const stored = await readSiteConfigJson(TAXONOMY_FILE, null);
-    let categories = null;
-    if (Array.isArray(stored)) categories = stored;
-    else if (stored?.categories && Array.isArray(stored.categories)) categories = stored.categories;
-    if (categories?.length) return injectMotarroIntoTree(categories, hidden);
-  } catch {
-    // fall through to bundled
-  }
-  return injectMotarroIntoTree(loadBundledTaxonomy(), hidden);
+  let stored = null;
+  try { stored = await readSiteConfigJson(TAXONOMY_FILE, null); } catch { /* bundled fallback only on read failure */ }
+  const categories = Array.isArray(stored) ? stored : stored?.categories;
+  if (!Array.isArray(categories)) return loadBundledTaxonomy();
+  const hidden = stored?.generatedTaxonomy ? [] : await loadHiddenMottaroIds();
+  // Invalid metadata must fail closed rather than resurrect suppressed folders.
+  return materializeTaxonomy({ ...(!Array.isArray(stored) ? stored : {}), categories }, hidden);
 }
 
 // Must match labelToSlug in src/lib/taxonomy.js and scripts/lib/master.mjs.

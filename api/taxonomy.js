@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
-import { injectMotarroIntoTree } from './_mottaro-category.js';
+import { materializeTaxonomy } from '../lib/taxonomy-generated.mjs';
 
 const TAXONOMY_FILE = 'taxonomy/categories.json';
 const MOTTARO_HIDDEN_FILE = 'taxonomy/mottaro-hidden.json';
@@ -47,18 +47,24 @@ export default async function handler(req, res) {
 
   try {
     let categories = null;
+    let payload = null;
     try {
       const stored = await readSiteConfigJson(TAXONOMY_FILE, null);
+      payload = stored;
       if (Array.isArray(stored)) categories = stored;
       else if (stored?.categories && Array.isArray(stored.categories)) categories = stored.categories;
     } catch {
       // Storage not configured / unreachable — fall through to bundled.
     }
 
-    if (!categories || !categories.length) categories = loadBundled();
+    if (!categories) {
+      // Without the stored document its hidden state is unknown. The bundled
+      // ordinary tree is readable, but must not regenerate any hidden brand folders.
+      return res.status(200).json({ categories: loadBundled() });
+    }
 
-    const hidden = await loadHiddenMottaroIds();
-    categories = injectMotarroIntoTree(categories, hidden);
+    const hidden = payload?.generatedTaxonomy ? [] : await loadHiddenMottaroIds();
+    categories = materializeTaxonomy({ ...(!Array.isArray(payload) ? payload : {}), categories }, hidden);
 
     // Short edge cache so category edits in admin reflect on the storefront
     // within seconds (the portal is a live mirror).
@@ -67,6 +73,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ categories });
   } catch (err) {
     console.error('taxonomy api error:', err);
-    return res.status(200).json({ categories: loadBundled() });
+    return res.status(503).json({ error: 'Taxonomy is unavailable' });
   }
 }

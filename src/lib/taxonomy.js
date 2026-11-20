@@ -1,3 +1,4 @@
+import { isManualGeneratedPath } from '../../lib/taxonomy-generated.mjs';
 import bundledCategories from '../data/categories.json';
 
 // IMPORTANT: this MUST stay identical to labelToSlug in scripts/lib/master.mjs
@@ -156,7 +157,11 @@ export function lookupProductCount(counts, navPath, categories) {
   if (counts[key] != null) return counts[key];
   // Fallback for legacy count keys stored by nav id
   const legacy = Array.isArray(navPath) ? navPath.join('/') : '';
-  return legacy ? counts[legacy] ?? null : counts[''];
+  if (legacy && counts[legacy] != null) return counts[legacy];
+  // Manual folders have no inferred membership. Keep them hidden until an
+  // explicit placement contributes a positive count, including mobile search.
+  if (isManualGeneratedPath(categories, navPath)) return 0;
+  return legacy ? null : counts[''];
 }
 
 /** Product count for a nav path; 0 when missing from the count map. */
