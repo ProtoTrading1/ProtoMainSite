@@ -82,3 +82,10 @@ test('whole-tree replace cannot insert manual nodes beneath a hidden generated p
  const old={...store(),generatedTaxonomy:{version:1,hiddenIds:['mottaro-paints'],nodes:[]}};
  assert.throws(()=>serializeTaxonomy(manual(materializeTaxonomy(store()),parent),{previous:old}),/Hidden/);
 });
+
+test('legacy duplicate IDs remain readable but cannot enter a new versioned write or ambiguous add target',()=>{
+ const raw=regular();raw[1].children.push({id:'paints',label:'Other Paints',children:[]});
+ const tree=materializeTaxonomy({categories:raw});assert.equal(tree.find(n=>n.id==='stationery').children[0].label,'Other Paints');
+ assert.equal(deepestTaxonomyParent(tree,['arts-and-crafts','art-supplies','paints']),null);
+ assert.throws(()=>serializeTaxonomy(tree,{previous:{categories:raw}}),/unique/);
+});

@@ -69,7 +69,7 @@ assert.doesNotMatch(productsSrc, /localStorage.*sort/i, 'sort orders not in loca
 console.log('✓ Item 4 sort-order cache settings');
 
 // Shared Mottaro module — must stay byte-identical to the admin copy
-const GENERATED_TAXONOMY_SHARED_HASH = 'fc85d63725768391';
+const GENERATED_TAXONOMY_SHARED_HASH = '8ef9c606ac2d197b';
 assert.equal(createHash('sha256').update(readSrc('lib/taxonomy-generated.mjs')).digest('hex').slice(0,16), GENERATED_TAXONOMY_SHARED_HASH, 'Generated taxonomy schema must remain identical in Admin and storefront');
 const MOTTARO_SHARED_HASH = '69aa6b250bbdfc90';
 const mottaroShared = readFileSync(join(root, 'lib/mottaro-category.mjs'), 'utf8');

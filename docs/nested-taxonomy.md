@@ -29,7 +29,7 @@ ID paths and manual sibling order, never copied automatic subtrees. IDs are glob
 unique, hidden descendants keep their reserved IDs, and each parent must resolve
 in the canonical or already validated manual tree. Duplicate labels, corrupt
 versions, forged automatic edits and orphaning replacements hold instead of guessing.
-Legacy leaves without `children` remain readable. New persisted nodes are validated.
+Legacy leaves without `children` and historical duplicate-ID trees remain readable; ambiguous targets and any new write retaining duplicate IDs are held until explicit repair. New persisted nodes are validated.
 
 Admin and storefront use byte-identical schema/merge helpers and generator code.
 Manual nodes are marked `manualGenerated` in the materialized tree. Automatic label
@@ -69,3 +69,6 @@ archive RPCs. Checks reject a stale revision before archive side effects and
 recheck before save, but no distributed atomicity guarantee is claimed. Keep a
 compatible reader/writer (or read-only taxonomy) on rollback after new-format writes;
 do not roll back to a writer that strips the new document fields.
+
+Before release, validate the actual stored taxonomy shape/IDs read-only. No automatic
+repair or deduplication of existing folders/products is part of this change.
