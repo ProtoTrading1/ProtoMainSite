@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { itemPreferenceFields } from '../lib/item-preference.mjs';
-import { basketLineKey, mergeBasketLines } from '../lib/basket-lines.mjs';
+import { basketLineKey, mergeBasketLines, hasNewInvalidBasketIdentity } from '../lib/basket-lines.mjs';
 import { cartSyncFailure } from '../src/lib/cartSyncRecovery.mjs';
 
 const MAX_LINES = 250;
@@ -80,6 +80,12 @@ function cleanNumber(value, { minimum = Number.NEGATIVE_INFINITY, fallback = nul
 function sanitizeProduct(product, identifiers) {
   const primary = identifiers.primary;
   return {
+    // Keep identity evidence through sanitation so new-add validation cannot
+    // accept a group container or a malformed secondary SKU as a leaf.
+    // Preserve raw legacy evidence for the context-aware save guard below.
+    // Decoding an old row must not prevent reading or removing that line.
+    ...(product.isVariantGroup != null ? { isVariantGroup: product.isVariantGroup } : {}),
+    ...(product.websiteSku != null ? { websiteSku: product.websiteSku } : {}),
     id: identifiers.id || primary,
     sku: identifiers.sku || primary,
     code: identifiers.code || primary,
@@ -340,6 +346,9 @@ export default async function handler(req, res) {
     ? resolveWholeCart(current, mutation.items, mutation.activityAt)
     : { items: mutation.items, activityAt: mutation.activityAt, changed: true };
   if (!resolved.changed) return res.status(200).json(currentPayload);
+  if (hasNewInvalidBasketIdentity(resolved.items, currentPayload.items)) {
+    return res.status(400).json({ error: 'A product option needs checking before it can be added', code: 'cart_identity' });
+  }
 
   return writeSnapshot({
     supabase,
