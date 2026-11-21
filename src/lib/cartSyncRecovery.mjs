@@ -3,7 +3,10 @@ export function cartSyncFailure(error) {
   const message = String(error?.message || '');
   let code = 'cart_connection';
   let detail = 'We cannot confirm this basket on your account. Retry before switching devices.';
-  if (status === 409) {
+  if (error?.code === 'cart_identity' || error?.data?.code === 'cart_identity') {
+    code = 'cart_identity';
+    detail = 'Some saved product options need checking. All items remain on this device and account syncing is paused. Remove the flagged lines or contact Proto, then choose “Keep these items and sync”.';
+  } else if (status === 409) {
     code = 'cart_conflict';
     detail = 'Your account has a different saved basket. Choose “Keep these items and sync” to save the items and quantities shown here to your account. A recovery copy of both baskets will be kept on this device.';
   } else if (error?.code === 'cart_timeout') {
@@ -23,5 +26,5 @@ export function cartSyncFailure(error) {
       : /product lines/i.test(message) ? 'cart_line_limit' : 'cart_payload';
     detail = 'The saved basket needs a data check. Contact Proto with the code below. Keep this page open; do not clear your basket.';
   }
-  return { code, detail, retryable: ![400, 401, 403, 409, 413, 422].includes(status) };
+  return { code, detail, retryable: code !== 'cart_identity' && ![400, 401, 403, 409, 413, 422].includes(status) };
 }

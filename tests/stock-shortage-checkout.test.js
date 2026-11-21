@@ -81,20 +81,24 @@ test('basket warning includes zero and negative stock without advising quantity 
 
 test('actual basket hydration preserves a line that becomes unavailable and hands it to checkout', async () => {
   const { readFileSync } = await import('node:fs');
-  const { mergeBasketLines, updateBasketLineQuantity, basketLineKey } = await import('../lib/basket-lines.mjs');
+  const { mergeBasketLines, updateBasketLineQuantity, basketLineKey, newBasketProductKey } = await import('../lib/basket-lines.mjs');
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
   const start = app.indexOf('async function hydrateAccountCartItems(items)');
   const end = app.indexOf('\nfunction makeCartSyncOperation', start);
   assert.ok(start >= 0 && end > start);
   const live = { ...item.product, id: row.sku, price: 10, stockOnHand: 0, stockQty: 0, inStock: false, canOrder: false };
-  const hydrate = new Function('mergeBasketLines', 'fetchProductsBySkus', 'TURTLE_BRACELET_COLOURS', 'withTurtleBraceletPhoto',
-    app.slice(start, end) + '; return hydrateAccountCartItems;')(mergeBasketLines, async () => new Map([[row.sku, live]]), [], p => p);
+  const hydrate = new Function('mergeBasketLines', 'newBasketProductKey', 'fetchProductsBySkus', 'TURTLE_BRACELET_COLOURS', 'withTurtleBraceletPhoto',
+    app.slice(start, end) + '; return hydrateAccountCartItems;')(mergeBasketLines, newBasketProductKey, async () => new Map([[row.sku, live]]), [], p => p);
   const saved = [{ ...item, product: { ...item.product, stockOnHand: 5, inStock: true } }];
   const refreshed = await hydrate(saved);
   assert.equal(refreshed.length, 1);
   assert.equal(refreshed[0].qty, 4);
   assert.equal(refreshed[0].preference, 'Blue');
   assert.equal(refreshed[0].product.stockOnHand, 0);
+  const unresolved = { ...saved[0], product: { ...saved[0].product, websiteSku: {} } };
+  const retained = await hydrate([unresolved]);
+  assert.deepEqual(retained[0].product, unresolved.product);
+  assert.deepEqual(retained[0].product.websiteSku, {});
   assert.equal(stockAdvisoryForQty(refreshed[0].product, refreshed[0].qty).shortfall, 4);
   const edited = updateBasketLineQuantity(refreshed, basketLineKey(refreshed[0]), 3, () => 0);
   assert.equal(edited.length, 1);
