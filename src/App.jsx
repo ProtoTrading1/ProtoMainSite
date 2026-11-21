@@ -299,7 +299,8 @@ export default function App({
     [routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal],
   );
   const catalogueResultsPending = loading || routeSearchQuery.trim() !== catalogResultQuery.trim();
-  const instoreSearch = useInstoreSearch(searchQuery, { enabled: instoreAvailable });
+  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
+  const instoreSearch = useInstoreSearch(searchQuery, { enabled: instoreAvailable && !viewingInstoreProducts });
   const visibleInstoreSearch = useMemo(() => {
     if (instoreSearch.query.trim() === routeSearchQuery.trim()) return instoreSearch;
     return {
@@ -1249,6 +1250,8 @@ export default function App({
   }, [activeCollection, categories, inStockOnly, catalogRefreshKey]);
 
   useEffect(() => {
+    // The dedicated In-store page owns this route; do not race it with a hidden Main read.
+    if (viewingInstoreProducts) return undefined;
     let cancelled = false;
     let cancelDeferredImageWarm = null;
 
@@ -1353,7 +1356,7 @@ export default function App({
       cancelled = true;
       if (cancelDeferredImageWarm) cancelDeferredImageWarm();
     };
-  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap]);
+  }, [activeCollection, page, path, searchQuery, sort, categories, inStockOnly, catalogRefreshKey, specialsMap, viewingInstoreProducts]);
 
   useEffect(() => {
     if (!routeSearchQuery.trim()) {
@@ -2262,7 +2265,6 @@ export default function App({
 
   const totalPages = Math.max(1, Math.ceil(visibleCatalogResults.total / CATALOG_PAGE_SIZE));
   const desktopDrawerVisible = cartDrawerOpen || drawerPeek;
-  const viewingInstoreProducts = ['instore-products', 'extended-range'].includes(path[0]);
   const instoreRouteQuery = instoreSearchQueryFromRefinements(refinements);
   const instoreRoutePage = instorePageFromRefinements(refinements);
   const shoppingBrowseKey = useRef('');

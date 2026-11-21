@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { catalogueSearchQueryFromRoute } from '../src/lib/catalogueSearchRoute.js';
 import {
   RESPONSE_CACHE_TTL_MS, STORAGE_KEY_PREFIX, STORED_RESPONSE_LIMIT, STORED_RESPONSE_MAX_AGE_MS,
   STORED_RESPONSE_MAX_BYTES, instoreRequestKey, storedResponseIsUsable,
@@ -184,4 +185,150 @@ test('the API and the browser share one page definition', async () => {
   assert.match(api, /import \{ instorePage \} from '\.\.\/lib\/instore-page\.mjs'/);
   // The API must not keep a private copy of the filter-and-rank rules.
   assert.doesNotMatch(api, /\.sort\(\(left, right\) => compareInstoreSearch/);
+});
+
+async function isolatedRange(id) {
+  const moduleUrl = new URL('../src/lib/extendedRange.js', import.meta.url);
+  const source = await readFile(moduleUrl, 'utf8');
+  const substituted = source
+    .replace("import { authenticatedGetJson } from './authHeaders';", 'const authenticatedGetJson = () => { throw Error("No network in cache test"); };')
+    .replace("import { preloadProductImages } from './imageUrl';", 'const preloadProductImages = () => {};')
+    .replace(/from '(\.[^']+)'/g, (_, relative) => `from '${new URL(relative, moduleUrl).href}'`);
+  return import(`data:text/javascript;base64,${Buffer.from(substituted).toString('base64')}#${id}`);
+}
+
+function fixtureIndexedDb(t) {
+  const original = globalThis.indexedDB;
+  const opens = [];
+  globalThis.indexedDB = { open() { const request = {}; opens.push(request); return request; } };
+  t.after(() => {
+    if (original === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = original;
+  });
+  return opens;
+}
+
+test('a stalled optional IndexedDB read cannot hold the In-store page beyond its head start or replace a fresh result', async (t) => {
+  const opens = fixtureIndexedDb(t);
+  const range = await isolatedRange('stall');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const hydration = range.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(opens.length, 1);
+  t.mock.timers.tick(180);
+  assert.equal(await hydration, null, 'page can use the authenticated paged fallback');
+  const open = opens[0];
+  let aborts = 0;
+  let closes = 0;
+  open.transaction = { abort() { aborts++; } };
+  open.onupgradeneeded();
+  assert.equal(aborts, 1, 'a late upgrade is aborted instead of writing or clearing');
+  open.result = { close() { closes++; }, transaction() { assert.fail('No late store access'); } };
+  open.onsuccess();
+  assert.equal(closes, 1);
+  assert.equal(range.instoreCatalogue(), null, 'a late cache read cannot be published over a paged answer');
+
+  // An already-started read may finish after the deadline, but cannot publish
+  // its rows or trigger a cache write.
+  const readingRange = await isolatedRange('reading-after-deadline');
+  const pendingRead = readingRange.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  const read = { result: { ts: Date.now(), data: [{ sku: 'LATE-PERSISTED' }] } };
+  opens[1].result = { close() { closes++; }, transaction(_store, mode) {
+    assert.equal(mode, 'readonly');
+    return { objectStore() { return { get() { return read; } }; } };
+  } };
+  opens[1].onsuccess();
+  await new Promise(resolve => setImmediate(resolve));
+  t.mock.timers.tick(180);
+  assert.equal(await pendingRead, null);
+  read.onsuccess();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(closes, 2);
+  assert.equal(readingRange.instoreCatalogue(), null);
+});
+
+test('a timely stored catalogue still paints without a request and a blocked open closes any late handle', async (t) => {
+  const opens = fixtureIndexedDb(t);
+  const range = await isolatedRange('ready');
+  const hydration = range.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  const read = { result: { ts: Date.now(), data: [{ sku: 'READY' }] } };
+  const open = opens[0];
+  let closes = 0;
+  open.result = { close() { closes++; }, transaction() { return { objectStore() { return { get() { return read; } }; } }; } };
+  open.onsuccess();
+  await new Promise(resolve => setImmediate(resolve));
+  read.onsuccess();
+  assert.deepEqual(await hydration, [{ sku: 'READY' }]);
+  assert.deepEqual(await range.hydrateInstoreCatalogue(), [{ sku: 'READY' }]);
+  assert.equal(opens.length, 1);
+  assert.equal(closes, 1);
+
+  const blockedRange = await isolatedRange('blocked');
+  const blocked = blockedRange.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  opens[1].onblocked();
+  assert.equal(await blocked, null);
+  opens[1].result = { close() { closes++; } };
+  opens[1].onsuccess();
+  assert.equal(closes, 2);
+});
+
+test('dedicated In-store navigation owns its results without suppressing combined Main results elsewhere', async () => {
+  const app = await readSource('src/App.jsx');
+  assert.match(app, /const viewingInstoreProducts = \['instore-products', 'extended-range'\]\.includes\(path\[0\]\);/);
+  assert.match(app, /useInstoreSearch\(searchQuery, \{ enabled: instoreAvailable && !viewingInstoreProducts \}\)/);
+  assert.match(app, /if \(viewingInstoreProducts\) return undefined;[\s\S]*const pageData = await withDeadline\(\(\) => fetchProductPage/);
+  assert.match(app, /catalogRefreshKey, specialsMap, viewingInstoreProducts\]\);/);
+  // The same displayed query belongs to a different owner on the dedicated
+  // route. The legacy App log clears its Main analytics refs there and can
+  // begin a fresh Main search log after navigation back.
+  const q = 'hair clips';
+  assert.deepEqual([[], ['instore-products'], ['extended-range'], []]
+    .map(path => catalogueSearchQueryFromRoute(path, { q })), [q, '', '', q]);
+  assert.match(app, /if \(!routeSearchQuery\.trim\(\)\) \{\s*searchTrackRef\.current = [\s\S]*?searchLogRequestRef\.current = null;\s*return;/);
+});
+
+
+test('account change keeps a blocked deletion fenced, even after next-generation hydration times out', async (t) => {
+  const opens = fixtureIndexedDb(t);
+  const range = await isolatedRange('clear-fence');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const oldHydration = range.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  const oldRead = { result: { ts: Date.now(), data: [{ sku: 'PRIOR-ACCOUNT' }] } };
+  opens[0].result = { close() {}, transaction() { return { objectStore() { return { get() { return oldRead; } }; } }; } };
+  opens[0].onsuccess();
+  await new Promise(resolve => setImmediate(resolve));
+
+  range.clearStoredInstoreResponses();
+  const nextHydration = range.hydrateInstoreCatalogue();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(opens.length, 2, 'only the pending sign-out deletion may start');
+  const clear = opens[1];
+  // IndexedDB reports a blocked request without completing it. Deletion must
+  // not convert that event into a successful clear.
+  clear.onblocked?.();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(opens.length, 2, 'next-generation read stays behind the blocked delete');
+
+  oldRead.onsuccess();
+  assert.equal(await oldHydration, null, 'the old generation cannot publish');
+  t.mock.timers.tick(180);
+  assert.equal(await nextHydration, null, 'the next account can still use its usual authenticated network fallback');
+  assert.equal(opens.length, 2, 'no prior persisted rows were read for the next account');
+
+  let deletes = 0, closes = 0;
+  const transaction = { objectStore() { return { delete() { deletes++; } }; } };
+  clear.result = { close() { closes++; }, transaction(_store, mode) { assert.equal(mode, 'readwrite'); return transaction; } };
+  clear.onsuccess();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(deletes, 1, 'delete eventually ran when the blocked connection opened');
+  transaction.oncomplete();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(closes, 1);
+  assert.equal(opens.length, 2, 'the timed-out optional read does not restart after deletion');
+  assert.equal(range.instoreCatalogue(), null);
 });
