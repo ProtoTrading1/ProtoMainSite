@@ -10,7 +10,7 @@ import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
 import { customerFacingCataloguePrice } from '../lib/catalogue-price.mjs';
-import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
+import { prepareInstoreDuplicateEvaluator } from '../lib/instore-duplicate-gate.mjs';
 import { discoveryTiles, prepareInstoreSearch } from '../lib/instore-discovery.mjs';
 import { instorePage } from '../lib/instore-page.mjs';
 import { searchQueryHasStructuredIntent, SEARCH_QUERY_MAX_LENGTH } from '../lib/search-language.mjs';
@@ -61,11 +61,11 @@ async function getCachedCatalogue(key, loader) {
 }
 
 export function excludeMainCatalogueProducts(products, catalogueRows) {
+  const evaluate = prepareInstoreDuplicateEvaluator({
+    status: 'success', complete: true, variantsIncluded: true, rows: catalogueRows,
+  });
   return (products || []).filter((product) => {
-    const outcome = evaluateInstoreDuplicate(product, {
-      status: 'success', complete: true, variantsIncluded: true,
-      checkedIdentifiers: [product.sku, product.code, product.barcode], rows: catalogueRows,
-    });
+    const outcome = evaluate(product, [product.sku, product.code, product.barcode]);
     if (outcome.decision === 'hold') throw new Error('Catalogue duplicate review required');
     return outcome.decision === 'eligible';
   });
