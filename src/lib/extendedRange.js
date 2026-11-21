@@ -1,5 +1,6 @@
 import { authenticatedGetJson } from './authHeaders';
 import { preloadProductImages } from './imageUrl';
+import { withDeadline } from './requestDeadline.mjs';
 import { instorePage } from '../../lib/instore-page.mjs';
 import {
   RESPONSE_CACHE_TTL_MS, STORAGE_KEY_PREFIX, STORED_RESPONSE_LIMIT,
@@ -15,6 +16,8 @@ const IDB_STORE = 'collection';
 const IDB_VERSION = 1;
 const IDB_KEY = 'approved-customer-v1';
 const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;
+// A slow device, stale tab or blocked store must not hold the authenticated page request.
+const INSTORE_HYDRATION_HEAD_START_MS = 180;
 // Roughly the first screen of cards, rather than the main catalogue's 60: the
 // rest arrive lazily as the customer scrolls.
 const LANDING_IMAGE_PRELOAD = 24;
@@ -39,24 +42,33 @@ export function subscribeInstoreCatalogue(listener) {
   return () => catalogueListeners.delete(listener);
 }
 
-function openCollectionDb() {
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+function openCollectionDb({ signal } = {}) {
+  if (typeof indexedDB === 'undefined' || signal?.aborted) return Promise.resolve(null);
   return new Promise((resolve) => {
+    let abandoned = false;
     const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    // Only optional reads may give up. Sign-out deletion (and its generation
+    // fence) must stay pending until the blocked database can actually open.
+    if (signal) request.onblocked = () => { abandoned = true; resolve(null); };
     request.onupgradeneeded = () => {
+      if (abandoned || signal?.aborted) { request.transaction.abort(); return; }
       const db = request.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
       // A version release must not resurrect a collection shaped for older code.
       else request.transaction.objectStore(IDB_STORE).clear();
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      if (abandoned || signal?.aborted) { request.result.close(); resolve(null); }
+      else resolve(request.result);
+    };
     request.onerror = () => resolve(null);
   });
 }
 
-async function readPersistedCollection() {
-  const db = await openCollectionDb();
+async function readPersistedCollection(signal) {
+  const db = await openCollectionDb({ signal });
   if (!db) return null;
+  if (signal.aborted) { db.close(); return null; }
   const entry = await new Promise((resolve) => {
     const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
     request.onsuccess = () => resolve(request.result || null);
@@ -245,7 +257,16 @@ export function hydrateInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
   if (!hydration) {
     const generation = collectionGeneration;
-    hydration = persistenceClear.then(() => generation === collectionGeneration ? readPersistedCollection() : null)
+    const controller = new AbortController();
+    const { signal } = controller;
+    const readCurrentGeneration = () => persistenceClear.then(() =>
+      generation === collectionGeneration && !signal.aborted ? readPersistedCollection(signal) : null);
+    // A timed-out optional read may neither publish an old snapshot nor
+    // bypass a pending sign-out deletion for the next account.
+    hydration = withDeadline(readCurrentGeneration, {
+      timeoutMs: INSTORE_HYDRATION_HEAD_START_MS,
+      onTimeout: () => controller.abort(),
+    })
       .then((persisted) => {
         if (generation !== collectionGeneration) return null;
         if (persisted && !catalogueProducts) {
