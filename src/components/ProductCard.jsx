@@ -1024,14 +1024,15 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                       disabled={!modalCanOrder}
                       onClick={() => {
                         if (!modalCanOrder) return;
-                        addToCart(activeProduct, qty, null, isBracelet ? braceletColour : undefined);
-                        setJustAdded(true);
+                        const accepted = addToCart(activeProduct, qty, null, isBracelet ? braceletColour : undefined);
+                        if (accepted === false) return;
+                        setJustAdded(typeof accepted === 'number' ? accepted : qty);
                         setTimeout(() => setJustAdded(false), 1800);
                       }}
                       type="button"
                     >
                       <ShoppingCart size={16} />
-                      {justAdded ? `Added ${qty} ✓` : `Add ${qty} to order`}
+                      {justAdded ? `Added ${justAdded} ✓` : `Add ${qty} to order`}
                     </button>
                   </>
                 )}

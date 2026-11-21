@@ -47,7 +47,7 @@ import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart, backupCartConflict } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { TURTLE_BRACELET_COLOURS, withTurtleBraceletPhoto } from '../lib/kbra2013-colours.mjs';
-import { addBasketLine, basketLineKey, basketProductKey, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
+import { addBasketLine, basketLineKey, basketProductKey, newBasketProductKey, hasNewInvalidBasketIdentity, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
 import { startPresenceHeartbeat } from './lib/presence';
@@ -178,10 +178,14 @@ async function hydrateAccountCartItems(items) {
   const savedItems = mergeBasketLines(items);
   if (!savedItems.length) return [];
   try {
-    const bySku = await fetchProductsBySkus(savedItems.map((item) => (
+    const identifiedItems = savedItems.filter(item => newBasketProductKey(item.product));
+    if (!identifiedItems.length) return savedItems;
+    const bySku = await fetchProductsBySkus(identifiedItems.map((item) => (
       item.product?.id || item.product?.sku || item.product?.code
     )));
     return savedItems.map((item) => {
+      // Keep unresolved legacy identity evidence, not a guessed live match.
+      if (!newBasketProductKey(item.product)) return item;
       const keys = [item.product?.id, item.product?.sku, item.product?.code]
         .map((value) => String(value || '').toUpperCase());
       const live = keys.map((key) => bySku.get(key)).find(Boolean);
@@ -713,6 +717,31 @@ export default function App({
       hydrationInFlight = true;
       setCartSyncStatus('loading');
       try {
+        // Unverified device-only legacy lines are retained for explicit review,
+        // never imported as new invalid account lines or silently discarded.
+        if (localItems.some(item => !newBasketProductKey(item.product))) {
+          const remote = await getAccountCart();
+          if (cancelled || cartAccountRef.current !== uid) return;
+          if (hasNewInvalidBasketIdentity(localItems, remote.items)) {
+            const backedUp = backupCartConflict(localStorage, uid,
+              { items: localItems, activityAt: localActivityAt }, remote);
+            cartRevisionRef.current = remote.revision;
+            lastSavedCartRef.current = cartFingerprint(remote.items);
+            currentCartRef.current = { items: localItems, activityAt: localActivityAt };
+            setCartItems(localItems);
+            setCartLastActivityAt(localActivityAt);
+            setCartPriceChanges([]);
+            cartConflictRef.current = true;
+            setCartHasConflict(true);
+            cartHydratedRef.current = true;
+            setCartHydrated(true);
+            setCartSyncIssue(backedUp ? cartSyncFailure({ code: 'cart_identity' }) : {
+              code: 'cart_backup', detail: 'Your items are still here, but a recovery copy could not be saved on this device. Contact Proto before changing this basket.',
+            });
+            setCartSyncStatus('error');
+            return;
+          }
+        }
         const accountCart = await mergeAccountCart(localItems, localActivityAt);
         if (pendingDraft && cartFingerprint(accountCart.items) !== cartFingerprint(pendingDraft.items)) {
           const draftItems = await hydrateAccountCartItems(pendingDraft.items);
@@ -927,6 +956,11 @@ export default function App({
       const remote = await getAccountCart();
       if (cartAccountRef.current !== accountId) return;
       const latest = currentCartRef.current;
+      if (hasNewInvalidBasketIdentity(latest.items, remote.items)) {
+        setCartSyncIssue(cartSyncFailure({ code: 'cart_identity' }));
+        setCartSyncStatus('error');
+        return;
+      }
       const operation = makeCartSyncOperation(accountId, latest.items, latest.activityAt,
         cartClearActivityAtRef.current, 'normal');
       operation.baseRevision = remote.revision;
@@ -1437,6 +1471,7 @@ export default function App({
   const markCartActivity = useCallback(() => {
     shoppingCartIntent.current = true;
     const now = Date.now();
+    currentCartRef.current = { ...currentCartRef.current, activityAt: now };
     setCartLastActivityAt(now);
     setCartClock(now);
     try { localStorage.setItem(CART_LAST_ACTIVITY_KEY, String(now)); } catch { /* ignore */ }
@@ -1510,23 +1545,37 @@ export default function App({
   }, [clearedCartSnapshot]);
 
   const addToCart = useCallback((product, qty, buttonPos = null, preference = undefined) => {
+    if (!newBasketProductKey(product)) {
+      setCartAnnouncement('This product option needs checking before it can be added. Please choose another option or contact Proto.');
+      return false;
+    }
     if (!cartHydratedRef.current) {
       setCartAnnouncement('Your account basket is still loading. Please try again in a moment.');
-      return;
+      return false;
     }
     const maxQty = cartQtyCapForProduct(product);
-    if (maxQty <= 0) return;
+    if (maxQty <= 0) return false;
     const minimumQty = Math.max(1, Math.min(9999, Math.floor(Number(product?.minQty) || 1)));
     if (maxQty < minimumQty) {
       setCartAnnouncement(`Only ${maxQty} available for ${product.name}; its minimum order is ${minimumQty}.`);
-      return;
+      return false;
     }
     const requestedQty = Math.max(minimumQty, normalizeCartQtyInput(qty));
     const requestedPreference = typeof preference === 'string' ? normalizeItemPreference(preference) : undefined;
     const incomingLine = { product, qty: requestedQty, ...itemPreferenceFields({ preference: requestedPreference }) };
-    setCartItems((prev) => addBasketLine(prev, incomingLine, {
+    const result = addBasketLine(currentCartRef.current.items, incomingLine, {
       quantityCapForProduct: cartQtyCapForProduct, maxLines: MAX_CART_LINES,
-    }).items);
+    });
+    if (result.addedQty <= 0) {
+      setCartAnnouncement(result.reason === 'line_limit'
+        ? 'Your basket has reached its product line limit. Remove a line before adding another.'
+        : 'The available quantity is already in your basket. No additional items were added.');
+      return false;
+    }
+    // Reserve synchronously so rapid adds share the same latest basket. React
+    // updaters may run later/replay; success effects must use the actual result.
+    currentCartRef.current = { ...currentCartRef.current, items: result.items };
+    setCartItems(result.items);
     markCartActivity();
     cartRevealSequenceRef.current += 1;
     setCartRevealRequest({ lineKey: basketLineKey(incomingLine), token: cartRevealSequenceRef.current });
@@ -1537,7 +1586,7 @@ export default function App({
     // adding to a basket.
     trackJourneyEvent('cart_item_added', {
       journey: 'basket',
-      metadata: { qty: Math.min(maxQty, requestedQty) },
+      metadata: { qty: result.addedQty },
     });
 
     if (searchTrackRef.current.rowId && searchQuery.trim()) {
@@ -1552,6 +1601,7 @@ export default function App({
       setDrawerPeek(false);
       drawerTimerRef.current = null;
     }, DRAWER_PEEK_MS);
+    return result.addedQty;
   }, [markCartActivity, searchQuery]);
 
   const handleCartRevealHandled = useCallback((token) => {
@@ -1565,13 +1615,17 @@ export default function App({
   const updateQty = useCallback((lineKey, qty) => {
     if (!cartHydratedRef.current) return;
     const requestedQty = normalizeCartQtyInput(qty);
-    setCartItems((prev) => updateBasketLineQuantity(prev, lineKey, requestedQty, cartQtyCapForProduct));
+    const items = updateBasketLineQuantity(currentCartRef.current.items, lineKey, requestedQty, cartQtyCapForProduct);
+    currentCartRef.current = { ...currentCartRef.current, items };
+    setCartItems(items);
     markCartActivity();
   }, [markCartActivity]);
 
   const removeFromCart = useCallback((lineKey) => {
     if (!cartHydratedRef.current) return;
-    setCartItems((prev) => removeBasketLine(prev, lineKey));
+    const items = removeBasketLine(currentCartRef.current.items, lineKey);
+    currentCartRef.current = { ...currentCartRef.current, items };
+    setCartItems(items);
     markCartActivity();
   }, [markCartActivity]);
 
@@ -2087,7 +2141,7 @@ export default function App({
     // it would be unreliable — React may run the updater later, or twice in
     // StrictMode, so `added`/`overflow` could be wrong or double-counted in the
     // message shown to the customer.
-    let nextCart = mergeBasketLines(cartItems);
+    let nextCart = mergeBasketLines(currentCartRef.current.items);
     let added = 0;
     let overflow = 0;
     for (const item of resolved) {
@@ -2103,6 +2157,7 @@ export default function App({
     }
 
     if (added) {
+      currentCartRef.current = { ...currentCartRef.current, items: nextCart };
       setCartItems(nextCart);
       markCartActivity();
     }
