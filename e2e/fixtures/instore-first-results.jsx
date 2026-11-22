@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client';
 import '../../src/index.css';
 import ExtendedRangePage from '../../src/components/ExtendedRangePage.jsx';
 import { useHashNav } from '../../src/hooks/useHashNav.js';
+import { instoreCatalogue, storedExtendedRange } from '../../src/lib/extendedRange.js';
 import { rememberAuthSession } from '../../src/lib/authHeaders.js';
 if (location.hostname !== '127.0.0.1') throw Error('Local fixture only');
 rememberAuthSession({ access_token: 'synthetic-first-results-only', user: { id: '10000000-0000-4000-8000-000000000001' } });
+window.firstResultsFixture = { cache: (query, exact) => ({ catalogue: Boolean(instoreCatalogue()), view: Boolean(storedExtendedRange(query, { page: 1, exact })) }) };
 export default function Fixture() {
   const { path, refinements, navigate } = useHashNav();
   if (path[0] === 'instore-products') return <ExtendedRangePage initialQuery={refinements.q || ''} addToCart={() => {}} />;

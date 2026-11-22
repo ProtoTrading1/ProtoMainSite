@@ -239,7 +239,7 @@ export default function App({
   requestedReorder = null,
   onRequestedReorderHandled,
 }) {
-  const { path, refinements, navigate: hashNavigate, setRefinement } = useHashNav();
+  const { path, refinements, navigate: hashNavigate, setRefinement, restoreInstoreReturnScroll } = useHashNav();
   const catalogueRefinements = useMemo(() => {
     const next = { ...refinements };
     delete next.product;
@@ -299,6 +299,10 @@ export default function App({
     [routeSearchQuery, catalogResultQuery, catalogProducts, catalogTotal],
   );
   const catalogueResultsPending = loading || routeSearchQuery.trim() !== catalogResultQuery.trim();
+  useEffect(() => {
+    if (['instore-products', 'extended-range'].includes(path[0]) || catalogueResultsPending || catalogError) return undefined;
+    return restoreInstoreReturnScroll();
+  }, [path, catalogueResultsPending, catalogError, restoreInstoreReturnScroll]);
   const instoreSearch = useInstoreSearch(searchQuery, { enabled: instoreAvailable });
   const visibleInstoreSearch = useMemo(() => {
     if (instoreSearch.query.trim() === routeSearchQuery.trim()) return instoreSearch;

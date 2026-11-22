@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { scrollToTop } from '../lib/scrollToTop';
 import { buildHash, parseHash } from '../lib/hashRoute';
+import { createInstoreHistoryScroll } from '../lib/instoreHistoryScroll.js';
 
 const parseWindowHash = () => parseHash(window.location.hash);
 
@@ -18,24 +19,34 @@ const parseWindowHash = () => parseHash(window.location.hash);
 export function useHashNav() {
   const [state, setState] = useState(parseWindowHash);
   const shouldScrollOnHashChangeRef = useRef(true);
+  const instoreHistoryRef = useRef(null);
 
   useEffect(() => {
+    const historyScroll = createInstoreHistoryScroll(window);
+    instoreHistoryRef.current = historyScroll;
     const handler = () => {
-      if (shouldScrollOnHashChangeRef.current) {
+      const restoring = historyScroll.transition();
+      if (!restoring && shouldScrollOnHashChangeRef.current) {
         scrollToTop();
       }
       shouldScrollOnHashChangeRef.current = true;
       setState(parseWindowHash());
     };
     window.addEventListener('hashchange', handler);
-    return () => window.removeEventListener('hashchange', handler);
+    return () => {
+      window.removeEventListener('hashchange', handler);
+      historyScroll.dispose();
+      instoreHistoryRef.current = null;
+    };
   }, []);
 
   const navigate = useCallback((newPath, newRefinements = {}, options = {}) => {
     const shouldScroll = options.scroll !== false;
     const nextHash = buildHash(newPath, newRefinements, state.routePrefix);
+    instoreHistoryRef.current?.beforeNavigate(nextHash);
     if (window.location.hash === nextHash) {
       if (shouldScroll) scrollToTop();
+      instoreHistoryRef.current?.sameEntry();
       shouldScrollOnHashChangeRef.current = true;
       setState(parseWindowHash());
       return;
@@ -43,6 +54,7 @@ export function useHashNav() {
     shouldScrollOnHashChangeRef.current = shouldScroll;
     if (options.replace) {
       window.history.replaceState(null, '', nextHash);
+      instoreHistoryRef.current?.transition();
       if (shouldScroll) scrollToTop();
       shouldScrollOnHashChangeRef.current = true;
       setState(parseWindowHash());
@@ -50,6 +62,8 @@ export function useHashNav() {
     }
     window.location.hash = nextHash;
   }, [state.routePrefix]);
+
+  const restoreInstoreReturnScroll = useCallback(() => instoreHistoryRef.current?.restoreWhenReady(), []);
 
   const back = () => {
     const { path, refinements } = state;
@@ -74,7 +88,7 @@ export function useHashNav() {
 
   const reset = () => navigate([]);
 
-  return { ...state, navigate, back, setRefinement, reset };
+  return { ...state, navigate, back, setRefinement, reset, restoreInstoreReturnScroll };
 }
 
 /** Utility: find a node in the category tree by path array */
