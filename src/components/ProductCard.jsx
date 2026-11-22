@@ -406,7 +406,7 @@ function SpecialRibbon({ special }) {
   );
 }
 
-function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
+function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999, label = 'Quantity' }) {
   const [draft, setDraft] = useState(String(qty));
   useEffect(() => { setDraft(String(qty)); }, [qty]);
   const commit = () => {
@@ -416,7 +416,7 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   };
   return (
     <input
-      aria-label="Quantity"
+      aria-label={label}
       inputMode="numeric"
       min={minQty || 1}
       max={maxQty}
@@ -429,7 +429,7 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   );
 }
 
-function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, initialBraceletColour = null, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
+function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, initialBraceletColour = null, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null, compactInstore = false }) {
   const [unitObservation,setUnitObservation]=useState(null);
   const [braceletColour, setBraceletColour] = useState(() => TURTLE_BRACELET_COLOURS.find(option => option.label === initialBraceletColour || option.image === sourceProduct?.localImage)?.label || 'Brown');
   const product=useMemo(()=>withTurtleBraceletPhoto(withPositillObservation(sourceProduct,unitObservation), braceletColour),[sourceProduct,unitObservation,braceletColour]);
@@ -467,6 +467,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   const [selectedVariant, setSelectedVariant] = useState(() => initialVariantForProduct(product));
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [justAdded, setJustAdded] = useState(false);
+  const [cardFeedback, setCardFeedback] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
   const addButtonRef = useRef(null);
   const modalRef = useRef(null);
@@ -566,7 +567,10 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
     if (!cardCanOrder) return;
     const rect = addButtonRef.current?.getBoundingClientRect();
     const pos = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
-    addToCart(activeProduct, qty, pos, isBracelet ? braceletColour : undefined);
+    const accepted = addToCart(activeProduct, qty, pos, isBracelet ? braceletColour : undefined);
+    if (compactInstore) setCardFeedback(accepted === false
+      ? 'Could not add. Check quantity and availability.'
+      : `Added ${typeof accepted === 'number' ? accepted : qty} to your order.`);
   };
 
   const shareProduct = async () => {
@@ -677,7 +681,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
 
   return (
     <>
-      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
+      <article className={`product-card${compactInstore ? ' product-card--instore' : ''}${cardCanOrder ? '' : ' product-card--unavailable'}`}>
         {/* Image */}
         <button
           className="product-image product-image-button"
@@ -736,6 +740,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
           </div>
 
           <StockBadge product={product} onVerifiedUnit={onVerifiedUnit} />
+          {compactInstore && !isVariantGroup && product.leadTime && <p className="instore-lead-time">{product.leadTime}</p>}
 
           {!isBracelet && preferenceSlot}
           {colourSelector}
@@ -761,7 +766,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                   >
                     <Minus size={14} />
                   </button>
-                  <ProductQtyInput qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={Math.max(1, instoreQuantityLimit(product))} />
+                  <ProductQtyInput label={compactInstore ? `Quantity for ${product.name}` : 'Quantity'} qty={qty} setQty={setQty} minQty={product.minQty || 1} maxQty={Math.max(1, instoreQuantityLimit(product))} />
                   <button
                     onClick={() => setQty((current) => Math.min(Math.max(1, instoreQuantityLimit(product)), current + 1))}
                     type="button"
@@ -787,7 +792,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
           {!isVariantGroup && cardAdvisory.isOverOrder && (
             <p className="pc-stock-advisory">Only {cardAdvisory.availableStock} in stock &mdash; we&rsquo;ll confirm the extra {cardAdvisory.shortfall} with you.</p>
           )}
-          <span className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
+          {compactInstore && <p className="instore-add-feedback" role="status" aria-live="polite" aria-atomic="true">{cardFeedback}</p>}
+          <span role={compactInstore ? 'status' : undefined} aria-live={compactInstore ? 'polite' : undefined} className={`pc-in-order${inCart ? '' : ' pc-in-order--empty'}`}>
             {inCart ? `In Your Order: ${cartQty}` : '\u00A0'}
           </span>
         </div>
