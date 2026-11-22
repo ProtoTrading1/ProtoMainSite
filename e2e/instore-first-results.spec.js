@@ -10,17 +10,23 @@ const stockReply = sku => ({ sku, qty: 25, unitsOfIssue: 'EACH', unitsOfIssueRaw
 async function setup(page, context, { idbDelay = 500, stalled = false } = {}) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await context.route('**/*', route => new URL(route.request().url()).hostname !== '127.0.0.1' ? route.abort() : route.continue());
-  await context.route('**/api/*', route => route.fulfill({ json: {} }));
-  await context.route('**/api/stock*', async route => {
+  await page.route('**/*', route => new URL(route.request().url()).hostname !== '127.0.0.1' ? route.abort() : route.continue());
+  await page.route('**/api/*', route => route.fulfill({ json: {} }));
+  await page.route('**/api/stock*', async route => {
     const sku = new URL(route.request().url()).searchParams.get('sku');
     expect(sku).toBe(product.sku);
     await new Promise(resolve => setTimeout(resolve, 240));
     await route.fulfill({ json: stockReply(sku) }).catch(() => {});
   });
-  await context.addInitScript(({ idbDelay, stalled }) => {
+  await page.addInitScript(({ idbDelay, stalled }) => {
     // Every document is cold; a repeated view within it keeps only response cache.
     sessionStorage.clear();
+    localStorage.clear();
+    window.firstResultsProbe = {
+      documentId: crypto.randomUUID(),
+      installs: (window.firstResultsProbe?.installs || 0) + 1,
+      cleanStorage: { session: sessionStorage.length, local: localStorage.length },
+    };
     window.requestIdleCallback = cb => setTimeout(cb, 0);
     const original = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function(name, ...args) {
@@ -75,30 +81,43 @@ async function setup(page, context, { idbDelay = 500, stalled = false } = {}) {
   return errors;
 }
 
-for (const browse of [false, true]) test(`repeatable ${browse ? 'browse' : 'exact'} cold/warm tap to correct card`, async ({ page, context }) => {
+for (const browse of [false, true]) test(`repeatable ${browse ? 'browse' : 'exact'} cold/warm tap to correct card`, async ({ context }) => {
   test.setTimeout(60000);
-  const errors = await setup(page, context);
-  const calls = [], samples = [], releases = [];
-  let run = -1, temperature = 'cold';
-  await context.route('**/api/extended-range*', async route => {
-    const params = new URL(route.request().url()).searchParams;
-    const full = params.get('catalogue') === '1';
-    const call = { run, temperature, full, query: params.get('q'), exact: params.get('exact'), page: params.get('page') };
-    calls.push(call);
-    if (full) {
-      // Hold optional full loads until both views are measured, so "warm" has
-      // one explicit meaning: this same paged response cached in this module.
-      await new Promise(resolve => releases.push(resolve));
-    } else {
-      expect(call).toMatchObject({ query: browse ? null : product.code, exact: browse ? null : '1', page: '1' });
-      await new Promise(resolve => setTimeout(resolve, 180));
-    }
-    await route.fulfill({ json: full ? { ...response, catalogue: [product] } : response }).catch(() => {});
-  });
-  try {
-    for (run = 0; run < 5; run++) {
+  const documentIds = new Set();
+  const reports = [];
+  for (let run = 0; run < 5; run++) {
+    // A goto to the identical URL can remain in the existing SPA document.
+    // A new Page guarantees a new module realm; only its warm view reuses it.
+    const page = await context.newPage();
+    const calls = [], samples = [], releases = [];
+    let temperature = 'cold', probe = null, errors = [];
+    try {
+      expect(page.url()).toBe('about:blank');
+      errors = await setup(page, context);
+      await page.route('**/api/extended-range*', async route => {
+        const params = new URL(route.request().url()).searchParams;
+        const full = params.get('catalogue') === '1';
+        const call = { run, temperature, documentId: probe?.documentId, full, query: params.get('q'), exact: params.get('exact'), page: params.get('page') };
+        calls.push(call);
+        if (full) {
+          // The warm sample reuses only the first paged response, never a
+          // background catalogue released by an earlier sample or document.
+          await new Promise(resolve => releases.push(resolve));
+        } else {
+          expect(call).toMatchObject({ query: browse ? null : product.code, exact: browse ? null : '1', page: '1' });
+          await new Promise(resolve => setTimeout(resolve, 180));
+        }
+        await route.fulfill({ json: full ? { ...response, catalogue: [product] } : response }).catch(() => {});
+      });
       await page.goto(fixture);
-      for (temperature of ['cold', 'warm']) {
+      await expect(page.getByRole('heading', { name: 'Main fixture' })).toBeVisible();
+      probe = await page.evaluate(() => window.firstResultsProbe);
+      expect(probe).toMatchObject({ installs: 1, cleanStorage: { session: 0, local: 0 } });
+      expect(documentIds.has(probe.documentId)).toBe(false);
+      documentIds.add(probe.documentId);
+      for (const sampleTemperature of ['cold', 'warm']) {
+        temperature = sampleTemperature;
+        expect((await page.evaluate(() => window.firstResultsProbe)).documentId).toBe(probe.documentId);
         const cache = await page.evaluate(({ query, exact }) => window.firstResultsFixture.cache(query, exact), { query: browse ? '' : product.code, exact: !browse });
         expect(cache).toEqual({ catalogue: false, view: temperature === 'warm' });
         const beforeRequests = calls.filter(c => !c.full).length;
@@ -124,29 +143,37 @@ for (const browse of [false, true]) test(`repeatable ${browse ? 'browse' : 'exac
         await expect(card.locator('.stock-readout--in')).toHaveText('In stock: 25');
         await expect.poll(() => page.evaluate(() => Boolean(window.firstResultsTimings.stockVerified))).toBe(true);
         const timing = await page.evaluate(() => window.firstResultsTimings);
-        samples.push({ run, temperature, cache, imageEvidence, ...timing });
+        samples.push({ run, temperature, documentId: probe.documentId, cache, imageEvidence, ...timing });
         expect(calls.filter(c => !c.full).length - beforeRequests).toBe(temperature === 'cold' ? 1 : 0);
         await expect(page.locator('.instore-grid')).not.toContainText('MAIN FIXTURE');
         await page.goBack();
         await expect(page.getByRole('heading', { name: 'Main fixture' })).toBeVisible();
         expect(await page.evaluate(() => location.hash)).toBe('#/?q=main+search&colour=Blue');
       }
-      releases.splice(0).forEach(release => release());
+      expect(calls.filter(call => !call.full)).toHaveLength(1);
+      expect(samples.map(sample => sample.temperature)).toEqual(['cold', 'warm']);
+      expect(errors).toEqual([]);
+    } finally {
+      const pending = await page.evaluate(() => window.firstResultsTimings).catch(() => null);
+      const report = { label: process.env.FIRST_RESULTS_LABEL || 'local', project: test.info().project.name, scenario: browse ? 'browse' : 'exact', run, probe, cpuSlowdown: test.info().project.name.startsWith('mobile') ? 4 : 1, calls, samples, pending, errors };
+      reports.push(report);
+      console.log(JSON.stringify(report));
+      try {
+        await test.info().attach(`first-results-${report.label}-${report.scenario}-pair-${run}`, { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+      } finally {
+        releases.splice(0).forEach(release => release());
+        await page.close();
+      }
     }
-    expect(errors).toEqual([]);
-  } finally {
-    const pending = await page.evaluate(() => window.firstResultsTimings).catch(() => null);
-    const report = { label: process.env.FIRST_RESULTS_LABEL || 'local', project: test.info().project.name, scenario: browse ? 'browse' : 'exact', cpuSlowdown: test.info().project.name.startsWith('mobile') ? 4 : 1, calls, samples, pending, errors };
-    console.log(JSON.stringify(report));
-    await test.info().attach(`first-results-${report.label}-${report.scenario}`, { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
-    releases.splice(0).forEach(release => release());
   }
+  expect(reports).toHaveLength(5);
+  expect(documentIds.size).toBe(5);
 });
 
 test('diagnostic: record stalled IndexedDB without changing the cache contract', async ({ page, context }) => {
   await setup(page, context, { stalled: true });
   const calls = [];
-  await context.route('**/api/extended-range*', route => { calls.push(route.request().url()); return route.fulfill({ json: response }); });
+  await page.route('**/api/extended-range*', route => { calls.push(route.request().url()); return route.fulfill({ json: response }); });
   await page.goto(fixture);
   await page.getByRole('button', { name: 'Open exact Instore' }).click();
   await page.waitForTimeout(750);
