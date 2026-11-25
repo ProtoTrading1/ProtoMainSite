@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
 import { injectMotarroIntoTree } from './_mottaro-category.js';
+import { graftMottaroFolders, loadMottaroFolders } from './_mottaro-folders.js';
 
 const TAXONOMY_FILE = 'taxonomy/categories.json';
 const MOTTARO_HIDDEN_FILE = 'taxonomy/mottaro-hidden.json';
@@ -57,8 +58,9 @@ export default async function handler(req, res) {
 
     if (!categories || !categories.length) categories = loadBundled();
 
-    const hidden = await loadHiddenMottaroIds();
-    categories = injectMotarroIntoTree(categories, hidden);
+    const [hidden, staffFolders] = await Promise.all([loadHiddenMottaroIds(), loadMottaroFolders()]);
+    // Folders staff created under Motarro in Admin sit under their exact parent.
+    categories = graftMottaroFolders(injectMotarroIntoTree(categories, hidden), staffFolders, hidden);
 
     // Short edge cache so category edits in admin reflect on the storefront
     // within seconds (the portal is a live mirror).
