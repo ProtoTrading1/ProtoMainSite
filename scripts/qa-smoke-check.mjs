@@ -78,6 +78,15 @@ assert.equal(
 );
 console.log('✓ Shared Mottaro module in sync with protoportal-admin');
 
+// Shared Motarro staff-folder module — must stay byte-identical to the admin copy
+const MOTTARO_FOLDERS_SHARED_HASH = '9b3fc8180bf5d99a';
+assert.equal(
+  createHash('sha256').update(readFileSync(join(root, 'lib/mottaro-folders.mjs'), 'utf8')).digest('hex').slice(0, 16),
+  MOTTARO_FOLDERS_SHARED_HASH,
+  'lib/mottaro-folders.mjs must stay byte-identical to Proto_Admin/lib/mottaro-folders.mjs — edit both copies together and update every pinned hash',
+);
+console.log('✓ Shared Motarro folders module in sync with Proto_Admin');
+
 // Shared placements module — must stay byte-identical to the admin copy
 const PLACEMENTS_SHARED_HASH = 'a73d1bb627f01442';
 const placementsShared = readFileSync(join(root, 'lib/placements.mjs'), 'utf8');

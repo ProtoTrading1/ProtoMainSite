@@ -541,6 +541,10 @@ function productMatchesNavPath(product, tree, navPath) {
   if (!Array.isArray(navPath) || !navPath.length) return true;
 
   if (isMotarroBrowsePath(navPath)) {
+    // An extra placement in a Motarro folder (e.g. one staff created in Admin)
+    // carries exact node ids, so any product placed there belongs here too.
+    if (productPaths(product).some((cp) =>
+      cp.length >= navPath.length && navPath.every((seg, i) => cp[i] === seg))) return true;
     if (!isMotarroProduct(product)) return false;
     const mottaroPath = product.alternateCategoryPath?.length
       ? product.alternateCategoryPath
@@ -865,6 +869,14 @@ export async function fetchCategoryCounts({ collection = 'all', inStockOnly = fa
       for (let depth = 1; depth <= productPath.length; depth += 1) {
         const entry = standardByResolvedPath.get(productPath.slice(0, depth).join('/'));
         if (entry) matchedEntries.add(entry);
+      }
+      // Extra placements inside Motarro count there too, so a folder holding
+      // only placed products is not hidden as empty. Set → never double counted.
+      if (productPath[0] === 'mottaro') {
+        for (let depth = 1; depth <= productPath.length; depth += 1) {
+          const entry = mottaroByNavPath.get(productPath.slice(0, depth).join('/'));
+          if (entry) matchedEntries.add(entry);
+        }
       }
     }
 

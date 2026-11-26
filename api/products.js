@@ -7,7 +7,8 @@ import { isIdentifierQuery, normalizeIdentifier } from '../src/lib/identifierNor
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readSiteConfigJson } from './_site-config.js';
-import { injectMotarroIntoTree, enrichMotarroCategoryFields } from './_mottaro-category.js';
+import { injectMotarroIntoTree, enrichMotarroCategoryFields, isMotarroBrowsePath, isMotarroProduct } from './_mottaro-category.js';
+import { graftMottaroFolders, loadMottaroFolders } from './_mottaro-folders.js';
 import { loadPlacementMapIfEnabled, skusMatchingBrowsePath } from './_placements.js';
 import { mergeCategoryPaths } from '../lib/placements.mjs';
 import { loadGroupInfoMapIfEnabled } from './_groups.js';
@@ -144,17 +145,20 @@ async function loadHiddenMottaroIds() {
 }
 
 async function loadTaxonomyTree() {
-  const hidden = await loadHiddenMottaroIds();
+  const [hidden, staffFolders] = await Promise.all([loadHiddenMottaroIds(), loadMottaroFolders()]);
+  // Staff-created Motarro folders are grafted under their exact parent, the
+  // same way Admin builds its tree (shared lib/mottaro-folders.mjs).
+  const withMotarro = (categories) => graftMottaroFolders(injectMotarroIntoTree(categories, hidden), staffFolders, hidden);
   try {
     const stored = await readSiteConfigJson(TAXONOMY_FILE, null);
     let categories = null;
     if (Array.isArray(stored)) categories = stored;
     else if (stored?.categories && Array.isArray(stored.categories)) categories = stored.categories;
-    if (categories?.length) return injectMotarroIntoTree(categories, hidden);
+    if (categories?.length) return withMotarro(categories);
   } catch {
     // fall through to bundled
   }
-  return injectMotarroIntoTree(loadBundledTaxonomy(), hidden);
+  return withMotarro(loadBundledTaxonomy());
 }
 
 // Must match labelToSlug in src/lib/taxonomy.js and scripts/lib/master.mjs.
@@ -238,6 +242,10 @@ function primaryBrowseFilter(labels) {
     (next, label, index) => (columns[index] ? next.eq(columns[index], label) : next),
     query,
   );
+}
+
+function motarroTitleFilter(query) {
+  return query.or('title.ilike.%motarro%,title.ilike.%mottaro%,title.ilike.%monttaro%');
 }
 
 function productMatchesBrowsePath(product, browsePath, labels) {
@@ -489,8 +497,14 @@ export default async function handler(req, res) {
         placedBatches.push(placedSkus.slice(i, i + MAX_SKUS_PER_REQUEST));
       }
 
+      // Motarro is a brand tree, not a category column: no product's own
+      // category says "Motarro", so the primary filter would find nothing.
+      // Fetch Motarro-titled rows instead; productMatchesBrowsePath then keeps
+      // only those whose Motarro path (or extra placement) is under this folder.
+      const motarroBrowse = isMotarroBrowsePath(browsePath);
       const [primaryRows, ...placedRows] = await Promise.all([
-        fetchAllRows(supabase, 'website_stock', STOCK_SELECT, primaryBrowseFilter(labels)),
+        fetchAllRows(supabase, 'website_stock', STOCK_SELECT, motarroBrowse ? motarroTitleFilter : primaryBrowseFilter(labels))
+          .then((found) => (motarroBrowse ? found.filter(isMotarroProduct) : found)),
         ...placedBatches.map((batch) =>
           fetchAllRows(supabase, 'website_stock', STOCK_SELECT, (query) => query.in('sku', batch))),
       ]);
