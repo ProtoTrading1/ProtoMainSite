@@ -40,7 +40,7 @@ await db.exec(setupSql);
 // checkout need not contain the parent commit to verify these payloads.
 for (const [file, hash] of [
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', '897119e9f573935f8b232cf25093bf9b43bc0d1c72dd9874a3b5ee654d76aa9d'],
+  ['api/send-order.js', '9e04143f8686a7025cb8eb8d50e51fbe0dc1c2f86eed59c2145fa2a75c9227ba'],
   ['lib/reviewed-colour-options.mjs', '9dc7d273f13bcaa3ed96f8f5e1b8636fcdac550ad29fe960ad07660a04fe1e26'],
   ['lib/reviewed-colour-labels.json', '6ece43b7608f60c337b99f37579ece228d08bcce4c5751c92e379736416d3cd7'],
   ['lib/supplier-stock-list-20261124.json', '5ff8c54a780d572779ddf2d9e018c660f1e0b92d48af036e1272cb94a96fc99d'],

@@ -15,6 +15,12 @@ export default async function globalSetup() {
     server: {
       host: '127.0.0.1',
       port,
+      // Safety fixtures block WebSockets. Keep Vite's development client from
+      // reconnecting or reloading the page during an isolated browser case.
+      hmr: false,
+      // Browser console/page errors stay available to Playwright; forwarding
+      // them to Vite would require the deliberately blocked socket transport.
+      forwardConsole: false,
       // Never switch to another local application when the requested isolated
       // port is occupied.
       strictPort: true,

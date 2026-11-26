@@ -13,7 +13,7 @@ await new Promise((resolve, reject) => {
   request.onerror = reject;
   request.onsuccess = () => {
     const db = request.result, transaction = db.transaction('collection', 'readwrite');
-    transaction.objectStore('collection').put({ data: searchProducts(5000), ts: Date.now() }, 'approved-customer-v1');
+    transaction.objectStore('collection').put({ data: searchProducts(5000), ts: Date.now(), contentGeneration: null }, 'approved-customer-content-v1');
     transaction.oncomplete = () => { db.close(); resolve(); };
     transaction.onerror = reject;
   };
