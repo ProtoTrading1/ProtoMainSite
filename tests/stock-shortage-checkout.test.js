@@ -4,6 +4,7 @@ import { resolveAuthoritativePrices, captureOrderRow, buildOrderEmailHtml } from
 import { evaluateCheckoutSnapshot } from '../lib/order-stock-guard.mjs';
 import { stockRequestNote } from '../lib/stock-request-note.mjs';
 import { stockAdvisoryForQty } from '../src/lib/stockAdvisory.js';
+import { withReviewedColourPhoto } from '../lib/reviewed-colour-options.mjs';
 
 const row = { sku: 'TEST-SHORTAGE', barcode: 'TEST-ONLY', title: 'Synthetic product', price: 10, units_of_issue: 'EACH', min_order_qty: 1, available_stock: 0, stock_qty: 0, to_order: false };
 const item = { qty: 4, preference: 'Blue', product: { sku: row.sku, checkoutSnapshot: { unitPrice: 10, stockQty: 5 }, stockRequest: { availableQty: 999 } } };
@@ -87,8 +88,8 @@ test('actual basket hydration preserves a line that becomes unavailable and hand
   const end = app.indexOf('\nfunction makeCartSyncOperation', start);
   assert.ok(start >= 0 && end > start);
   const live = { ...item.product, id: row.sku, price: 10, stockOnHand: 0, stockQty: 0, inStock: false, canOrder: false };
-  const hydrate = new Function('mergeBasketLines', 'newBasketProductKey', 'fetchProductsBySkus', 'TURTLE_BRACELET_COLOURS', 'withTurtleBraceletPhoto',
-    app.slice(start, end) + '; return hydrateAccountCartItems;')(mergeBasketLines, newBasketProductKey, async () => new Map([[row.sku, live]]), [], p => p);
+  const hydrate = new Function('mergeBasketLines', 'newBasketProductKey', 'fetchProductsBySkus', 'TURTLE_BRACELET_COLOURS', 'withTurtleBraceletPhoto', 'withReviewedColourPhoto',
+    app.slice(start, end) + '; return hydrateAccountCartItems;')(mergeBasketLines, newBasketProductKey, async () => new Map([[row.sku, live]]), [], p => p, withReviewedColourPhoto);
   const saved = [{ ...item, product: { ...item.product, stockOnHand: 5, inStock: true } }];
   const refreshed = await hydrate(saved);
   assert.equal(refreshed.length, 1);

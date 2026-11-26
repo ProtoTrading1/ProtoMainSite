@@ -47,6 +47,7 @@ import { cartSyncFailure } from './lib/cartSyncRecovery.mjs';
 import { readPendingCart, writePendingCart, clearPendingCart, backupCartConflict } from './lib/cartSyncJournal.mjs';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { TURTLE_BRACELET_COLOURS, withTurtleBraceletPhoto } from '../lib/kbra2013-colours.mjs';
+import { withReviewedColourPhoto } from '../lib/reviewed-colour-options.mjs';
 import { addBasketLine, basketLineKey, basketProductKey, newBasketProductKey, hasNewInvalidBasketIdentity, mergeBasketLines, removeBasketLine, updateBasketLineQuantity } from '../lib/basket-lines.mjs';
 import { detectCartPriceChanges } from './lib/cartPriceChanges';
 import { trackJourneyEvent } from './lib/journeyAnalytics';
@@ -191,7 +192,7 @@ async function hydrateAccountCartItems(items) {
       const live = keys.map((key) => bySku.get(key)).find(Boolean);
       if (!live) return item;
       const hasColour = TURTLE_BRACELET_COLOURS.some(option => option.label === item.preference);
-      return { ...item, product: hasColour ? withTurtleBraceletPhoto(live, item.preference) : live };
+      return { ...item, product: withReviewedColourPhoto(hasColour ? withTurtleBraceletPhoto(live, item.preference) : live, item.preference) };
     });
   } catch {
     return savedItems;

@@ -5,7 +5,8 @@ import { createHash } from 'node:crypto';
 
 test('release manifest binds each selected main and every asset to the reviewed batch', async () => {
   const manifestBytes = await readFile(new URL('../api/_website-only-manifest.json', import.meta.url));
-  assert.equal(createHash('sha256').update(manifestBytes).digest('hex'),'4318801942b220d2a5bd6c125145828ce912887b6ce71e5ebcd39dbe889f741f');
+  // Git checkouts may use CRLF on Windows; preserve the reviewed LF content hash.
+  assert.equal(createHash('sha256').update(manifestBytes.toString('utf8').replace(/\r\n/g,'\n')).digest('hex'),'4318801942b220d2a5bd6c125145828ce912887b6ce71e5ebcd39dbe889f741f');
   const manifest = JSON.parse(manifestBytes);
   assert.equal(manifest.items.length, 163);
   assert.equal(new Set(manifest.items.map(x => x.sku)).size, 163);
