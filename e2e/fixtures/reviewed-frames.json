@@ -1,0 +1,149 @@
+[
+  {
+    "id": "1066",
+    "code": "1066",
+    "barcode": "1066",
+    "websiteSku": "1066",
+    "sku": "1066",
+    "parentSku": "1066",
+    "description": "",
+    "originalDescription": "",
+    "packDescription": "",
+    "unitsOfIssue": "EACH",
+    "price": 21.5,
+    "images": [
+      "https://admin.proto.co.za/api/archive-publication-image/81d998ad54e3599442e0f4e600882c3f3dad6836426e525205440b2d3cfa7949/a3751333-2622-499e-a992-843cc591b865/4acb0fbec5fb79d742ea48efe5122ca9fa2a675a675a523f933f34ca0a2802c6.png",
+      "https://admin.proto.co.za/api/archive-publication-image/81d998ad54e3599442e0f4e600882c3f3dad6836426e525205440b2d3cfa7949/7ae01108-c6da-4179-8bd1-e8db65368cad/844789fb1a5704b2412c36353f4a62ed95bd9058e1dbfba02565dd56b3191709.png"
+    ],
+    "image": "https://admin.proto.co.za/api/archive-publication-image/81d998ad54e3599442e0f4e600882c3f3dad6836426e525205440b2d3cfa7949/a3751333-2622-499e-a992-843cc591b865/4acb0fbec5fb79d742ea48efe5122ca9fa2a675a675a523f933f34ca0a2802c6.png",
+    "secondaryImage": "https://admin.proto.co.za/api/archive-publication-image/81d998ad54e3599442e0f4e600882c3f3dad6836426e525205440b2d3cfa7949/7ae01108-c6da-4179-8bd1-e8db65368cad/844789fb1a5704b2412c36353f4a62ed95bd9058e1dbfba02565dd56b3191709.png",
+    "stockQty": 34,
+    "stockOnHand": 34,
+    "colour": "",
+    "category": "homeware",
+    "categoryLabel": "Homeware",
+    "categoryPath": [
+      "homeware"
+    ],
+    "subcategoryLabels": [],
+    "tags": [],
+    "badges": [],
+    "isNew": false,
+    "isSpecial": false,
+    "isArchived": false,
+    "sortOrder": 0,
+    "minQty": 1,
+    "casePack": "Each",
+    "sellingUnit": {
+      "code": "EACH",
+      "label": "Each",
+      "priceSuffix": "per item",
+      "unitsPerSellingUnit": 1
+    },
+    "marginCue": "",
+    "leadTime": "",
+    "tradeNote": "",
+    "inStock": true,
+    "keepLiveWhenOos": false,
+    "toOrder": false,
+    "orderableWhenOutOfStock": false,
+    "availability": {
+      "state": "in_stock",
+      "label": "In stock",
+      "guidance": "Available now",
+      "canOrder": true,
+      "stockQty": 34,
+      "incomingStatus": "none",
+      "incomingQty": 0,
+      "incomingEta": "",
+      "allowPreorder": false
+    },
+    "yearlySales": 0,
+    "supplier": "",
+    "isMultiCategory": false,
+    "alternateCategoryPath": [],
+    "categoryPaths": [
+      [
+        "homeware"
+      ]
+    ],
+    "brandLine": null,
+    "mottaroPath": [],
+    "name": "PHOTO FRAME A4 CERTIFICATE",
+    "title": "PHOTO FRAME A4 CERTIFICATE"
+  },
+  {
+    "id": "2306",
+    "code": "2306",
+    "barcode": "2306",
+    "websiteSku": "2306",
+    "sku": "2306",
+    "parentSku": "2306",
+    "description": "",
+    "originalDescription": "",
+    "packDescription": "",
+    "unitsOfIssue": "EACH",
+    "price": 33,
+    "images": [
+      "https://admin.proto.co.za/api/archive-publication-image/4fbf2f81601331885d6d81fc5fd0a42a5c27d9ef76844eec3d181e395e2cb4b8/7d0fddb7-46c3-4f96-a891-a1e8556648c4/926f1d6fb23479598a0e45336219220518626a9f97af473e44d1900d5ed753af.png",
+      "https://admin.proto.co.za/api/archive-publication-image/4fbf2f81601331885d6d81fc5fd0a42a5c27d9ef76844eec3d181e395e2cb4b8/f61e7397-b16f-4ea1-b15d-72712e2fa904/a2b1154d1c5682ee572dd1972e1fe758cff2a5dc1f099af139a650fc4d1d1f17.png",
+      "https://admin.proto.co.za/api/archive-publication-image/4fbf2f81601331885d6d81fc5fd0a42a5c27d9ef76844eec3d181e395e2cb4b8/357df974-1e0d-4271-94b0-91e7c3a37238/f62059b5e4ebe0597eafb67096c4b56b124c991c6e7a0683658e88bec22eac7a.png"
+    ],
+    "image": "https://admin.proto.co.za/api/archive-publication-image/4fbf2f81601331885d6d81fc5fd0a42a5c27d9ef76844eec3d181e395e2cb4b8/7d0fddb7-46c3-4f96-a891-a1e8556648c4/926f1d6fb23479598a0e45336219220518626a9f97af473e44d1900d5ed753af.png",
+    "secondaryImage": "https://admin.proto.co.za/api/archive-publication-image/4fbf2f81601331885d6d81fc5fd0a42a5c27d9ef76844eec3d181e395e2cb4b8/f61e7397-b16f-4ea1-b15d-72712e2fa904/a2b1154d1c5682ee572dd1972e1fe758cff2a5dc1f099af139a650fc4d1d1f17.png",
+    "stockQty": 225,
+    "stockOnHand": 225,
+    "colour": "",
+    "category": "homeware",
+    "categoryLabel": "Homeware",
+    "categoryPath": [
+      "homeware"
+    ],
+    "subcategoryLabels": [],
+    "tags": [],
+    "badges": [],
+    "isNew": false,
+    "isSpecial": false,
+    "isArchived": false,
+    "sortOrder": 0,
+    "minQty": 1,
+    "casePack": "Each",
+    "sellingUnit": {
+      "code": "EACH",
+      "label": "Each",
+      "priceSuffix": "per item",
+      "unitsPerSellingUnit": 1
+    },
+    "marginCue": "",
+    "leadTime": "",
+    "tradeNote": "",
+    "inStock": true,
+    "keepLiveWhenOos": false,
+    "toOrder": false,
+    "orderableWhenOutOfStock": false,
+    "availability": {
+      "state": "in_stock",
+      "label": "In stock",
+      "guidance": "Available now",
+      "canOrder": true,
+      "stockQty": 225,
+      "incomingStatus": "none",
+      "incomingQty": 0,
+      "incomingEta": "",
+      "allowPreorder": false
+    },
+    "yearlySales": 0,
+    "supplier": "",
+    "isMultiCategory": false,
+    "alternateCategoryPath": [],
+    "categoryPaths": [
+      [
+        "homeware"
+      ]
+    ],
+    "brandLine": null,
+    "mottaroPath": [],
+    "name": "PHOTO FRAME A4 CERTIFICATE",
+    "title": "PHOTO FRAME A4 CERTIFICATE"
+  }
+]

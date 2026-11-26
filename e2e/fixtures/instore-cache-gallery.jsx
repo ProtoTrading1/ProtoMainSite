@@ -17,7 +17,7 @@ await new Promise((resolve,reject)=>{
  const request=indexedDB.open('proto-instore',1);
  request.onupgradeneeded=()=>request.result.createObjectStore('collection');
  request.onerror=reject;
- request.onsuccess=()=>{const db=request.result,transaction=db.transaction('collection','readwrite');transaction.objectStore('collection').put({data:[{...product,images:[product.image]}],ts:Date.now()},'approved-customer-v1');transaction.oncomplete=()=>{db.close();resolve();};};
+ request.onsuccess=()=>{const db=request.result,transaction=db.transaction('collection','readwrite');transaction.objectStore('collection').put({data:[{...product,images:[product.image]}],ts:Date.now(),contentGeneration:null},'approved-customer-content-v1');transaction.oncomplete=()=>{db.close();resolve();};};
 });
 const root=createRoot(document.getElementById('root'));
 window.galleryFixture={product,snapshot:instoreCatalogue,refresh:prefetchInstoreCatalogue,cached:()=>storedExtendedRange('',{includeCatalogue:true}),clear:()=>{root.unmount();clearStoredInstoreResponses();}};

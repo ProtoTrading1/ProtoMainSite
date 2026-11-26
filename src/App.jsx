@@ -13,7 +13,8 @@ import MobileNav from './components/MobileNav';
 import ExtendedRangePage from './components/ExtendedRangePage';
 import { instoreAvailable } from './lib/instoreAvailability';
 import useInstoreSearch from './hooks/useInstoreSearch';
-import { instoreCatalogue } from './lib/extendedRange';
+import { instoreCatalogue,subscribeInstoreCatalogue } from './lib/extendedRange';
+import { refreshInstoreBasketText } from '../lib/instore-website-content.mjs';
 import Drawer from './components/Drawer';
 import ProductCard from './components/ProductCard';
 import CartFlyAnimation from './components/CartFlyAnimation';
@@ -323,6 +324,9 @@ export default function App({
     } catch { return []; }
   });
   const [cartAnnouncement, setCartAnnouncement] = useState('');
+  const [instoreDisplayProducts,setInstoreDisplayProducts]=useState(()=>instoreCatalogue());
+  useEffect(()=>subscribeInstoreCatalogue(setInstoreDisplayProducts),[]);
+  const cartDisplayItems=useMemo(()=>refreshInstoreBasketText(cartItems,instoreDisplayProducts),[cartItems,instoreDisplayProducts]);
   const [cartPriceChanges, setCartPriceChanges] = useState([]);
   const [cartRevealRequest, setCartRevealRequest] = useState(null);
   const [cartScrollTop, setCartScrollTop] = useState(0);
@@ -2512,7 +2516,7 @@ export default function App({
           onMouseLeave={resumeDrawerPeek}
         >
           {desktopDrawerVisible && <Drawer
-            cartItems={cartItems}
+            cartItems={cartDisplayItems}
             cartTotal={cartTotal}
             updateQty={updateQty}
             quantityCapForProduct={cartQtyCapForProduct}
@@ -2636,7 +2640,7 @@ export default function App({
             </div>
             <div className="mobile-cart-sheet-body">
               <Drawer
-                cartItems={cartItems}
+                cartItems={cartDisplayItems}
                 cartTotal={cartTotal}
                 updateQty={updateQty}
                 quantityCapForProduct={cartQtyCapForProduct}

@@ -1,0 +1,44 @@
+[
+  {
+    "input": {
+      "sku": "A",
+      "barcode": null,
+      "supplier_name": null,
+      "image_source_key": null
+    },
+    "expected": "9f97909b4db87d300bc23222b499bc6de5e042f2575a9e3f183b12ab2bb5f2e8"
+  },
+  {
+    "input": {
+      "sku": "A",
+      "barcode": "",
+      "supplier_name": "",
+      "image_source_key": ""
+    },
+    "expected": "aa2f26b5310bb03074587026eab6f11436aa4d62ba35d4cbd47a4850a1d2c6a5"
+  },
+  {
+    "input": {
+      "sku": "A",
+      "barcode": " CODE ",
+      "supplier_name": "Supplier \"quoted\" \\ slash",
+      "image_source_key": "line1\nline2"
+    },
+    "expected": "ea4d471aff4a8295fb99d2ea1785d2673d3c0fc7a561d7fb859fd50ddd6e8e4b"
+  },
+  {
+    "input": {
+      "sku": "A",
+      "barcode": "é漢字😀",
+      "supplier_name": "a\tb\r\nc",
+      "image_source_key": "x\u0001y"
+    },
+    "expected": "6f2515948d0314d94e4d89449c8bce7bbde7fa1ddbd53906cc13e3005de3bd5d"
+  },
+  {
+    "input": {
+      "sku": "A"
+    },
+    "expected": "9f97909b4db87d300bc23222b499bc6de5e042f2575a9e3f183b12ab2bb5f2e8"
+  }
+]

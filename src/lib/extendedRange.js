@@ -13,7 +13,7 @@ import {
 const IDB_NAME = 'proto-instore';
 const IDB_STORE = 'collection';
 const IDB_VERSION = 1;
-const IDB_KEY = 'approved-customer-v1';
+const IDB_KEY = 'approved-customer-content-v1';
 const PERSISTED_COLLECTION_MAX_AGE_MS = 1_800_000;
 // Roughly the first screen of cards, rather than the main catalogue's 60: the
 // rest arrive lazily as the customer scrolls.
@@ -22,8 +22,12 @@ const LANDING_IMAGE_PRELOAD = 24;
 const responseCache = new Map();
 let catalogueRequest = null;
 let catalogueProducts = null;
+let collectionWasLoaded = false;
 let hydration = null;
 let collectionGeneration = 0;
+let contentGeneration = null;
+let contentPoll = null;
+let contentCheck = null;
 let persistenceClear = Promise.resolve();
 const catalogueListeners = new Set();
 
@@ -36,7 +40,40 @@ function notifyCatalogue() {
 export function subscribeInstoreCatalogue(listener) {
   catalogueListeners.add(listener);
   listener(catalogueProducts);
-  return () => catalogueListeners.delete(listener);
+  if(catalogueListeners.size===1&&typeof window!=='undefined'){
+    contentPoll=window.setInterval(()=>{if(typeof document==='undefined'||document.visibilityState!=='hidden')void revalidateInstoreWebsiteContent();},60000);
+    window.addEventListener('focus',revalidateInstoreWebsiteContent);
+  }
+  return () => {catalogueListeners.delete(listener);if(!catalogueListeners.size&&typeof window!=='undefined'){window.clearInterval(contentPoll);contentPoll=null;window.removeEventListener('focus',revalidateInstoreWebsiteContent);}};
+}
+
+function adoptContentGeneration(value){
+ const incoming=typeof value==='string'&&/^(0|[1-9][0-9]{0,17})$/.test(value)?value:null;
+ if(contentGeneration!==null&&incoming===null)throw Error('Website details could not be verified. Keeping the last verified collection.');
+ if(incoming!==null){
+  if(contentGeneration!==null&&BigInt(incoming)<BigInt(contentGeneration))throw Error('Website details changed during this request. Please retry.');
+  if(incoming!==contentGeneration){
+   const hadCollection=catalogueProducts!==null;responseCache.clear();catalogueProducts=null;hydration=null;if(hadCollection)notifyCatalogue();
+   persistenceClear=persistenceClear.then(clearPersistedCollection);
+  }
+  contentGeneration=incoming;
+ }
+}
+
+// An already-open visible catalogue checks its tiny metadata generation once
+// per minute and on focus. No stock/identity or basket mutation is performed.
+export function revalidateInstoreWebsiteContent(){
+ const connection=typeof navigator==='undefined'?null:navigator.connection;
+ if(!collectionWasLoaded||connection?.saveData||['slow-2g','2g'].includes(connection?.effectiveType))return Promise.resolve(null);
+ if(contentCheck)return contentCheck;
+ const generation=collectionGeneration;
+ const pending=(async()=>{
+  const {response,data}=await authenticatedGetJson('/api/extended-range?content=generation',{timeoutMs:15000});
+  if(!response.ok||generation!==collectionGeneration)return;
+  const previous=contentGeneration;adoptContentGeneration(data?.contentGeneration);
+  if(contentGeneration!==previous||!catalogueProducts)await fetchCollection();
+ })().catch(()=>null);
+ contentCheck=pending.finally(()=>{contentCheck=null;});return contentCheck;
 }
 
 function openCollectionDb() {
@@ -65,18 +102,19 @@ async function readPersistedCollection() {
   db.close();
   const age = Date.now() - Number(entry?.ts || 0);
   if (!Array.isArray(entry?.data) || !entry.data.length) return null;
+  if(contentGeneration!==null&&entry.contentGeneration!==contentGeneration)return null;
   return Number.isFinite(age) && age >= 0 && age < PERSISTED_COLLECTION_MAX_AGE_MS ? entry.data : null;
 }
 
-async function writePersistedCollection(products, generation = collectionGeneration) {
+async function writePersistedCollection(products, generation = collectionGeneration, contentVersion = contentGeneration) {
   await persistenceClear;
-  if (generation !== collectionGeneration) return;
+  if (generation !== collectionGeneration || contentVersion!==contentGeneration) return;
   const db = await openCollectionDb();
   if (!db) return;
-  if (generation !== collectionGeneration) { db.close(); return; }
+  if (generation !== collectionGeneration || contentVersion!==contentGeneration) { db.close(); return; }
   await new Promise((resolve) => {
     const transaction = db.transaction(IDB_STORE, 'readwrite');
-    transaction.objectStore(IDB_STORE).put({ data: products, ts: Date.now() }, IDB_KEY);
+    transaction.objectStore(IDB_STORE).put({ data: products, ts: Date.now(),contentGeneration:contentVersion }, IDB_KEY);
     transaction.oncomplete = resolve;
     transaction.onerror = resolve;
     transaction.onabort = resolve;
@@ -110,6 +148,7 @@ function storage() {
 // same for every approved customer, but the store is still cleared on sign-out
 // so nothing of one session is left for the next.
 export function clearStoredInstoreResponses() {
+  collectionWasLoaded=false;
   collectionGeneration += 1;
   responseCache.clear();
   catalogueRequest = null;
@@ -177,21 +216,23 @@ function writeStored(key, data) {
 export function storedExtendedRange(query = '', options = {}) {
   const key = instoreRequestKey(query, options);
   const cached = responseCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
-  return readStored(key);
+  if (cached && cached.expiresAt > Date.now() && (contentGeneration===null||cached.data?.contentGeneration===contentGeneration)) return cached.data;
+  const stored=readStored(key);
+  return contentGeneration===null||stored?.contentGeneration===contentGeneration?stored:null;
 }
 
 export async function fetchExtendedRange(query = '', { signal, page = 1, category = '', includeCatalogue = false, exact = false } = {}) {
   const generation = collectionGeneration;
   const cacheKey = instoreRequestKey(query, { page, category, includeCatalogue, exact });
   const cached = responseCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (cached && cached.expiresAt > Date.now() && (contentGeneration===null||cached.data?.contentGeneration===contentGeneration)) return cached.data;
   // The preview may be reading a few thousand staged products. Give its
   // protected, server-side eligibility checks enough time to finish instead
   // of turning a slow-but-valid response into a false loading failure.
   const { response, data } = await authenticatedGetJson(`/api/extended-range?${cacheKey}`, { signal, timeoutMs: 45000 });
   if (generation !== collectionGeneration) throw new Error('The Instore collection changed. Please retry.');
   if (!response.ok) throw new Error('Unable to load Instore Products. Please try again.');
+  adoptContentGeneration(data?.contentGeneration);
   if (!signal?.aborted) {
     responseCache.set(cacheKey, { data, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
     if (!includeCatalogue) writeStored(cacheKey, data);
@@ -225,15 +266,16 @@ function preloadLandingImages(products) {
 async function fetchCollection() {
   const generation = collectionGeneration;
   const data = await fetchExtendedRange('', { page: 1, includeCatalogue: true });
-  if (generation !== collectionGeneration) return null;
+  if (generation !== collectionGeneration || data?.contentGeneration&&data.contentGeneration!=='unavailable'&&data.contentGeneration!==contentGeneration) return null;
   const products = Array.isArray(data?.catalogue) && data.catalogue.length ? data.catalogue : null;
   if (products) {
+    collectionWasLoaded=true;
     catalogueProducts = products;
     notifyCatalogue();
     preloadLandingImages(products);
-    await writePersistedCollection(products, generation).catch(() => {});
+    await writePersistedCollection(products, generation, contentGeneration).catch(() => {});
   }
-  return generation === collectionGeneration ? products : null;
+  return generation === collectionGeneration && (!data?.contentGeneration||data.contentGeneration==='unavailable'||data.contentGeneration===contentGeneration) ? products : null;
 }
 
 /**
@@ -245,11 +287,13 @@ export function hydrateInstoreCatalogue() {
   if (catalogueProducts) return Promise.resolve(catalogueProducts);
   if (!hydration) {
     const generation = collectionGeneration;
+    const contentVersion=contentGeneration;
     hydration = persistenceClear.then(() => generation === collectionGeneration ? readPersistedCollection() : null)
       .then((persisted) => {
-        if (generation !== collectionGeneration) return null;
+        if (generation !== collectionGeneration || contentVersion!==contentGeneration) return null;
         if (persisted && !catalogueProducts) {
           catalogueProducts = persisted;
+          collectionWasLoaded=true;
           notifyCatalogue();
           preloadLandingImages(persisted);
         }

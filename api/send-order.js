@@ -33,6 +33,8 @@ import { evaluateCheckoutSnapshot, isLandedStockAvailable, isToOrderProduct, nor
 import { stockRequestNote } from '../lib/stock-request-note.mjs';
 import { stockClient } from './extended-range.js';
 import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
+import { readInstoreWebsiteContent,instoreContentSourceIdentity } from './_instore-website-content.js';
+import { applyInstoreWebsiteContent } from '../lib/instore-website-content.mjs';
 import {
   assertOrderCaptureSchemaReady,
   isMissingClientRefSchema,
@@ -322,7 +324,7 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   let indexRows; let normalRows; let listingControls;
   try {
     const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
-      index.from('extended_range_items').select('sku, image_source, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
+      index.from('extended_range_items').select('sku, supplier_name, image_source_key, image_source, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('barcode', skus),
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
@@ -361,11 +363,15 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   }
   const arrivals=await readArrivedStockRecords(index,skus);
   const verifiedArrivals=assertArrivedOrderTotals(items,arrivals,bridgeBySku);
+  const contentSnapshot=await readInstoreWebsiteContent(index,skus);
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    return resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible',arrivalStock:verifiedArrivals.get(sku) });
+    const line=resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible',arrivalStock:verifiedArrivals.get(sku) });
+    const bound={...line.product,instoreSourceIdentity:instoreContentSourceIdentity(matching[0])};
+    const display=applyInstoreWebsiteContent([bound],contentSnapshot)[0];
+    return display===bound?line:{...line,product:{...line.product,name:display.name,description:display.description,sourceDescription:line.product.name}};
   });
 }
 
