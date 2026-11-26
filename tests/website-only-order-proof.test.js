@@ -2,8 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { createSendOrderHandler, resolveAuthoritativePrices, resolveInstorePrices } from '../api/send-order.js';
-import { checkoutRequestHash } from '../api/_order-replay.js';
+import { createSendOrderHandler, resolveAuthoritativePrices } from '../api/send-order.js';
 import {createWebsiteOnlyProvider} from '../api/_website-only-provider.js';
 
 const user = { id: '10000000-0000-4000-8000-000000000001', email: 'buyer@example.invalid' };

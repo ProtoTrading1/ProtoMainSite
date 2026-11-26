@@ -9,8 +9,6 @@ import { MIN_PASSWORD_LENGTH, passwordPolicyError } from '../src/lib/passwordPol
 import { validateRegistrationStep } from '../src/lib/registrationValidation.mjs';
 import { safeServerRegistrationFields } from '../src/lib/registrationServerGuidance.mjs';
 
-const id='00000000-0000-4000-8000-000000000007';
-const allowed=async()=>({allowed:true});
 const response=()=>({statusCode:200,headers:{},status(n){this.statusCode=n;return this;},setHeader(k,v){this.headers[k]=v;},json(body){this.body=body;return this;},end(){return this;}});
 const payload=()=>({email:'synthetic@fixture.invalid',password:'1234567890',contactName:'Synthetic Applicant',businessName:'Synthetic Trade',phone:'0825550123',companyAddress:'1 Fixture Road, Fixture Suburb',deliveryAddress:'1 Fixture Road, Fixture Suburb',country:'South Africa',streetName:'1 Fixture Road',suburb:'Fixture Suburb',city:'Fixture City',postalCode:'0001',buildingType:'House',acceptWhatsapp:false,salesChannels:['Physical retail store'],productCategories:['Gifts & novelty products'],businessDescription:'Synthetic gifts supplied to local shops.'});
 
