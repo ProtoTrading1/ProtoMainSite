@@ -224,6 +224,19 @@ export async function readCatalogueProducts(client) {
   return rows.map((row) => row.payload);
 }
 
+// Only rows already admitted to the eligible snapshot may gain website text.
+// Supplement edited search terms without scanning the complete catalogue or
+// reconstructing a product from an override row.
+export async function readCatalogueContentCandidates(client, skus) {
+  const products=[];
+  for(let start=0;start<skus.length;start+=200){
+    const selected=skus.slice(start,start+200);
+    const rows=await readCompleteRows(()=>client.from('instore_catalogue').select('sku,payload',{count:'exact'}).in('sku',selected));
+    products.push(...rows.map(row=>row.payload));
+  }
+  return products;
+}
+
 export async function claimCatalogueRefresh(client, { staleBeforeMs = 0 } = {}) {
   const { data, error } = await client.rpc('instore_catalogue_claim_refresh', {
     p_stale_before: new Date(Date.now() - Math.max(0, staleBeforeMs)).toISOString(),

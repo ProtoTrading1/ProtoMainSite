@@ -1,4 +1,6 @@
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
+import { readInstoreWebsiteContent,instoreContentSourceIdentity } from './_instore-website-content.js';
+import { applyInstoreWebsiteContent,instoreContentMatchesProducts } from '../lib/instore-website-content.mjs';
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
@@ -19,7 +21,7 @@ import { normalizeIdentifier, isAlphabeticSuffixVariant } from '../src/lib/ident
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
   controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
-  readCatalogueSearchCandidates, readCatalogueState, readCatalogueView,
+  readCatalogueSearchCandidates, readCatalogueState, readCatalogueView,readCatalogueContentCandidates,
   releaseCatalogueRefresh, writeCatalogueSnapshot,
 } from './_instore-catalogue.js';
 
@@ -121,6 +123,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const gallery = imageHidden ? [] : sarongiInstoreGallery(sku, imageUrl);
     const product = {
       id: sku, sku, code: sku, barcode: String(row?.barcode || '').trim(),
+      instoreSourceIdentity:instoreContentSourceIdentity(row),
       name: String(row?.title || '').trim() || sku,
       title: String(row?.title || '').trim() || sku,
       description: String(row?.original_description || '').trim(),
@@ -204,7 +207,7 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
   const [rangeRows, catalogue, imageControls, listingControls] = await Promise.all([
     readCompleteRows(() => {
       let rangeQuery=client.from('extended_range_items')
-      .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
+      .select('sku, supplier_name, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active', { count: 'exact' })
       .in('visibility_status', includeStaged ? ['search_only', 'hidden'] : ['search_only'])
       .eq('image_review_status', 'verified')
       .in('is_active', includeStaged ? [true, false] : [true])
@@ -240,7 +243,7 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 // completely. Otherwise body is null and staleBeforeMs says how old a snapshot
 // the live read that follows may leave in place: a snapshot built under
 // superseded Instore controls is rebuilt at once rather than waited out.
-export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue }) {
+export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, contentSnapshot }) {
   const ttlMs = catalogueTtlMs();
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
   const searchPatterns = catalogueSearchPatterns(query);
@@ -253,10 +256,11 @@ export async function serveStoredCatalogue(client, { query, category, page, from
     try {
       const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
       if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
+        if(!instoreContentMatchesProducts(view.products,contentSnapshot))return {body:null,staleBeforeMs:0};
         return {
           body: {
             count: Math.min(PAGE_SIZE, Math.max(0, view.total - from)), page, pageSize: PAGE_SIZE,
-            total: view.total, tiles: view.state.tiles, products: view.products, catalogue: undefined,
+            total: view.total, tiles: view.state.tiles, products: applyInstoreWebsiteContent(view.products,contentSnapshot), catalogue: undefined,
           },
           staleBeforeMs: ttlMs,
         };
@@ -292,11 +296,18 @@ export async function serveStoredCatalogue(client, { query, category, page, from
 
   try {
     const catalogue = includeCatalogue || structuredOnly
-      ? await readCatalogueProducts(client)
+      ? applyInstoreWebsiteContent(await readCatalogueProducts(client),contentSnapshot)
       : undefined;
+    if(catalogue&&!instoreContentMatchesProducts(catalogue,contentSnapshot))return {body:null,staleBeforeMs:0};
     let result;
     if (searchPatterns.length) {
-      const candidates = await readCatalogueSearchCandidates(client, { query, category });
+      const [canonicalCandidates,editedCandidates]=await Promise.all([
+        readCatalogueSearchCandidates(client, { query, category }),
+        contentSnapshot?.overrides?.length?readCatalogueContentCandidates(client,contentSnapshot.overrides.map(row=>row.sku)):[],
+      ]);
+      const unique=new Map([...canonicalCandidates,...editedCandidates].map(product=>[product.sku,product]));
+      if(!instoreContentMatchesProducts([...unique.values()],contentSnapshot))return {body:null,staleBeforeMs:0};
+      const candidates=applyInstoreWebsiteContent([...unique.values()].sort((a,b)=>a.sku.localeCompare(b.sku)),contentSnapshot);
       // The same page definition the live read uses. The database has only
       // narrowed the collection to the stored token matches first.
       const view = instorePage(candidates, { query, category, page, pageSize: PAGE_SIZE });
@@ -306,6 +317,8 @@ export async function serveStoredCatalogue(client, { query, category, page, from
       result = { products: view.products, total: view.total };
     } else {
       result = await readCatalogueOrderedPage(client, { category, from, pageSize: PAGE_SIZE });
+      if(!instoreContentMatchesProducts(result.products,contentSnapshot))return {body:null,staleBeforeMs:0};
+      result={...result,products:applyInstoreWebsiteContent(result.products,contentSnapshot)};
     }
     const { products, total } = result;
     return {
@@ -454,6 +467,9 @@ return async function handler(req, res) {
     }
     const includeStaged = false;
     const client = getClient();
+    const generationOnly=req.query?.content==='generation';
+    const contentSnapshot=await readInstoreWebsiteContent(client,generationOnly?[]:null);
+    if(generationOnly)return sendInstoreResponse(res,{contentGeneration:contentSnapshot.generation});
     const query = normalizeQuery(req.query?.q);
     const category = String(req.query?.category || '').trim();
     const includeCatalogue = req.query?.catalogue === '1';
@@ -465,9 +481,9 @@ return async function handler(req, res) {
       const origin=websiteOnlyProvider ? websiteOnlyRequestOrigin(req) : null;
       const provider=websiteOnlyProvider ? (options)=>websiteOnlyProvider({...options,origin}) : null;
       const live=await loadLiveInstoreCatalogue(client,{websiteOnlyProvider:provider,exactSku:query.toUpperCase()});
-      const products=await attachArchivePublicationGalleries(attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client)),client,'instore');
+      const products=applyInstoreWebsiteContent(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client)),client,'instore'),contentSnapshot);
       const view=instorePage(products,{query,category,page,pageSize:PAGE_SIZE});
-      return sendInstoreResponse(res,{source:SOURCE_LABEL,count:view.products.length,page,pageSize:PAGE_SIZE,total:view.total,tiles:[],products:view.products});
+      return sendInstoreResponse(res,{source:SOURCE_LABEL,contentGeneration:contentSnapshot.generation,count:view.products.length,page,pageSize:PAGE_SIZE,total:view.total,tiles:[],products:view.products});
     }
 
     // The stored read model answers browsing from one small page instead of
@@ -477,14 +493,14 @@ return async function handler(req, res) {
     const useArrivals=arrivedStockEnabled();
     // The durable snapshot predates the arrival ledger. Keep it untouched and
     // use only the existing bounded 30-second memory cache in arrival mode.
-    const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue });
+    const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue,contentSnapshot });
     if (stored.body) {
       const galleries = await readPrivateReviewGalleries(client);
       const body = {...stored.body, products: await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.products, galleries),client,'instore')};
       if (Array.isArray(stored.body.catalogue)) body.catalogue = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.catalogue, galleries),client,'instore');
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
-      return res.status(200).json({ source: SOURCE_LABEL, ...body });
+      return res.status(200).json({ source: SOURCE_LABEL,contentGeneration:contentSnapshot.generation, ...body });
     }
 
     // One caller rebuilds the stored collection; the rest just serve. Claiming
@@ -493,12 +509,13 @@ return async function handler(req, res) {
     const claimed = (useArrivals||websiteOnlyProvider)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
     const websiteOnlyOrigin=websiteOnlyProvider?websiteOnlyRequestOrigin(req):null;
     const providerForRequest=websiteOnlyProvider?()=>websiteOnlyProvider({origin:websiteOnlyOrigin}):null;
-    const live = websiteOnlyProvider ? await getCachedCatalogue(`website-only:${websiteOnlyOrigin}`,()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest})) : await (claimed
+    let live = websiteOnlyProvider ? await getCachedCatalogue(`website-only:${websiteOnlyOrigin}`,()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest})) : await (claimed
       ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
         await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
         throw error;
       })
       : getCachedCatalogue(useArrivals?'arrivals-production':includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
+    if(!instoreContentMatchesProducts(live.products,contentSnapshot))live=await loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest});
     let allEligible = live.products;
     if(useArrivals||websiteOnlyProvider){
       // Explicit image/listing removals still take effect immediately, even
@@ -507,17 +524,18 @@ return async function handler(req, res) {
       allEligible=allEligible.filter(product=>listingControls.get(product.sku)!=='hidden').map(product=>imageControls.get(product.sku)==='hidden'?{...product,image:'',images:[],imageStatus:'hidden'}:product);
     }
     allEligible = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client)),client,'instore');
+    allEligible = applyInstoreWebsiteContent(allEligible,contentSnapshot);
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);
     return sendInstoreResponse(res, {
-      source: SOURCE_LABEL,
+      source: SOURCE_LABEL,contentGeneration:contentSnapshot.generation,
       count: Math.min(PAGE_SIZE, Math.max(0, view.total - from)), page, pageSize: PAGE_SIZE,
       total: view.total, tiles, products: view.products,
       // The first authenticated response includes the same already-verified
       // data used by this handler. The browser can then search and browse it
       // instantly without bypassing the stock, price, image, or duplicate gate.
       catalogue: includeCatalogue ? allEligible : undefined,
-    }, claimed ? () => storeInstoreCatalogue(client, { ...live, tiles }) : null);
+    }, claimed ? () => storeInstoreCatalogue(client, { ...live, tiles:discoveryTiles(live.products) }) : null);
   } catch (error) {
     console.error('extended range api error:', error?.message || error);
     return res.status(503).json({ error: 'Instore Products is temporarily unavailable.' });

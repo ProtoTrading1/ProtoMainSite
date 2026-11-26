@@ -1,4 +1,5 @@
 import { isSarongiInstoreRequest, sarongiRequestAvailability, instoreQuantityLimit } from '../../lib/sarongi-instore-requests.mjs';
+import {customerProductDescription} from '../../lib/instore-website-content.mjs';
 import { trackShoppingPreview, closeShoppingPreview, releaseUnmountedPreview } from '../lib/shoppingAnalytics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -926,8 +927,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                 </div>
                 <h2 className="pz-name" id={`pz-name-${activeProduct.id || product.id}`}>{displayProductText(activeProduct.name)}</h2>
 
-                {activeProduct.originalDescription && (
-                  <p className="pz-desc">{displayProductText(activeProduct.originalDescription)}</p>
+                {customerProductDescription(activeProduct) && (
+                  <p className="pz-desc">{displayProductText(customerProductDescription(activeProduct))}</p>
                 )}
 
                 {/* Specs */}
