@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import process from 'node:process';
 import { createRegisterTradeHandler } from '../api/register-trade.js';
 
 test('rejected password stays on form, preserves details, and corrected registration reaches confirmation',async({page},testInfo)=>{
