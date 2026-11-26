@@ -11,7 +11,8 @@ test('turtle bracelet displays four colour preferences under one SKU', async ({ 
   await expect(card).toHaveCount(1);
   const select = card.getByLabel('Preferred bracelet colour');
   await expect(select).toHaveValue('Brown');
-  await expect(select.locator('option')).toHaveText(['Brown', 'Black', 'Turquoise', 'White']);
+  await expect(select.locator('option')).toHaveText(['Brown', 'Black — Stock available', 'Turquoise — Stock available', 'White — Stock available']);
+  expect(await select.locator('option').evaluateAll(options => options.map(option => option.value))).toEqual(['Brown', 'Black', 'Turquoise', 'White']);
   await expect(card.locator('img').first()).toHaveAttribute('src', /2013brn\.jpg/);
   for (const [colour, suffix] of [['Black', 'blk'], ['Turquoise', 'tur'], ['White', 'whi']]) {
     await select.selectOption(colour);
