@@ -1,0 +1,316 @@
+{
+  "asOf": "2026-11-24",
+  "namedOptions": { "KBRA2013": ["Black", "Turquoise", "White"] },
+  "productSkus": [
+    "I-INC1001",
+    "I-INC1004",
+    "KBRA3006",
+    "KBRA3017",
+    "KBRA3018",
+    "KBRA3103",
+    "KBRA4030",
+    "KBRA4034",
+    "KBRA4035",
+    "KBRA4040",
+    "KBRA4043",
+    "KBRA4101",
+    "KBRA4104",
+    "KBRA4109",
+    "KBRA4303",
+    "KBRA4401",
+    "KBRA6011",
+    "KEAR2018",
+    "KNEC1107",
+    "KNEC1202",
+    "KNEC1401",
+    "KNEC2010",
+    "KNEC2016",
+    "KNEC3005",
+    "KNEC3006",
+    "KNEC3008",
+    "KNEC4001",
+    "KNEC4014",
+    "KNEC4015",
+    "KNEC4016",
+    "KNEC4038",
+    "KNEC4101",
+    "N-DRU1001",
+    "N-DRU1001B",
+    "N-DRU1003",
+    "N-DRU1003B",
+    "N-FLU1001",
+    "N-FLU1002",
+    "N-FLU2003",
+    "N-FLU2004",
+    "N-KAL1001",
+    "N-MAR1001",
+    "N-PAN2002-6-6",
+    "N-RAI1001",
+    "N-RAI1004",
+    "N-SHA1001",
+    "N-SHA1005",
+    "N-SHA1015",
+    "N-SHA1016",
+    "N-SHA1017",
+    "N-SHA1018",
+    "N-TAM1002",
+    "X-WHI1001"
+  ],
+  "photos": [
+    {
+      "sku": "KANK3201",
+      "sha256": "1a8241a826b7430683250514e7129f3157f73311d7301f04aaa92213c7134f1c",
+      "supplierCode": "K-ANK-3201TUR"
+    },
+    {
+      "sku": "KANK3201",
+      "sha256": "aec8db4390b86b42d8d850feec0e9c6ef2e6fceba80de33c51914d1158d43489",
+      "supplierCode": "K-ANK-3201WHI"
+    },
+    {
+      "sku": "KBRA2003",
+      "sha256": "f1ec2966b668e86a29789f24684a612667d6a7d589cd19175cfc73e03d59a56a",
+      "supplierCode": "K-BRA-2003WHI"
+    },
+    {
+      "sku": "KBRA4018",
+      "sha256": "0892f48db96f57e8800d6947cd713986e7ba23afb486fcbe0cf63eafc0c27e91",
+      "supplierCode": "K-BRA-4018BLK"
+    },
+    {
+      "sku": "KBRA4018",
+      "sha256": "8fa5ce9044c7cd601459b3ea13621ed7c8562f73d53e2eaf871b535fceb2c15f",
+      "supplierCode": "K-BRA-4018BRN"
+    },
+    {
+      "sku": "KBRA4018",
+      "sha256": "d3e2586214704487ee0a1fba3bc751c773d3ec9cecb84d83122fa2fc93f6c72a",
+      "supplierCode": "K-BRA-4018PLN"
+    },
+    {
+      "sku": "KBRA2017",
+      "sha256": "045a3ed287fa1bc5c7d79f9cdc21831da27205467dc717a963a12d5d3b3033da",
+      "supplierCode": "K-BRA-2017TUR"
+    },
+    {
+      "sku": "KBRA2018",
+      "sha256": "17a901fc4545fe930a3888ad43c5cae20bfc72647e1e2ded5323c7f1c0edd6ee",
+      "supplierCode": "K-BRA-2018BLK"
+    },
+    {
+      "sku": "KBRA2018",
+      "sha256": "40a528dc43c7047f8de2817256e537ea6aba7e24df3ef034bad3c710a5df88a9",
+      "supplierCode": "K-BRA-2018CRE"
+    },
+    {
+      "sku": "KBRA3001",
+      "sha256": "974c08002671e6c41bdc66d293d50960103f9d44f2bbe0ef7847ec5e6a2a43e4",
+      "supplierCode": "K-BRA-3001AQU"
+    },
+    {
+      "sku": "KBRA3001",
+      "sha256": "a244f7227c8a2163285c458a833f4308dd8f3594b5d208d2103b9333db9ccc88",
+      "supplierCode": "K-BRA-3001BLK"
+    },
+    {
+      "sku": "KBRA3001",
+      "sha256": "8007a35fdb589e18491326c73fc437bf275bf2b7e1a3ff0b9d03943b4fb8b393",
+      "supplierCode": "K-BRA-3001BRN"
+    },
+    {
+      "sku": "KBRA3001",
+      "sha256": "25ee89f7888a48ea6b52b8aff5f6b7551a7545c3323fdb1ac632176921d0ad90",
+      "supplierCode": "K-BRA-3001WHI"
+    },
+    {
+      "sku": "KBRA2019",
+      "sha256": "41d9ea05fdc0fc034f2a7ae9a9aa5322c88b024af7927081947cd1d87313a500",
+      "supplierCode": "K-BRA-2019RED"
+    },
+    {
+      "sku": "KBRA3013",
+      "sha256": "932e1545b34a95cac78b94ea16f0bd8c83553d03f73bd72692b0c1a17f2cf60d",
+      "supplierCode": "K-BRA-3013BEI"
+    },
+    {
+      "sku": "KBRA3013",
+      "sha256": "78dc00aaed0387e75d628ee4ae6e350bceb72107b7d3d76cd40262beb8393f62",
+      "supplierCode": "K-BRA-3013BLK"
+    },
+    {
+      "sku": "KBRA3013",
+      "sha256": "1afddf390e79d70e93e42268f218ccea34092de9d7d65fd318aae09a423a2f52",
+      "supplierCode": "K-BRA-3013GRN"
+    },
+    {
+      "sku": "KBRA3021",
+      "sha256": "b2d2a1f772b9f80ee34430062be5ed8555348dcc2ebbcb41fec4f88896e341b9",
+      "supplierCode": "K-BRA-3021BLK"
+    },
+    {
+      "sku": "KBRA3021",
+      "sha256": "adfb2f29ba5bdfa58b7ef1a8f7f215b00f3b59a6d8e1fcf67f79b4c766cd7ee1",
+      "supplierCode": "K-BRA-3021TUR"
+    },
+    {
+      "sku": "KBRA3021",
+      "sha256": "df5eb4004c3d4e0ed3a8cfcbe511dfe00ba28fba93e6509ce59b88d6588d4448",
+      "supplierCode": "K-BRA-3021WHI"
+    },
+    {
+      "sku": "KBRA3101",
+      "sha256": "01bb1683249071c67b9b018f3b57eff01a02c0895b880969af666478604aa93b",
+      "supplierCode": "K-BRA-3101BLK"
+    },
+    {
+      "sku": "KBRA3101",
+      "sha256": "4e026f1af9265bb4c59b7cd082263e647343461b9069976ce10b647ea4b81896",
+      "supplierCode": "K-BRA-3101GRN"
+    },
+    {
+      "sku": "KBRA3101",
+      "sha256": "ca3cca1ce241c736d2516896d4a91fac882c5e72ad7ace4411c70d6f94ca49d2",
+      "supplierCode": "K-BRA-3101WHI"
+    },
+    {
+      "sku": "KBRA3020",
+      "sha256": "d5a58dad47fd26fcc88637adbe1616bb798c2954e78135b502d224e3cfc076aa",
+      "supplierCode": "K-BRA-3020BLK"
+    },
+    {
+      "sku": "KBRA3020",
+      "sha256": "a40a951785c97e6ad3e448d591d61347955bc2d87f584fdf93dc86c31561a4ed",
+      "supplierCode": "K-BRA-3020WHI"
+    },
+    {
+      "sku": "KBRA4019",
+      "sha256": "91a8ead0713786cb43f79b6a65a47c356661da19b1b1ec443cfc4847d57af287",
+      "supplierCode": "K-BRA-4019CRE"
+    },
+    {
+      "sku": "KBRA4019",
+      "sha256": "ab814e40587be6f0b7b86ec78492d9853aa1750964859abc5eea8b584a58c737",
+      "supplierCode": "K-BRA-4019TUR"
+    },
+    {
+      "sku": "KNEC2013",
+      "sha256": "8feffbe517e4c04026b3313be4b9d516f9f77d0ace7bb625ead39952e60e0893",
+      "supplierCode": "K-NEC-2013RED"
+    },
+    {
+      "sku": "KBRA4027",
+      "sha256": "9f72b1c98c1c59064916103512abbdfefbf1d4ee7ca35c7ac16e5c5784cd3cbd",
+      "supplierCode": "K-BRA-4027CRE"
+    },
+    {
+      "sku": "KBRA4027",
+      "sha256": "7d1ba28718ec8ace30c2c47d3386a24b2193b2af16de1fe7bdb6f8499bea3ee4",
+      "supplierCode": "K-BRA-4027TC"
+    },
+    {
+      "sku": "KBRA4027",
+      "sha256": "86094308c74f073939762fc135f0495784b63ce5a6d1f341d771a5a1cdaae2ab",
+      "supplierCode": "K-BRA-4027TUR"
+    },
+    {
+      "sku": "KBRA4028",
+      "sha256": "5325929bdc2b5e16fcde2970d44d20262ab9ba7b6a9c063d517b228fd267bc02",
+      "supplierCode": "K-BRA-4028BLK"
+    },
+    {
+      "sku": "KBRA4304",
+      "sha256": "b367781341fa258c5c3d0396b080aa7ff9e8c797a0836f2f2c389f5278ed6562",
+      "supplierCode": "K-BRA-4304BRN"
+    },
+    {
+      "sku": "KBRA4304",
+      "sha256": "dfc04c0201c19459f2775a3da4c2628990e5d7a3c12b4f01fdd22003ab09f0c6",
+      "supplierCode": "K-BRA-4304PNK"
+    },
+    {
+      "sku": "KBRA4304",
+      "sha256": "a64ed3f21fb2355940dcfa2c55cb682526478e0d3780c20dce6e7cc98e232d49",
+      "supplierCode": "K-BRA-4304PUR"
+    },
+    {
+      "sku": "KBRA4304",
+      "sha256": "99b28b52f91f2f2978924999bde4d48af2831c2301377f515b96007c62d75a7c",
+      "supplierCode": "K-BRA-4304WHI"
+    },
+    {
+      "sku": "KBRA6001",
+      "sha256": "e5a5a8094a5880e38fede0d80b312e2dcd9fc9c9fefd9e3def1e7bdd34605cdd",
+      "supplierCode": "K-BRA-6001GRN"
+    },
+    {
+      "sku": "KBRA6001",
+      "sha256": "0680d8f6d4047d9d9859691759be1de49abca865d9f6af9a77e298fceb583de9",
+      "supplierCode": "K-BRA-6001GRY"
+    },
+    {
+      "sku": "KBRA6001",
+      "sha256": "1c42ffe6305936d6b0946ce9a30fe2fec5680e6c906332fbd80c1c4e97233d3d",
+      "supplierCode": "K-BRA-6001OCE"
+    },
+    {
+      "sku": "KBRA6001",
+      "sha256": "6e5f92251e45c328caa078eedf8a84c6143a5723069dd0fe07770968671959ae",
+      "supplierCode": "K-BRA-6001ROS"
+    },
+    {
+      "sku": "KNEC3001",
+      "sha256": "b82f51370334dbb8469ee8dd125d8e66cfb7fa7fda08a72ebaaf6575134df69f",
+      "supplierCode": "K-NEC-3001AQU"
+    },
+    {
+      "sku": "KNEC3001",
+      "sha256": "41699c453adf9c087a681da290eb76fa548e024f6e5f433305b204abbdc1b6f6",
+      "supplierCode": "K-NEC-3001BLK"
+    },
+    {
+      "sku": "KNEC3001",
+      "sha256": "5dbad80b60a36de4e6ff8c20185e15bd84e3916310c41acc31ba5efbe9b31aa2",
+      "supplierCode": "K-NEC-3001BRN"
+    },
+    {
+      "sku": "KNEC3001",
+      "sha256": "111348bf9d1aa4d104e7071fcc9a1cbfd5e75dace75a092cd2063edf6de0dce6",
+      "supplierCode": "K-NEC-3001WHI"
+    },
+    {
+      "sku": "KNEC3101",
+      "sha256": "521dad5a35dff2f4d6005feb00424fb0c0f78b704f37e898580c7f77f48dbe20",
+      "supplierCode": "K-NEC-3101BLK"
+    },
+    {
+      "sku": "KBRA3010",
+      "sha256": "51548e2322869c8af379c1c3c06876794f36c45e2849213f0f81db41d48b7faf",
+      "supplierCode": "K-BRA-3010BRN"
+    },
+    {
+      "sku": "KBRA3010",
+      "sha256": "1e8f8fd8d304adcf04486855738400847d37ff55e68b10b54c2567b27978161b",
+      "supplierCode": "K-BRA-3010PLN"
+    },
+    {
+      "sku": "KBRA3014",
+      "sha256": "35f4550c31cf50d4f957d5c5621c4e136b23c4d0169bf82990a7d7b9ad605a30",
+      "supplierCode": "K-BRA-3014ORA"
+    },
+    {
+      "sku": "KBRA3014",
+      "sha256": "26dacf3e28db5d65dffcf59052e4a194efd2b478299aa2441811c2ee561bac0e",
+      "supplierCode": "K-BRA-3014TUR"
+    },
+    {
+      "sku": "KNEC1103",
+      "sha256": "e71a5ea69548d8d12e7e98155fd6f80c100a09449f4bf42853f0011d01c93d9d",
+      "supplierCode": "K-NEC-1103BLK"
+    },
+    {
+      "sku": "KNEC1103",
+      "sha256": "4f7d9b41b0aea0c64eb907e841568b1fd07c9360067dd0f03f597f0294bbdf97",
+      "supplierCode": "K-NEC-1103BLU"
+    }
+  ]
+}

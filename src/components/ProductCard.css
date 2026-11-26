@@ -654,3 +654,14 @@
     height: 188px;
   }
 }
+.pc-colour-options { border: 0; padding: 0; margin: 12px 0; min-width: 0; }
+.pc-colour-options legend { font-weight: 700; font-size: 14px; }
+.pc-colour-options > p, .pc-colour-options > small { display: block; color: #64748b; font-size: 11px; line-height: 1.45; margin: 5px 0; }
+.pc-colour-options-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.pc-colour-option { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; width: 82px; min-height: 86px; padding: 6px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer; }
+.pc-colour-option img { width: 46px; height: 46px; object-fit: contain; }
+.pc-colour-option--selected { border: 2px solid #c56328; padding: 5px; background: #fff7ed; }
+.pc-colour-option:focus-visible { outline: 3px solid #245aa7; outline-offset: 2px; }
+.pc-supplier-stock { font-size: 10px; color: #166534; background: #dcfce7; border-radius: 4px; padding: 2px 4px; }
+.pc-supplier-stock-note { margin: 8px 0; font-size: 12px; color: #166534; }
+.pc-supplier-stock-note small { display: block; color: #64748b; font-size: 10px; }

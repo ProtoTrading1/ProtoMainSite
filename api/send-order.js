@@ -3,6 +3,7 @@ import {readArrivedStockRecords,assertArrivedOrderTotals} from './_arrived-stock
 import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
+import { reviewedColourOrderImage } from '../lib/reviewed-colour-options.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
@@ -489,8 +490,8 @@ async function resolveStandardPrices(items) {
         barcode: authoritativeBarcode,
         name: cleanText(row.title, authoritativeSku),
         price,
-        image: cleanText(row.image_url_one),
-        remoteImage: cleanText(row.image_url_one),
+        image: reviewedColourOrderImage(authoritativeSku, cleanText(row.image_url_one), item.preference),
+        remoteImage: reviewedColourOrderImage(authoritativeSku, cleanText(row.image_url_one), item.preference),
         unitsOfIssue,
         casePack: sellingUnitDetails(unitsOfIssue).label,
         packDescription: cleanText(row.pack_description),

@@ -1,0 +1,177 @@
+[
+  {
+    "sku": "KANK3201",
+    "sha256": "1a8241a826b7430683250514e7129f3157f73311d7301f04aaa92213c7134f1c",
+    "label": "Turquoise"
+  },
+  {
+    "sku": "KANK3201",
+    "sha256": "aec8db4390b86b42d8d850feec0e9c6ef2e6fceba80de33c51914d1158d43489",
+    "label": "White"
+  },
+  {
+    "sku": "KBRA2003",
+    "sha256": "16a5ce2c23ccf9f58aeec12b01903b51e46915130353f8e2cd97a7fdc9e7839b",
+    "label": "Black"
+  },
+  {
+    "sku": "KBRA2003",
+    "sha256": "526a85bb6740be75073b0126aa811998a4457473bb8995b844ca8bbeec5692e4",
+    "label": "Blue"
+  },
+  {
+    "sku": "KBRA2003",
+    "sha256": "d67132804d9824736ae9a060475803b97cac9d59e3e6f0cd450320614eb68a93",
+    "label": "Brown"
+  },
+  {
+    "sku": "KBRA2003",
+    "sha256": "61a334332b744fe5db76deced129ee1f6b5e38afda4cb3ac69031d2f0895b255",
+    "label": "Purple"
+  },
+  {
+    "sku": "KBRA2003",
+    "sha256": "f1ec2966b668e86a29789f24684a612667d6a7d589cd19175cfc73e03d59a56a",
+    "label": "White"
+  },
+  {
+    "sku": "KBRA2016",
+    "sha256": "14b4127e53be5fec5eec833c05114ec593d9a96b1343890919b01422a36f2241",
+    "label": "Black"
+  },
+  {
+    "sku": "KBRA2016",
+    "sha256": "a17cc64dc08ffe5e6e308564c2130ace75fee8d3abc7bedb075377afd51cbbe7",
+    "label": "Brown"
+  },
+  {
+    "sku": "KBRA2016",
+    "sha256": "81c60d46760394cc1cc7a78e72f263c56b3bb93be5c1f1010843ab41de956902",
+    "label": "Cream"
+  },
+  {
+    "sku": "KBRA2016",
+    "sha256": "6a8c3b18d87f7187112fda80ac7c51621a0f7be86bd862acef0ced3778f2f9fd",
+    "label": "Red"
+  },
+  {
+    "sku": "KBRA2016",
+    "sha256": "e425829a9ee1022e6edde664dc998b244cfe4851f19dd4ea19229ef6a83145d2",
+    "label": "Turquoise"
+  },
+  {
+    "sku": "KBRA2019",
+    "sha256": "1105dd2b2e537d3b2ec23940bb63e9ac4055a94af9225c682aa3a8ac88f8bae0",
+    "label": "Black"
+  },
+  {
+    "sku": "KBRA2019",
+    "sha256": "6b25b3e5626c1e712ca6ade497facc0b66d9431ec71fdffa51ac8161137f8815",
+    "label": "Multicolour: red, yellow and black"
+  },
+  {
+    "sku": "KBRA2019",
+    "sha256": "41d9ea05fdc0fc034f2a7ae9a9aa5322c88b024af7927081947cd1d87313a500",
+    "label": "Red, white and blue"
+  },
+  {
+    "sku": "KBRA2019",
+    "sha256": "c7ee92a27781715e104cd2cbe1693854cffe5f9bfdb9aa4b8063058ac3736abd",
+    "label": "Turquoise"
+  },
+  {
+    "sku": "KBRA3010",
+    "sha256": "51548e2322869c8af379c1c3c06876794f36c45e2849213f0f81db41d48b7faf",
+    "label": "Brown"
+  },
+  {
+    "sku": "KBRA3010",
+    "sha256": "1e8f8fd8d304adcf04486855738400847d37ff55e68b10b54c2567b27978161b",
+    "label": "Beige"
+  },
+  {
+    "sku": "KBRA3014",
+    "sha256": "35f4550c31cf50d4f957d5c5621c4e136b23c4d0169bf82990a7d7b9ad605a30",
+    "label": "Orange"
+  },
+  {
+    "sku": "KBRA3014",
+    "sha256": "a8dfc35d69ef859a98210a768cd8601fabd7221b68824d830be36cec5925fbd1",
+    "label": "Purple"
+  },
+  {
+    "sku": "KBRA3014",
+    "sha256": "26dacf3e28db5d65dffcf59052e4a194efd2b478299aa2441811c2ee561bac0e",
+    "label": "Turquoise"
+  },
+  {
+    "sku": "KBRA3020",
+    "sha256": "d5a58dad47fd26fcc88637adbe1616bb798c2954e78135b502d224e3cfc076aa",
+    "label": "Black"
+  },
+  {
+    "sku": "KBRA3020",
+    "sha256": "a40a951785c97e6ad3e448d591d61347955bc2d87f584fdf93dc86c31561a4ed",
+    "label": "White"
+  },
+  {
+    "sku": "KBRA6008",
+    "sha256": "0c66100de59840f9f1ae6c8bc2a368f4c7105fe62e740d83e183e00d5c9a976a",
+    "label": "Blue and brown"
+  },
+  {
+    "sku": "KBRA6008",
+    "sha256": "30d1136b8c34872d448d580dd8b2a7c79084a9dcb969e3fb52d9add6f2da2d4e",
+    "label": "White and brown"
+  },
+  {
+    "sku": "KNEC1004",
+    "sha256": "b385f8ac29f52303245e70c4c3b444224fe1c2a6bda668d67619850e1fb69a1a",
+    "label": "Brown"
+  },
+  {
+    "sku": "KNEC1004",
+    "sha256": "aac904d82c5278802d50aff86e2d02ffe9501a1541494910bd4d9530e7ae7883",
+    "label": "White"
+  },
+  {
+    "sku": "KNEC1103",
+    "sha256": "e71a5ea69548d8d12e7e98155fd6f80c100a09449f4bf42853f0011d01c93d9d",
+    "label": "Black"
+  },
+  {
+    "sku": "KNEC1103",
+    "sha256": "4f7d9b41b0aea0c64eb907e841568b1fd07c9360067dd0f03f597f0294bbdf97",
+    "label": "Blue"
+  },
+  {
+    "sku": "KNEC1103",
+    "sha256": "f449492bf2c8788b0e97719c1c2ebe969d24cd430530b1c12cbbf9cf1db6543b",
+    "label": "Red"
+  },
+  {
+    "sku": "KNEC1103",
+    "sha256": "167db2a96e642b5cc3a8b5bb46e70eddbc31448c310b9a6a5428e05f41d2f097",
+    "label": "White"
+  },
+  {
+    "sku": "KNEC2013",
+    "sha256": "5f917cc76d04224a1d2d8d7c1637bf8ef8dc7669e81fdf3c153cd727c7442f15",
+    "label": "Black"
+  },
+  {
+    "sku": "KNEC2013",
+    "sha256": "f7ec5795cb25f13eb61dbced9ba75e72792d7e0ddbb5eee65906de7400abb5a1",
+    "label": "Brown"
+  },
+  {
+    "sku": "KNEC2013",
+    "sha256": "8feffbe517e4c04026b3313be4b9d516f9f77d0ace7bb625ead39952e60e0893",
+    "label": "Red"
+  },
+  {
+    "sku": "KNEC2013",
+    "sha256": "c4d88365be783c346d762f2a7a9247c08010a16c123397831cc98f93172eefd7",
+    "label": "Turquoise"
+  }
+]
