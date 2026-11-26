@@ -1,3 +1,4 @@
+import { reviewedFrameStockImages } from '../lib/sarongi-instore-gallery.mjs';
 import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import {attachInstoreMoveGalleries, instoreMoveGalleriesEnabled} from '../lib/instore-move-galleries.mjs';
@@ -369,8 +370,8 @@ export async function expandIdentifierAdminGroupRows(supabase, rows, groupInfo, 
  * are none the returned object is byte-identical to before, so the payload is
  * unchanged while the feature is off.
  */
-function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, groupInfo = null, incoming = null) {
-  const images = [row.image_url_one, row.image_url_two, row.image_url_three, row.image_url_four].filter(Boolean);
+export function adapt(row, tree, salesByBarcode = new Map(), placementPaths = null, groupInfo = null, incoming = null) {
+  const images = reviewedFrameStockImages(row);
   const subLabels = [
     row.subcategory_one, row.subcategory_two, row.subcategory_three, row.subcategory_four,
     ...parseSubcategoryExtra(row.subcategory_extra),
