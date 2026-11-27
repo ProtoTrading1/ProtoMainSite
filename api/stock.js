@@ -44,16 +44,21 @@ export function validateInstoreBridgeStock(sku, row) {
 }
 
 export async function readFreshInstoreStock(sku, { includeStaged = false, websiteOnlyRows = [], websiteOnlyProvider = null, indexClient = stockClient(), fetchBridge = fetch, bridgeEnv = process.env } = {}) {
-  if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus:[sku]})).rows;
-  const { data, error } = await indexClient.from('extended_range_items')
+  const [{ data, error },listing] = await Promise.all([indexClient.from('extended_range_items')
     .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active')
-    .eq('sku', sku).limit(1);
-  if (error) throw error;
+    .eq('sku', sku).limit(1),indexClient.from('instore_listing_controls').select('sku,status').in('sku',[sku])]);
+  if (error||listing.error) throw error||listing.error;
+  if(!Array.isArray(listing.data)||listing.data.length>1||listing.data.some(row=>row?.sku!==sku||!['visible','hidden'].includes(row.status)))throw Error('Instore listing controls unavailable');
+  // A cached card must not re-verify its selling unit or availability after
+  // this SKU was hidden. Check every actual/supplemental Instore row before
+  // provider evidence, bridge reads or product availability, not only CAT07.
+  if(listing.data.some(row=>row.status==='hidden'))return null;
+  if (websiteOnlyProvider) websiteOnlyRows=(await websiteOnlyProvider({skus:[sku]})).rows;
   if(sku==='8640000274'){
     if(data?.length!==1)return null;
-    const [normal,controls]=await Promise.all([indexClient.from('website_stock').select('sku,barcode').or(`sku.eq.${sku},barcode.eq.${sku}`),indexClient.from('instore_listing_controls').select('sku,status').eq('sku',sku)]);
-    if(normal.error||controls.error)throw Error('Christmas listing controls unavailable');
-    if(normal.data?.length||controls.data?.some(row=>row.status==='hidden'))return null;
+    const normal=await indexClient.from('website_stock').select('sku,barcode').or(`sku.eq.${sku},barcode.eq.${sku}`);
+    if(normal.error)throw Error('Christmas listing controls unavailable');
+    if(normal.data?.length)return null;
     const verified=await verifyCat07Row(data[0],{client:indexClient,env:bridgeEnv,read:async(code,{env})=>{
       const base=String(env.STOCK_SQL_BRIDGE_URL||'').trim().replace(/\/$/,''),key=String(env.STOCK_SQL_BRIDGE_KEY||'').trim();if(!base.startsWith('https://')||!key)throw Error('Current stock unavailable');
       const response=await fetchBridge(base+'/stmast',{method:'POST',redirect:'error',headers:{'content-type':'application/json','x-api-key':key},body:JSON.stringify({sku:code}),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Current stock unavailable');return (await response.json())?.row;
@@ -69,12 +74,11 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
     const controlReads=Promise.all([
       indexClient.from('website_stock').select('sku, barcode').in('sku',[sku]),
       indexClient.from('website_stock').select('sku, barcode').in('barcode',[sku]),
-      indexClient.from('instore_listing_controls').select('sku, status').in('sku',[sku]),
     ]);
-    const [bySku,byBarcode,controls]=await controlReads;
-    if (bySku.error||byBarcode.error||controls.error) throw new Error('Website-only controls unavailable');
+    const [bySku,byBarcode]=await controlReads;
+    if (bySku.error||byBarcode.error) throw new Error('Website-only controls unavailable');
     const duplicate=evaluateInstoreDuplicate({sku,barcode:sku},{status:'success',complete:true,variantsIncluded:true,checkedIdentifiers:[sku],rows:[...(bySku.data||[]),...(byBarcode.data||[])]});
-    if (duplicate.decision!=='eligible'||(controls.data||[]).some(row=>String(row.status).toLowerCase()==='hidden')) return null;
+    if (duplicate.decision!=='eligible') return null;
   }
   const product = buildExtendedRangeProducts(mergeWebsiteOnlyIndex(data || [],extra), '', { includeStaged,ignoreStockEligibility:arrivals.has(sku) })[0];
   if (!product) return null;
