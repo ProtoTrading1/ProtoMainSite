@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash, deliverOrderChannel, findMatchingOrder, OrderReplayError } from './_order-replay.js';
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { reviewedColourOrderImage } from '../lib/reviewed-colour-options.mjs';
+import { reviewedPlateOrderImage } from '../lib/reviewed-plate-gallery.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
@@ -311,7 +312,8 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
     throw orderError(`${title} (${sku}) has a changed Positill selling unit. Review this item before ordering.`,409);
   }
   const name = bridgeMatches ? cleanText(bridgeRow.DESCR, title) : title;
-  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: cleanText(indexRow.image_url), remoteImage: cleanText(indexRow.image_url), ...unit, casePack: sellingUnitDetails(unit.unitsOfIssue).label, packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
+  const orderImage = reviewedPlateOrderImage(sku, cleanText(indexRow.image_url), item.preference) || cleanText(indexRow.image_url);
+  return { qty, ...itemPreferenceFields(item), product: { id: sku, sku, code: textId(indexRow.barcode) || sku, barcode: textId(indexRow.barcode), name, price, image: orderImage, remoteImage: orderImage, ...unit, casePack: sellingUnitDetails(unit.unitsOfIssue).label, packDescription: '', minQty: 1, availabilityState: 'in_stock', availabilityLabel: 'In stock', isExtendedRange: true } };
 }
 
 export async function resolveInstorePrices(items, { websiteOnlyRows = [], websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {

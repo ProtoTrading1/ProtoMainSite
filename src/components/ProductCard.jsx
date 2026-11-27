@@ -17,6 +17,7 @@ import { showroomAvailabilityGuidance, showroomAvailabilityLabel } from '../../l
 import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import { reviewedColourOptions, withReviewedColourPhoto, supplierStockAvailable, supplierNamedOptionAvailable } from '../../lib/reviewed-colour-options.mjs';
+import { withReviewedPlateGallery } from '../../lib/reviewed-plate-gallery.mjs';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -435,7 +436,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   const [unitObservation,setUnitObservation]=useState(null);
   const [braceletColour, setBraceletColour] = useState(() => TURTLE_BRACELET_COLOURS.find(option => option.label === initialBraceletColour || option.image === sourceProduct?.localImage)?.label || 'Brown');
   const [colourChoice, setColourChoice] = useState('');
-  const product=useMemo(()=>withReviewedColourPhoto(withTurtleBraceletPhoto(withPositillObservation(sourceProduct,unitObservation), braceletColour),colourChoice),[sourceProduct,unitObservation,braceletColour,colourChoice]);
+  const product=useMemo(()=>withReviewedColourPhoto(withTurtleBraceletPhoto(withReviewedPlateGallery(withPositillObservation(sourceProduct,unitObservation)), braceletColour),colourChoice),[sourceProduct,unitObservation,braceletColour,colourChoice]);
   const colourOptions = reviewedColourOptions(product);
   const selectedColour = colourOptions.find(option => option.label === colourChoice);
   const needsColourChoice = colourOptions.length > 1 && !selectedColour;
@@ -487,7 +488,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
           {option.stockAvailable && <small className="pc-supplier-stock">Stock available</small>}
         </button>)}
       </div>
-      <small>Stock available badges: supplier list, 24 Nov 2026. Live stock is checked separately.</small>
+      {colourOptions.some(option => option.stockAvailable) && <small>Stock available badges: supplier list, 24 Nov 2026. Live stock is checked separately.</small>}
     </fieldset>
   );
   const supplierBadge = supplierStockAvailable(product) && <p className="pc-supplier-stock-note"><strong>Stock available</strong><small>Supplier list · 24 Nov 2026</small></p>;
@@ -898,7 +899,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
                       key={idx}
                       type="button"
                       className={`pz-gallery-thumb${idx === activeImageIdx ? ' pz-gallery-thumb--active' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); const option = colourOptions.find(p => p.image === img); if (option) { setColourChoice(option.label); setActiveImageIdx(0); } else setActiveImageIdx(idx); }}
+                      onClick={(e) => { e.stopPropagation(); const option = colourOptions.find(p => p.image === img); if (option) { setColourChoice(option.label); setActiveImageIdx(0); } else if (colourOptions.length && img === sourceProduct.image) { setColourChoice(''); setActiveImageIdx(0); } else setActiveImageIdx(idx); }}
                       aria-label={colourOptions.find(p => p.image === img)?.label ? `View ${colourOptions.find(p => p.image === img).label}` : `View image ${idx + 1}`}
                     >
                       <img src={optimizedImageUrl(img)} alt={`${activeProduct.name} ${idx + 1}`} />

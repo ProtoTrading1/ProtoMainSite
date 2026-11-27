@@ -1,0 +1,23 @@
+{
+  "id": "8640000171",
+  "sku": "8640000171",
+  "code": "8640000171",
+  "barcode": "8640000171",
+  "name": "PARTY PLATES 9\" 10PCS PLAIN COLOURS",
+  "title": "PARTY PLATES 9\" 10PCS PLAIN COLOURS",
+  "price": 11.5,
+  "stockQty": 1243,
+  "stockOnHand": 1243,
+  "unitsOfIssue": "10PC",
+  "minQty": 1,
+  "image": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/instore-reference-images/sha256/2b1f1a36f2196bf8673c8c2aac255ed6c5870e7b853112e3bcf284d20e05024f.jpg",
+  "images": [
+    "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/instore-reference-images/sha256/2b1f1a36f2196bf8673c8c2aac255ed6c5870e7b853112e3bcf284d20e05024f.jpg"
+  ],
+  "inStock": true,
+  "availability": {
+    "state": "in_stock",
+    "label": "In stock",
+    "canOrder": true
+  }
+}
