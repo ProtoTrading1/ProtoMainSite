@@ -1,4 +1,4 @@
-import {ballsAliasMatches} from '../../lib/834-customer-gallery.mjs';
+import {ballsAliasMatches,isBallsAlias} from '../../lib/834-customer-gallery.mjs';
 export const SEARCH_MIN_CONFIDENCE = 50;
 
 import {
@@ -432,6 +432,8 @@ function scoreProduct(product, query, allowCategory = true, allowModelFallback =
 }
 
 export function fuzzyFilter(products, query) {
+  // Exact reviewed aliases are identifiers, even when slash syntax resembles a measurement.
+  if(isBallsAlias(query))return products.filter(product=>ballsAliasMatches(product,query));
   const intent = parseSearchQuery(query);
   const variants = searchQueryVariants(query);
   const eligible = products.filter((product) => productMatchesSearchIntent(product, intent));

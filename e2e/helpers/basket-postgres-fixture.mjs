@@ -40,12 +40,12 @@ await db.exec(setupSql);
 // checkout need not contain the parent commit to verify these payloads.
 for (const [file, hash] of [
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', '8c1be75b2b44f8cfea0c0fda497a12d267194c90395cdc8455ecf1e7b515adb2'],
+  ['api/send-order.js', '475b03eabe9f1cb7ab41da3cf41495a00d6f885b0bebd40bad460cc9dee71907'],
   ['lib/reviewed-colour-options.mjs', '4a30306e2ad9208f560232b6bf77a818b40a80bba123f2234ee42b6664b376ce'],
   ['api/_instore-catalogue.js', 'c86cf0c8a6ff0b73086bebfbef4e787c740c3dbfa6b59799c71a1a46679793c9'],
   ['lib/instore-website-content.mjs', '515741692cf6df4b711eacd2284569bb12f768665415b9a87029f6864a33bf9b'],
   ['api/_834-family.js', '4fd60aeb35701542f2a34e465c00af27c30fae054cc4fbe8d9f005d7a7a40f36'],
-  ['lib/834-customer-gallery.mjs', 'f0bffd3ceb1d4141b744cfefb26a057457437e84d17db2aaf263977705688d5a'],
+  ['lib/834-customer-gallery.mjs', 'c432e384fface6d8906393d2b4fe6f8c48ada92a957c2ea59c08ec9bb0d386d2'],
   ['lib/834-order.mjs', '3b8e0e738ec0e3345d138c64cd561797daf916f2aa1827833e65bdf80ebd9da9'],
   ['lib/834-reviewed-views.json', '6b8a9aa38341bf2bfaae60b5b5d14bdf2faee7115e9bc42917333f9eadcf203a'],
   ['api/_cat07-family.js', '78f64e96bdcea77212ac08465ee00c321bdffe53146622d20b3b097dad9dcb1d'],

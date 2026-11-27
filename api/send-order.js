@@ -631,9 +631,20 @@ export async function detectUnflaggedInstoreSkus(items, client = null, { website
 
 export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env, publicTransport=globalThis.fetch } = {}) {
   if(items.length>MAX_ORDER_LINES)throw orderError('Too many order lines.');
-  if(items.some(item=>isBallsAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a colour under Christmas product 8-34; historical photo references are not separate stock.',409);
-  const ballsItems=items.filter(item=>textId(item?.product?.sku||item?.product?.id)==='8-34');
-  if(ballsItems.length){const resolved=await resolveBallsPrices(ballsItems,{client:index||getStockClient(),fetchBridge,bridgeEnv,publicTransport});const others=items.filter(item=>!ballsItems.includes(item));const rest=others.length?await resolveAuthoritativePrices(others,{classify,websiteOnlyProvider,index,fetchBridge,bridgeEnv,publicTransport}):[];let a=0,b=0;return items.map(item=>ballsItems.includes(item)?resolved[a++]:rest[b++]);}
+  const identities=item=>['sku','id','code','barcode'].map(key=>item?.product?.[key]).filter(value=>value!=null&&String(value).trim()!=='');
+  if(items.some(item=>identities(item).some(isBallsAlias)))throw orderError('Choose a colour under Christmas product 8-34; historical photo references are not separate stock.',409);
+  const ballsItems=items.filter(item=>identities(item).some(value=>textId(value)==='8-34'));
+  if(ballsItems.length){
+    // A family barcode fallback must not enter ordinary stock-request handling,
+    // including unknown primary SKUs. Conflicting identities need a fresh card.
+    if(ballsItems.some(item=>identities(item).some(value=>textId(value)!=='8-34')))throw orderError('Christmas ball product identifiers disagree. Refresh the product before ordering.',409);
+    const canonical=ballsItems.map(item=>({...item,product:{...item.product,sku:'8-34',id:'8-34',code:'8-34',barcode:'8-34'}}));
+    const resolved=await resolveBallsPrices(canonical,{client:index||getStockClient(),fetchBridge,bridgeEnv,publicTransport});
+    const others=items.filter(item=>!ballsItems.includes(item));let rest=[];
+    try{if(others.length)rest=await resolveAuthoritativePrices(others,{classify,websiteOnlyProvider,index,fetchBridge,bridgeEnv,publicTransport});}
+    catch(error){const match=/^(Product on order line|Invalid quantity on order line) (\d+)/.exec(error?.message||'');if(match){const original=items.indexOf(others[Number(match[2])-1]);if(original>=0)error.message=error.message.replace(`line ${match[2]}`,`line ${original+1}`);}throw error;}
+    let a=0,b=0;return items.map(item=>ballsItems.includes(item)?resolved[a++]:rest[b++]);
+  }
 
   if(items.some(item=>isCat07HistoricalAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a style under Christmas product 8640000274; historical photo references are not separate stock.',409);
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
