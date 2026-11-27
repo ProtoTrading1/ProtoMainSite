@@ -245,7 +245,7 @@ export default function ExtendedRangePage({ addToCart, cartQtyMap = {}, cartPref
 
   return <section className={`instore${searchActive ? ' instore--search-active' : ''}`} aria-labelledby="instore-title">
     <header className="instore-hero">
-      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">{searchActive ? 'Instore search' : <>More products,<br />ready to order<span aria-hidden="true">.</span></>}</h1><p>{searchActive ? 'Verified products with current price and more than 10 units available.' : 'Search by everyday product names, see available stock, and add a colour or design preference for each item.'}</p></div>
+      <div><span className="instore-eyebrow"><Store size={15} aria-hidden="true" /> PROTO · INSTORE PRODUCTS</span><h1 id="instore-title">{searchActive ? 'Instore search' : <>More products,<br />ready to order<span aria-hidden="true">.</span></>}</h1><p>{searchActive ? 'Verified products with current prices. Instore orders are requests; availability is confirmed when packing.' : 'Search by everyday product names, see available stock, and add a colour or design preference for each item.'}</p></div>
       {!searchActive && <ol className="instore-guide">
         <li><button type="button" style={guideActionStyle} onClick={() => searchRef.current?.focus()}><b>01</b><span>Search in plain language</span></button></li>
         <li><button type="button" style={guideActionStyle} onClick={() => resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}><b>02</b><span>Check live stock</span></button></li>
