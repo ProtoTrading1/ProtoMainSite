@@ -18,6 +18,7 @@ import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import { reviewedColourOptions, withReviewedColourPhoto, supplierStockAvailable, supplierNamedOptionAvailable } from '../../lib/reviewed-colour-options.mjs';
 import { withReviewedPlateGallery } from '../../lib/reviewed-plate-gallery.mjs';
+import {cat07CustomerOptions} from '../../lib/cat07-customer-gallery.mjs';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -508,8 +509,10 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   const variantIdentity=useRef({id:product?.id,primaryVariantId:product?.primaryVariantId});
   const cardAvailability = catalogStockState(product);
   const modalAvailability = catalogStockState(activeProduct);
-  const cardCanOrder = cardAvailability.canOrder;
-  const modalCanOrder = modalAvailability.canOrder;
+  const cat07Held=sourceProduct.sku==='8640000274'&&!cat07CustomerOptions(sourceProduct).length;
+  const cat07Full=sourceProduct.sku==='8640000274'&&cartQty>=instoreQuantityLimit(product);
+  const cardCanOrder = cardAvailability.canOrder&&!cat07Held&&!cat07Full;
+  const modalCanOrder = modalAvailability.canOrder&&!cat07Held&&!cat07Full;
   const cardAdvisory = stockAdvisoryForQty(product, qty);
   const modalAdvisory = stockAdvisoryForQty(activeProduct, qty);
 

@@ -1,0 +1,78 @@
+{
+  "sku": "8640000274",
+  "overview": {
+    "operationId": "f0ac69c0-e792-49cf-85eb-61961c3c3de2",
+    "requestHash": "9898df6705127581b800246f9548e53f684e4ddbceeb8a892bc8401adc4fa035",
+    "imageId": "b51ed800-b3ec-46c3-b9ca-daa88af63b84",
+    "mime": "image/jpeg",
+    "size": 401338,
+    "sha256": "930d2e5fa8c73656721a0852641ba4a4de70333b6be838b805fa87685151bf73",
+    "filename": "8640000274.jpg"
+  },
+  "styles": [
+    {
+      "attachment": 4,
+      "label": "Snowman — orange hat",
+      "sha256": "5f7a39a762d96d05ae23651878383e44c3b76fa1f16cf516d57c38360784c583",
+      "size": 44538,
+      "legacySku": "8640000274-4-4",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-4-4/1.jpg"
+    },
+    {
+      "attachment": 5,
+      "label": "Gingerbread Man — red bow",
+      "sha256": "ba7f39d37e5bee71f4dde0a79ed12afe22d7bff4b394b79759a841c107606ff5",
+      "size": 87616,
+      "legacySku": null,
+      "url": null
+    },
+    {
+      "attachment": 6,
+      "label": "Santa — carrying a gift",
+      "sha256": "bd086f0464e7f5f6d59201782c6382899e1ff6929569fc67dad5b2ef0d156b7c",
+      "size": 69691,
+      "legacySku": "8640000274-6-6",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-6-6/1.jpg"
+    },
+    {
+      "attachment": 7,
+      "label": "Reindeer — earmuffs",
+      "sha256": "516df5761e1ddc6668ca1c17b62010631d87c90b90122b8aff94251b16ed6afe",
+      "size": 50188,
+      "legacySku": "8640000274-7-7",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-7-7/1.jpg"
+    },
+    {
+      "attachment": 8,
+      "label": "Snowman — black hat and gift",
+      "sha256": "7ac43ccd702a7e85cdb9b6ca0aec38173d55f94ae313beab4753777e264c9a8c",
+      "size": 47127,
+      "legacySku": "8640000274-8-8",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-8-8/1.jpg"
+    },
+    {
+      "attachment": 9,
+      "label": "Merry Christmas tree",
+      "sha256": "867e91878f664c30fd5891d0e46a9f8d1cd3b0f47e8d9310d32b109aac604bc1",
+      "size": 60055,
+      "legacySku": "8640000274-9-9",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-9-9/1.jpg"
+    },
+    {
+      "attachment": 10,
+      "label": "Reindeer — Santa hat and gift",
+      "sha256": "dbca5bace36a28b01a028aaeddc45493f02d831345041905dc825e187ace2489",
+      "size": 53812,
+      "legacySku": "8640000274-10-10",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-10-10/1.jpg"
+    },
+    {
+      "attachment": 11,
+      "label": "Reindeer — striped scarf and bell",
+      "sha256": "05d0fc7974034b04a1f23bd4c157eda03b9af7585aa3219850d0b2014d22f423",
+      "size": 55928,
+      "legacySku": "8640000274-11-11",
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8640000274-11-11/1.jpg"
+    }
+  ]
+}
