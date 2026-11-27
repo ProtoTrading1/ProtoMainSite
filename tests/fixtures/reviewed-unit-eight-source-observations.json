@@ -89,8 +89,8 @@
     {
       "sku": "8616200089-NAT",
       "barcode": "8616200089",
-      "title": "Jewellery Display Tags – Earrings, Natural, ±5×7cm ±200 pcs",
-      "original_description": "JEWELLERY DISPLAY TAGS | EARRINGS | NATURAL | ±5×7cm ±200PCS (8616200089)",
+      "title": "Jewellery Display Tags â€“ Earrings, Natural, Â±5Ã—7cm Â±200 pcs",
+      "original_description": "JEWELLERY DISPLAY TAGS | EARRINGS | NATURAL | Â±5Ã—7cm Â±200PCS (8616200089)",
       "category": "Packaging & Storage",
       "subcategory_one": "Tags",
       "subcategory_two": "Jewellery Display",
@@ -116,8 +116,8 @@
     {
       "sku": "RIV0030B",
       "barcode": "8616700030B",
-      "title": "Double Capped Rivet – Antique Brass, Cap Width And Height 7×4mm, Rivet Post Height And Width 7×7mm, ±1000 Sets",
-      "original_description": "DOUBLE CAPPED RIVET | ANTIQUE BRASS | CAP WIDTH AND HEIGHT 7×4mm | RIVET POST HEIGHT AND WIDTH 7×7mm | (MATERIAL: IRON) | ±1000 SETS  (8616700030B)",
+      "title": "Double Capped Rivet â€“ Antique Brass, Cap Width And Height 7Ã—4mm, Rivet Post Height And Width 7Ã—7mm, Â±1000 Sets",
+      "original_description": "DOUBLE CAPPED RIVET | ANTIQUE BRASS | CAP WIDTH AND HEIGHT 7Ã—4mm | RIVET POST HEIGHT AND WIDTH 7Ã—7mm | (MATERIAL: IRON) | Â±1000 SETS  (8616700030B)",
       "category": "Bag & Belt Components",
       "subcategory_one": "Rivets",
       "subcategory_two": "Antique",
@@ -762,5 +762,5 @@
       "incoming": null
     }
   ],
-  "evidence": "eight-unverified-unit-audit-20261127.json plus 2026-11-28 opaque-label review: exact same source/website labels for8616200089/RIV0030B need no pack conversion; existing normalize+-200=>+ 200 remains; printed manufacturer package identities forMC085-1/MU146-1; existing1=>EACH policy forEC-07"
+  "evidence": "Exact seven reviewed source/code/raw/DESCR contracts. Existing opaque units retained; M200 eleven EACH+100PCS website fields model a separately approved unit-only CAS, original before-state retained in fixture. Crimp aliases retain existing8689120060 shared barcode, including unresolved nickel title annotation. Bows0.44/20 remains held. Manufacturer photo/code evidence retained forMC085-1/MU146-1."
 }
