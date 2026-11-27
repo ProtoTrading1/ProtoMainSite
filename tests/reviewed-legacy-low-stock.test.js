@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {overlayArrivedStock,assertArrivedOrderTotals} from '../api/_arrived-stock.js';
-import {applyInstoreImageControls,buildExtendedRangeProducts,excludeMainCatalogueProducts} from '../api/extended-range.js';
+import {applyInstoreImageControls,buildExtendedRangeProducts,excludeMainCatalogueProducts,createExtendedRangeHandler} from '../api/extended-range.js';
 import {resolveInstoreOrderLine} from '../api/send-order.js';
 import {reviewedLegacyLowStockEligible} from '../lib/reviewed-legacy-low-stock.mjs';
 
@@ -55,4 +55,40 @@ test('unrelated local-folder imports keep the original greater-than-ten discover
  assert.equal(buildExtendedRangeProducts([row]).length,0);
  assert.equal(buildExtendedRangeProducts([{...row,available_stock:10}]).length,0);
  assert.equal(buildExtendedRangeProducts([{...row,available_stock:11}]).length,1);
+});
+
+test('authenticated HTTP browse and exact fallback keep fresh markers through the complete merge/controls pipeline',async()=>{
+ const envKeys=['INSTORE_ARRIVED_STOCK_ENABLED','STOCK_SQL_BRIDGE_URL','STOCK_SQL_BRIDGE_KEY','PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED'];
+ const saved=Object.fromEntries(envKeys.map(key=>[key,process.env[key]])),originalFetch=globalThis.fetch;
+ let rows=cases.map(base),duplicates=[],listing=[],image=[],fail=false,sourceReads=0,providerReads=0;
+ const extra={...base(cases[0]),sku:'TEST-OTHER',barcode:'TEST-OTHER',available_stock:20,image_source_key:'website-only-test'};
+ const db={from(table){
+  const tables={extended_range_items:rows,website_stock:duplicates,instore_image_controls:image,instore_listing_controls:listing};
+  assert.ok(Object.hasOwn(tables,table),'Unexpected table/write '+table);
+  let predicates=[];const values=()=>tables[table].filter(row=>predicates.every(f=>f(row)));
+  const q={select(){return q;},order(){return q;},in(key,set){predicates.push(row=>set.includes(row[key]));return q;},eq(key,value){predicates.push(row=>row[key]===value);return q;},gt(key,value){predicates.push(row=>row[key]>value);return q;},like(key,pattern){assert.equal(pattern,'https://%');predicates.push(row=>row[key].startsWith('https://'));return q;},range(start,end){const result=values();return Promise.resolve({data:JSON.parse(JSON.stringify(result.slice(start,end+1))),count:result.length,error:null});},then(resolve,reject){return Promise.resolve({data:JSON.parse(JSON.stringify(values())),error:null}).then(resolve,reject);}};
+  return q;
+ },async rpc(name,args){
+  if(name==='instore_website_content_read_v1')return {data:{generation:'0',overrides:[]},error:null};
+  assert.equal(name,'arrived_stock_receipts_v1');assert.equal(args.p_action,'states');
+  return {data:cases.filter(c=>args.p_body.codes.includes(c.sku)).map(receipt),error:null};
+ }};
+ const provider=async options=>{providerReads++;return {rows:options?.baseSku?[]:[extra]};};
+ const handler=createExtendedRangeHandler({authorize:async()=>({user:{id:'isolated-fixture'}}),getClient:()=>db,websiteOnlyProvider:provider});
+ async function request(query){const res={statusCode:0,headers:{},setHeader(key,value){this.headers[key]=value;},status(code){this.statusCode=code;return this;},json(body){this.body=JSON.parse(JSON.stringify(body));return this;}};await handler({method:'GET',headers:{host:'www.proto.co.za'},query},res);assert.equal(res.statusCode,200);assert.equal(res.headers['Cache-Control'],'private, no-store');return res.body;}
+ try{
+  process.env.INSTORE_ARRIVED_STOCK_ENABLED='1';process.env.STOCK_SQL_BRIDGE_URL='https://bridge.fixture.invalid';process.env.STOCK_SQL_BRIDGE_KEY='synthetic-no-provider-key';delete process.env.PROTO_INSTORE_PRIVATE_REVIEW_GALLERY_ENABLED;
+  globalThis.fetch=async(url,options)=>{assert.equal(url,'https://bridge.fixture.invalid/stmast');assert.equal(options.method,'POST');const code=JSON.parse(options.body).sku,c=cases.find(c=>c.sku===code);assert.ok(c);sourceReads++;if(fail)throw Error('synthetic offline');return new Response(JSON.stringify({row:bridge(c)}),{headers:{'content-type':'application/json'}});};
+  const browse=await request({catalogue:'1'});
+  assert.deepEqual(new Set(browse.products.map(p=>p.sku)),new Set([...cases.map(c=>c.sku),extra.sku]));
+  assert.equal(browse.catalogue.length,3);assert.ok(providerReads>0);assert.equal(sourceReads,2);
+  for(const c of cases){const exact=await request({q:c.sku,exact:'1'});assert.equal(exact.products.length,1);assert.equal(exact.products[0].stockQty,c.stock);assert.equal(exact.products[0].image,base(c).image_url);assert.equal(exact.products[0].price,c.price);assert.equal(exact.products[0].barcode,c.sku);assert.ok(!JSON.stringify(exact).includes('reviewed legacy live stock'));}
+  duplicates=[{sku:cases[0].sku,barcode:cases[0].sku}];assert.equal((await request({q:cases[0].sku,exact:'1'})).products.length,0);duplicates=[];
+  listing=[{sku:cases[0].sku,status:'hidden'}];assert.equal((await request({q:cases[0].sku,exact:'1'})).products.length,0);listing=[];
+  image=[{sku:cases[0].sku,status:'hidden'}];assert.equal((await request({q:cases[0].sku,exact:'1'})).products[0].image,'');image=[];
+  fail=true;assert.equal((await request({q:cases[0].sku,exact:'1'})).products.length,0);fail=false;
+  // Persisted low-stock rows/marker-like JSON cannot replace a fresh observation.
+  rows=JSON.parse(JSON.stringify(cases.map(c=>({...base(c),available_stock:9,reviewedLegacyLiveStock:true}))));delete process.env.INSTORE_ARRIVED_STOCK_ENABLED;
+  assert.equal((await request({q:cases[0].sku,exact:'1'})).products.length,0);
+ }finally{globalThis.fetch=originalFetch;for(const key of envKeys){if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];}}
 });
