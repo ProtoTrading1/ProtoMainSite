@@ -1,0 +1,68 @@
+[
+  {
+    "id": "gold",
+    "role": "colour",
+    "label": "Gold",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GLD/1.jpg",
+      "sha256": "e16abbee6ec7cbd27689b8ca2a8a07f30f7f4d032f0bd7dd95872f323656862a",
+      "size": 47134,
+      "mime": "image/jpeg"
+    }
+  },
+  {
+    "id": "blue",
+    "role": "colour",
+    "label": "Blue",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-BLU/1.jpg",
+      "sha256": "ecc1b5073f4b7a48a35d2de1ca6c8340c6e59f5056bf2fd8895fa9f0320feb86",
+      "size": 44612,
+      "mime": "image/jpeg"
+    }
+  },
+  {
+    "id": "green",
+    "role": "colour",
+    "label": "Green",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GRN/1.jpg",
+      "sha256": "1ca843ccd3e2b895ab2150e63d51d518b5a506c8f2cc7a675fa79795e33e9053",
+      "size": 47649,
+      "mime": "image/jpeg"
+    }
+  },
+  {
+    "id": "pink",
+    "role": "colour",
+    "label": "Pink",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-PNK/1.jpg",
+      "sha256": "fd4cc0d197b22a1fd712df9ed2cfcf1001a1a25ec4bbdedd7750efc44548e8d2",
+      "size": 42108,
+      "mime": "image/jpeg"
+    }
+  },
+  {
+    "id": "red",
+    "role": "colour",
+    "label": "Red",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-RED/1.jpg",
+      "sha256": "636e9076aa7e2afaef59b0c60dbc289acf74e986950f71b90854c94ebe0cb2a9",
+      "size": 44408,
+      "mime": "image/jpeg"
+    }
+  },
+  {
+    "id": "silver",
+    "role": "colour",
+    "label": "Silver",
+    "image": {
+      "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-SIL/1.jpg",
+      "sha256": "e992f53018692231dc34c0e8c8a4605ec769a73196e61a62624c6d0ebfbe1f99",
+      "size": 36205,
+      "mime": "image/jpeg"
+    }
+  }
+]

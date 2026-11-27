@@ -1,3 +1,4 @@
+import {ballsAliasMatches,isBallsAlias} from '../../lib/834-customer-gallery.mjs';
 export const SEARCH_MIN_CONFIDENCE = 50;
 
 import {
@@ -362,6 +363,7 @@ function isBareModelQuery(query) {
 function scoreIdentifierQuery(product, query, allowModelFallback = false) {
   const queryId = normalizeIdentifier(query);
   if (!queryId) return 0;
+  if(ballsAliasMatches(product,query))return SCORE.EXACT_SKU;
 
   const literal = String(query).trim().toLowerCase();
   if (skuValues(product).some(value => value.trim().toLowerCase() === literal)) return SCORE.EXACT_SKU + 2;
@@ -430,6 +432,8 @@ function scoreProduct(product, query, allowCategory = true, allowModelFallback =
 }
 
 export function fuzzyFilter(products, query) {
+  // Exact reviewed aliases are identifiers, even when slash syntax resembles a measurement.
+  if(isBallsAlias(query))return products.filter(product=>ballsAliasMatches(product,query));
   const intent = parseSearchQuery(query);
   const variants = searchQueryVariants(query);
   const eligible = products.filter((product) => productMatchesSearchIntent(product, intent));

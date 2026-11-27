@@ -18,6 +18,7 @@ import { isLandedStockAvailable } from '../../lib/order-stock-guard.mjs';
 import { TURTLE_BRACELET_COLOURS, isTurtleBracelet, withTurtleBraceletPhoto } from '../../lib/kbra2013-colours.mjs';
 import { reviewedColourOptions, withReviewedColourPhoto, supplierStockAvailable, supplierNamedOptionAvailable } from '../../lib/reviewed-colour-options.mjs';
 import { withReviewedPlateGallery } from '../../lib/reviewed-plate-gallery.mjs';
+import {ballsCustomerOptions} from '../../lib/834-customer-gallery.mjs';
 import {cat07CustomerOptions} from '../../lib/cat07-customer-gallery.mjs';
 import './ProductCard.css';
 
@@ -490,6 +491,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
         </button>)}
       </div>
       {colourOptions.some(option => option.stockAvailable) && <small>Stock available badges: supplier list, 24 Nov 2026. Live stock is checked separately.</small>}
+      {sourceProduct.sku==='8-34'&&<small>All colours share one stock balance. Each tube contains 10 baubles. Your preferred colour is subject to availability.</small>}
       {sourceProduct.sku==='8640000274'&&<small>All styles share one stock balance. Your preferred style is subject to availability.</small>}
     </fieldset>
   );
@@ -510,8 +512,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   const variantIdentity=useRef({id:product?.id,primaryVariantId:product?.primaryVariantId});
   const cardAvailability = catalogStockState(product);
   const modalAvailability = catalogStockState(activeProduct);
-  const cat07Held=sourceProduct.sku==='8640000274'&&!cat07CustomerOptions(sourceProduct).length;
-  const cat07Full=sourceProduct.sku==='8640000274'&&cartQty>=instoreQuantityLimit(product);
+  const cat07Held=(sourceProduct.sku==='8640000274'&&!cat07CustomerOptions(sourceProduct).length)||(sourceProduct.sku==='8-34'&&!ballsCustomerOptions(sourceProduct).length);
+  const cat07Full=(sourceProduct.sku==='8640000274'&&cartQty>=instoreQuantityLimit(product))||(sourceProduct.sku==='8-34'&&cartQty>=Math.max(0,Number(product.stockOnHand??product.stockQty)||0));
   const cardCanOrder = cardAvailability.canOrder&&!cat07Held&&!cat07Full;
   const modalCanOrder = modalAvailability.canOrder&&!cat07Held&&!cat07Full;
   const cardAdvisory = stockAdvisoryForQty(product, qty);

@@ -1,0 +1,30 @@
+import {evaluateCheckoutSnapshot} from '../lib/order-stock-guard.mjs';
+import {createHash} from 'node:crypto';
+import {BALLS_SKU,isBallsAlias,validateBallsGallery} from '../lib/834-customer-gallery.mjs';
+import {ballsManifestHash,resolveBallsOrder} from '../lib/834-order.mjs';
+import {readArrivedBridgeRow} from './_arrived-stock.js';
+import {positillUnitObservation} from '../lib/positill-selling-unit.mjs';
+import {websitePriceFromExVat} from '../lib/catalogue-price.mjs';
+const hold=()=>{throw Object.assign(Error('The Christmas ball photos and current stock could not be verified. Please refresh.'),{status:409});};
+export async function readCompletedBallsReceipt(client,row){
+ const abort=new AbortController();let timer;try{if(row?.sku!==BALLS_SKU||row.barcode!==BALLS_SKU||row.units_of_issue!=='10PC'||row.to_order===true)hold();const call=client.rpc('loader_834_public_family_read_v1',{p_body:{sku:BALLS_SKU,destination:'website'}}),pending=typeof call?.abortSignal==='function'?call.abortSignal(abort.signal):call;
+ const {data,error}=await Promise.race([pending,new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(Error('Family read timeout'));},2500);})]);if(error)hold();validateBallsGallery(data);if(ballsManifestHash(data)!==data.manifestHash||row.image_url_one!==data.views[0].image.url)hold();return structuredClone(data);}catch{hold();}finally{clearTimeout(timer);}
+}
+export function ballsCurrentSource(row,{now=Date.now()}={}){
+ const unit=positillUnitObservation(BALLS_SKU,row);if(unit.unitsOfIssue!=='10PC'||!['ONHAND','BOOKED','PRICE_A'].every(key=>['number','string'].includes(typeof row?.[key])&&String(row[key]).trim()!==''))hold();
+ const onHand=Number(row.ONHAND),booked=Number(row.BOOKED),available=onHand-booked,priceInclVat=websitePriceFromExVat(Number(row.PRICE_A));if(![onHand,booked,available].every(Number.isSafeInteger)||booked<0||!Number.isFinite(priceInclVat)||priceInclVat<=0)hold();return {authority:'live-exact-code-observation',canonicalCode:BALLS_SKU,units:'10PC',priceInclVat,onHand,booked,available,observedAt:new Date(now).toISOString()};
+}
+// Exact public URLs only, no auth/private bytes; unchanged URLs with changed
+// pixels must not authorize a different colour. Checkout never uses a cache.
+export async function verifyBallsPublicImages(receipt,{transport=globalThis.fetch}={}){
+ validateBallsGallery(receipt);let next=0;await Promise.all(Array.from({length:2},async()=>{while(next<6){const view=receipt.views[next++],response=await transport(view.image.url,{method:'GET',redirect:'error',signal:AbortSignal.timeout(4000)});if(!response.ok||response.headers.get('content-type')?.split(';')[0]!=='image/jpeg')hold();const length=response.headers.get('content-length');if(length&&Number(length)!==view.image.size)hold();const reader=response.body?.getReader();if(!reader)hold();const chunks=[];let size=0;try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>view.image.size){await reader.cancel();hold();}chunks.push(Buffer.from(value));}}finally{reader.releaseLock();}const bytes=Buffer.concat(chunks);if(size!==view.image.size||createHash('sha256').update(bytes).digest('hex')!==view.image.sha256)hold();}}));return true;
+}
+export async function readBallsAuthority(client,row,{read=readArrivedBridgeRow,env=process.env,transport=globalThis.fetch}={}){
+ const source=ballsCurrentSource(await read(BALLS_SKU,{env}));const receipt=await readCompletedBallsReceipt(client,row);await verifyBallsPublicImages(receipt,{transport});if(Date.now()-Date.parse(source.observedAt)>60000)hold();return {receipt,row,source};
+}
+export async function resolveBallsPrices(items,{client,fetchBridge=globalThis.fetch,bridgeEnv=process.env,publicTransport=globalThis.fetch}={}){
+ if(!items.length)return [];const {data,error}=await client.from('website_stock').select('sku,barcode,image_url_one,units_of_issue,to_order').or('sku.eq.8-34,barcode.eq.8-34');if(error||data?.length!==1)hold();const authority=await readBallsAuthority(client,data[0],{env:bridgeEnv,transport:publicTransport,read:(code,{env})=>readArrivedBridgeRow(code,{env,transport:fetchBridge})});const resolved=resolveBallsOrder(items,authority).items;const changes=items.map(item=>evaluateCheckoutSnapshot({sku:BALLS_SKU,name:'CHRISTMAS BAUBLES | 6CM | 10PC TUBE',quantity:item.qty,isToOrder:false,submittedSnapshot:item.product?.checkoutSnapshot||{},currentPrice:authority.source.priceInclVat,currentStockQty:authority.source.available,allowKnownStockRequests:true,allowUnknownStockRequests:true})).filter(change=>change?.priceChanged);if(changes.length)throw Object.assign(Error('Price changed while you were shopping. Review the Christmas ball price before sending your order request.'),{status:409,code:'ORDER_REVIEW_REQUIRED',changes});return resolved;
+}
+export async function attachBallsProducts(products,{client,read,env,transport}={}){
+ const matches=products.filter(p=>p.sku===BALLS_SKU);if(!matches.length)return products;try{if(matches.length!==1)hold();client=typeof client==='function'?client():client;const product=matches[0];if(product.imageStatus==='hidden'||product.isExtendedRange||product.barcode!==BALLS_SKU)hold();const {data,error}=await client.from('website_stock').select('sku,barcode,image_url_one,units_of_issue,to_order').or('sku.eq.8-34,barcode.eq.8-34');if(error||data?.length!==1)hold();const authority=await readBallsAuthority(client,data[0],{read,env,transport});const {receipt,source}=authority;if(product.image!==receipt.views[0].image.url||(source.available<=0&&product.keepLiveWhenOos!==true))hold();return products.filter(p=>!isBallsAlias(p.sku)).map(p=>p.sku===BALLS_SKU?{...p,ballsFamily:receipt,image:receipt.views[0].image.url,images:receipt.views.map(v=>v.image.url),price:source.priceInclVat,stockQty:source.available,stockOnHand:source.available,unitsOfIssue:'10PC',toOrder:false,availability:{state:source.available>0?'in_stock':'out_of_stock',label:source.available>0?'In stock':'Out of stock',canOrder:source.available>0}}:p);}catch{return products.filter(p=>p.sku!==BALLS_SKU);}
+}
