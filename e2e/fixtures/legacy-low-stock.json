@@ -1,0 +1,50 @@
+[
+  {
+    "id": "8630000031",
+    "sku": "8630000031",
+    "barcode": "8630000031",
+    "name": "WET WIPES CYLINDER - CARTOON DESIGNS",
+    "title": "WET WIPES CYLINDER - CARTOON DESIGNS",
+    "price": 12.5,
+    "stockQty": 1,
+    "stockOnHand": 1,
+    "unitsOfIssue": "EACH",
+    "isExtendedRange": true,
+    "category": "Beauty & Personal Care",
+    "minQty": 1,
+    "image": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8630000031/84f3f379-ec8f-409e-8a48-2092d6dfc35a.jpg",
+    "images": [
+      "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8630000031/84f3f379-ec8f-409e-8a48-2092d6dfc35a.jpg"
+    ],
+    "inStock": true,
+    "availability": {
+      "state": "in_stock",
+      "canOrder": true,
+      "label": "In stock"
+    }
+  },
+  {
+    "id": "8781830027",
+    "sku": "8781830027",
+    "barcode": "8781830027",
+    "name": "COOLER BAG WITH SHOULDER STRAP - GREY",
+    "title": "COOLER BAG WITH SHOULDER STRAP - GREY",
+    "price": 159,
+    "stockQty": 9,
+    "stockOnHand": 9,
+    "unitsOfIssue": "EACH",
+    "isExtendedRange": true,
+    "category": "Homeware",
+    "minQty": 1,
+    "image": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8781830027/985408ab-8190-4c2c-bc51-0ca3b218bef6.jpg",
+    "images": [
+      "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8781830027/985408ab-8190-4c2c-bc51-0ca3b218bef6.jpg"
+    ],
+    "inStock": true,
+    "availability": {
+      "state": "in_stock",
+      "canOrder": true,
+      "label": "In stock"
+    }
+  }
+]

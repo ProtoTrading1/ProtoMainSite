@@ -2,6 +2,7 @@ import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import {arrivedStockAvailability} from '../lib/arrived-stock-availability.mjs';
 import {positillUnitObservation} from '../lib/positill-selling-unit.mjs';
 import {websitePriceFromExVat} from '../lib/catalogue-price.mjs';
+import {confirmReviewedLegacyStock} from '../lib/reviewed-legacy-low-stock.mjs';
 export const arrivedStockEnabled=(env=process.env)=>env.INSTORE_ARRIVED_STOCK_ENABLED==='1';
 export async function readArrivedStockRecords(client,codes,{env=process.env}={}){
  const map=new Map();if(!arrivedStockEnabled(env)||!codes.length)return map;
@@ -32,7 +33,7 @@ export async function overlayArrivedStock(rows,{client,env=process.env,read=read
  const records=await readArrivedStockRecords(client,rows.map(row=>String(row.sku||'').trim().toUpperCase()),{env});
  const out=rows.map(row=>({...row}));let next=0;const deadline=Date.now()+20000;
  const worker=async()=>{while(next<out.length){const index=next++,row=out[index],sku=String(row.sku||'').trim().toUpperCase(),arrival=records.get(sku);if(!arrival)continue;
-   try{if(Date.now()>deadline)throw Error('Arrived-stock refresh deadline reached');const current=effectiveArrivedStock(sku,await read(sku,{env}),arrival);row.available_stock=current.qty;row.price=current.price;}
+   try{if(Date.now()>deadline)throw Error('Arrived-stock refresh deadline reached');const current=effectiveArrivedStock(sku,await read(sku,{env}),arrival);row.available_stock=current.qty;row.price=current.price;confirmReviewedLegacyStock(row,current,arrival);}
    catch{row.available_stock=0;}
  }};await Promise.all(Array.from({length:Math.min(4,out.length)},worker));return out;
 }
