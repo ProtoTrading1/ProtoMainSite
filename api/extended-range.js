@@ -8,6 +8,7 @@ import { sarongiInstoreGallery } from '../lib/sarongi-instore-gallery.mjs';
 import { attachPrivateReviewGalleries } from '../lib/private-review-galleries.mjs';
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
+import {reviewedLegacyLowStockEligible} from '../lib/reviewed-legacy-low-stock.mjs';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -106,7 +107,8 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const customerVisibleStock = Number.isFinite(availableStock) ? Math.floor(availableStock) : null;
     // Legacy imports may also have minimum_stock = 1. Require Archive provenance.
     const archiveStockOverride = row?.minimum_stock === 1 && /^archive-publication-v1:[a-f0-9]{64}$/.test(row?.image_source_key || '');
-    const stockEligible = archiveStockOverride ? customerVisibleStock >= 1 : customerVisibleStock > MIN_INSTORE_AVAILABLE_STOCK;
+    const stockEligible = archiveStockOverride || reviewedLegacyLowStockEligible(row)
+      ? customerVisibleStock >= 1 : customerVisibleStock > MIN_INSTORE_AVAILABLE_STOCK;
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
