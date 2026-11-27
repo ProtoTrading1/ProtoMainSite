@@ -21,7 +21,7 @@ export function validateShowroomStock(data,target,now=Date.now()){
 export function applyShowroomStock(product,records,now=Date.now()){
   if(product?.isVariantGroup)return {...product,variants:(product.variants||[]).map(row=>applyShowroomStock(row,records,now))};
   const target=showroomStockTarget(product);if(!target)return product;
-  const saved=records?.[target.pool],fresh=saved?.sourceCode===target.sourceCode&&saved?.status==='verified'&&now-Date.parse(saved.checkedAt)>=-1000&&now-Date.parse(saved.checkedAt)<=SHOWROOM_STOCK_MAX_AGE;
+  const saved=records?.[target.pool],fresh=saved?.sourceCode===target.sourceCode&&saved?.status==='verified'&&now-Date.parse(saved.checkedAt)>=-1000&&now-Date.parse(saved.checkedAt)<SHOWROOM_STOCK_MAX_AGE;
   const observation=fresh?saved:{status:saved?.status==='checking'?'checking':'unavailable',sourceCode:target.sourceCode,qty:null,checkedAt:null};
   const qty=fresh?saved.qty:null;
   const availability=resolveProductAvailability({stockQty:qty,toOrder:Boolean(product.toOrder||product.to_order||product.orderableWhenOutOfStock||product.orderable_when_out_of_stock),incoming:{...product,...product.availability}});

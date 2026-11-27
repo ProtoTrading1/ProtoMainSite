@@ -18,7 +18,7 @@ function CatalogueDiscovery({selected}){
  useEffect(()=>{let current=true;
   const readStock=async codes=>{
    if(selected==='failure')return new Map(codes.map(code=>[code,null]));
-   const report={ok:true,schemaVersion:'proto.sql-report.v1',report:{id:SHOWROOM_STOCK_REPORT},params:{skus:codes},rows:codes.map(code=>({CODE:code,ONHAND:code===product.sku?Number(selected):5,BOOKED:0,UNITS:'PKT,12'})),rowCount:codes.length,meta:{source:'POSWINSQL',readOnly:true,backendCompatible:true,requestedCount:codes.length,rowCapReached:false,missingCodes:[],generatedAt:new Date().toISOString()}};
+   const report={ok:true,schemaVersion:'proto.sql-report.v1',report:{id:SHOWROOM_STOCK_REPORT},params:{skus:codes},rows:codes.map(code=>({CODE:code,ONHAND:code===product.sku?Number(selected):5,BOOKED:0,UNITS:'PKT,12',DESCR:code===product.sku?'BALLOONS 12INCH XMAS PRINT +-12PCS':'SYNTHETIC RESTOCK PREVIEW PACK12'})),rowCount:codes.length,meta:{source:'POSWINSQL',readOnly:true,backendCompatible:true,requestedCount:codes.length,rowCapReached:false,missingCodes:[],generatedAt:new Date().toISOString()}};
    return validateShowroomStockBatch(report,codes);
   };
   void refreshCatalogueStock(catalogue,{readStock}).then(result=>{if(current)setRows(result);});

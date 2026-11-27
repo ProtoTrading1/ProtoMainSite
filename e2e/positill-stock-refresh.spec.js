@@ -7,7 +7,7 @@ test('ordinary Showroom uses fresh68 then63 and holds unavailable source without
  await expect(card).toHaveCount(1);await expect(card).toContainText('68');
  await expect(page.getByTestId('discovery-count')).toHaveText('Visible listings: 2');
  await expect(page.getByTestId('discovery-PREVIEW-RESTOCK')).toHaveText('Restocked preview item: 5 packets');
- const initialImage=await image.getAttribute('src');await expect(image).toBeVisible();expect(await image.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+ const initialImage=await image.getAttribute('src');await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
  await page.getByLabel('Simulated source').selectOption('63');await page.clock.fastForward(31000);await expect(card).toContainText('63');
  await expect(image).toHaveAttribute('src',initialImage);await expect(card).toContainText('27.50');
  await page.getByLabel('Simulated source').selectOption('failure');await page.clock.fastForward(31000);await expect(card).toContainText('Stock unavailable');

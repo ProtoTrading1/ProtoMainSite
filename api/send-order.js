@@ -1,5 +1,6 @@
 import {resolveBallsPrices} from './_834-family.js';
 import { currentShowroomStock } from './_showroom-stock.js';
+import {showroomSourceCode} from '../lib/showroom-live-stock.mjs';
 import {isBallsAlias} from '../lib/834-customer-gallery.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,assertArrivedOrderTotals} from './_arrived-stock.js';
@@ -454,6 +455,7 @@ export async function resolveStandardPrices(items, { index = null, fetchBridge =
   }).filter(Boolean);
   const uniqueRows = [...new Map(resolvedRows.map(row => [row.sku, row])).values()];
   const liveBySku = await currentShowroomStock(uniqueRows, incomingBySku, {readStock, fetchBridge, bridgeEnv});
+  const stockPoolKey = row => {try{return showroomSourceCode(row);}catch{return '';}};
   const reviewChanges = [];
   const requestedBySku = new Map();
   const requestedByBarcode = new Map();
@@ -484,7 +486,7 @@ export async function resolveStandardPrices(items, { index = null, fetchBridge =
     requestedBySku.set(aggregateKey, aggregate);
     // Distinct website variants can point at one Positill product. Their
     // capped quantities must not each consume the full shared balance.
-    const sharedBarcode = textId(row.barcode).toUpperCase();
+    const sharedBarcode = stockPoolKey(row);
     if (sharedBarcode && !toOrder && !isLandedStockAvailable(availability)) {
       const group=requestedByBarcode.get(sharedBarcode)||{qty:0,stockQty:null,hasUnknown:false,variants:new Map(),units:new Set()};
       const stock=normaliseStockQty(availability.stockQty);
@@ -587,7 +589,7 @@ export async function resolveStandardPrices(items, { index = null, fetchBridge =
   // review, not a reservation, stock adjustment, backorder or fulfilment promise.
   for (const item of authItems) {
     const aggregate = requestedBySku.get(textId(item.product.sku));
-    const shared = requestedByBarcode.get(textId(item.product.barcode).toUpperCase());
+    const shared = requestedByBarcode.get(stockPoolKey(aggregate.row));
     const total = shared?.variants.size > 1 ? shared.qty : aggregate.qty;
     const stock = shared?.variants.size > 1 ? (shared.hasUnknown ? null : shared.stockQty) : normaliseStockQty(aggregate.availability.stockQty);
     if (!aggregate.toOrder && !isLandedStockAvailable(aggregate.availability) && stock === null) {

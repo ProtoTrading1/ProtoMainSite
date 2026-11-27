@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './helpers/live-stock-fixture.js';
 import { expect, test } from '@playwright/test';
 import { catalogueProducts, installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
 import { withChristmasPenGroup } from '../api/_christmas-pen-group.js';
@@ -77,7 +78,7 @@ test('one featured family member still shows the whole pen group', async ({ page
     const result = url.searchParams.has('skus')
       ? rows.filter((row) => url.searchParams.get('skus').split(',').includes(row.sku))
       : rows;
-    return route.fulfill({ json: result });
+    return fulfillStockFixture(route, result);
   });
   await signInCatalogue(page);
   const card = page.locator('.product-card');

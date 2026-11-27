@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './helpers/live-stock-fixture.js';
 import { expect, test } from '@playwright/test';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -61,7 +62,7 @@ test('technical titles and decimal budgets render correct results with explicit 
 });
 
 function json(route, body, status = 200) {
-  return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  return fulfillStockFixture(route, body, status);
 }
 
 function tokenFor(user) {

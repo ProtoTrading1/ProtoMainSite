@@ -441,8 +441,8 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
 }
 
 const readShowroomStock=createShowroomStockReader({session:captureAuthIdentity,assertSession:assertAuthIdentity,load:async(target,{signal})=>{const {response,data}=await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(target.sourceCode)}&website_sku=${encodeURIComponent(target.sku)}`,{cache:'no-store',signal,timeoutMs:25000});if(!response.ok)throw Error('Current stock unavailable');return data;}});
-function useShowroomStock(sourceProduct){
-  const articleRef=useRef(null),[visible,setVisible]=useState(false),[records,setRecords]=useState({}),[revision,setRevision]=useState(0);
+function useShowroomStock(sourceProduct,modalOpen){
+  const articleRef=useRef(null),[visible,setVisible]=useState(false),[records,setRecords]=useState({}),[revision,setRevision]=useState(0),[expiryClock,setExpiryClock]=useState(()=>Date.now());
   const targets=useMemo(()=>showroomStockTargets(sourceProduct),[sourceProduct]);
   const onRetry=useCallback(()=>setRevision(value=>value+1),[]);
   useEffect(()=>{
@@ -451,21 +451,28 @@ function useShowroomStock(sourceProduct){
     const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{rootMargin:'160px'});observer.observe(element);return()=>observer.disconnect();
   },[targets]);
   useEffect(()=>{
-    if(!visible||!targets.length)return undefined;let disposed=false,controller;
-    const run=(force=false)=>{if(disposed||document.visibilityState==='hidden')return;controller?.abort();controller=new AbortController();const current=controller;
+    if((!visible&&!modalOpen)||!targets.length)return undefined;let disposed=false,controller;
+    const run=(force=false)=>{setExpiryClock(Date.now());if(disposed||document.visibilityState==='hidden')return;controller?.abort();controller=new AbortController();const current=controller;
       setRecords(previous=>({...previous,...Object.fromEntries(targets.map(target=>[target.pool,{status:'checking',sourceCode:target.sourceCode,qty:null}]))}));
-      for(const target of targets)readShowroomStock(target,{signal:current.signal,force}).then(value=>{if(!disposed&&!current.signal.aborted)setRecords(previous=>({...previous,[target.pool]:value}));},()=>{if(!disposed&&!current.signal.aborted)setRecords(previous=>({...previous,[target.pool]:{status:'unavailable',sourceCode:target.sourceCode,qty:null,checkedAt:null}}));});
+      for(const target of targets)readShowroomStock(target,{signal:current.signal,force}).then(value=>{if(!disposed&&!current.signal.aborted){setExpiryClock(Date.now());setRecords(previous=>({...previous,[target.pool]:value}));}},()=>{if(!disposed&&!current.signal.aborted)setRecords(previous=>({...previous,[target.pool]:{status:'unavailable',sourceCode:target.sourceCode,qty:null,checkedAt:null}}));});
     };
     run(revision>0);const focus=()=>run(true),visibility=()=>{if(document.visibilityState==='visible')run(true);};const timer=window.setInterval(()=>run(),SHOWROOM_STOCK_MAX_AGE);
     window.addEventListener('focus',focus);document.addEventListener('visibilitychange',visibility);
     return()=>{disposed=true;controller?.abort();window.clearInterval(timer);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
-  },[visible,targets,revision]);
-  const product=useMemo(()=>applyShowroomStock(sourceProduct,records),[sourceProduct,records]);
+  },[visible,modalOpen,targets,revision]);
+  useEffect(()=>{
+    const now=Date.now(),deadlines=Object.values(records).filter(record=>record.status==='verified').map(record=>Date.parse(record.checkedAt)+SHOWROOM_STOCK_MAX_AGE).filter(deadline=>deadline>now);
+    if(!deadlines.length)return undefined;
+    const timer=window.setTimeout(()=>setExpiryClock(Date.now()),Math.min(...deadlines)-now);
+    return()=>window.clearTimeout(timer);
+  },[records,expiryClock]);
+  const product=useMemo(()=>applyShowroomStock(sourceProduct,records,expiryClock),[sourceProduct,records,expiryClock]);
   return {product,articleRef,onRetry};
 }
 
 function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, initialBraceletColour = null, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
-  const {product:observedSourceProduct,articleRef:showroomArticleRef,onRetry:onShowroomRetry}=useShowroomStock(sourceProduct);
+  const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
+  const {product:observedSourceProduct,articleRef:showroomArticleRef,onRetry:onShowroomRetry}=useShowroomStock(sourceProduct,zoomOpen);
   const [unitObservation,setUnitObservation]=useState(null);
   const [braceletColour, setBraceletColour] = useState(() => TURTLE_BRACELET_COLOURS.find(option => option.label === initialBraceletColour || option.image === sourceProduct?.localImage)?.label || 'Brown');
   const [colourChoice, setColourChoice] = useState('');
@@ -493,7 +500,6 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
     ? [{ label: variantCount > 1 ? `${variantCount} variants` : 'Multiple Variants', bg: '#7F1D1D', color: '#fff' }, ...baseTags]
     : baseTags;
   const [qty, setQty] = useState(product.minQty || 1);
-  const [zoomOpen, setZoomOpen] = useState(initialZoomOpen);
   const analyticsViewed = useRef(false);
   useEffect(() => {
     if (!zoomOpen) { analyticsViewed.current = false; return undefined; }
@@ -615,13 +621,15 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   };
   const openPreview = () => showPreview(false);
   const openOptions = () => showPreview(true);
+  const latestPreview=useRef({product,onZoomClose});
+  useEffect(()=>{latestPreview.current={product,onZoomClose};},[product,onZoomClose]);
   const closePreview = useCallback(() => {
-    closeShoppingPreview(product);
+    closeShoppingPreview(latestPreview.current.product);
     setZoomOpen(false);
     setFocusOptionsOnOpen(false);
     setSelectedVariant(null);
-    onZoomClose?.();
-  }, [onZoomClose, product]);
+    latestPreview.current.onZoomClose?.();
+  }, []);
 
   const handleAdd = () => {
     if (isVariantGroup) {

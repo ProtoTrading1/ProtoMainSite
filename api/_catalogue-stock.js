@@ -14,7 +14,10 @@ export async function refreshCatalogueStock(products,{readStock=readShowroomBatc
   const codes=[...new Set(eligible.flatMap(product=>{
     try{return [showroomSourceCode(product)];}catch{return [];}
   }))];
-  const observations=await readStock(codes,options);
+  // A future oversized catalogue must not turn every product into an HTTP500.
+  // Keep the bounded source budget; unobserved tail identities remain unknown
+  // and can still receive exact checks when viewed.
+  const observations=await readStock(codes.slice(0,10000),options);
   const refreshed=overlayShowroomLiveStock(eligible,observations);let index=0;
   return products.map(product=>preserved.has(product)?product:refreshed[index++]);
 }

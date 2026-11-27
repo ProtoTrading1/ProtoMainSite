@@ -392,6 +392,7 @@ export function adapt(row, tree, salesByBarcode = new Map(), placementPaths = nu
     originalDescription: row.original_description || '',
     packDescription: String(row.pack_description || '').trim(),
     unitsOfIssue,
+    stockUnitConfigured: typeof row.units_of_issue === 'string' && row.units_of_issue.trim() !== '',
     price: customerFacingCataloguePrice(row.price),
     images,
     ...(MOVE_GALLERIES_ENABLED && row.moved_from === 'instore' ? {hasPreservedInstoreGallery:true} : {}),

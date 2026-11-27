@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readShowroomBatchStock,validateShowroomStockBatch,SHOWROOM_STOCK_REPORT} from '../lib/showroom-batch-stock.mjs';
 const stamp=Date.UTC(2026,10,27,22),clock=()=>stamp;
-const row=(CODE,ONHAND=70,BOOKED=2,UNITS='PKT,12')=>({CODE,ONHAND,BOOKED,UNITS});
+const row=(CODE,ONHAND=70,BOOKED=2,UNITS='PKT,12',DESCR='Synthetic stock')=>({CODE,ONHAND,BOOKED,UNITS,DESCR});
 const envelope=(codes,rows=codes.map(value=>row(value)))=>({ok:true,schemaVersion:'proto.sql-report.v1',engineVersion:'4.3.1',report:{id:SHOWROOM_STOCK_REPORT},params:{skus:codes},rows,rowCount:rows.length,meta:{source:'POSWINSQL',readOnly:true,generatedAt:new Date(stamp).toISOString(),durationMs:5,rowCapReached:false,backendCompatible:true,requestedCount:codes.length,missingCodes:codes.filter(value=>!rows.some(row=>row.CODE===value))}});
 
 test('batch report preserves legitimate Motarro at/ampersand identities without allowing filter or control syntax',async()=>{
@@ -33,10 +33,24 @@ test('missing source codes stay unknown with exact missing-code proof; no fake z
  assert.equal(result.get('A').qty,68);assert.equal(result.get('B'),null);assert.equal(result.get('C').qty,0);
 });
 
-test('no wrong, duplicate, extra or malformed row may partially confirm its cohort',async()=>{
- for(const rows of [[row('A'),row('OTHER')],[row('A'),row('A')],[row('A'),{...row('B'),PRICE_A:23.91}],[row('A'),row('B',null)],[row('A'),row('B',5,-1)],[row('A'),row('B',5,0,'UNKNOWN')]]){
+test('no wrong, duplicate or unexpected fieldset may partially confirm its cohort',async()=>{
+ for(const rows of [[row('A'),row('OTHER')],[row('A'),row('A')],[row('A'),{...row('B'),PRICE_A:23.91}],[row('A'),{CODE:'B',ONHAND:5,BOOKED:0,UNITS:'EACH'}]]){
   const result=await readShowroomBatchStock(['A','B'],{now:clock,readBatch:async codes=>envelope(codes,rows)});assert.deepEqual([...result.values()],[null,null]);
  }
+});
+
+test('known rows with missing balances or unverified units hold only themselves, not other source codes',async()=>{
+ for(const bad of [row('B',null),row('B',5,-1),row('B',5,0,'UNKNOWN'),row('B',5,0,null),row('B',5,null,'EACH')]){
+  const values=await readShowroomBatchStock(['A','B'],{now:clock,readBatch:async codes=>envelope(codes,[row('A'),bad])});assert.equal(values.get('A').qty,68);assert.equal(values.get('B'),null);
+ }
+ const codes=Array.from({length:300},(_,i)=>'COHORT'+i),rows=codes.map(value=>row(value));rows[150]=row(codes[150],5,0,'');
+ const values=validateShowroomStockBatch(envelope(codes,rows),codes,{now:stamp});assert.equal([...values.values()].filter(Boolean).length,299);assert.equal(values.get(codes[150]),null);
+});
+
+test('existing exact PKT,00 exception resolves identically to the single-code path with actual description proof',()=>{
+ const code='8640000227',expected='BALLOONS 12INCH PKT,100 WHITE';
+ const values=validateShowroomStockBatch(envelope(['A',code],[row('A'),row(code,50,0,'PKT,00',expected)]),['A',code],{now:stamp});assert.equal(values.get('A').qty,68);assert.equal(values.get(code).sourceUnits,'PACK 100');assert.equal(values.get(code).qty,50);
+ const held=validateShowroomStockBatch(envelope(['A',code],[row('A'),row(code,50,0,'PKT,00','Different source product')]),['A',code],{now:stamp});assert.equal(held.get('A').qty,68);assert.equal(held.get(code),null);
 });
 
 test('report identity, readonly, membership, schema, rowcount and complete envelope are mandatory',()=>{

@@ -42,6 +42,15 @@ test('negative raw onhand and oversold balances remain diagnostic but orderable 
  }
 });
 
+test('decimal-exact flooring fixes cancellation without rounding genuine fractional stock upward',()=>{
+ for(const [onHand,booked,expected]of [[2.3,.3,2],['2.3','0.3',2],['1.999999999999998','0',1],['2.000000000000001','0.000000000000002',1],['2.3e-1','0.03',0]]){
+  const current=observation(raw(code,onHand,booked));assert.equal(current.qty,expected);
+  const [actual]=overlayShowroomLiveStock([product()],new Map([[code,current]]),{now:stamp});assert.equal(actual.stockQty,expected);
+ }
+ const current=observation(raw(code,2.3,.3));assert.equal(current.available,2);assert.deepEqual(current.balanceProof,{onHand:'2.3',booked:'0.3'});
+ const [forged]=overlayShowroomLiveStock([product()],new Map([[code,{...current,balanceProof:{onHand:'2.3',booked:'.4'}}]]),{now:stamp});assert.equal(forged.stockQty,null);
+});
+
 test('deduplicates canonical pools with a maximum of four concurrent exact reads',async()=>{
  let active=0,peak=0;const calls=[];const codes=Array.from({length:12},(_,i)=>'SKU'+i);
  const result=await readShowroomLiveStock([...codes,code,code],{now:clock,read:async value=>{active++;peak=Math.max(peak,active);calls.push(value);await new Promise(resolve=>setTimeout(resolve,2));active--;return raw(value);}});
@@ -90,7 +99,14 @@ test('one incompatible alias unit holds the represented shared pool instead of d
  const aliases=[product({sku:'RED'}),product({sku:'GREEN',unitsOfIssue:'EACH'})];
  const result=overlayShowroomLiveStock(aliases,new Map([[code,observation()]]),{now:stamp});
  assert.deepEqual(result.map(p=>p.stockQty),[null,null]);assert.deepEqual(result.map(p=>p.unitsOfIssue),['PACK 12','EACH']);
- const [missing]=overlayShowroomLiveStock([product({unitsOfIssue:null})],new Map([[code,observation()]]),{now:stamp});assert.equal(missing.stockQty,68);assert.equal(missing.unitsOfIssue,null);
+ const [missing]=overlayShowroomLiveStock([product({unitsOfIssue:null})],new Map([[code,observation()]]),{now:stamp});assert.equal(missing.stockQty,null);assert.equal(missing.unitsOfIssue,null);
+});
+
+test('missing website unit and adapted EACH fallback never manufacture configured selling-unit proof',()=>{
+ for(const extra of [{unitsOfIssue:null},{unitsOfIssue:''},{unitsOfIssue:'EACH',stockUnitConfigured:false}]){
+  for(const sourceUnits of ['EACH','PKT,12']){const [actual]=overlayShowroomLiveStock([product(extra)],new Map([[code,observation(raw(code,68,0,sourceUnits))]]),{now:stamp});assert.equal(actual.stockQty,null);assert.equal(actual.unitsOfIssue,extra.unitsOfIssue);}
+ }
+ const [configured]=overlayShowroomLiveStock([product({unitsOfIssue:'EACH',stockUnitConfigured:true})],new Map([[code,observation(raw(code,68,0,'EACH'))]]),{now:stamp});assert.equal(configured.stockQty,68);
 });
 
 test('known-zero and unknown keep existing To-order and incoming/landed policy without inventing stock or badges',()=>{

@@ -22,6 +22,12 @@ test('source-unavailable discovery cannot present the old stock snapshot as fres
  const current=await refreshCatalogueStock([product('8640000255',96)],{readStock:async()=>new Map()});
  assert.equal(current[0].stockOnHand,null);assert.equal(current[0].stockSource,'unavailable');assert.equal(current[0].inStock,false);
 });
+test('a catalogue beyond the source budget stays readable with unobserved rows unknown',async()=>{
+ const rows=Array.from({length:10001},(_,index)=>product(`P${index}`,96));let seen;
+ const refreshed=await refreshCatalogueStock(rows,{readStock:async codes=>{seen=codes;return new Map();}});
+ assert.equal(seen.length,10000);assert.equal(refreshed.length,10001);
+ assert.equal(refreshed.at(-1).stockOnHand,null);assert.equal(refreshed.at(-1).image,rows.at(-1).image);
+});
 test('all authenticated catalogue response branches refresh stock rather than returning metadata-only304',async()=>{
  const source=await readFile(new URL('../api/products.js',import.meta.url),'utf8');
  assert.equal((source.match(/json\(await refreshCatalogueStock\(/g)||[]).length,3);

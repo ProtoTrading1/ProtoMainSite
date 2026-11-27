@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './helpers/live-stock-fixture.js';
 import { expect, test } from '@playwright/test';
 import { catalogueProducts, installAccessibilityServices, TEST_EMAIL, TEST_PASSWORD } from './helpers/accessibility-services.js';
 
@@ -13,7 +14,7 @@ test('a failed catalogue search is retryable and never recorded as zero results'
   await installAccessibilityServices(context);
   let fail = true;
   const searches = [];
-  await context.route('**/api/products**', (route) => route.fulfill({ status: fail ? 503 : 200, contentType: 'application/json', body: JSON.stringify(fail ? { error: 'Synthetic catalogue outage' } : catalogueProducts) }));
+  await context.route('**/api/products**', (route) => fulfillStockFixture(route, fail ? { error: 'Synthetic catalogue outage' } : catalogueProducts, fail ? 503 : 200));
   for (const endpoint of ['search-analytics', 'shopping-events']) {
     await context.route(`**/api/${endpoint}`, (route) => {
       searches.push({ endpoint, data: route.request().postDataJSON() });

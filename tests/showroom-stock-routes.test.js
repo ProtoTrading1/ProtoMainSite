@@ -93,6 +93,14 @@ test('checkout source failure retains explicit unverified staff-request policy, 
  assert.equal(line.qty,4);assert.equal(line.product.stockOnHand,null);assert.equal(line.product.stockRequest.stockUnverified,true);
  assert.equal(line.product.stockSource,'unavailable');assert.equal(line.product.image,image);
 });
+test('a source SKU with null barcode shares its pool with a barcode-mapped website alias',async()=>{
+ const rows=[{...balloon,barcode:null},{...balloon,sku:'BALL-RED'}];
+ const lines=await resolveStandardPrices(rows.map(row=>item(row,40)),{index:client(rows),readStock:async codes=>{
+  assert.deepEqual(codes,[code]);return new Map([[code,source(68)]]);
+ }});
+ for(const line of lines){assert.equal(line.product.stockRequest.sharedStock,true);assert.equal(line.product.stockRequest.requestedQty,80);
+  assert.equal(line.product.stockRequest.availableQty,68);assert.equal(line.product.stockRequest.shortfallQty,12);}
+});
 test('fresh zero preserves verified arrival and To-order semantics without altering arrival records',async()=>{
  const marker={sku:code,incoming_status:'landed_awaiting_grv',incoming_qty:20};
  for(const row of [balloon,{...balloon,to_order:true}]){

@@ -26,3 +26,9 @@ test('reader bounds concurrency, deduplicates aliases/card-modal, caches30sec an
 test('cancelled/changed-account requests cannot commit or be reused by a new owner session',async()=>{
  let current=actor,resolveRead,reads=0;const read=createShowroomStockReader({session:()=>current,assertSession:a=>{if(a!==current)throw Error('Account changed');},now:()=>100000,load:async target=>{reads++;await new Promise(resolve=>{resolveRead=resolve;});return payload(target);}});const target=showroomStockTarget(product());const controller=new AbortController(),pending=read(target,{signal:controller.signal});const held=assert.rejects(pending,{name:'AbortError'});await new Promise(resolve=>setImmediate(resolve));controller.abort();await held;resolveRead();await new Promise(resolve=>setImmediate(resolve));current={userId:'B',epoch:2};const next=read(target);await new Promise(resolve=>setImmediate(resolve));const denied=assert.rejects(next,/Account changed/);current={userId:'C',epoch:3};resolveRead();await denied;assert.equal(reads,2);
 });
+
+test('an observation expires at its source deadline, including a memoized29second-old response',()=>{
+ const p=product(),target=showroomStockTarget(p),records={[target.pool]:validateShowroomStock(payload(target,68,100000),target,129000)};
+ assert.equal(applyShowroomStock(p,records,129999).stockQty,68);
+ const expired=applyShowroomStock(p,records,130000);assert.equal(expired.stockQty,null);assert.equal(expired.availability.canOrder,false);assert.equal(expired.showroomStockObservation.checkedAt,null);
+});
