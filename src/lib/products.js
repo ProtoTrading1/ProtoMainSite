@@ -1,3 +1,4 @@
+import {scrubCachedShowroomStock} from './catalogueStockFreshness.js';
 import { fuzzyFilter } from './fuzzySearch';
 import { applyCollection } from './collectionFilter.js';
 import { sortNewArrivals } from './newArrivalOrder.js';
@@ -123,7 +124,7 @@ function loadFromLocalCache() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
-    return (Date.now() - ts < LS_TTL) ? data : null;
+    return (Date.now() - ts < LS_TTL) ? scrubCachedShowroomStock(data) : null;
   } catch { return null; }
 }
 
@@ -169,7 +170,7 @@ async function loadFromIndexedCache() {
   });
   db.close();
   if (!entry || Date.now() - Number(entry.ts || 0) >= LS_TTL) return null;
-  return Array.isArray(entry.data) ? entry.data : null;
+  return Array.isArray(entry.data) ? scrubCachedShowroomStock(entry.data) : null;
 }
 
 async function loadFromPersistentCache() {
@@ -226,7 +227,7 @@ function startCatalogFetch() {
   return fetchJsonWithTimeout('/api/products', 45000, { cache: 'no-cache', authenticated: true })
     .then((products) => {
       _lastLiveRefreshAt = Date.now();
-      return products;
+      return scrubCachedShowroomStock(products);
     })
     .catch(() => {
       const local = loadFromLocalCache();
@@ -235,7 +236,7 @@ function startCatalogFetch() {
     })
     .then((products) => {
       const hadPrior = !!_cache;
-      _cache = products;
+      _cache = scrubCachedShowroomStock(products);
       saveToLocalCache(products);
       void saveToIndexedCache(products);
       if (hadPrior) {
@@ -253,6 +254,7 @@ function startCatalogFetch() {
 
 function getAllCached() {
   if (_cache) {
+    _cache = scrubCachedShowroomStock(_cache);
     if (!_loadPromise) {
       _loadPromise = startCatalogFetch();
       // A cached read remains usable if its optional background refresh fails.
@@ -303,7 +305,7 @@ export function invalidateProductCache() {
 export function refreshProductCache({ maxAgeMs = CATALOG_REFRESH_MIN_MS } = {}) {
   if (_refreshPromise) return _refreshPromise;
   if (_lastLiveRefreshAt && Date.now() - _lastLiveRefreshAt < maxAgeMs) {
-    return Promise.resolve(_cache);
+    return Promise.resolve(scrubCachedShowroomStock(_cache));
   }
 
   _refreshPromise = startCatalogFetch().finally(() => {
@@ -366,7 +368,7 @@ export async function fetchProductsBySkus(skus) {
 
   const bySku = new Map();
   const addAll = (products) => {
-    for (const product of products) {
+    for (const product of scrubCachedShowroomStock(products)) {
       const key = productSkuKey(product);
       if (key && !bySku.has(key)) bySku.set(key, product);
     }
@@ -410,7 +412,7 @@ export async function fetchProductsBySkus(skus) {
 let _featuredResolved = null; // { key, products, at }
 let _featuredRefreshing = false;
 let _featuredLoad = null; // { key, promise }
-const FEATURED_RESOLVED_REFRESH_MS = 60_000;
+const FEATURED_RESOLVED_REFRESH_MS = 30_000;
 
 async function fetchFeaturedCatalogProducts() {
   const featuredSkus = await getFeaturedProducts();
@@ -425,7 +427,7 @@ async function fetchFeaturedCatalogProducts() {
         .catch(() => {})
         .finally(() => { _featuredRefreshing = false; });
     }
-    return _featuredResolved.products;
+    return scrubCachedShowroomStock(_featuredResolved.products);
   }
   if (_featuredLoad?.key === key) return _featuredLoad.promise;
 
@@ -449,7 +451,7 @@ async function resolveFeaturedCatalogProducts(featuredSkus, key) {
     );
 
     const bySku = new Map();
-    for (const product of responses.flat()) {
+    for (const product of scrubCachedShowroomStock(responses.flat())) {
       const key = productSkuKey(product);
       if (key && !bySku.has(key)) bySku.set(key, product);
     }
@@ -515,6 +517,7 @@ export function isProductAvailable(product) {
 }
 
 function applyInStockFilter(products, inStockOnly) {
+  products = scrubCachedShowroomStock(products);
   if (!inStockOnly) return products;
   return products.filter(isProductAvailable);
 }
@@ -656,14 +659,14 @@ export async function fetchIdentifierProducts(query) {
   // than making the API perform the lookup twice. The entry is deliberately
   // short-lived: this is request coalescing, not a stock/catalogue cache.
   const key = identifier.toUpperCase();
-  if (_identifierRequests.has(key)) return _identifierRequests.get(key);
+  if (_identifierRequests.has(key)) return _identifierRequests.get(key).then(scrubCachedShowroomStock);
 
   const request = fetchJsonWithTimeout(
     `/api/products?identifier=${encodeURIComponent(identifier)}`,
     4500,
     { cache: 'no-store', authenticated: true },
   )
-    .then((products) => (Array.isArray(products) ? products : []))
+    .then((products) => scrubCachedShowroomStock(products))
     .catch(() => [])
     .finally(() => {
       globalThis.setTimeout(() => {
@@ -677,14 +680,14 @@ export async function fetchIdentifierProducts(query) {
 async function fetchBrowseProducts(categoryPath) {
   const key = categoryPath.join('/');
   const cached = _browseRequests.get(key);
-  if (cached) return cached;
+  if (cached) return cached.then(scrubCachedShowroomStock);
 
   const request = fetchJsonWithTimeout(
     `/api/products?browsePath=${encodeURIComponent(key)}`,
     8000,
     { cache: 'default', authenticated: true },
   )
-    .then((products) => (Array.isArray(products) ? products : []))
+    .then((products) => scrubCachedShowroomStock(products))
     .catch(async () => {
       const all = await getAllCached();
       return applyPathFilter(all, categoryPath);
@@ -774,7 +777,7 @@ export async function fetchProductPage({
   const canFilterCategoryLocally = isCategoryBrowse && Array.isArray(_cache) && _cache.length > 0;
   let products = isCategoryBrowse
     ? canFilterCategoryLocally
-      ? applyPathFilter(_cache, categoryPath)
+      ? applyPathFilter(scrubCachedShowroomStock(_cache), categoryPath)
       : await fetchBrowseProducts(categoryPath)
     : await getAllCached();
   const pool = products;

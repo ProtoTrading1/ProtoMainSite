@@ -1,0 +1,22 @@
+import {test,expect} from '@playwright/test';
+import {fileURLToPath} from 'node:url';
+test('ordinary Showroom uses fresh68 then63 and holds unavailable source without changing main or selling unit',async({page,context})=>{
+ await context.route('**/*',route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1')return route.continue();if(u.hostname==='yiqsvwajozafvalwcero.supabase.co'&&u.pathname.endsWith('/product-images/8640000255/1.jpg'))return route.fulfill({status:200,contentType:'image/jpeg',path:fileURLToPath(new URL('./fixtures/positill-stock-refresh-8640000255.jpg',import.meta.url))});return route.abort();});
+ await page.clock.install();await page.goto('/e2e/fixtures/positill-stock-refresh.html');
+ const card=page.locator('.product-card'),image=card.getByRole('img',{name:'CHRISTMAS BALLOONS | ±12PCS',exact:true});
+ await expect(card).toHaveCount(1);await expect(card).toContainText('68');
+ await expect(page.getByTestId('discovery-count')).toHaveText('Visible listings: 2');
+ await expect(page.getByTestId('discovery-PREVIEW-RESTOCK')).toHaveText('Restocked preview item: 5 packets');
+ const initialImage=await image.getAttribute('src');await expect(image).toBeVisible();expect(await image.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+ await page.getByLabel('Simulated source').selectOption('63');await page.clock.fastForward(31000);await expect(card).toContainText('63');
+ await expect(image).toHaveAttribute('src',initialImage);await expect(card).toContainText('27.50');
+ await page.getByLabel('Simulated source').selectOption('failure');await page.clock.fastForward(31000);await expect(card).toContainText('Stock unavailable');
+ await expect(page.getByTestId('discovery-count')).toHaveText('Visible listings: 0');
+ await expect(page.getByTestId('discovery-proof')).toHaveText('Unknown balances: 2; zero balances: 0');
+ await page.getByLabel('Available only',{exact:true}).uncheck();
+ await expect(page.getByTestId('discovery-count')).toHaveText('Visible listings: 2');
+ await expect(page.getByTestId('discovery-PREVIEW-RESTOCK')).toHaveText('Restocked preview item: Stock unavailable packets');
+ await card.hover();await expect(card.getByRole('button',{name:'Add to Cart',exact:true})).toBeDisabled();
+ await expect(image).toHaveAttribute('src',initialImage);await expect(page.getByRole('status').filter({hasText:'Memory-only'})).toHaveText('Memory-only Add callbacks: 0');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

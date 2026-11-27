@@ -8,7 +8,7 @@ import { buildImageCandidates, optimizedImageUrl } from '../lib/imageUrl';
 import { trackEvent } from '../lib/trackEvent';
 import { stockAdvisoryForQty } from '../lib/stockAdvisory';
 import { displayProductText } from '../lib/productText';
-import { authenticatedGetJson } from '../lib/authHeaders';
+import { captureAuthIdentity, assertAuthIdentity, authenticatedGetJson } from '../lib/authHeaders';
 import { scheduleInstoreStockCheck } from '../lib/instoreStockQueue';
 import { buildProductDetailUrl } from '../lib/productDetailUrl';
 import { hasVerifiedInstoreUnit, productSellingUnit, withPositillObservation } from '../../lib/positill-selling-unit.mjs';
@@ -20,6 +20,7 @@ import { reviewedColourOptions, withReviewedColourPhoto, supplierStockAvailable,
 import { withReviewedPlateGallery } from '../../lib/reviewed-plate-gallery.mjs';
 import {ballsCustomerOptions} from '../../lib/834-customer-gallery.mjs';
 import {cat07CustomerOptions} from '../../lib/cat07-customer-gallery.mjs';
+import {showroomStockTarget,showroomStockTargets,applyShowroomStock,createShowroomStockReader,SHOWROOM_STOCK_MAX_AGE} from '../lib/showroomStockObservation.js';
 import './ProductCard.css';
 
 function productBarcode(product) {
@@ -180,7 +181,12 @@ function orderQuantityLabel(product) {
   return parts.join(' · ');
 }
 
-function StockBadge({ product, onVerifiedUnit }) {
+function ShowroomStockReadout({product,onRetry}){
+  const observation=product.showroomStockObservation;
+  return <div className="stock-check"><span className="stock-result" role="status" aria-live="polite">{observation?.status==='verified'?`Live stock: ${observation.qty}`:observation?.status==='checking'?'Checking live stock…':'Stock unavailable'} {observation?.status!=='checking'&&<button type="button" className="stock-retry" onClick={onRetry}>Check live stock</button>}</span></div>;
+}
+
+function StockBadge({ product, onVerifiedUnit, onShowroomRetry }) {
   const sku = product?.code || product?.barcode || product?.sku || product?.id;
   if (!product) return null;
   const availability = catalogStockState(product);
@@ -193,7 +199,7 @@ function StockBadge({ product, onVerifiedUnit }) {
         <span>{showroomAvailabilityLabel(product, availability)}</span>
         {guidance && <small>{guidance}</small>}
       </div>
-      {!product.isVariantGroup && sku ? <StockCheck
+      {showroomStockTarget(product)?<ShowroomStockReadout product={product} onRetry={onShowroomRetry}/>:!product.isVariantGroup && sku ? <StockCheck
         sku={sku}
         source={product.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
         isInstore={Boolean(product.isExtendedRange)}
@@ -434,11 +440,36 @@ function ProductQtyInput({ qty, setQty, minQty, maxQty = 9999 }) {
   );
 }
 
+const readShowroomStock=createShowroomStockReader({session:captureAuthIdentity,assertSession:assertAuthIdentity,load:async(target,{signal})=>{const {response,data}=await authenticatedGetJson(`/api/stock?sku=${encodeURIComponent(target.sourceCode)}&website_sku=${encodeURIComponent(target.sku)}`,{cache:'no-store',signal,timeoutMs:25000});if(!response.ok)throw Error('Current stock unavailable');return data;}});
+function useShowroomStock(sourceProduct){
+  const articleRef=useRef(null),[visible,setVisible]=useState(false),[records,setRecords]=useState({}),[revision,setRevision]=useState(0);
+  const targets=useMemo(()=>showroomStockTargets(sourceProduct),[sourceProduct]);
+  const onRetry=useCallback(()=>setRevision(value=>value+1),[]);
+  useEffect(()=>{
+    const element=articleRef.current;if(!element||!targets.length)return undefined;
+    if(typeof IntersectionObserver==='undefined'){setVisible(true);return undefined;}
+    const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{rootMargin:'160px'});observer.observe(element);return()=>observer.disconnect();
+  },[targets]);
+  useEffect(()=>{
+    if(!visible||!targets.length)return undefined;let disposed=false,controller;
+    const run=(force=false)=>{if(disposed||document.visibilityState==='hidden')return;controller?.abort();controller=new AbortController();const current=controller;
+      setRecords(previous=>({...previous,...Object.fromEntries(targets.map(target=>[target.pool,{status:'checking',sourceCode:target.sourceCode,qty:null}]))}));
+      for(const target of targets)readShowroomStock(target,{signal:current.signal,force}).then(value=>{if(!disposed&&!current.signal.aborted)setRecords(previous=>({...previous,[target.pool]:value}));},()=>{if(!disposed&&!current.signal.aborted)setRecords(previous=>({...previous,[target.pool]:{status:'unavailable',sourceCode:target.sourceCode,qty:null,checkedAt:null}}));});
+    };
+    run(revision>0);const focus=()=>run(true),visibility=()=>{if(document.visibilityState==='visible')run(true);};const timer=window.setInterval(()=>run(),SHOWROOM_STOCK_MAX_AGE);
+    window.addEventListener('focus',focus);document.addEventListener('visibilitychange',visibility);
+    return()=>{disposed=true;controller?.abort();window.clearInterval(timer);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visibility);};
+  },[visible,targets,revision]);
+  const product=useMemo(()=>applyShowroomStock(sourceProduct,records),[sourceProduct,records]);
+  return {product,articleRef,onRetry};
+}
+
 function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, priority = false, initialZoomOpen = false, initialFocusOptions = false, initialBraceletColour = null, onZoomClose, onSearchEngage = null, onProductPreview = null, preferenceSlot = null }) {
+  const {product:observedSourceProduct,articleRef:showroomArticleRef,onRetry:onShowroomRetry}=useShowroomStock(sourceProduct);
   const [unitObservation,setUnitObservation]=useState(null);
   const [braceletColour, setBraceletColour] = useState(() => TURTLE_BRACELET_COLOURS.find(option => option.label === initialBraceletColour || option.image === sourceProduct?.localImage)?.label || 'Brown');
   const [colourChoice, setColourChoice] = useState('');
-  const product=useMemo(()=>withReviewedColourPhoto(withTurtleBraceletPhoto(withReviewedPlateGallery(withPositillObservation(sourceProduct,unitObservation)), braceletColour),colourChoice),[sourceProduct,unitObservation,braceletColour,colourChoice]);
+  const product=useMemo(()=>withReviewedColourPhoto(withTurtleBraceletPhoto(withReviewedPlateGallery(withPositillObservation(observedSourceProduct,unitObservation)), braceletColour),colourChoice),[observedSourceProduct,unitObservation,braceletColour,colourChoice]);
   const colourOptions = reviewedColourOptions(product);
   const selectedColour = colourOptions.find(option => option.label === colourChoice);
   const needsColourChoice = colourOptions.length > 1 && !selectedColour;
@@ -504,7 +535,8 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
   const variantsRef = useRef(null);
   const lastFocusedElementRef = useRef(null);
 
-  const activeProduct = selectedVariant || product;
+  const currentVariant=selectedVariant&&variants.find(variant=>variant.id===selectedVariant.id);
+  const activeProduct = currentVariant || product;
   const galleryImages = Array.isArray(activeProduct.images) && activeProduct.images.length > 1
     ? activeProduct.images
     : null;
@@ -710,7 +742,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
 
   return (
     <>
-      <article className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
+      <article ref={showroomArticleRef} className={`product-card${cardCanOrder ? '' : ' product-card--unavailable'}`}>
         {/* Image */}
         <button
           className="product-image product-image-button"
@@ -768,7 +800,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
             ) : null}
           </div>
 
-          <StockBadge product={product} onVerifiedUnit={onVerifiedUnit} />
+          <StockBadge product={product} onVerifiedUnit={onVerifiedUnit} onShowroomRetry={onShowroomRetry} />
 
           {!isBracelet && !colourOptions.length && preferenceSlot}
           {colourSelector}
@@ -1025,13 +1057,13 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
 
                 {(!isVariantGroup || selectedVariant) && (
                   <div className="pz-stock-check">
-                    <StockCheck
+                    {showroomStockTarget(activeProduct)?<ShowroomStockReadout product={activeProduct} onRetry={onShowroomRetry}/>:<StockCheck
                       sku={activeProduct.code || activeProduct.barcode || activeProduct.sku || activeProduct.id}
                       autoCheck
                       isInstore={Boolean(activeProduct.isExtendedRange)}
                       source={activeProduct.imageSource === 'isolated-preview' ? 'instore-preview' : ''}
                       onVerifiedUnit={onVerifiedUnit}
-                    />
+                    />}
                   </div>
                 )}
               </div>

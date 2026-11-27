@@ -5,6 +5,7 @@ import { evaluateCheckoutSnapshot } from '../lib/order-stock-guard.mjs';
 import { stockRequestNote } from '../lib/stock-request-note.mjs';
 import { stockAdvisoryForQty } from '../src/lib/stockAdvisory.js';
 import { withReviewedColourPhoto } from '../lib/reviewed-colour-options.mjs';
+import {validateShowroomStockObservation} from '../lib/showroom-live-stock.mjs';
 
 const row = { sku: 'TEST-SHORTAGE', barcode: 'TEST-ONLY', title: 'Synthetic product', price: 10, units_of_issue: 'EACH', min_order_qty: 1, available_stock: 0, stock_qty: 0, to_order: false };
 const item = { qty: 4, preference: 'Blue', product: { sku: row.sku, checkoutSnapshot: { unitPrice: 10, stockQty: 5 }, stockRequest: { availableQty: 999 } } };
@@ -19,7 +20,11 @@ async function resolve(stock = row, incoming = [], items = [item]) {
     assert.notEqual(data, null);
     return new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
   };
-  try { return await resolveAuthoritativePrices(items, { classify: async () => new Set() }); }
+  // The test explicitly supplies its synthetic read-only source, separately
+  // from the website listing response. Unknown source remains an explicit null.
+  const readStock=async codes=>new Map(codes.map(code=>[code,stock?.available_stock==null?null:
+    validateShowroomStockObservation(code,{CODE:stock.barcode,ONHAND:stock.available_stock,BOOKED:0,UNITS:stock.units_of_issue})]));
+  try { return await resolveAuthoritativePrices(items, { classify: async () => new Set(),readStock }); }
   finally {
     globalThis.fetch = before.fetch;
     for (const [name, value] of [['VITE_STOCK_SUPABASE_URL', before.url], ['VITE_STOCK_SUPABASE_KEY', before.key]]) {

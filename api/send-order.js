@@ -1,4 +1,5 @@
 import {resolveBallsPrices} from './_834-family.js';
+import { currentShowroomStock } from './_showroom-stock.js';
 import {isBallsAlias} from '../lib/834-customer-gallery.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,assertArrivedOrderTotals} from './_arrived-stock.js';
@@ -34,7 +35,7 @@ import {
 } from './_promo-codes.js';
 import { APP_ORIGIN, PUBLIC_ASSET_URL } from './_public-site-url.js';
 import { orderToken } from './_order-token.js';
-import { availabilityForRow, loadIncomingAvailabilityMap } from './_product-availability.js';
+import { loadIncomingAvailabilityMap } from './_product-availability.js';
 import { evaluateCheckoutSnapshot, isLandedStockAvailable, isToOrderProduct, normaliseStockQty } from '../lib/order-stock-guard.mjs';
 import { stockRequestNote } from '../lib/stock-request-note.mjs';
 import { stockClient } from './extended-range.js';
@@ -396,7 +397,7 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   });
 }
 
-async function resolveStandardPrices(items) {
+export async function resolveStandardPrices(items, { index = null, fetchBridge = fetch, bridgeEnv = process.env, readStock } = {}) {
   if (!items.length) return [];
   if (items.length > MAX_ORDER_LINES) {
     const error = new Error(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
@@ -412,8 +413,8 @@ async function resolveStandardPrices(items) {
     .filter(Boolean))];
   const productBySku = new Map();
   const productByBarcode = new Map();
-  let incomingBySku = new Map();
-  const sb = getStockClient();
+  let incomingBySku;
+  const sb = index || getStockClient();
   try {
     if (skus.length) {
       const { data, error } = await sb
@@ -445,6 +446,14 @@ async function resolveStandardPrices(items) {
     throw unavailable;
   }
 
+  const resolvedRows = items.map(item => {
+    const product=item.product||{};
+    const sku=String(product.sku||product.id||'').trim().toUpperCase();
+    const barcode=String(product.code||product.barcode||'').trim();
+    return productBySku.get(sku)||(barcode?productByBarcode.get(barcode):null);
+  }).filter(Boolean);
+  const uniqueRows = [...new Map(resolvedRows.map(row => [row.sku, row])).values()];
+  const liveBySku = await currentShowroomStock(uniqueRows, incomingBySku, {readStock, fetchBridge, bridgeEnv});
   const reviewChanges = [];
   const requestedBySku = new Map();
   const requestedByBarcode = new Map();
@@ -465,7 +474,8 @@ async function resolveStandardPrices(items) {
       error.status = 400;
       throw error;
     }
-    const availability = availabilityForRow(row, incomingBySku.get(row.sku) || null);
+    const live = liveBySku.get(row.sku);
+    const availability = live.availability;
     const price = customerFacingCataloguePrice(rawPrice);
     const toOrder = isToOrderProduct(row);
     const aggregateKey = textId(row.sku);
@@ -525,6 +535,10 @@ async function resolveStandardPrices(items) {
         minQty,
         availabilityState: availability.state,
         availabilityLabel: availability.label,
+        stockQty: live.stockOnHand,
+        stockOnHand: live.stockOnHand,
+        stockSource: live.stockSource,
+        stockCheckedAt: live.stockCheckedAt,
       },
     };
   });
@@ -629,7 +643,7 @@ export async function detectUnflaggedInstoreSkus(items, client = null, { website
   }
 }
 
-export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env, publicTransport=globalThis.fetch } = {}) {
+export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env, publicTransport=globalThis.fetch, readStock } = {}) {
   if(items.length>MAX_ORDER_LINES)throw orderError('Too many order lines.');
   const identities=item=>['sku','id','code','barcode'].map(key=>item?.product?.[key]).filter(value=>value!=null&&String(value).trim()!=='');
   if(items.some(item=>identities(item).some(isBallsAlias)))throw orderError('Choose a colour under Christmas product 8-34; historical photo references are not separate stock.',409);
@@ -641,7 +655,7 @@ export async function resolveAuthoritativePrices(items, { classify = null, websi
     const canonical=ballsItems.map(item=>({...item,product:{...item.product,sku:'8-34',id:'8-34',code:'8-34',barcode:'8-34'}}));
     const resolved=await resolveBallsPrices(canonical,{client:index||getStockClient(),fetchBridge,bridgeEnv,publicTransport});
     const others=items.filter(item=>!ballsItems.includes(item));let rest=[];
-    try{if(others.length)rest=await resolveAuthoritativePrices(others,{classify,websiteOnlyProvider,index,fetchBridge,bridgeEnv,publicTransport});}
+    try{if(others.length)rest=await resolveAuthoritativePrices(others,{classify,websiteOnlyProvider,index,fetchBridge,bridgeEnv,publicTransport,readStock});}
     catch(error){const match=/^(Product on order line|Invalid quantity on order line) (\d+)/.exec(error?.message||'');if(match){const original=items.indexOf(others[Number(match[2])-1]);if(original>=0)error.message=error.message.replace(`line ${match[2]}`,`line ${original+1}`);}throw error;}
     let a=0,b=0;return items.map(item=>ballsItems.includes(item)?resolved[a++]:rest[b++]);
   }
@@ -656,7 +670,7 @@ export async function resolveAuthoritativePrices(items, { classify = null, websi
   const standardItems = items.filter((item) => !isInstore(item));
   let resolvedInstore; let resolvedStandard;
   try {
-    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems,{websiteOnlyProvider,index,fetchBridge,bridgeEnv}), resolveStandardPrices(standardItems)]);
+    [resolvedInstore, resolvedStandard] = await Promise.all([resolveInstorePrices(instoreItems,{websiteOnlyProvider,index,fetchBridge,bridgeEnv}), resolveStandardPrices(standardItems,{index,fetchBridge,bridgeEnv,readStock})]);
   } catch (error) {
     // Line numbers inside each resolver count only that group; report the
     // basket's own line number to the customer.
