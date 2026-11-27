@@ -40,8 +40,11 @@ await db.exec(setupSql);
 // checkout need not contain the parent commit to verify these payloads.
 for (const [file, hash] of [
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', '9e04143f8686a7025cb8eb8d50e51fbe0dc1c2f86eed59c2145fa2a75c9227ba'],
-  ['lib/reviewed-colour-options.mjs', '9dc7d273f13bcaa3ed96f8f5e1b8636fcdac550ad29fe960ad07660a04fe1e26'],
+  ['api/send-order.js', 'c646af57eaa9028377086c4a4be3fd09c9ae8d5063ad9754a20cf4f496428070'],
+  ['lib/reviewed-colour-options.mjs', '5d80000a939572612848f315e2c09a55c41f10d669355a5f8d9cda7a462cc6d1'],
+  ['lib/reviewed-plate-gallery.mjs', 'dfbbdeb47c3129549e55c2fad822ba0227e04c041a4df6e500d01f0e5dd7ec6d'],
+  ['lib/reviewed-plate-gallery.json', '52e6f819d6cd70b954af1837dd3416417ddbf09bd789e7ed56b651bb5c618887'],
+  ['lib/sarongi-instore-gallery.mjs', '21cb6d176e4b280d982a8a62b2d5cd80928eda9ef44ab1dea4202a714988beda'],
   ['lib/reviewed-colour-labels.json', '6ece43b7608f60c337b99f37579ece228d08bcce4c5751c92e379736416d3cd7'],
   ['lib/supplier-stock-list-20261124.json', '5ff8c54a780d572779ddf2d9e018c660f1e0b92d48af036e1272cb94a96fc99d'],
   ['api/_auth.js', '4357c812bd63adb2496c8a753e14cc20bf0a711e7c2dbc990408b37b42a81e68'],
