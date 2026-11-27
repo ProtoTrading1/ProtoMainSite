@@ -1,0 +1,159 @@
+{
+  "evidence": "PGlite-only synthetic derivatives; actual SQL receipt, not a live adoption",
+  "receipt": {
+    "sku": "8640000274",
+    "views": [
+      {
+        "id": "overview",
+        "role": "overview",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/overview/800be73df097f4523b3fcb879fde3b867f2d1371a627834e151eeb37d4f78eeb.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "800be73df097f4523b3fcb879fde3b867f2d1371a627834e151eeb37d4f78eeb"
+        },
+        "label": "Saved family reference overview",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 401338,
+          "sha256": "930d2e5fa8c73656721a0852641ba4a4de70333b6be838b805fa87685151bf73"
+        }
+      },
+      {
+        "id": "style-4",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-4/e1df3519315652228b3ab83e3ff7c36c0781f4c923bf2106d549248502a16442.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "e1df3519315652228b3ab83e3ff7c36c0781f4c923bf2106d549248502a16442"
+        },
+        "label": "Snowman — orange hat",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 44538,
+          "sha256": "5f7a39a762d96d05ae23651878383e44c3b76fa1f16cf516d57c38360784c583"
+        }
+      },
+      {
+        "id": "style-5",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-5/6730a1f7ffa569927cca29c3b5660d02e4d2d517054229d6a4e2f6476a3e6c22.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "6730a1f7ffa569927cca29c3b5660d02e4d2d517054229d6a4e2f6476a3e6c22"
+        },
+        "label": "Gingerbread Man — red bow",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 87616,
+          "sha256": "ba7f39d37e5bee71f4dde0a79ed12afe22d7bff4b394b79759a841c107606ff5"
+        }
+      },
+      {
+        "id": "style-6",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-6/6677e25c14c51592e9cf1a53e12a9ee34773b5ab01e0f2992bc69ffb9041308e.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "6677e25c14c51592e9cf1a53e12a9ee34773b5ab01e0f2992bc69ffb9041308e"
+        },
+        "label": "Santa — carrying a gift",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 69691,
+          "sha256": "bd086f0464e7f5f6d59201782c6382899e1ff6929569fc67dad5b2ef0d156b7c"
+        }
+      },
+      {
+        "id": "style-7",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-7/ee89b0def75b19d8994b12b00d3c19906f67d55e80e354f213dcd4810f2332cb.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "ee89b0def75b19d8994b12b00d3c19906f67d55e80e354f213dcd4810f2332cb"
+        },
+        "label": "Reindeer — earmuffs",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 50188,
+          "sha256": "516df5761e1ddc6668ca1c17b62010631d87c90b90122b8aff94251b16ed6afe"
+        }
+      },
+      {
+        "id": "style-8",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-8/759d599aedaa45f007f94ad8862103bc47ee4145cb294682de02ba365cd3d3b8.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "759d599aedaa45f007f94ad8862103bc47ee4145cb294682de02ba365cd3d3b8"
+        },
+        "label": "Snowman — black hat and gift",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 47127,
+          "sha256": "7ac43ccd702a7e85cdb9b6ca0aec38173d55f94ae313beab4753777e264c9a8c"
+        }
+      },
+      {
+        "id": "style-9",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-9/6bbf9e0783d3db078724018a3a16a4c13edd8f2bde63a36edf7486a227835f2b.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "6bbf9e0783d3db078724018a3a16a4c13edd8f2bde63a36edf7486a227835f2b"
+        },
+        "label": "Merry Christmas tree",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 60055,
+          "sha256": "867e91878f664c30fd5891d0e46a9f8d1cd3b0f47e8d9310d32b109aac604bc1"
+        }
+      },
+      {
+        "id": "style-10",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-10/43a40b69b39d752411aef77831aff97a9078f7cecd7b5ef5a0edf4dfe49a34e0.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "43a40b69b39d752411aef77831aff97a9078f7cecd7b5ef5a0edf4dfe49a34e0"
+        },
+        "label": "Reindeer — Santa hat and gift",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 53812,
+          "sha256": "dbca5bace36a28b01a028aaeddc45493f02d831345041905dc825e187ace2489"
+        }
+      },
+      {
+        "id": "style-11",
+        "role": "style",
+        "image": {
+          "url": "https://admin.proto.co.za/api/cat07-family-image/ce7b52ad-fbbe-4270-aa83-59455d8da8dd/style-11/d9b04e26fbf4e18ed8a94a8876381ac0995dcdf0f874b81f55b65d5bf0e981f1.png",
+          "mime": "image/png",
+          "size": 29,
+          "sha256": "d9b04e26fbf4e18ed8a94a8876381ac0995dcdf0f874b81f55b65d5bf0e981f1"
+        },
+        "label": "Reindeer — striped scarf and bell",
+        "original": {
+          "mime": "image/jpeg",
+          "size": 55928,
+          "sha256": "05d0fc7974034b04a1f23bd4c157eda03b9af7585aa3219850d0b2014d22f423"
+        }
+      }
+    ],
+    "status": "complete",
+    "barcode": "8640000274",
+    "protocol": "proto.cat07-family-publication.v1",
+    "receiptId": "ce7b52ad-fbbe-4270-aa83-59455d8da8dd",
+    "mainViewId": "overview",
+    "destination": "instore",
+    "manifestHash": "37be290b1098a415f73c28d448db203f9cd649507daf8f3a38bb1e19ac303175"
+  }
+}

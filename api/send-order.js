@@ -5,6 +5,9 @@ import { assertMatchingOrder, assertOrderReplaySchemaReady, checkoutRequestHash,
 import { itemPreferenceFields, normalizeItemPreference } from '../lib/item-preference.mjs';
 import { reviewedColourOrderImage } from '../lib/reviewed-colour-options.mjs';
 import { reviewedPlateOrderImage } from '../lib/reviewed-plate-gallery.mjs';
+import {readCompletedCat07Receipt,cat07CurrentSource} from './_cat07-family.js';
+import {resolveCat07OrderPreview} from '../lib/cat07-order-preview.mjs';
+import {isCat07HistoricalAlias} from '../lib/cat07-customer-gallery.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
@@ -289,6 +292,7 @@ function availableFromBridge(row) {
 export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows = [], listingStatus = 'visible',arrivalStock } = {}) {
   const sku = textId(item?.product?.sku || item?.product?.id);
   if (!sku || textId(indexRow?.sku) !== sku || normalRows.length) throw orderError('Instore product could not be verified.', normalRows.length ? 409 : 503);
+  if(sku==='8640000274')throw orderError('Christmas style lines must be verified together against their completed family.',409);
   // A removed/misleading product photo must never make a separately approved
   // SKU unorderable. Image visibility is presentation-only; the normal index,
   // duplicate and price gates stay authoritative.
@@ -318,6 +322,7 @@ export function resolveInstoreOrderLine(item, { indexRow, bridgeRow, normalRows 
 
 export async function resolveInstorePrices(items, { websiteOnlyRows = [], websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
   if (!items.length) return [];
+  if(items.some(item=>isCat07HistoricalAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a style under Christmas product 8640000274; historical photo references are not separate stock.',409);
   const itemSkus = items.map((item) => textId(item?.product?.sku || item?.product?.id));
   if (itemSkus.some((sku) => !sku)) throw orderError('Each Instore order line needs a product code.');
   const skus = [...new Set(itemSkus)];
@@ -326,7 +331,7 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   let indexRows; let normalRows; let listingControls;
   try {
     const [indexResult, normalSkuResult, normalBarcodeResult, listingResult] = await Promise.all([
-      index.from('extended_range_items').select('sku, supplier_name, image_source_key, image_source, barcode, title, price, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
+      index.from('extended_range_items').select('sku, supplier_name, image_source_key, image_source, barcode, title, price, minimum_stock, image_url, image_review_status, visibility_status, is_active').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('sku', skus),
       index.from('website_stock').select('sku, barcode').in('barcode', skus),
       index.from('instore_listing_controls').select('sku, status').in('sku', skus),
@@ -349,12 +354,12 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   const bridgeKey = String(bridgeEnv.STOCK_SQL_BRIDGE_KEY || '').trim();
   // The bridge is best-effort for price and a stock log line only: a bridge
   // outage or an unknown SKU must not block an Instore order request.
-  const bridgeBySku = new Map();
+  const bridgeBySku = new Map(),bridgeObservedAt=new Map();
   if (bridgeUrl.startsWith('https://') && bridgeKey) {
     await Promise.all(skus.map(async (sku) => {
       try {
         const response = await fetchBridge(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
-        if (response.ok) bridgeBySku.set(sku, (await response.json())?.row);
+        if (response.ok) {const row=(await response.json())?.row;bridgeBySku.set(sku,row);bridgeObservedAt.set(sku,Date.now());}
         else console.warn('send-order: Instore bridge returned', response.status, 'for', sku);
       } catch (error) {
         console.warn('send-order: Instore bridge unreachable for', sku, error?.message || error);
@@ -366,11 +371,23 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   const arrivals=await readArrivedStockRecords(index,skus);
   const verifiedArrivals=assertArrivedOrderTotals(items,arrivals,bridgeBySku);
   const contentSnapshot=await readInstoreWebsiteContent(index,skus);
+  const familyItems=items.filter(item=>textId(item?.product?.sku||item?.product?.id)==='8640000274');
+  let familyLines=[],familyLine=0;
+  if(familyItems.length){
+    const matching=indexRows.filter(row=>textId(row.sku)==='8640000274');
+    if(matching.length!==1||duplicates.get('8640000274')?.decision!=='eligible'||listingControls.get('8640000274')==='hidden')throw orderError('Christmas family is unavailable or duplicated.',409);
+    const row=matching[0],receipt=await readCompletedCat07Receipt(index,row),observedAt=bridgeObservedAt.get('8640000274');
+    if(!Number.isSafeInteger(observedAt))throw orderError('Current Christmas stock must be refreshed.',409);
+    const source=cat07CurrentSource(bridgeBySku.get('8640000274'),{now:observedAt});
+    const canonicalItems=familyItems.map(item=>({...item,product:{...item.product,sku:'8640000274'}}));
+    familyLines=resolveCat07OrderPreview(canonicalItems,{receipt,indexRow:{sku:row.sku,barcode:row.barcode,destination:'instore',image:row.image_url,hidden:false},source}).items;
+    familyLines=familyLines.map(line=>({...line,product:{...line.product,name:cleanText(row.title,source.description)}}));
+  }
   return items.map((item) => {
     const sku = textId(item?.product?.sku || item?.product?.id);
     const matching = indexRows.filter((row) => textId(row.sku) === sku);
     if (matching.length !== 1 || duplicates.get(sku)?.decision !== 'eligible') throw orderError('Instore product is unavailable or already listed in the main catalogue.', 409);
-    const line=resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible',arrivalStock:verifiedArrivals.get(sku) });
+    const line=sku==='8640000274'?familyLines[familyLine++]:resolveInstoreOrderLine(item, { indexRow: matching[0], bridgeRow: bridgeBySku.get(sku), listingStatus: listingControls.get(sku) || 'visible',arrivalStock:verifiedArrivals.get(sku) });
     const bound={...line.product,instoreSourceIdentity:instoreContentSourceIdentity(matching[0])};
     const display=applyInstoreWebsiteContent([bound],contentSnapshot)[0];
     return display===bound?line:{...line,product:{...line.product,name:display.name,description:display.description,sourceDescription:line.product.name}};
@@ -611,9 +628,11 @@ export async function detectUnflaggedInstoreSkus(items, client = null, { website
 }
 
 export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+  if(items.some(item=>isCat07HistoricalAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a style under Christmas product 8640000274; historical photo references are not separate stock.',409);
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
   const detectedInstore = await (classify ? classify(items) : detectUnflaggedInstoreSkus(items,index,{websiteOnlyProvider}));
-  const isInstore = (item) => item?.product?.isExtendedRange === true
+  const isInstore = (item) => textId(item?.product?.sku||item?.product?.id)==='8640000274'
+    || item?.product?.isExtendedRange === true
     || detectedInstore.has(textId(item?.product?.sku || item?.product?.id));
   const instoreItems = items.filter(isInstore);
   const standardItems = items.filter((item) => !isInstore(item));

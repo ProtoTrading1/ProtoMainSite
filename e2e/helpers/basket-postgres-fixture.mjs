@@ -40,8 +40,16 @@ await db.exec(setupSql);
 // checkout need not contain the parent commit to verify these payloads.
 for (const [file, hash] of [
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', 'c646af57eaa9028377086c4a4be3fd09c9ae8d5063ad9754a20cf4f496428070'],
-  ['lib/reviewed-colour-options.mjs', '5d80000a939572612848f315e2c09a55c41f10d669355a5f8d9cda7a462cc6d1'],
+  ['api/send-order.js', '5f881e37c4d3ddce25566ec2b512f637420b65e80551b693345fdbd687cfb2c2'],
+  ['lib/reviewed-colour-options.mjs', 'fd917963db2342331c327086d020d0ea6e8baac2033474064f88706fc997d0a9'],
+  ['api/_cat07-family.js', '78f64e96bdcea77212ac08465ee00c321bdffe53146622d20b3b097dad9dcb1d'],
+  ['api/stock.js', 'cf839c0600279a839a35c08a2fd5b1bbc4d0754bc4bf99e9ecea3cb044ef82fa'],
+  ['api/extended-range.js', '591754f328a30d74086e064e9b8f435eebc9178a695a2ab24f56feaefbaa172d'],
+  ['lib/cat07-customer-gallery.mjs', 'e12a3999c7329b43ee42233bf3dc079e013ba5f8fbaea5a8e62359a9af08d4f4'],
+  ['lib/cat07-order-preview.mjs', 'de3c4c8482e94234263fa4e6c645d265f1bc8635d864c8b9466403d9d148b688'],
+  ['lib/cat07-reviewed-views.json', 'd9a65530c70e5ab021aa1cbf54ef2fed5a79daf79cb6416eab609852d092ee22'],
+  ['lib/instore-option-search.mjs', '9c8643250ad4b9ef9c5eabe3df7ea3b2ca7904d43b81a20af53b296d6d7a9b90'],
+  ['lib/instore-discovery.mjs', 'e9b75d4a144766ae765dac580e6651846adc7fdb1ee94e5f40130be8382211d6'],
   ['lib/reviewed-plate-gallery.mjs', 'dfbbdeb47c3129549e55c2fad822ba0227e04c041a4df6e500d01f0e5dd7ec6d'],
   ['lib/reviewed-plate-gallery.json', '52e6f819d6cd70b954af1837dd3416417ddbf09bd789e7ed56b651bb5c618887'],
   ['lib/sarongi-instore-gallery.mjs', '21cb6d176e4b280d982a8a62b2d5cd80928eda9ef44ab1dea4202a714988beda'],

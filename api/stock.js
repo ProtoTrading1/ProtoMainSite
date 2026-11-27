@@ -6,6 +6,7 @@ import { evaluateInstoreDuplicate } from '../lib/instore-duplicate-gate.mjs';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,effectiveArrivedStock} from './_arrived-stock.js';
+import {verifyCat07Row,cat07RowProof} from './_cat07-family.js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
 import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
 import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
@@ -48,6 +49,18 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
     .select('sku, image_source, image_source_key, barcode, title, original_description, price, available_stock, minimum_stock, category, image_url, image_review_status, visibility_status, is_active')
     .eq('sku', sku).limit(1);
   if (error) throw error;
+  if(sku==='8640000274'){
+    if(data?.length!==1)return null;
+    const [normal,controls]=await Promise.all([indexClient.from('website_stock').select('sku,barcode').or(`sku.eq.${sku},barcode.eq.${sku}`),indexClient.from('instore_listing_controls').select('sku,status').eq('sku',sku)]);
+    if(normal.error||controls.error)throw Error('Christmas listing controls unavailable');
+    if(normal.data?.length||controls.data?.some(row=>row.status==='hidden'))return null;
+    const verified=await verifyCat07Row(data[0],{client:indexClient,env:bridgeEnv,read:async(code,{env})=>{
+      const base=String(env.STOCK_SQL_BRIDGE_URL||'').trim().replace(/\/$/,''),key=String(env.STOCK_SQL_BRIDGE_KEY||'').trim();if(!base.startsWith('https://')||!key)throw Error('Current stock unavailable');
+      const response=await fetchBridge(base+'/stmast',{method:'POST',redirect:'error',headers:{'content-type':'application/json','x-api-key':key},body:JSON.stringify({sku:code}),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Current stock unavailable');return (await response.json())?.row;
+    }});
+    const source=cat07RowProof(verified).source;
+    return {sku,qty:source.available,price:source.priceInclVat,unitsOfIssue:'EACH',unitsOfIssueRaw:'EACH',unitsOfIssueSource:'positill_live',unitsOfIssueVerified:true,availability:{state:source.available>0?'in_stock':'out_of_stock',label:source.available>0?'In stock':'Out of stock',canOrder:source.available>0}};
+  }
   const arrivals=await readArrivedStockRecords(indexClient,[sku]);
   // Only a verified server-side receipt may defer the index's stale quantity
   // gate. Current bridge stock/unit/price still decide the actual response.

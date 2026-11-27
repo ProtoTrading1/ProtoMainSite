@@ -9,6 +9,7 @@ import { attachPrivateReviewGalleries } from '../lib/private-review-galleries.mj
 import { sendInstoreResponse } from './_instore-response.js';
 import {arrivedStockEnabled,overlayArrivedStock} from './_arrived-stock.js';
 import {reviewedLegacyLowStockEligible} from '../lib/reviewed-legacy-low-stock.mjs';
+import {attachVerifiedCat07Rows,cat07RowProof} from './_cat07-family.js';
 import { createStockClient } from '../lib/stock-supabase.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { requireApprovedCustomer } from './_auth.js';
@@ -109,6 +110,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
     const archiveStockOverride = row?.minimum_stock === 1 && /^archive-publication-v1:[a-f0-9]{64}$/.test(row?.image_source_key || '');
     const stockEligible = archiveStockOverride || reviewedLegacyLowStockEligible(row)
       ? customerVisibleStock >= 1 : customerVisibleStock > MIN_INSTORE_AVAILABLE_STOCK;
+    const family=sku==='8640000274'?cat07RowProof(row):null;
     const rawPrice = Number(row?.price);
     const price = pricesAreInclusive
       ? (Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0)
@@ -120,7 +122,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
         ? (!includeStaged || row?.is_active !== false)
         : row?.is_active !== true)
       || (!imageHidden && !imageUrl.startsWith('https://'))
-      || (!ignoreStockEligibility && !isSarongiRequestSku(sku) && !stockEligible)
+      || (sku==='8640000274'?!family||customerVisibleStock<1:!ignoreStockEligibility&&!isSarongiRequestSku(sku)&&!stockEligible)
       || price <= 0) return [];
     const gallery = imageHidden ? [] : sarongiInstoreGallery(sku, imageUrl);
     const product = {
@@ -135,6 +137,7 @@ export function buildExtendedRangeProducts(rows, rawQuery = '', { includeStaged 
       minQty: 1, category: String(row?.category || '').trim(), categoryLabel: String(row?.category || '').trim(),
       isExtendedRange: true, imageSource: String(row?.image_source || 'nutstore'),
       availability: { state: 'in_stock', label: 'In stock', canOrder: true },
+      ...(family?{cat07Family:family.receipt,images:imageHidden?[]:family.receipt.views.map(view=>view.image.url),unitsOfIssue:'EACH'}:{}),
     };
     if (!search.matches(product)) return [];
     seen.add(sku);
@@ -226,7 +229,8 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
   })();
   const [existing,websiteRows]=await Promise.all([existingRead,websiteRead]);
   const {observedRows,catalogue,imageControls,listingControls}=existing;
-  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(mergeWebsiteOnlyIndex(observedRows,websiteRows), imageControls, listingControls), '', { includeStaged });
+  const verifiedRows=await attachVerifiedCat07Rows(mergeWebsiteOnlyIndex(observedRows,websiteRows),{client});
+  const eligible = buildExtendedRangeProducts(applyInstoreImageControls(verifiedRows, imageControls, listingControls), '', { includeStaged });
   return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
 }
 
