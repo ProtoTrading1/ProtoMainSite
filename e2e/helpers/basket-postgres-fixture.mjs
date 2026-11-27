@@ -45,7 +45,7 @@ for (const [file, hash] of [
   ['api/_instore-catalogue.js', 'c86cf0c8a6ff0b73086bebfbef4e787c740c3dbfa6b59799c71a1a46679793c9'],
   ['lib/instore-website-content.mjs', '515741692cf6df4b711eacd2284569bb12f768665415b9a87029f6864a33bf9b'],
   ['api/_cat07-family.js', '78f64e96bdcea77212ac08465ee00c321bdffe53146622d20b3b097dad9dcb1d'],
-  ['api/stock.js', 'cf839c0600279a839a35c08a2fd5b1bbc4d0754bc4bf99e9ecea3cb044ef82fa'],
+  ['api/stock.js', 'b42d21983f413045d044ddf157a4a5875ec2348922a8d2f9def34820adb56749'],
   ['api/extended-range.js', '1bcc83f9312d79582510a5c383edea589b7253fac72a272402f74df92a78969f'],
   ['lib/cat07-customer-gallery.mjs', 'e12a3999c7329b43ee42233bf3dc079e013ba5f8fbaea5a8e62359a9af08d4f4'],
   ['lib/cat07-order-preview.mjs', 'de3c4c8482e94234263fa4e6c645d265f1bc8635d864c8b9466403d9d148b688'],
