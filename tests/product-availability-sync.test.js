@@ -96,16 +96,19 @@ test('availability follows one explicit priority order', () => {
 });
 
 test('catalogue, live-stock and order verification consume the shared contract', async () => {
-  const [productsApi, stockApi, orderApi, card] = await Promise.all([
+  const [productsApi, stockApi, orderApi, card, showroomApi] = await Promise.all([
     readSource('api/products.js'),
     readSource('api/stock.js'),
     readSource('api/send-order.js'),
     readSource('src/components/ProductCard.jsx'),
+    readSource('api/_showroom-stock.js'),
   ]);
 
   assert.match(productsApi, /availability:\s*availabilityForRow\(row, incoming\)/);
-  assert.match(stockApi, /const availability = availabilityForRow\(row, incoming\)/);
-  assert.match(orderApi, /const availability = availabilityForRow\(row, incomingBySku\.get\(row\.sku\)/);
+  assert.match(stockApi, /currentShowroomStock\(\[row\], new Map\(\[\[row\.sku, incoming\]\]\)/);
+  assert.match(showroomApi, /availability: availabilityForRow\(row, incomingBySku\.get\(row\.sku\)\)/);
+  assert.match(orderApi, /currentShowroomStock\(uniqueRows, incomingBySku/);
+  assert.match(orderApi, /const availability = live\.availability/);
   assert.match(orderApi, /availabilityState:\s*availability\.state/);
   assert.match(card, /data\.availability \|\| null/);
 });

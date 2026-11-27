@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './helpers/live-stock-fixture.js';
 import {expect,test} from '@playwright/test';
 import {catalogueProducts,installAccessibilityServices,signInCatalogue} from './helpers/accessibility-services.js';
 const item=(sku,name)=>({id:sku,sku,code:sku,name,title:name,price:19.5,stockQty:32,stockOnHand:32,minQty:1,isExtendedRange:true,imageSource:'nutstore',image:'/bag_black.png',availability:{state:'in_stock',canOrder:true,label:'In stock'}});
@@ -6,7 +7,7 @@ const observation=(sku,qty=32)=>({sku,qty,unitsOfIssue:'EACH',unitsOfIssueRaw:'E
 async function setup(context,products,read){
  await installAccessibilityServices(context,{products:catalogueProducts});
  await context.route('**/api/extended-range*',route=>route.fulfill({json:{products,catalogue:products,total:products.length,page:1,pageSize:24,tiles:[]}}));
- await context.route('**/api/stock*',async route=>{expect(route.request().headers().authorization).toMatch(/^Bearer /);await read(route,new URL(route.request().url()).searchParams.get('sku'));});
+ await context.route('**/api/stock*',async route=>{expect(route.request().headers().authorization).toMatch(/^Bearer /);const params=new URL(route.request().url()).searchParams;if(params.has('website_sku'))return fulfillStockFixture(route,{qty:100});await read(route,params.get('sku'));});
 }
 test('visible KBRA3006 automatically becomes orderable with exact Each unit and unchanged price',async({page,context},testInfo)=>{
  let checks=0;await setup(context,[bracelet],async(route,sku)=>{checks++;await route.fulfill({json:observation(sku)});});

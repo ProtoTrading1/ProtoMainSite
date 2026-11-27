@@ -5,6 +5,7 @@ import { fuzzyFilter } from '../../src/lib/fuzzySearch.js';
 import { prepareInstoreSearch } from '../../lib/instore-discovery.mjs';
 import { fetchIdentifierRows } from '../../api/products.js';
 import { resolveAuthoritativePrices } from '../../api/send-order.js';
+import {validateShowroomStockObservation} from '../../lib/showroom-live-stock.mjs';
 import { groupProductsByBarcode } from '../../src/lib/productGroups.js';
 import { searchRecoveryTerms, searchTypoMatch } from '../../lib/search-language.mjs';
 import { novemberProducts as rows, novemberCases, novemberNegatives, novemberInstoreOnly } from '../fixtures/search-november.mjs';
@@ -66,7 +67,7 @@ test('four diary choices share one authoritative stock pool at checkout', async 
   try {
     const result = await resolveAuthoritativePrices(leaves.map(row => ({ qty: 6, product: {
       sku: row.sku, barcode: row.barcode, code: row.barcode, checkoutSnapshot: { unitPrice: 100, stockQty: 20 },
-    } })), { classify: async () => new Set() });
+    } })), { classify: async () => new Set(),readStock:async codes=>new Map(codes.map(code=>[code,validateShowroomStockObservation(code,{CODE:'8621100236',ONHAND:20,BOOKED:0,UNITS:'EACH'})])) });
     assert.equal(result.length, 4);
     assert.deepEqual(result[0].product.stockRequest, { availableQty: 20, requestedQty: 24, shortfallQty: 4, sharedStock: true });
   } finally {

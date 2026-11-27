@@ -22,6 +22,8 @@ process.env.VITE_STOCK_SUPABASE_URL = stock;
 process.env.VITE_STOCK_SUPABASE_KEY = 'fixture-no-stock-key';
 process.env.BREVO_API_KEY = 'fixture-non-credential-required-by-handler';
 process.env.VERCEL_ENV = 'development';
+process.env.STOCK_SQL_BRIDGE_URL = 'https://basket-positill.example.invalid';
+process.env.STOCK_SQL_BRIDGE_KEY = 'synthetic-read-only-key';
 
 const user = { id: '00000000-0000-4000-8000-000000000210', email: 'accessibility-e2e@example.invalid' };
 const bearer = 'Bearer ' + process.env.FIXTURE_AUTH_TOKEN;
@@ -39,8 +41,13 @@ await db.exec(setupSql);
 // Pin the reviewed handlers (including colour-photo order reconstruction) and boundary helpers. The shallow CI
 // checkout need not contain the parent commit to verify these payloads.
 for (const [file, hash] of [
+  ['api/_showroom-stock.js', '486d074a463434e4b46b8eecf9e0c3a25a7332d145a267347765beed6509b21b'],
+  ['lib/showroom-live-stock.mjs', '8f82aa2547bbd48bab302748e871f53f7cbd3a1a0e51b290d2230ed84d6fbbba'],
+  ['lib/positill-selling-unit.mjs', '580c2172c4be49f9e9c593171bdfb3d527aef15a4ba2b6ea9dd9e90ee7d4c49e'],
+  ['lib/selling-unit.mjs', 'd6d8d6ba8030d7ee7bccf53f79cce18d1c9e44f407d6b47af084b7157ec554ff'],
+  ['lib/product-availability.mjs', '1dda4ddcada1c4191c6483cba69a463df7138c467e836d98aeba7d840d82f6e1'],
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', '475b03eabe9f1cb7ab41da3cf41495a00d6f885b0bebd40bad460cc9dee71907'],
+  ['api/send-order.js', '48ab31be6f80febda360af82e525d10b24d6b40bca8330c5507c81c5ce668d7a'],
   ['lib/reviewed-colour-options.mjs', '4a30306e2ad9208f560232b6bf77a818b40a80bba123f2234ee42b6664b376ce'],
   ['api/_instore-catalogue.js', 'c86cf0c8a6ff0b73086bebfbef4e787c740c3dbfa6b59799c71a1a46679793c9'],
   ['lib/instore-website-content.mjs', '515741692cf6df4b711eacd2284569bb12f768665415b9a87029f6864a33bf9b'],
@@ -49,7 +56,7 @@ for (const [file, hash] of [
   ['lib/834-order.mjs', '3b8e0e738ec0e3345d138c64cd561797daf916f2aa1827833e65bdf80ebd9da9'],
   ['lib/834-reviewed-views.json', '6b8a9aa38341bf2bfaae60b5b5d14bdf2faee7115e9bc42917333f9eadcf203a'],
   ['api/_cat07-family.js', '78f64e96bdcea77212ac08465ee00c321bdffe53146622d20b3b097dad9dcb1d'],
-  ['api/stock.js', '81a5fa9b5b7afebae26f691cd809cb4154b914ab89f0c20377a1183c0fc4465b'],
+  ['api/stock.js', '2d104491970059a4d74ec57a54b61bccc6d5d21b5818b6628b6025351933d3bb'],
   ['api/extended-range.js', '1bcc83f9312d79582510a5c383edea589b7253fac72a272402f74df92a78969f'],
   ['lib/cat07-customer-gallery.mjs', 'e12a3999c7329b43ee42233bf3dc079e013ba5f8fbaea5a8e62359a9af08d4f4'],
   ['lib/cat07-order-preview.mjs', 'de3c4c8482e94234263fa4e6c645d265f1bc8635d864c8b9466403d9d148b688'],
@@ -151,6 +158,10 @@ globalThis.fetch = async (input,init={}) => {
       deniedDeliveryClaims++;
       return json({claimed:false, reason:'Notifications disabled in isolated rehearsal'});
     }
+  }
+  if (url.origin === 'https://basket-positill.example.invalid' && url.pathname === '/stmast' && method === 'POST') {
+    assert.deepEqual(body, { sku: productRow.barcode });
+    return json({ CODE: productRow.barcode, ONHAND: 1, BOOKED: 0, UNITS: 'EACH' });
   }
   if (url.origin===stock) {
     if (method==='GET' && url.pathname==='/rest/v1/website_stock') return rows(filtered([productRow,redRow],url));

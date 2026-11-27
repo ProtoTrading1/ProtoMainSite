@@ -13,7 +13,7 @@ test('returning to an open storefront silently revalidates catalogue data', asyn
   assert.match(app, /window\.addEventListener\('online', refreshCatalogue\)/);
   assert.match(app, /document\.addEventListener\('visibilitychange', refreshWhenVisible\)/);
   assert.match(app, /document\.visibilityState === 'visible'/);
-  assert.match(app, /5 \* 60_000/);
+  assert.match(app, /window\.setInterval\(refreshWhenVisible, 30_000\)/);
 });
 
 test('catalogue refreshes are coalesced, throttled and replace visible caches', async () => {

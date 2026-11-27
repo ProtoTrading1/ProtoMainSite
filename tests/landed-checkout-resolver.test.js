@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolveAuthoritativePrices } from '../api/send-order.js';
+import {validateShowroomStockObservation} from '../lib/showroom-live-stock.mjs';
 
 const row = { sku: '8616000132W', barcode: 'SYNTHETIC-BARCODE', title: 'SYNTHETIC ARRIVED PACK', price: 49.5, units_of_issue: 'Pack of 50', min_order_qty: 1, available_stock: -23, stock_qty: -23, to_order: false };
 const marker = { sku: row.sku, incoming_status: 'landed_awaiting_grv', incoming_qty: 0.001 };
@@ -21,7 +22,9 @@ async function resolve(items, { stock = row, incoming = [marker] } = {}) {
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try {
-    return await resolveAuthoritativePrices(items, { classify: async () => new Set() });
+    const readStock=async codes=>new Map(codes.map(code=>[code,stock.available_stock==null?null:
+      validateShowroomStockObservation(code,{CODE:stock.barcode,ONHAND:stock.available_stock,BOOKED:0,UNITS:'PKT,50'})]));
+    return await resolveAuthoritativePrices(items, { classify: async () => new Set(),readStock });
   } finally {
     globalThis.fetch = oldFetch;
     if (oldUrl === undefined) delete process.env.VITE_STOCK_SUPABASE_URL; else process.env.VITE_STOCK_SUPABASE_URL = oldUrl;

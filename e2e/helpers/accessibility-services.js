@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './live-stock-fixture.js';
 import { expect } from '@playwright/test';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -30,7 +31,7 @@ export async function installAccessibilityServices(context, { products = catalog
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
-    const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    const json = (body, status = 200) => fulfillStockFixture(route, body, status);
     if (url.origin !== LOCAL_ORIGIN) return route.abort();
     if (path.endsWith('/mock-supabase/auth/v1/token')) return json(syntheticSession());
     if (path.endsWith('/mock-supabase/auth/v1/user')) return json(syntheticSession().user);
@@ -52,7 +53,11 @@ export async function installAccessibilityServices(context, { products = catalog
     if (path === '/api/featured-products') return json({ items: products.map(({ sku }) => ({ sku })) });
     if (path === '/api/personalised-arrivals') return json({ suggestions: [] });
     if (path === '/api/taxonomy') return json({ categories: [] });
-    if (path === '/api/stock') return json({ qty: 100, to_order: false });
+    if (path === '/api/stock') {
+      const sku = url.searchParams.get('website_sku');
+      const product = products.find(row => [row.sku, row.id].includes(sku));
+      return json({ qty: product?.stockOnHand ?? product?.stockQty ?? 100, to_order: false });
+    }
     if (path === '/api/extended-range') return json({ products: [], total: 0, page: 1, pageSize: 24, catalogue: [], tiles: [] });
     if (path === '/api/specials') return json({ specials: [] });
     if (path === '/api/banner' || path === '/api/popup-special') return json(null);

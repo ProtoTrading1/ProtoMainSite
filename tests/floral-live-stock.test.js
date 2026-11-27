@@ -50,7 +50,8 @@ test('approved customer stock endpoint reads Positill and preserves receipt meta
   const response = {headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.code=n;return this;},json(body){this.body=body;return this;}};
   await createStockHandler({authenticate:async()=>({id:'test'}),approve:async()=>true,getClient:()=>client,bridgeEnv,fetchBridge:async()=>({ok:true,json:async()=>({row:{CODE:code,ONHAND:72,BOOKED:0}})})})({method:'GET',query:{sku:code}},response);
   assert.equal(response.code,200); assert.equal(response.body.qty,72);
-  assert.equal(response.body.stock_source,'live_positill');
+  assert.equal(response.body.stock_source,'positill_live');
+  assert.equal(response.body.source_code,code);
   assert.equal(response.body.availability.incomingQty,0.001);
   assert.equal(response.headers['Cache-Control'],'no-store');
   assert.equal(row.stock_qty,0);

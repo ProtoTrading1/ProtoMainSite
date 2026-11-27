@@ -1,6 +1,9 @@
 import {readBallsAuthority} from './_834-family.js';
+import { currentShowroomStock } from './_showroom-stock.js';
+import { showroomSourceCode } from '../lib/showroom-live-stock.mjs';
+import { normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
 import {readArrivedBridgeRow} from './_arrived-stock.js';
-import { applyFloralLiveStock, isFloralLiveCode } from '../lib/floral-live-stock.mjs';
+import {applyFloralLiveStock,isFloralLiveCode} from '../lib/floral-live-stock.mjs';
 import { isSarongiRequestSku, sarongiRequestAvailability } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider } from './_website-only-runtime.js';
@@ -10,11 +13,12 @@ import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,effectiveArrivedStock} from './_arrived-stock.js';
 import {verifyCat07Row,cat07RowProof} from './_cat07-family.js';
 import { getApprovedCustomer, requireAuth } from './_auth.js';
-import { availabilityForRow, loadIncomingAvailability } from './_product-availability.js';
+import { loadIncomingAvailability } from './_product-availability.js';
 import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequest, previewCatalogueClient, signPreviewImages, stockClient } from './extended-range.js';
 
 // Live, on-demand stock lookup for the customer-facing "Check Stock" button.
-// Always hits the DB fresh (no-store) so a click never serves a cached number.
+// Reads the exact Positill balance after authenticating and resolving a
+// published listing. A fresh Website Stock read alone is not live POS stock.
 //
 // Stock is tracked at the source-product level: products.sku = website_stock.barcode.
 // One barcode maps to several variant rows that share the same stock, so we match
@@ -23,7 +27,7 @@ import { buildExtendedRangeProducts, buildPreviewProducts, isIsolatedPreviewRequ
 // public.products via sync_website_from_products().
 
 // Accept uppercase letters, digits and dashes (real SKUs/barcodes), sane max length.
-const SKU_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/;
+const SKU_RE = /^[A-Z0-9][A-Z0-9._/@&-]{0,63}$/;
 
 export function validateInstoreBridgeStock(sku, row) {
   if (typeof row?.CODE !== 'string' || row.CODE.trim().toUpperCase() !== sku) throw new Error('Instore bridge returned a different product');
@@ -95,7 +99,7 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
   return { ...current, availability: sarongiRequestAvailability(sku, current.availability) };
 }
 
-export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env,publicTransport=globalThis.fetch}={}) {
+export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env,publicTransport=globalThis.fetch,readStock}={}) {
 return async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -103,8 +107,18 @@ return async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const sku = String(req.query.sku || '').trim().toUpperCase();
-  if (!sku || !SKU_RE.test(sku)) {
+  const sourceRaw = req.query.sku;
+  const hasControl = value => [...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+  const sku = typeof sourceRaw === 'string' ? sourceRaw.trim().toUpperCase() : '';
+  const websiteSkuRaw = req.query.website_sku;
+  const websiteSku = typeof websiteSkuRaw === 'string' ? websiteSkuRaw.trim().toUpperCase() : '';
+  // Website aliases can contain punctuation that is not a source-code grammar.
+  // They use the escaped equality builder, never an interpolated .or filter.
+  if (websiteSkuRaw !== undefined && (typeof websiteSkuRaw !== 'string' || !websiteSku
+    || websiteSku.length > 128 || hasControl(websiteSkuRaw))) {
+    return res.status(400).json({error:'Invalid website product identity'});
+  }
+  if (!sku || !SKU_RE.test(sku) || hasControl(sourceRaw)) {
     return res.status(400).json({ error: 'Invalid or missing sku' });
   }
 
@@ -143,11 +157,14 @@ return async function handler(req, res) {
     // from every live stock check without caching or weakening either rule.
     const [access, stockResult] = await Promise.all([
       approve(user, res),
-      supabase
+      websiteSku ? supabase
+        .from('website_stock')
+        .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order, image_url_one, units_of_issue')
+        .eq('sku', websiteSku).limit(2) : supabase
         .from('website_stock')
         .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order, image_url_one, units_of_issue')
         .or(`barcode.eq.${sku},sku.eq.${sku}`)
-        .limit(1),
+        .limit(101),
     ]);
     if (!access) return;
 
@@ -155,38 +172,49 @@ return async function handler(req, res) {
 
     if (error) throw error;
     if (!data || data.length === 0) {
+      if (websiteSku) return res.status(404).json({error:'Published product not found'});
       const instore = await readFreshInstoreStock(sku, { includeStaged,websiteOnlyProvider,indexClient:supabase,fetchBridge,bridgeEnv });
       if (!instore) return res.status(404).json({ error: 'SKU not found' });
       return res.status(200).json({ ...instore, sku, qty: instore.qty, keep_live_when_oos: false, to_order: false, available_stock: instore.qty, stock_qty: null, availability: instore.availability, checked_at: new Date().toISOString() });
     }
 
-    const row = data[0];
+    if (data.length > 100) throw new Error('Stock identity needs review');
+    const exact = data.filter(row => String(row.sku || '').trim().toUpperCase() === sku);
+    if (exact.length > 1) throw new Error('Stock identity needs review');
+    const row = exact[0] || data[0];
+    const sourceCode = showroomSourceCode(row);
+    if (websiteSku && (data.length !== 1 || String(row.sku || '').trim().toUpperCase() !== websiteSku || sourceCode !== sku)) {
+      throw new Error('Published source identity changed');
+    }
+    if (!sourceCode || (!exact.length && data.some(other => showroomSourceCode(other) !== sourceCode
+      || normalizeUnitsOfIssue(other.units_of_issue) !== normalizeUnitsOfIssue(row.units_of_issue)))) {
+      throw new Error('Stock identity needs review');
+    }
     if(sku==='8-34'){
       const {source}=await readBallsAuthority(supabase,row,{env:bridgeEnv,transport:publicTransport,read:(code,{env})=>readArrivedBridgeRow(code,{env,transport:fetchBridge})});
       return res.status(200).json({sku,qty:source.available,price:source.priceInclVat,unitsOfIssue:'10PC',available_stock:source.available,stock_qty:source.available,to_order:false,keep_live_when_oos:false,availability:{state:source.available>0?'in_stock':'out_of_stock',label:source.available>0?'In stock':'Out of stock',canOrder:source.available>0},checked_at:source.observedAt});
     }
-    const code = String(row.barcode || row.sku || '').trim().toUpperCase();
-    if (isFloralLiveCode(code)) {
+    if (isFloralLiveCode(sourceCode)) {
       const incoming = await loadIncomingAvailability(supabase, row.sku);
-      const [live] = await applyFloralLiveStock([{ barcode: code, toOrder: !!row.to_order, availability: incoming }], { fetchBridge, bridgeEnv });
-      return res.status(200).json({ sku, qty: live.stockQty, available_stock: live.stockQty, stock_qty: live.stockQty, keep_live_when_oos: !!row.keep_live_when_oos, to_order: !!row.to_order, availability: live.availability, stock_source: live.stockSource, checked_at: live.stockCheckedAt });
+      const [live] = await applyFloralLiveStock([{barcode:sourceCode,toOrder:!!row.to_order,availability:incoming}],{fetchBridge,bridgeEnv});
+      return res.status(200).json({sku:websiteSku||sku,qty:live.stockQty,available_stock:live.stockQty,stock_qty:live.stockQty,
+        keep_live_when_oos:!!row.keep_live_when_oos,to_order:!!row.to_order,availability:live.availability,
+        source_code:sourceCode,stock_source:live.stockSource==='live_positill'?'positill_live':live.stockSource,checked_at:live.stockCheckedAt});
     }
-
-    // available_stock is SOH (what Bladerunner/cron writes); stock_qty is the raw figure.
-    const avail = Number(row.available_stock);
-    const raw = Number(row.stock_qty);
-    const qty = Number.isFinite(avail) ? avail : (Number.isFinite(raw) ? raw : 0);
     const incoming = await loadIncomingAvailability(supabase, row.sku);
-    const availability = availabilityForRow(row, incoming);
+    const live = (await currentShowroomStock([row], new Map([[row.sku, incoming]]), {readStock, fetchBridge, bridgeEnv})).get(row.sku);
+    const qty = live.stockOnHand;
     return res.status(200).json({
-      sku,
+      sku: websiteSku || sku,
       qty,
       keep_live_when_oos: !!row.keep_live_when_oos,
       to_order: !!row.to_order,
-      available_stock: Number.isFinite(avail) ? avail : null,
-      stock_qty: Number.isFinite(raw) ? raw : null,
-      availability,
-      checked_at: new Date().toISOString(),
+      available_stock: qty,
+      stock_qty: qty,
+      availability: live.availability,
+      source_code: sourceCode,
+      stock_source: live.stockSource,
+      checked_at: live.stockCheckedAt,
     });
   } catch (err) {
     console.error('stock api error:', err?.message || err);

@@ -1217,13 +1217,13 @@ export default function App({
   useEffect(() => {
     const refreshCatalogue = () => {
       void refreshProductCache().catch(() => {
-        // Keep the last known-good catalogue visible during a transient outage.
+        // Keep catalogue metadata/photos; expired stock is scrubbed to unknown.
       });
     };
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') refreshCatalogue();
     };
-    const interval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+    const interval = window.setInterval(refreshWhenVisible, 30_000);
 
     window.addEventListener('focus', refreshCatalogue);
     window.addEventListener('online', refreshCatalogue);

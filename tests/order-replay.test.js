@@ -3,6 +3,10 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { createSendOrderHandler, resolveAuthoritativePrices } from '../api/send-order.js';
 import { checkoutRequestHash } from '../api/_order-replay.js';
+import {validateShowroomStockObservation} from '../lib/showroom-live-stock.mjs';
+
+// Independent synthetic source boundary for resolver integration cases.
+const sourceFor=row=>async codes=>new Map(codes.map(code=>{assert.equal(code,row.barcode);return [code,row.available_stock==null?null:validateShowroomStockObservation(code,{CODE:row.barcode,ONHAND:row.available_stock,BOOKED:0,UNITS:row.units_of_issue})];}));
 
 const user = { id: '10000000-0000-4000-8000-000000000001', email: 'buyer@example.invalid' };
 const body = () => ({ clientRef: randomUUID(), deliveryMethod: 'In store pick up', customerNotes: 'Deliver carefully', items: [{ qty: 2, preference: 'Blue', product: { id: 'SKU-1', sku: 'SKU-1', code: '1001', name: 'Forged title', price: 99999, checkoutSnapshot: { unitPrice: 10, stockQty: 100 } } }] });
@@ -233,10 +237,10 @@ test('real authoritative resolver rejects changed stock/prices and never accepts
     return new Response(JSON.stringify(String(url).includes('/rpc/') ? [] : [row]), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try {
-    const input = body(); const resolved = await resolveAuthoritativePrices(input.items);
+    const input = body(); const resolved = await resolveAuthoritativePrices(input.items,{readStock:sourceFor(row)});
     assert.equal(resolved[0].product.price, 10); assert.equal(resolved[0].product.name, 'Server notebook');
     row.price = 12; row.available_stock = 0;
-    await assert.rejects(() => resolveAuthoritativePrices(input.items), error => error.code === 'ORDER_REVIEW_REQUIRED');
+    await assert.rejects(() => resolveAuthoritativePrices(input.items,{readStock:sourceFor(row)}), error => error.code === 'ORDER_REVIEW_REQUIRED');
   } finally {
     globalThis.fetch = previousFetch;
     if (previousUrl === undefined) delete process.env.VITE_STOCK_SUPABASE_URL; else process.env.VITE_STOCK_SUPABASE_URL = previousUrl;
@@ -258,7 +262,7 @@ test('handler accepts combined preference stock shortages once and preserves bot
     // Force the second line through barcode resolution; it is still the same
     // authoritative SKU and must not receive a second independent stock cap.
     blue.product.sku = ''; blue.product.id = ''; input.items.push(blue);
-    const f = fixture({ resolve: items => resolveAuthoritativePrices(items) });
+    const f = fixture({ resolve: items => resolveAuthoritativePrices(items,{readStock:sourceFor(row)}) });
     const accepted = await f.invoke(input);
     assert.equal(accepted.statusCode, 200); assert.equal(f.orders.length, 1);
     assert.equal(f.orders[0].items.length, 2);
@@ -285,7 +289,7 @@ test('unknown stock is sent once as an order request with a team warning', async
     return new Response(JSON.stringify(String(url).includes('/rpc/') ? [] : [row]), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   try {
-    const input = body(); const f = fixture({ resolve: items => resolveAuthoritativePrices(items) });
+    const input = body(); const f = fixture({ resolve: items => resolveAuthoritativePrices(items,{readStock:sourceFor(row)}) });
     const accepted = await f.invoke(input);
     assert.equal(accepted.statusCode, 200); assert.equal(f.orders.length, 1);
     assert.equal(f.orders[0].items[0].qty, input.items[0].qty);

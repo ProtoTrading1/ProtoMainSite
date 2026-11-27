@@ -1,3 +1,4 @@
+import { fulfillStockFixture } from './helpers/live-stock-fixture.js';
 import { expect, test } from '@playwright/test';
 import { resolveProductAvailability } from '../lib/product-availability.mjs';
 import { installAccessibilityServices, signInCatalogue } from './helpers/accessibility-services.js';
@@ -16,7 +17,7 @@ test('DIRT TRUCK shows Stock available with an enabled cart button and real stoc
     stockQty: qty, stockOnHand: qty, availability: stock,
   };
   await installAccessibilityServices(context, { products: [truck] });
-  await context.route('**/api/stock*', route => route.fulfill({ json: { qty, availability: stock } }));
+  await context.route('**/api/stock*', route => fulfillStockFixture(route, { qty, availability: stock }));
   await signInCatalogue(page);
 
   const card = page.locator('.product-card').first();
@@ -24,19 +25,19 @@ test('DIRT TRUCK shows Stock available with an enabled cart button and real stoc
   await expect(card).not.toContainText('Available subject to confirmation');
   await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
   await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
-  await expect(card.locator('.stock-readout')).toHaveText('In stock: 12');
+  await expect(card.locator('.stock-result')).toContainText('Live stock: 12');
 });
 
 test('SR0002 cached badge and live result consistently say Stock available', async ({ page, context }, testInfo) => {
   await installAccessibilityServices(context, { products: [product] });
-  await context.route('**/api/stock*', route => route.fulfill({ json: { qty: 0, availability } }));
+  await context.route('**/api/stock*', route => fulfillStockFixture(route, { qty: 0, availability }));
   const errors=[]; page.on('pageerror', error => errors.push(error.message));
   await signInCatalogue(page);
   const card=page.locator('.product-card').first();
   await expect(card.locator('.pc-orderability > span')).toHaveText('Stock available');
   await expect(card.locator('.pc-orderability small')).toHaveText('Available subject to confirmation');
   await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
-  await expect(card.locator('.stock-readout')).toHaveText('Stock available');
+  await expect(card.locator('.stock-result')).toContainText('Live stock: 0');
   await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
   await expect(card).not.toContainText('Landed - being received');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -44,7 +45,7 @@ test('SR0002 cached badge and live result consistently say Stock available', asy
   await card.getByRole('button', { name: `View ${product.name}`, exact: true }).click();
   await expect(page.locator('.pz-to-order-note')).toHaveText('Stock available.');
   await page.locator('.pz-to-order-note').scrollIntoViewIfNeeded();
-  await expect(page.locator('.pz-stock-check .stock-readout')).toHaveText('Stock available');
+  await expect(page.locator('.pz-stock-check .stock-result')).toContainText('Live stock: 0');
   await page.screenshot({ path: testInfo.outputPath('stock-available-detail.png'), animations: 'disabled' });
   expect(errors).toEqual([]);
 });
@@ -61,7 +62,7 @@ for (const [sku, name, stockQty] of [
       stockQty, stockOnHand: stockQty, availability: stock,
     };
     await installAccessibilityServices(context, { products: [received] });
-    await context.route('**/api/stock*', route => route.fulfill({ json: { qty: stockQty, availability: stock } }));
+    await context.route('**/api/stock*', route => fulfillStockFixture(route, { qty: stockQty, availability: stock }));
     await signInCatalogue(page);
 
     const card = page.locator('.product-card').first();
@@ -69,6 +70,6 @@ for (const [sku, name, stockQty] of [
     await expect(card).not.toContainText('Available subject to confirmation');
     await expect(card.getByRole('button', { name: 'Add to Cart', exact: true })).toBeEnabled();
     await card.getByRole('button', { name: 'Check live stock', exact: true }).click();
-    await expect(card.locator('.stock-readout')).toHaveText('Stock available');
+    await expect(card.locator('.stock-result')).toContainText('Live stock: 0');
   });
 }

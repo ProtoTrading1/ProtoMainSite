@@ -1,4 +1,5 @@
 import {attachBallsProducts} from './_834-family.js';
+import {refreshCatalogueStock} from './_catalogue-stock.js';
 import {ballsIdentifier} from '../lib/834-customer-gallery.mjs';
 import { reviewedFrameStockImages } from '../lib/sarongi-instore-gallery.mjs';
 import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
@@ -64,9 +65,9 @@ function parseSubcategoryExtra(raw) {
 // `updated_at = now()` (migrations 016 / 031) — and archive/create changes the
 // count, so the stamp moves whenever the catalogue actually changes.
 //
-// That gives two big wins under load: repeat requests revalidate with an ETag
-// and get a 304 (no rebuild, no body), and a warm lambda reuses the built
-// payload instead of re-scanning for every request.
+// A warm lambda reuses this metadata instead of re-scanning every request.
+// Current stock is read separately before every customer response; the
+// metadata stamp cannot validate a previously returned stock snapshot.
 const catalogueBuild = createCatalogueBuildCache();
 // Safety net: even if a writer ever forgets to bump updated_at, never serve a
 // memoized payload for longer than this.
@@ -74,11 +75,8 @@ const catalogueBuild = createCatalogueBuildCache();
 // The stamp's time bucket exists because the payload is ALSO built from inputs
 // (taxonomy JSON, feature flags, product_placements, product_groups,
 // yearly_sales) that website_stock's updated_at does not cover — without it,
-// changing one of those would pin clients on a 304 forever. But at 60s the
-// bucket rotated the ETag every minute, which made 304s impossible in practice
-// and re-shipped the full ~6MB catalogue on nearly every visit. 10 minutes
-// bounds those secondary changes while letting unchanged catalogues answer
-// 304 + empty body — stock edits still bust the ETag instantly via updated_at.
+// changing one of those must eventually rebuild the metadata too. Ten minutes
+// bounds those secondary changes; Positill stock never uses this cache age.
 const CATALOG_MAX_STALE_MS = 10 * 60_000;
 
 async function loadCatalogVersion(supabase) {
@@ -100,16 +98,6 @@ async function loadCatalogVersion(supabase) {
     newest,
     count: stockResult.count ?? 0,
   };
-}
-
-function etagMatches(req, etag) {
-  const raw = req.headers['if-none-match'];
-  if (!raw || !etag) return false;
-  // Compare weak validators: a proxy may strip/add the W/ prefix.
-  const norm = (v) => String(v).trim().replace(/^W\//, '').replace(/^"|"$/g, '');
-  return String(raw)
-    .split(',')
-    .some((candidate) => norm(candidate) === norm(etag));
 }
 
 async function fetchAllRows(supabase, table, selectCols = '*', filter = null, maxRows = Infinity) {
@@ -404,6 +392,7 @@ export function adapt(row, tree, salesByBarcode = new Map(), placementPaths = nu
     originalDescription: row.original_description || '',
     packDescription: String(row.pack_description || '').trim(),
     unitsOfIssue,
+    stockUnitConfigured: typeof row.units_of_issue === 'string' && row.units_of_issue.trim() !== '',
     price: customerFacingCataloguePrice(row.price),
     images,
     ...(MOVE_GALLERIES_ENABLED && row.moved_from === 'instore' ? {hasPreservedInstoreGallery:true} : {}),
@@ -477,8 +466,9 @@ export default async function handler(req, res) {
     // SHARED cache (Vercel's CDN keys on URL, not on the Authorization header —
     // an s-maxage here could hand the protected catalogue to an unauthenticated
     // request). Private + revalidate keeps it in the user's own browser cache
-    // only, and the ETag below makes that revalidation cheap.
-    res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+    // only. Stock is now observed separately on every authorized request, so
+    // a metadata ETag cannot authorize304 or a persistent stock snapshot.
+    res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Vary', 'Authorization');
 
     // A department click should not wait for the entire protected catalogue.
@@ -534,9 +524,9 @@ export default async function handler(req, res) {
         ))
         .filter((product) => productMatchesBrowsePath(product, browsePath, labels));
 
-      res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+      res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(await attachPreservedMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'))),{client:()=>createStockClient({legacyServiceRole:true})}));
+      return res.status(200).json(await refreshCatalogueStock(await attachBallsProducts(await applyFloralLiveStock(await attachPreservedMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'))),{client:()=>createStockClient({legacyServiceRole:true})})));
     }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
@@ -567,13 +557,12 @@ export default async function handler(req, res) {
         }
       }
 
-      if (etagMatches(req, etag)) {
-        return res.status(304).end();
-      }
+      // Website metadata can stay memoized, but its version does not prove
+      // current Positill balances. Never answer304 before observing stock.
       const cached = catalogueBuild.peek(baseEtag);
       if (cached) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(cached),{client:()=>createStockClient({legacyServiceRole:true})}));
+        return res.status(200).json(await refreshCatalogueStock(await attachBallsProducts(await applyFloralLiveStock(cached),{client:()=>createStockClient({legacyServiceRole:true})})));
       }
     }
 
@@ -629,7 +618,7 @@ export default async function handler(req, res) {
       ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3${MOVE_GALLERY_CACHE_TAG}"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(products),{client:()=>createStockClient({legacyServiceRole:true})}));
+    return res.status(200).json(await refreshCatalogueStock(await attachBallsProducts(await applyFloralLiveStock(products),{client:()=>createStockClient({legacyServiceRole:true})})));
   } catch (err) {
     console.error('products api error:', err);
     return res.status(err.code === 'CATALOGUE_BUSY' ? 503 : 500).json({ error: err.message || 'Failed to fetch products' });
