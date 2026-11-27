@@ -1,0 +1,17 @@
+import {createRoot} from 'react-dom/client';
+import {useState,useRef} from 'react';
+import ProductCard from '../../src/components/ProductCard.jsx';
+import {rememberAuthSession} from '../../src/lib/authHeaders.js';
+import {addBasketLine} from '../../lib/basket-lines.mjs';
+
+import '../../src/index.css';
+if(location.hostname!=='127.0.0.1')throw Error('Local preview only');
+const localFetch=window.fetch.bind(window),product=await (await localFetch('/__fixture/834/product')).json();
+rememberAuthSession({access_token:'834-local-preview-noncredential',user:{id:'834-preview'}});
+window.fetch=async input=>{const url=new URL(typeof input==='string'?input:input.url,location.href);if(url.origin===location.origin&&url.pathname==='/api/stock')return new Response(JSON.stringify({sku:product.sku,qty:14,unitsOfIssue:'10PC',unitsOfIssueRaw:'10PC',unitsOfIssueSource:'positill_live',unitsOfIssueVerified:true,availability:product.availability}),{headers:{'content-type':'application/json'}});if(url.origin===location.origin&&url.pathname.startsWith('/__fixture/'))return localFetch(input);return new Response('{}',{status:503});};
+export default function Preview(){const [basket,setBasket]=useState([]),[message,setMessage]=useState(''),[html,setHtml]=useState(''),basketRef=useRef([]);
+ function add(selected,qty,_point,preference){const result=addBasketLine(basketRef.current,{product:selected,qty,preference},{quantityCapForProduct:()=>14});basketRef.current=result.items;setBasket(result.items);setMessage(result.addedQty===0?'All 14 tubes are already in the preview basket.':result.addedQty<qty?'Added '+result.addedQty+' of the '+qty+' requested tubes. All colours share 14 tubes.':'Added '+result.addedQty+' tube(s). All colours share 14 tubes.');setHtml('');return result.addedQty>0;}
+ async function orderPreview(){const response=await localFetch('/__fixture/834/order-preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({items:basket})}),result=await response.json();if(response.ok){setHtml(result.html);setMessage('Order preview only. Nothing was sent.');}else setMessage(result.error);}
+ return <main style={{maxWidth:1000,margin:'auto',padding:20}}><h1>Christmas baubles</h1><p>Six colours · R36 per tube of 10 baubles · 14 tubes shared across all colours.</p><p>Choose a preferred colour. Individual colours are subject to availability when packing.</p><aside><strong>Local preview only</strong><p>Six existing public photos. Gold remains the main. No publication, private photo changes, live basket changes or orders.</p></aside><div style={{maxWidth:480}}><ProductCard product={product} cartQty={basket.reduce((n,line)=>n+line.qty,0)} addToCart={add}/></div><h2>Preview basket</h2><p>Preview only — no live basket changes or order will be sent.</p><p role="status">{message}</p><p data-testid="shared-total">{basket.reduce((n,line)=>n+line.qty,0)} of 14 tubes</p>{basket.map(line=><article key={line.preference} style={{display:'flex',gap:12,alignItems:'center',margin:12}}><img width="72" height="72" src={line.product.image} alt={line.preference}/><span>{line.preference} · {line.qty} tubes · R36 per tube</span></article>)}<button type="button" disabled={!basket.length} onClick={orderPreview}>Preview order</button>{html&&<iframe title="Order preview" srcDoc={html} style={{width:'100%',height:500,border:'1px solid #ddd'}}/>}</main>;
+}
+createRoot(document.getElementById('root')).render(<Preview/>);

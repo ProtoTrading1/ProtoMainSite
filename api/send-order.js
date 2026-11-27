@@ -1,3 +1,5 @@
+import {resolveBallsPrices} from './_834-family.js';
+import {isBallsAlias} from '../lib/834-customer-gallery.mjs';
 import { positillUnitObservation } from '../lib/positill-selling-unit.mjs';
 import {readArrivedStockRecords,assertArrivedOrderTotals} from './_arrived-stock.js';
 import PDFDocument from 'pdfkit';
@@ -627,7 +629,12 @@ export async function detectUnflaggedInstoreSkus(items, client = null, { website
   }
 }
 
-export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env } = {}) {
+export async function resolveAuthoritativePrices(items, { classify = null, websiteOnlyProvider = null, index = null, fetchBridge = fetch, bridgeEnv = process.env, publicTransport=globalThis.fetch } = {}) {
+  if(items.length>MAX_ORDER_LINES)throw orderError('Too many order lines.');
+  if(items.some(item=>isBallsAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a colour under Christmas product 8-34; historical photo references are not separate stock.',409);
+  const ballsItems=items.filter(item=>textId(item?.product?.sku||item?.product?.id)==='8-34');
+  if(ballsItems.length){const resolved=await resolveBallsPrices(ballsItems,{client:index||getStockClient(),fetchBridge,bridgeEnv,publicTransport});const others=items.filter(item=>!ballsItems.includes(item));const rest=others.length?await resolveAuthoritativePrices(others,{classify,websiteOnlyProvider,index,fetchBridge,bridgeEnv,publicTransport}):[];let a=0,b=0;return items.map(item=>ballsItems.includes(item)?resolved[a++]:rest[b++]);}
+
   if(items.some(item=>isCat07HistoricalAlias(item?.product?.sku||item?.product?.id)))throw orderError('Choose a style under Christmas product 8640000274; historical photo references are not separate stock.',409);
   if (items.length > MAX_ORDER_LINES) throw orderError(`An order can contain at most ${MAX_ORDER_LINES} product lines.`);
   const detectedInstore = await (classify ? classify(items) : detectUnflaggedInstoreSkus(items,index,{websiteOnlyProvider}));

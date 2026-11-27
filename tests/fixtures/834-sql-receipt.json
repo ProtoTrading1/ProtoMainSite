@@ -1,0 +1,134 @@
+{
+  "scope": "Offline actual SQL fixture only, not a live publication",
+  "receipt": {
+    "sku": "8-34",
+    "views": [
+      {
+        "id": "gold",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GLD/1.jpg",
+          "mime": "image/jpeg",
+          "size": 47134,
+          "sha256": "e16abbee6ec7cbd27689b8ca2a8a07f30f7f4d032f0bd7dd95872f323656862a"
+        },
+        "label": "Gold"
+      },
+      {
+        "id": "blue",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-BLU/1.jpg",
+          "mime": "image/jpeg",
+          "size": 44612,
+          "sha256": "ecc1b5073f4b7a48a35d2de1ca6c8340c6e59f5056bf2fd8895fa9f0320feb86"
+        },
+        "label": "Blue"
+      },
+      {
+        "id": "green",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GRN/1.jpg",
+          "mime": "image/jpeg",
+          "size": 47649,
+          "sha256": "1ca843ccd3e2b895ab2150e63d51d518b5a506c8f2cc7a675fa79795e33e9053"
+        },
+        "label": "Green"
+      },
+      {
+        "id": "pink",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-PNK/1.jpg",
+          "mime": "image/jpeg",
+          "size": 42108,
+          "sha256": "fd4cc0d197b22a1fd712df9ed2cfcf1001a1a25ec4bbdedd7750efc44548e8d2"
+        },
+        "label": "Pink"
+      },
+      {
+        "id": "red",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-RED/1.jpg",
+          "mime": "image/jpeg",
+          "size": 44408,
+          "sha256": "636e9076aa7e2afaef59b0c60dbc289acf74e986950f71b90854c94ebe0cb2a9"
+        },
+        "label": "Red"
+      },
+      {
+        "id": "silver",
+        "role": "colour",
+        "image": {
+          "url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-SIL/1.jpg",
+          "mime": "image/jpeg",
+          "size": 36205,
+          "sha256": "e992f53018692231dc34c0e8c8a4605ec769a73196e61a62624c6d0ebfbe1f99"
+        },
+        "label": "Silver"
+      }
+    ],
+    "status": "complete",
+    "barcode": "8-34",
+    "protocol": "proto.834-public-family.v1",
+    "receiptId": "701871da-d795-4dbb-a902-cd60c564c459",
+    "mainViewId": "gold",
+    "destination": "website",
+    "manifestHash": "ca0e9b6fdc4a1f39ef7ee6d71bcdc0b6f3a42313808efa7e62f949c1a66b9a72"
+  },
+  "row": {
+    "id": null,
+    "sku": "8-34",
+    "price": 36,
+    "title": "XMAS 6CM BALLS 10PC TUBE",
+    "barcode": "8-34",
+    "category": "Party, Events & Seasonals",
+    "moved_at": null,
+    "moved_to": null,
+    "to_order": false,
+    "staged_by": null,
+    "stock_qty": 14,
+    "created_at": null,
+    "moved_from": null,
+    "updated_at": "2026-11-27T18:25:47.151+00:00",
+    "archived_at": null,
+    "archived_by": null,
+    "mottaro_path": null,
+    "image_url_one": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GLD/1.jpg",
+    "image_url_two": null,
+    "min_order_qty": 1,
+    "image_url_four": null,
+    "is_new_arrival": null,
+    "units_of_issue": "10PC",
+    "available_stock": 14,
+    "image_url_three": null,
+    "staged_batch_id": null,
+    "subcategory_one": "Party Décor",
+    "subcategory_two": null,
+    "pack_description": null,
+    "subcategory_four": null,
+    "staged_expires_at": null,
+    "subcategory_extra": null,
+    "subcategory_three": null,
+    "keep_live_when_oos": true,
+    "original_description": "XMAS 6CM BALLS 10PC TUBE"
+  },
+  "canonicalIndex": {
+    "title": "XMAS 6CM BALLS 10PC TUBE",
+    "active": true,
+    "colour": null,
+    "barcode": "8-34",
+    "category": "Party, Events & Seasonals",
+    "image_url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/8-34-GLD/1.jpg",
+    "created_at": null,
+    "parent_sku": null,
+    "sort_order": null,
+    "description": "XMAS 6CM BALLS 10PC TUBE",
+    "product_sku": "8-34",
+    "subcategory": "Party Décor",
+    "website_sku": "8-34",
+    "leaf_category": "Party Décor"
+  }
+}

@@ -1,3 +1,5 @@
+import {attachBallsProducts} from './_834-family.js';
+import {ballsIdentifier} from '../lib/834-customer-gallery.mjs';
 import { reviewedFrameStockImages } from '../lib/sarongi-instore-gallery.mjs';
 import { applyFloralLiveStock, FLORAL_REFRESH_MS } from '../lib/floral-live-stock.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
@@ -207,8 +209,8 @@ function parseSkuQuery(raw) {
 
 function parseIdentifierQuery(raw) {
   if (!isIdentifierQuery(raw)) return null;
-  const value = normalizeIdentifier(raw);
-  if (!value || value.length < 4 || value.length > 64) return null;
+  const value = ballsIdentifier(String(raw))?'834':normalizeIdentifier(raw);
+  if (!value || (value.length < 4&&value!=='834') || value.length > 64) return null;
   // Normalization and this final allowlist keep the interpolated PostgREST
   // filter strict while accepting the same labelled/separated code forms as
   // the browser.
@@ -277,6 +279,7 @@ export async function fetchIdentifierRows(supabase, identifier, rawIdentifier = 
   // exact scans through the slower prefix plan too.
   // A supplier model may omit only the final numeric-suffix hyphen. Query
   // those two spellings case-insensitively, retaining collisions for ranking.
+  if(identifier==='834'||ballsIdentifier(String(rawIdentifier)))return fetchAllRows(supabase,'website_stock',STOCK_SELECT,q=>q.eq('sku','8-34'),10);
   const suffix = /^([A-Z]{2,}\d{2,})(\d)$/.exec(identifier);
   const barcodeFilter = /^\d+$/.test(identifier) ? `barcode.eq.${identifier}` : `barcode.ilike.${identifier}`;
   const exactFilter = suffix
@@ -533,7 +536,7 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json(await applyFloralLiveStock(await attachPreservedMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'))));
+      return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(await attachPreservedMoveGalleries(await attachArchivePublicationGalleries(products,()=>createStockClient({legacyServiceRole:true}),'website'))),{client:()=>createStockClient({legacyServiceRole:true})}));
     }
 
     // Full-catalogue request: the expensive path, and the one worth versioning.
@@ -570,7 +573,7 @@ export default async function handler(req, res) {
       const cached = catalogueBuild.peek(baseEtag);
       if (cached) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json(await applyFloralLiveStock(cached));
+        return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(cached),{client:()=>createStockClient({legacyServiceRole:true})}));
       }
     }
 
@@ -626,7 +629,7 @@ export default async function handler(req, res) {
       ? await catalogueBuild.get(`W/"cat-${version.stamp}-christmas-pens-serviettes-galleries-floral-live-v3${MOVE_GALLERY_CACHE_TAG}"`, buildProducts)
       : await buildProducts();
     res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(await applyFloralLiveStock(products));
+    return res.status(200).json(await attachBallsProducts(await applyFloralLiveStock(products),{client:()=>createStockClient({legacyServiceRole:true})}));
   } catch (err) {
     console.error('products api error:', err);
     return res.status(err.code === 'CATALOGUE_BUSY' ? 503 : 500).json({ error: err.message || 'Failed to fetch products' });

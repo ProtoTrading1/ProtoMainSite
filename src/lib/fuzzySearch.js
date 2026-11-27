@@ -1,3 +1,4 @@
+import {ballsAliasMatches} from '../../lib/834-customer-gallery.mjs';
 export const SEARCH_MIN_CONFIDENCE = 50;
 
 import {
@@ -362,6 +363,7 @@ function isBareModelQuery(query) {
 function scoreIdentifierQuery(product, query, allowModelFallback = false) {
   const queryId = normalizeIdentifier(query);
   if (!queryId) return 0;
+  if(ballsAliasMatches(product,query))return SCORE.EXACT_SKU;
 
   const literal = String(query).trim().toLowerCase();
   if (skuValues(product).some(value => value.trim().toLowerCase() === literal)) return SCORE.EXACT_SKU + 2;

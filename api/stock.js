@@ -1,3 +1,5 @@
+import {readBallsAuthority} from './_834-family.js';
+import {readArrivedBridgeRow} from './_arrived-stock.js';
 import { applyFloralLiveStock, isFloralLiveCode } from '../lib/floral-live-stock.mjs';
 import { isSarongiRequestSku, sarongiRequestAvailability } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
@@ -93,7 +95,7 @@ export async function readFreshInstoreStock(sku, { includeStaged = false, websit
   return { ...current, availability: sarongiRequestAvailability(sku, current.availability) };
 }
 
-export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env}={}) {
+export function createStockHandler({authenticate=requireAuth,approve=getApprovedCustomer,getClient=createStockClient,websiteOnlyProvider=null,fetchBridge=fetch,bridgeEnv=process.env,publicTransport=globalThis.fetch}={}) {
 return async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -143,7 +145,7 @@ return async function handler(req, res) {
       approve(user, res),
       supabase
         .from('website_stock')
-        .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order')
+        .select('sku, barcode, stock_qty, available_stock, keep_live_when_oos, to_order, image_url_one, units_of_issue')
         .or(`barcode.eq.${sku},sku.eq.${sku}`)
         .limit(1),
     ]);
@@ -159,6 +161,10 @@ return async function handler(req, res) {
     }
 
     const row = data[0];
+    if(sku==='8-34'){
+      const {source}=await readBallsAuthority(supabase,row,{env:bridgeEnv,transport:publicTransport,read:(code,{env})=>readArrivedBridgeRow(code,{env,transport:fetchBridge})});
+      return res.status(200).json({sku,qty:source.available,price:source.priceInclVat,unitsOfIssue:'10PC',available_stock:source.available,stock_qty:source.available,to_order:false,keep_live_when_oos:false,availability:{state:source.available>0?'in_stock':'out_of_stock',label:source.available>0?'In stock':'Out of stock',canOrder:source.available>0},checked_at:source.observedAt});
+    }
     const code = String(row.barcode || row.sku || '').trim().toUpperCase();
     if (isFloralLiveCode(code)) {
       const incoming = await loadIncomingAvailability(supabase, row.sku);
