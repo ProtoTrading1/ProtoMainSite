@@ -7,16 +7,16 @@ import {createStockHandler} from '../api/stock.js';
 import {resolveStandardPrices} from '../api/send-order.js';
 import {showroomStockTarget,validateShowroomStock,applyShowroomStock} from '../src/lib/showroomStockObservation.js';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/reviewed-unit-eight-source-observations.json',import.meta.url),'utf8'));
-const units={'8615207001':'EACH','MC085-1':'4+1','MU146-1':'27'};
+const units={'8615207001':'EACH','8616200089':'+ 200','8616700030B':'1000','MC085-1':'4+1','MU146-1':'27'};
 const now=Date.parse(fixture.observedAt);
 
-test('three exact reviewed source contracts preserve existing selling units, balances and raw source rows',()=>{
+test('five exact reviewed source contracts preserve existing selling units, balances and raw source rows',()=>{
  for(const [code,expected] of Object.entries(units)){
   const row=fixture.sourceRows.find(value=>value.CODE===code),before=structuredClone(row);
   const unit=positillUnitObservation(code,row),stock=validateShowroomStockObservation(code,row,{now});
   assert.equal(unit.unitsOfIssue,expected);assert.equal(unit.unitsOfIssueRaw,row.UNITS);
   assert.equal(stock.sourceUnits,expected);assert.equal(stock.qty,row.ONHAND-row.BOOKED);
-  assert.deepEqual(row,before); // Never multiply by1,4+1 or27, or rewrite source.
+  assert.deepEqual(row,before); // Never multiply by a unit label or rewrite the source.
  }
 });
 
@@ -30,13 +30,13 @@ test('reviewed admission requires the exact code/raw-unit/description triple and
  for(const raw of ['1','27','4+1','100','1000','+-200','+-10000','0.44/20'])assert.throws(()=>positillUnitObservation('UNKNOWN',{CODE:'UNKNOWN',UNITS:raw,DESCR:'UNREVIEWED'}),/verification/);
 });
 
-test('all eight captured source pools overlay as exactly three known and five unknown, retaining every alias and photo',()=>{
+test('all eight captured source pools overlay as exactly five known and three unknown, retaining every alias and photo',()=>{
  const observations=new Map();
  for(const row of fixture.sourceRows){
   try{observations.set(row.CODE,validateShowroomStockObservation(row.CODE,row,{now}));}
   catch{observations.set(row.CODE,null);}
  }
- assert.equal([...observations.values()].filter(Boolean).length,3);
+ assert.equal([...observations.values()].filter(Boolean).length,5);
  const before=structuredClone(fixture.websiteRows),updated=overlayShowroomLiveStock(before,observations,{now});
  assert.equal(updated.length,before.length);
  for(let i=0;i<before.length;i++){
@@ -65,7 +65,7 @@ function publishedClient(rows){return {from(table){assert.equal(table,'website_s
 function captureResponse(){return {headers:{},setHeader(key,value){this.headers[key]=value;},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};}
 function sourceReader(row,clock){return codes=>readShowroomLiveStock(codes,{now:()=>clock,read:async code=>{assert.equal(code,row.CODE);return structuredClone(row);}});}
 
-test('real stock API, checkout and browser consumer agree on all three exact units without changing photos/prices or multiplying stock',async()=>{
+test('real stock API, checkout and browser consumer agree on all five exact units without changing photos/prices or multiplying stock',async()=>{
  const clock=Date.now();
  for(const [code,expectedUnit] of Object.entries(units)){
   const source=fixture.sourceRows.find(row=>row.CODE===code),published=fixture.websiteRows.find(row=>row.barcode===code),before=structuredClone(published);

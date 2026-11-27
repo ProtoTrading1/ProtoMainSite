@@ -43,7 +43,7 @@ await db.exec(setupSql);
 for (const [file, hash] of [
   ['api/_showroom-stock.js', '486d074a463434e4b46b8eecf9e0c3a25a7332d145a267347765beed6509b21b'],
   ['lib/showroom-live-stock.mjs', '8f82aa2547bbd48bab302748e871f53f7cbd3a1a0e51b290d2230ed84d6fbbba'],
-  ['lib/positill-selling-unit.mjs', '9dcd8237de7c01a85cbf7ed89cbe66e42b48120752b2a0695f27e7e62fda4119'],
+  ['lib/positill-selling-unit.mjs', 'c3a1ddfe1cc37b67d166891ae6a40f594623cc6df37ab57867b6c651701edd1c'],
   ['lib/selling-unit.mjs', 'd6d8d6ba8030d7ee7bccf53f79cce18d1c9e44f407d6b47af084b7157ec554ff'],
   ['lib/product-availability.mjs', '1dda4ddcada1c4191c6483cba69a463df7138c467e836d98aeba7d840d82f6e1'],
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
