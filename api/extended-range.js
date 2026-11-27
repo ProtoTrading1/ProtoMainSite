@@ -1,6 +1,6 @@
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { readInstoreWebsiteContent,instoreContentSourceIdentity } from './_instore-website-content.js';
-import { applyInstoreWebsiteContent,instoreContentMatchesProducts } from '../lib/instore-website-content.mjs';
+import { applyInstoreWebsiteContent,applyInstoreWebsitePlacements,instoreContentMatchesProducts } from '../lib/instore-website-content.mjs';
 import { isSarongiRequestSku } from '../lib/sarongi-instore-requests.mjs';
 import { mergeWebsiteOnlyIndex } from './_website-only-index.js';
 import { runtimeWebsiteOnlyProvider, websiteOnlyRequestOrigin } from './_website-only-runtime.js';
@@ -22,7 +22,7 @@ import { readCompleteRows } from './_complete-rows.js';
 import { normalizeIdentifier, isAlphabeticSuffixVariant } from '../src/lib/identifierNormalize.js';
 import {
   catalogueSearchPatterns, catalogueSnapshotIsFresh, catalogueTtlMs, claimCatalogueRefresh,
-  controlsFingerprint, readCatalogueOrderedPage, readCatalogueProducts,
+  controlsFingerprint, validContentGeneration, readCatalogueOrderedPage, readCatalogueProducts,
   readCatalogueSearchCandidates, readCatalogueState, readCatalogueView,readCatalogueContentCandidates,
   releaseCatalogueRefresh, writeCatalogueSnapshot,
 } from './_instore-catalogue.js';
@@ -47,6 +47,9 @@ const SOURCE_LABEL = 'verified Instore image index with live stock eligibility';
 
 async function getCachedCatalogue(key, loader) {
   const now = Date.now();
+  // Generation keys are short-lived too; old versions must not accumulate.
+  for(const [name,entry] of catalogueCache)if(entry.value&&entry.expiresAt<=now)catalogueCache.delete(name);
+  if(catalogueCache.size>=32){for(const [name,entry]of catalogueCache){if(entry.value){catalogueCache.delete(name);break;}}}
   const cached = catalogueCache.get(key);
   if (cached?.value && cached.expiresAt > now) return cached.value;
   if (cached?.promise) return cached.promise;
@@ -234,9 +237,9 @@ export async function loadLiveInstoreCatalogue(client, { includeStaged = false, 
   return { products: excludeMainCatalogueProducts(eligible, catalogue), imageControls, listingControls };
 }
 
-export async function storeInstoreCatalogue(client, { products, tiles, imageControls, listingControls }) {
+export async function storeInstoreCatalogue(client, { products, tiles, imageControls, listingControls, contentGeneration }) {
   try {
-    await writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls });
+    await writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls, contentGeneration });
   } catch (error) {
     // A cache that cannot be written must not fail a request that already has
     // the correct products in hand.
@@ -251,6 +254,8 @@ export async function storeInstoreCatalogue(client, { products, tiles, imageCont
 // superseded Instore controls is rebuilt at once rather than waited out.
 export async function serveStoredCatalogue(client, { query, category, page, from, includeCatalogue, contentSnapshot }) {
   const ttlMs = catalogueTtlMs();
+  const contentGeneration=contentSnapshot?.generation;
+  if(contentSnapshot&&!validContentGeneration(contentGeneration))return {body:null,staleBeforeMs:0};
   if (ttlMs <= 0) return { body: null, staleBeforeMs: ttlMs };
   const searchPatterns = catalogueSearchPatterns(query);
   const structuredOnly = !searchPatterns.length && searchQueryHasStructuredIntent(query);
@@ -260,7 +265,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
   // below, and so does a database that has not had migration 072 applied.
   if (!searchPatterns.length && !structuredOnly && !includeCatalogue) {
     try {
-      const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE });
+      const view = await readCatalogueView(client, { category, from, pageSize: PAGE_SIZE, contentGeneration });
       if (catalogueSnapshotIsFresh(view.state, view.fingerprint, ttlMs)) {
         if(!instoreContentMatchesProducts(view.products,contentSnapshot))return {body:null,staleBeforeMs:0};
         return {
@@ -290,7 +295,7 @@ export async function serveStoredCatalogue(client, { query, category, page, from
       readInstoreListingControls(client),
     ]);
     state = stateRow;
-    fingerprint = controlsFingerprint(imageControls, listingControls);
+    fingerprint = controlsFingerprint(imageControls, listingControls, contentGeneration);
   } catch (error) {
     console.error('instore catalogue snapshot unreadable:', error?.message || error);
     return { body: null, staleBeforeMs: ttlMs };
@@ -512,15 +517,17 @@ return async function handler(req, res) {
     // One caller rebuilds the stored collection; the rest just serve. Claiming
     // before the read means the snapshot is written from source rows that were
     // read now, not from a warm in-process copy of an earlier request's rows.
-    const claimed = (useArrivals||websiteOnlyProvider)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
+    const generationKnown=validContentGeneration(contentSnapshot.generation);
+    const claimed = (useArrivals||websiteOnlyProvider||!generationKnown)?false:await claimCatalogueRefresh(client, { staleBeforeMs: stored.staleBeforeMs });
     const websiteOnlyOrigin=websiteOnlyProvider?websiteOnlyRequestOrigin(req):null;
     const providerForRequest=websiteOnlyProvider?()=>websiteOnlyProvider({origin:websiteOnlyOrigin}):null;
-    let live = websiteOnlyProvider ? await getCachedCatalogue(`website-only:${websiteOnlyOrigin}`,()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest})) : await (claimed
-      ? loadLiveInstoreCatalogue(client, { includeStaged }).catch(async (error) => {
-        await releaseCatalogueRefresh(client, error?.message || 'live catalogue read failed');
-        throw error;
-      })
-      : getCachedCatalogue(useArrivals?'arrivals-production':includeStaged ? 'preview' : 'production', () => loadLiveInstoreCatalogue(client, { includeStaged })));
+    const load=()=>loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest});
+    const namespace=websiteOnlyProvider?'website-only:'+websiteOnlyOrigin:useArrivals?'arrivals-production':includeStaged?'preview':'production';
+    // Bind both successful values and pending builds to the generation observed
+    // before source reads. A delayed old build can never fill a new edit's key.
+    let live = claimed
+      ? await load().catch(async error=>{await releaseCatalogueRefresh(client,error?.message||'live catalogue read failed');throw error;})
+      : generationKnown ? await getCachedCatalogue(JSON.stringify([namespace,contentSnapshot.generation]),load) : await load();
     if(!instoreContentMatchesProducts(live.products,contentSnapshot))live=await loadLiveInstoreCatalogue(client,{includeStaged,websiteOnlyProvider:providerForRequest});
     let allEligible = live.products;
     if(useArrivals||websiteOnlyProvider){
@@ -541,7 +548,7 @@ return async function handler(req, res) {
       // data used by this handler. The browser can then search and browse it
       // instantly without bypassing the stock, price, image, or duplicate gate.
       catalogue: includeCatalogue ? allEligible : undefined,
-    }, claimed ? () => storeInstoreCatalogue(client, { ...live, tiles:discoveryTiles(live.products) }) : null);
+    }, claimed ? () => storeInstoreCatalogue(client, { ...live, products:applyInstoreWebsitePlacements(live.products,contentSnapshot), contentGeneration:contentSnapshot.generation, tiles:discoveryTiles(applyInstoreWebsitePlacements(live.products,contentSnapshot)) }) : null);
   } catch (error) {
     console.error('extended range api error:', error?.message || error);
     return res.status(503).json({ error: 'Instore Products is temporarily unavailable.' });

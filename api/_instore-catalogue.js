@@ -34,11 +34,14 @@ function hidden(controls) {
     .sort();
 }
 
-// Only a hiding control changes what a customer sees, so only those form the
-// fingerprint: a stored 'visible' row must not force a needless rebuild.
-export function controlsFingerprint(imageControls, listingControls) {
+// Bind snapshots to hiding controls and the reviewed metadata generation.
+// A stored 'visible' control alone must not force a needless rebuild.
+export function validContentGeneration(value) { return typeof value==='string'&&/^(0|[1-9][0-9]{0,17})$/.test(value); }
+
+export function controlsFingerprint(imageControls, listingControls, contentGeneration) {
+  if(contentGeneration!==undefined&&!validContentGeneration(contentGeneration))throw Error('Instore content generation unavailable');
   return createHash('sha256')
-    .update(JSON.stringify({ image: hidden(imageControls), listing: hidden(listingControls) }))
+    .update(JSON.stringify({ image: hidden(imageControls), listing: hidden(listingControls), ...(contentGeneration===undefined?{}:{contentGeneration}) }))
     .digest('hex');
 }
 
@@ -119,7 +122,7 @@ function hiddenControlMap(skus) {
  * fingerprint the snapshot was built under, exactly as it does when it reads
  * the control tables itself, so a superseded snapshot is still refused.
  */
-export async function readCatalogueView(client, { category = '', from = 0, pageSize = 60 } = {}) {
+export async function readCatalogueView(client, { category = '', from = 0, pageSize = 60, contentGeneration } = {}) {
   const { data, error } = await client.rpc('instore_catalogue_view', {
     p_category: category, p_from: from, p_limit: pageSize,
   });
@@ -136,7 +139,7 @@ export async function readCatalogueView(client, { category = '', from = 0, pageS
     },
     fingerprint: controlsFingerprint(
       hiddenControlMap(data.hidden_image_skus),
-      hiddenControlMap(data.hidden_listing_skus),
+      hiddenControlMap(data.hidden_listing_skus), contentGeneration,
     ),
     total,
     products: Array.isArray(data.products) ? data.products : [],
@@ -257,7 +260,8 @@ export async function releaseCatalogueRefresh(client, message) {
   if (error) console.error('instore catalogue release failed:', error.message || error);
 }
 
-export async function writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls }) {
+export async function writeCatalogueSnapshot(client, { products, tiles, imageControls, listingControls, contentGeneration }) {
+  const fingerprint=controlsFingerprint(imageControls,listingControls,contentGeneration);
   const rows = buildCatalogueRows(products);
   if (!rows.length) throw new Error('Instore catalogue refresh produced no products');
   const batch = randomUUID();
@@ -271,7 +275,7 @@ export async function writeCatalogueSnapshot(client, { products, tiles, imageCon
   const { data, error } = await client.rpc('instore_catalogue_commit', {
     p_batch: batch,
     p_tiles: tiles || [],
-    p_controls_fingerprint: controlsFingerprint(imageControls, listingControls),
+    p_controls_fingerprint: fingerprint,
     p_payload_fingerprint: rowsFingerprint(rows),
     p_expected_count: rows.length,
   });

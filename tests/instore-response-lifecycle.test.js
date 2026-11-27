@@ -79,6 +79,7 @@ test('actual authenticated API returns eligible products before an unresponsive 
       if (url.pathname === '/auth/v1/user') return json({ id: '00000000-0000-4000-8000-000000000001' });
       if (url.pathname === '/rest/v1/customers') return json([{ id: '00000000-0000-4000-8000-000000000001', role: 'customer', is_approved: true }]);
       if (url.pathname === '/rest/v1/instore_catalogue_state') return json([{ refreshed_at: null, product_count: 0, tiles: [], controls_fingerprint: '' }]);
+      if (url.pathname === '/rest/v1/rpc/instore_website_content_read_v1') return json({generation:'0',overrides:[],placements:[]});
       if (url.pathname === '/rest/v1/rpc/instore_catalogue_claim_refresh') return json(true);
       if (url.pathname === '/rest/v1/rpc/instore_catalogue_stage') { notifyStage(); await heldStage; return json(1); }
       if (url.pathname === '/rest/v1/rpc/instore_catalogue_commit') return json({ product_count: 1 });
