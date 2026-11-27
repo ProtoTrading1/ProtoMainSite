@@ -1,6 +1,8 @@
+import {applyInstoreWebsitePlacements} from '../lib/instore-website-content.mjs';
+import {readInstoreWebsiteContent} from './_instore-website-content.js';
 import { discoveryTiles } from '../lib/instore-discovery.mjs';
 import {
-  catalogueTtlMs, claimCatalogueRefresh, readCatalogueState,
+  catalogueTtlMs, claimCatalogueRefresh, readCatalogueState, validContentGeneration,
   releaseCatalogueRefresh, writeCatalogueSnapshot,
 } from './_instore-catalogue.js';
 import { loadLiveInstoreCatalogue, stockClient } from './extended-range.js';
@@ -45,9 +47,15 @@ export default async function handler(req, res) {
         refreshedAt: state?.refreshed_at || null, productCount: state?.product_count || 0,
       });
     }
+    // Capture before the source read. If an edit wins while this refresh is
+    // in flight, the old-generation fingerprint is refused by all new reads.
+    const content=await readInstoreWebsiteContent(client);
+    const {generation}=content;
+    if(!validContentGeneration(generation))throw Error('Instore content generation unavailable');
     const live = await loadLiveInstoreCatalogue(client, { includeStaged: false });
+    const placed=applyInstoreWebsitePlacements(live.products,content);
     const { productCount, state } = await writeCatalogueSnapshot(client, {
-      ...live, tiles: discoveryTiles(live.products),
+      ...live, products:placed, contentGeneration:generation, tiles: discoveryTiles(placed),
     });
     return res.status(200).json({
       ok: true, refreshed: true, productCount,

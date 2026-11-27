@@ -1,0 +1,77 @@
+{
+  "scope": "Offline actual SQL proof, not a live category edit",
+  "receipt": {
+    "sku": "8640000274",
+    "reason": "Local four-level category preview only",
+    "outcome": "saved",
+    "revision": "1",
+    "generation": "1",
+    "operationId": "e0069d5f-3815-4d30-94ff-5cdf92c556a1",
+    "categoryPath": [
+      "arts-and-crafts",
+      "art-supplies",
+      "paints",
+      "paints-acrylic"
+    ],
+    "listingHidden": false,
+    "categoryLabels": [
+      "Arts and Crafts",
+      "Art Supplies",
+      "Paints",
+      "Acrylic"
+    ]
+  },
+  "contentSnapshot": {
+    "overrides": [],
+    "generation": "1",
+    "placements": [
+      {
+        "sku": "8640000274",
+        "revision": "1",
+        "categoryPath": [
+          "arts-and-crafts",
+          "art-supplies",
+          "paints",
+          "paints-acrylic"
+        ],
+        "categoryLabels": [
+          "Arts and Crafts",
+          "Art Supplies",
+          "Paints",
+          "Acrylic"
+        ],
+        "sourceIdentity": "566b471cac939cf820e5dbdedf034f79e2b49894e2b5521a4768c77c0d358e7e"
+      }
+    ]
+  },
+  "row": {
+    "sku": "8640000274",
+    "price": 6,
+    "title": "XMAS DECO HANGING ORNAMENT ASST",
+    "barcode": "8640000274",
+    "category": "Arts and Crafts",
+    "image_url": "https://admin.proto.co.za/api/cat07-family-image/b6e09c23-9e34-4257-9e4f-644740b090db/overview/800be73df097f4523b3fcb879fde3b867f2d1371a627834e151eeb37d4f78eeb.png",
+    "is_active": true,
+    "updated_at": "2026-11-27T13:06:51.864+00:00",
+    "image_source": "nutstore",
+    "category_path": [
+      "Arts and Crafts",
+      "Art Supplies",
+      "Paints",
+      "Acrylic"
+    ],
+    "minimum_stock": 1,
+    "supplier_name": "POSITILL",
+    "last_synced_at": "2026-11-27T13:06:51.864+00:00",
+    "units_of_issue": "EACH",
+    "available_stock": 6,
+    "subcategory_one": "Art Supplies",
+    "subcategory_two": "Paints",
+    "image_source_key": "cat07-family-v1:45d7d5acfc2f942841f45d4954f397a5ee531fee77dbfed79a9480abd5e3cb68",
+    "image_observed_at": "2026-11-27T13:06:51.864+00:00",
+    "visibility_status": "search_only",
+    "source_observed_at": "2026-11-27T13:06:51.836+00:00",
+    "image_review_status": "verified",
+    "original_description": "XMAS DECO HANGING ORNAMENT ASST"
+  }
+}
