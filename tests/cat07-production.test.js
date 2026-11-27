@@ -104,3 +104,14 @@ test('all seven historical aliases search the one completed family but can never
  assert.equal(CAT07_HISTORICAL_ALIASES.length,7);
  const hidden={...products[0],imageStatus:'hidden'};for(const alias of CAT07_HISTORICAL_ALIASES)assert.equal(instorePage([hidden],{query:alias,page:1,pageSize:24}).products.length,0);
 });
+test('id-only canonical basket input is normalized server-side before family resolution',async()=>{
+ const item=line(2,1);delete item.product.sku;item.product.id=sku;item.product.isExtendedRange=false;
+ const [resolved]=await resolveAuthoritativePrices([item],{classify:async()=>new Set(),index:client(),fetchBridge:transport(bridge()),bridgeEnv:env});
+ assert.equal(resolved.product.sku,sku);assert.equal(resolved.product.code,sku);assert.equal(resolved.product.image,fixtureReceipt.views[2].image.url);
+});
+test('bridge observation age includes later content/receipt reads instead of being restamped',async()=>{
+ const originalNow=Date.now;let clock=1800000000000;Date.now=()=>clock;
+ try{const db=client(),rpc=db.rpc.bind(db);db.rpc=async(name,args)=>{const result=await rpc(name,args);if(name==='instore_website_content_read_v1')clock+=60001;return result;};
+  await assert.rejects(()=>resolveInstorePrices([line()],{index:db,fetchBridge:transport(bridge()),bridgeEnv:env}),/must be refreshed/);
+ }finally{Date.now=originalNow;}
+});

@@ -28,6 +28,12 @@ for(const style of reviewed.styles)test(style.label+' retains nine views/one ide
 test('pending, changed main/order, hidden, extra/missing/duplicate images never offer choices',()=>{
  for(const p of [{...fixtureProduct,cat07Family:{...fixtureReceipt,status:'pending'}},{...fixtureProduct,image:fixtureProduct.images[1]},{...fixtureProduct,images:[...fixtureProduct.images].reverse()},{...fixtureProduct,images:fixtureProduct.images.slice(1)},{...fixtureProduct,images:[...fixtureProduct.images,fixtureProduct.image]},{...fixtureProduct,imageStatus:'hidden'},{...fixtureProduct,barcode:'other'}])assert.deepEqual(cat07CustomerOptions(p),[]);
 });
+test('reselecting from a previously selected grid product retains all eight choices and canonical nine-view order',()=>{
+ const first=withReviewedColourPhoto(fixtureProduct,reviewed.styles[7].label),second=withReviewedColourPhoto(first,reviewed.styles[1].label);
+ assert.equal(reviewedColourOptions(first).length,8);assert.equal(reviewedColourOptions(second).length,8);
+ assert.equal(second.images[0],fixtureReceipt.views[2].image.url);assert.equal(second.images[1],fixtureProduct.image);
+ assert.deepEqual(new Set(second.images),new Set(fixtureProduct.images));assert.equal(second.cat07CanonicalMain,fixtureProduct.image);assert.equal(fixtureProduct.image,fixtureReceipt.views[0].image.url);
+});
 test('server rejects changed digest/destination/main/label or missing receipt, never browser proof',()=>{
  for(const mutate of [a=>{a.receipt=null;},a=>{a.receipt.views[1].label='forged';},a=>{a.receipt.manifestHash='0'.repeat(64);},a=>{a.receipt.destination='website';a.receipt.manifestHash=cat07ManifestHash(a.receipt);},a=>{a.indexRow.destination='website';},a=>{a.indexRow.image=fixtureReceipt.views[1].image.url;},a=>{a.indexRow.hidden=true;}]){const a=authority();mutate(a);assert.throws(()=>resolveCat07OrderPreview([line()],a));}
  for(const label of ['','Saved family reference overview','unknown','<script>'])assert.throws(()=>resolveCat07OrderPreview([line(label)],authority()));

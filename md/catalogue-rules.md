@@ -1,0 +1,7 @@
+# Customer catalogue sources
+
+The main catalogue reads its published product rows and stock from `public.website_stock`. Existing Instore products use their separate reviewed `public.extended_range_items` index and approved packing-confirmed request policy. These surfaces must not be confused with metadata-only `website_products` links or archived products.
+
+The user explicitly approved one additional scoped, read-only source exception for Christmas family `8640000274`: retain all nine photos under one canonical Instore product and use its actual shared Positill balance, current price and EACH unit. A completed Website Stock family receipt and the bound current canonical Instore row are mandatory. After customer authentication, the server may read the exact code through the existing Positill bridge `/stmast` endpoint to supply current browse, stock-check and checkout values. Checkout sums every style line against that one current balance; stale or unavailable source proof holds the family. The main-catalogue source rule is unchanged for other products.
+
+This exception authorizes no Positill write, source adjustment, fabricated quantity, availability badge, invented suffix SKU or generic low-stock bypass. The bridge request is an exact-code read only. Website publication and order records remain separate from source stock. Historical archive/index aliases remain unchanged and cannot become independent stock balances after family adoption.

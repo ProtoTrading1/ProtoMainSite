@@ -354,12 +354,12 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   const bridgeKey = String(bridgeEnv.STOCK_SQL_BRIDGE_KEY || '').trim();
   // The bridge is best-effort for price and a stock log line only: a bridge
   // outage or an unknown SKU must not block an Instore order request.
-  const bridgeBySku = new Map();
+  const bridgeBySku = new Map(),bridgeObservedAt=new Map();
   if (bridgeUrl.startsWith('https://') && bridgeKey) {
     await Promise.all(skus.map(async (sku) => {
       try {
         const response = await fetchBridge(`${bridgeUrl}/stmast`, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-api-key': bridgeKey }, body: JSON.stringify({ sku }), signal: AbortSignal.timeout(15000) });
-        if (response.ok) bridgeBySku.set(sku, (await response.json())?.row);
+        if (response.ok) {const row=(await response.json())?.row;bridgeBySku.set(sku,row);bridgeObservedAt.set(sku,Date.now());}
         else console.warn('send-order: Instore bridge returned', response.status, 'for', sku);
       } catch (error) {
         console.warn('send-order: Instore bridge unreachable for', sku, error?.message || error);
@@ -376,8 +376,11 @@ export async function resolveInstorePrices(items, { websiteOnlyRows = [], websit
   if(familyItems.length){
     const matching=indexRows.filter(row=>textId(row.sku)==='8640000274');
     if(matching.length!==1||duplicates.get('8640000274')?.decision!=='eligible'||listingControls.get('8640000274')==='hidden')throw orderError('Christmas family is unavailable or duplicated.',409);
-    const row=matching[0],receipt=await readCompletedCat07Receipt(index,row),source=cat07CurrentSource(bridgeBySku.get('8640000274'));
-    familyLines=resolveCat07OrderPreview(familyItems,{receipt,indexRow:{sku:row.sku,barcode:row.barcode,destination:'instore',image:row.image_url,hidden:false},source}).items;
+    const row=matching[0],receipt=await readCompletedCat07Receipt(index,row),observedAt=bridgeObservedAt.get('8640000274');
+    if(!Number.isSafeInteger(observedAt))throw orderError('Current Christmas stock must be refreshed.',409);
+    const source=cat07CurrentSource(bridgeBySku.get('8640000274'),{now:observedAt});
+    const canonicalItems=familyItems.map(item=>({...item,product:{...item.product,sku:'8640000274'}}));
+    familyLines=resolveCat07OrderPreview(canonicalItems,{receipt,indexRow:{sku:row.sku,barcode:row.barcode,destination:'instore',image:row.image_url,hidden:false},source}).items;
     familyLines=familyLines.map(line=>({...line,product:{...line.product,name:cleanText(row.title,source.description)}}));
   }
   return items.map((item) => {
