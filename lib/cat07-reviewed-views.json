@@ -1,13 +1,9 @@
 {
   "sku": "8640000274",
   "overview": {
-    "operationId": "f0ac69c0-e792-49cf-85eb-61961c3c3de2",
-    "requestHash": "9898df6705127581b800246f9548e53f684e4ddbceeb8a892bc8401adc4fa035",
-    "imageId": "b51ed800-b3ec-46c3-b9ca-daa88af63b84",
-    "mime": "image/jpeg",
-    "size": 401338,
     "sha256": "930d2e5fa8c73656721a0852641ba4a4de70333b6be838b805fa87685151bf73",
-    "filename": "8640000274.jpg"
+    "size": 401338,
+    "mime": "image/jpeg"
   },
   "styles": [
     {

@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import {createHash} from 'node:crypto';
 import reviewed from '../../lib/cat07-reviewed-views.json' with {type:'json'};
 import {cat07ManifestHash} from '../../lib/cat07-order-preview.mjs';
-export const fixtureReceipt={state:'complete',protocol:'proto.cat07-family-publication.v1',receiptId:'00000000-0000-4000-8000-000000000274',sku:reviewed.sku,barcode:reviewed.sku,destination:'instore',mainViewId:'overview',views:[],manifestHash:''};
+export const fixtureReceipt={status:'complete',protocol:'proto.cat07-family-publication.v1',receiptId:'00000000-0000-4000-8000-000000000274',sku:reviewed.sku,barcode:reviewed.sku,destination:'instore',mainViewId:'overview',views:[],manifestHash:''};
 export const fixtureImages=new Map();
 const specs=[{id:'overview',role:'overview',label:'Saved family reference overview',...reviewed.overview},...reviewed.styles.map(style=>({id:'style-'+style.attachment,role:'style',...style}))];
 for(const spec of specs){

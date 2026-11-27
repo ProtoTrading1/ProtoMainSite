@@ -490,6 +490,7 @@ function ProductCard({ product: sourceProduct, addToCart, cartQty = 0, special, 
         </button>)}
       </div>
       {colourOptions.some(option => option.stockAvailable) && <small>Stock available badges: supplier list, 24 Nov 2026. Live stock is checked separately.</small>}
+      {sourceProduct.sku==='8640000274'&&<small>All styles share one stock balance. Your preferred style is subject to availability.</small>}
     </fieldset>
   );
   const supplierBadge = supplierStockAvailable(product) && <p className="pc-supplier-stock-note"><strong>Stock available</strong><small>Supplier list · 24 Nov 2026</small></p>;

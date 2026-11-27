@@ -17,7 +17,7 @@ test('actual card/detail preserve nine views and eight preferences; combined6 an
 });
 test('pending family cannot fall through to ordinary Add and unexpected network/methods are denied',async({page,request})=>{
  const product=await (await request.get('/__fixture/cat07/product')).json();
- await page.route('**/__fixture/cat07/product',route=>route.fulfill({json:{...product,cat07Family:{...product.cat07Family,state:'pending'}}}));
+ await page.route('**/__fixture/cat07/product',route=>route.fulfill({json:{...product,cat07Family:{...product.cat07Family,status:'pending'}}}));
  await page.goto('/e2e/fixtures/cat07.html');await expect(page.locator('.product-card')).toBeVisible();await expect(page.getByRole('button',{name:'Add to Cart',exact:true})).toBeDisabled();
  for(const path of ['/api/send-order','/mock-supabase/auth/v1/token'])expect((await request.post(path,{data:{}})).status()).toBe(409);
  expect((await request.post('/__fixture/cat07/product')).status()).toBe(404);

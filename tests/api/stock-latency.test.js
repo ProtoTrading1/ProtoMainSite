@@ -21,7 +21,10 @@ test('Instore stock requires its exact product identity and complete numeric bal
 const readSource = (relativePath) => readFile(new URL(`../../${relativePath}`, import.meta.url), 'utf8');
 
 test('live stock keeps authentication first and overlaps approval with the stock read', async () => {
-  const source = await readSource('api/stock.js');
+  // Helpers may also run parallel reads after their caller authenticates.
+  // Inspect the actual HTTP handler's ordering, not an earlier helper body.
+  const module = await readSource('api/stock.js');
+  const source = module.slice(module.indexOf('export function createStockHandler('));
 
   assert.match(source, /authenticate=requireAuth/);
   assert.match(source, /approve=getApprovedCustomer/);
