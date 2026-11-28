@@ -1,0 +1,11 @@
+import {createRoot} from 'react-dom/client';
+import {useEffect,useState} from 'react';
+import ProductCard from '../../src/components/ProductCard.jsx';
+import {rememberAuthSession} from '../../src/lib/authHeaders.js';
+import '../../src/index.css';
+if(location.hostname!=='127.0.0.1')throw Error('Local preview only');
+rememberAuthSession({access_token:'synthetic-piece-preview-noncredential',user:{id:'synthetic-piece-preview'}});
+export function Preview(){const [rows,setRows]=useState([]),[adds,setAdds]=useState(0),[mismatch,setMismatch]=useState(false);
+ useEffect(()=>{let active=true;void fetch('/__fixture/catalogue?mismatch='+(mismatch?'yes':'no')).then(r=>r.json()).then(value=>{if(active)setRows(value);});return()=>{active=false;};},[mismatch]);
+ return <main style={{maxWidth:950,margin:'auto',padding:20}}><h1>Piece-unit stock preview</h1><p>LOCAL SIMULATION ONLY. 17BFTGC two aliases, simulated source22/5PC, original website5PCS/R119. Placeholder photos; no production API, basket or order writes.</p><button onClick={()=>{setRows([]);setMismatch(value=>!value);}}>Switch to {mismatch?'matching5PC':'mismatched50PC'}</button><p role="status">Memory-only Add callbacks: {adds}</p><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16}}>{rows.map(row=><ProductCard key={row.sku+String(mismatch)} product={row} addToCart={()=>{setAdds(value=>value+1);return true;}}/>)}</div></main>;
+}createRoot(document.getElementById('root')).render(<Preview/>);

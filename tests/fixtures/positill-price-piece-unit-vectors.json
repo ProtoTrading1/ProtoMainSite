@@ -1,0 +1,163 @@
+{
+  "scope": "Positive PC/PCS equivalence only; preserve baseline noncanonical literal keys; customer baseline PC/PCS maps to EACH",
+  "vectors": [
+    {
+      "value": "5PC",
+      "expected": "5PC"
+    },
+    {
+      "value": "5PCS",
+      "expected": "5PC"
+    },
+    {
+      "value": "5pcs",
+      "expected": "5PC"
+    },
+    {
+      "value": " 5 PCS ",
+      "expected": "5PC"
+    },
+    {
+      "value": "5\tPC",
+      "expected": "5PC"
+    },
+    {
+      "value": " 5 PCS ",
+      "expected": "5PC"
+    },
+    {
+      "value": "1PCS",
+      "expected": "1PC"
+    },
+    {
+      "value": "99999PCS",
+      "expected": "99999PC"
+    },
+    {
+      "value": "5 PCS",
+      "expected": "5PC"
+    },
+    {
+      "value": "0PC",
+      "expected": "0PC"
+    },
+    {
+      "value": "0PCS",
+      "expected": "0PCS"
+    },
+    {
+      "value": "-5PC",
+      "expected": null
+    },
+    {
+      "value": "-5PCS",
+      "expected": null
+    },
+    {
+      "value": "+5PC",
+      "expected": "+5PC"
+    },
+    {
+      "value": "0.5PC",
+      "expected": "0.5PC"
+    },
+    {
+      "value": "5.0PC",
+      "expected": "5.0PC"
+    },
+    {
+      "value": "05PC",
+      "expected": "05PC"
+    },
+    {
+      "value": "05PCS",
+      "expected": "05PCS"
+    },
+    {
+      "value": "5-PC",
+      "expected": null
+    },
+    {
+      "value": "5_PC",
+      "expected": null
+    },
+    {
+      "value": "5PC/5PCS",
+      "expected": "5PC/5PCS"
+    },
+    {
+      "value": "5PC+1",
+      "expected": "5PC+1"
+    },
+    {
+      "value": "5PC.",
+      "expected": "5PC."
+    },
+    {
+      "value": "PC",
+      "expected": "PC",
+      "expectedCustomer": "EACH"
+    },
+    {
+      "value": "PCS",
+      "expected": "PCS",
+      "expectedCustomer": "EACH"
+    },
+    {
+      "value": "5PCX",
+      "expected": "5PCX"
+    },
+    {
+      "value": "5PC\n",
+      "expected": null
+    },
+    {
+      "value": "5\rPCS",
+      "expected": null
+    },
+    {
+      "value": "100000PCS",
+      "expected": "100000PCS"
+    },
+    {
+      "value": "5                                                                PCS",
+      "expected": null
+    },
+    {
+      "value": null,
+      "expected": null
+    },
+    {
+      "value": "PCK100",
+      "expected": "PCK100"
+    },
+    {
+      "value": "PCK,100",
+      "expected": "PCK 100"
+    },
+    {
+      "value": "+-20pc",
+      "expected": "+ 20PC"
+    },
+    {
+      "value": "+-50pc",
+      "expected": "+ 50PC"
+    },
+    {
+      "value": "±800PCS",
+      "expected": "±800PCS"
+    },
+    {
+      "value": "5PC 5PCS",
+      "expected": "5PC 5PCS"
+    },
+    {
+      "value": "5PCS/5PCS",
+      "expected": "5PCS/5PCS"
+    },
+    {
+      "value": "5--PC",
+      "expected": null
+    }
+  ]
+}

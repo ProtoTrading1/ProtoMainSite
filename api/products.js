@@ -1,4 +1,5 @@
 import {attachBallsProducts} from './_834-family.js';
+import {stockUnitComparisonKey} from '../lib/stock-unit-comparison.mjs';
 import {refreshCatalogueStock} from './_catalogue-stock.js';
 import {ballsIdentifier} from '../lib/834-customer-gallery.mjs';
 import { reviewedFrameStockImages } from '../lib/sarongi-instore-gallery.mjs';
@@ -392,7 +393,7 @@ export function adapt(row, tree, salesByBarcode = new Map(), placementPaths = nu
     originalDescription: row.original_description || '',
     packDescription: String(row.pack_description || '').trim(),
     unitsOfIssue,
-    stockUnitConfigured: typeof row.units_of_issue === 'string' && row.units_of_issue.trim() !== '',
+    stockUnitConfigured: typeof row.units_of_issue === 'string' && row.units_of_issue.trim() !== '' && stockUnitComparisonKey(row.units_of_issue) !== null,
     price: customerFacingCataloguePrice(row.price),
     images,
     ...(MOVE_GALLERIES_ENABLED && row.moved_from === 'instore' ? {hasPreservedInstoreGallery:true} : {}),
