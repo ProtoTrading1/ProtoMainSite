@@ -1,3 +1,4 @@
+import {attachInstoreSecondaryGalleries} from '../lib/instore-secondary-galleries.mjs';
 import {attachArchivePublicationGalleries} from '../lib/archive-publication-galleries.mjs';
 import { readInstoreWebsiteContent,instoreContentSourceIdentity } from './_instore-website-content.js';
 import { applyInstoreWebsiteContent,applyInstoreWebsitePlacements,instoreContentMatchesProducts } from '../lib/instore-website-content.mjs';
@@ -492,7 +493,7 @@ return async function handler(req, res) {
       const origin=websiteOnlyProvider ? websiteOnlyRequestOrigin(req) : null;
       const provider=websiteOnlyProvider ? (options)=>websiteOnlyProvider({...options,origin}) : null;
       const live=await loadLiveInstoreCatalogue(client,{websiteOnlyProvider:provider,exactSku:query.toUpperCase()});
-      const products=applyInstoreWebsiteContent(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client)),client,'instore'),contentSnapshot);
+      const products=applyInstoreWebsiteContent(await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(live.products,await readPrivateReviewGalleries(client)),client,'instore'),client,{generation:contentSnapshot.generation}),contentSnapshot);
       const view=instorePage(products,{query,category,page,pageSize:PAGE_SIZE});
       return sendInstoreResponse(res,{source:SOURCE_LABEL,contentGeneration:contentSnapshot.generation,count:view.products.length,page,pageSize:PAGE_SIZE,total:view.total,tiles:[],products:view.products});
     }
@@ -507,8 +508,12 @@ return async function handler(req, res) {
     const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue,contentSnapshot });
     if (stored.body) {
       const galleries = await readPrivateReviewGalleries(client);
-      const body = {...stored.body, products: await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.products, galleries),client,'instore')};
-      if (Array.isArray(stored.body.catalogue)) body.catalogue = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.catalogue, galleries),client,'instore');
+      const productCount=stored.body.products.length,hasCatalogue=Array.isArray(stored.body.catalogue);
+      const combined=[...stored.body.products,...(hasCatalogue?stored.body.catalogue:[])];
+      // One authoritative gallery observation supplies both response arrays.
+      const enriched=await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(combined,galleries),client,'instore'),client,{generation:contentSnapshot.generation});
+      const body={...stored.body,products:enriched.slice(0,productCount)};
+      if(hasCatalogue)body.catalogue=enriched.slice(productCount);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({ source: SOURCE_LABEL,contentGeneration:contentSnapshot.generation, ...body });
@@ -536,7 +541,7 @@ return async function handler(req, res) {
       const [imageControls,listingControls]=await Promise.all([readInstoreImageControls(client),readInstoreListingControls(client)]);
       allEligible=allEligible.filter(product=>listingControls.get(product.sku)!=='hidden').map(product=>imageControls.get(product.sku)==='hidden'?{...product,image:'',images:[],imageStatus:'hidden'}:product);
     }
-    allEligible = await attachArchivePublicationGalleries(attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client)),client,'instore');
+    allEligible = await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(allEligible, await readPrivateReviewGalleries(client)),client,'instore'),client,{generation:contentSnapshot.generation});
     allEligible = applyInstoreWebsiteContent(allEligible,contentSnapshot);
     const view = instorePage(allEligible, { query, category, page, pageSize: PAGE_SIZE });
     const tiles = discoveryTiles(allEligible);

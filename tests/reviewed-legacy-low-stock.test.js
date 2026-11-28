@@ -69,6 +69,7 @@ test('authenticated HTTP browse and exact fallback keep fresh markers through th
   const q={select(){return q;},order(){return q;},in(key,set){predicates.push(row=>set.includes(row[key]));return q;},eq(key,value){predicates.push(row=>row[key]===value);return q;},gt(key,value){predicates.push(row=>row[key]>value);return q;},like(key,pattern){assert.equal(pattern,'https://%');predicates.push(row=>row[key].startsWith('https://'));return q;},range(start,end){const result=values();return Promise.resolve({data:JSON.parse(JSON.stringify(result.slice(start,end+1))),count:result.length,error:null});},then(resolve,reject){return Promise.resolve({data:JSON.parse(JSON.stringify(values())),error:null}).then(resolve,reject);}};
   return q;
  },async rpc(name,args){
+  if(name==='instore_secondary_gallery_read_v1')return {data:{protocol:'proto.instore-secondary-gallery.v1',generation:'0',galleries:[]},error:null};
   if(name==='instore_website_content_read_v1')return {data:{generation:'0',overrides:[]},error:null};
   assert.equal(name,'arrived_stock_receipts_v1');assert.equal(args.p_action,'states');
   return {data:cases.filter(c=>args.p_body.codes.includes(c.sku)).map(receipt),error:null};

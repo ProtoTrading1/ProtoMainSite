@@ -1,0 +1,4 @@
+const PREFIX='/e2e/fixtures/secondary-photos-assets/';let mappings=new Map();
+self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('message',event=>{if(event.data?.type==='secondary-mappings'){mappings=new Map(event.data.entries);event.ports[0]?.postMessage('ready');}});
+self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(url.origin===self.location.origin)return;const canonical=new URL(url.href);canonical.pathname=canonical.pathname.replace('/storage/v1/render/image/public/','/storage/v1/object/public/');canonical.search='';const mapped=mappings.get(canonical.href);event.respondWith(mapped&&mapped.startsWith(PREFIX)?fetch(mapped):Promise.resolve(new Response('External network blocked in preview',{status:403})));});
