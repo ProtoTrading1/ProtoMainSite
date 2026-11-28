@@ -1,0 +1,46 @@
+{
+  "scope": "OFFLINE PGlite-generated integration vector, NOT live publication. Original and PNG bytes are synthetic and no network request is made.",
+  "row": {
+    "sku": "8622930082",
+    "price": 27.5,
+    "title": "Stage3 matching cards",
+    "barcode": "8622930082",
+    "image_url": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8622930082/chinese.jpg",
+    "is_active": true,
+    "image_source": "nutstore",
+    "supplier_name": "POSITILL",
+    "units_of_issue": null,
+    "available_stock": 44,
+    "image_source_key": "local-folder-live:stage3",
+    "visibility_status": "search_only",
+    "image_review_status": "verified"
+  },
+  "reader": {
+    "protocol": "proto.instore-secondary-gallery.v1",
+    "galleries": [
+      {
+        "sku": "8622930082",
+        "mainUrl": "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8622930082/chinese.jpg",
+        "revision": 1,
+        "imageUrls": [
+          "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8622930082/chinese.jpg",
+          "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore-secondary-v1/996f08db-b9ea-487f-ab06-5462d83cbb9b/b97f12b8cfeb1beff304430c1ae3141550600e75cdc3274164aa714f994d368e.png"
+        ],
+        "operationId": "996f08db-b9ea-487f-ab06-5462d83cbb9b",
+        "baseImageUrls": [
+          "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore/8622930082/chinese.jpg"
+        ],
+        "managedImageUrls": [
+          "https://yiqsvwajozafvalwcero.supabase.co/storage/v1/object/public/product-images/instore-secondary-v1/996f08db-b9ea-487f-ab06-5462d83cbb9b/b97f12b8cfeb1beff304430c1ae3141550600e75cdc3274164aa714f994d368e.png"
+        ],
+        "sourceIdentitySHA": "17c8a45273a6e6bdd750637d4217165542de0e255a7f6311b33c642dc721fb68"
+      }
+    ],
+    "generation": "1"
+  },
+  "contentSnapshot": {
+    "generation": "1",
+    "overrides": [],
+    "placements": []
+  }
+}

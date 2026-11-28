@@ -1,0 +1,14 @@
+{
+  "kind": "isolated fixture assets; public mains and explicit synthetic secondary placeholder",
+  "mains": [
+    {
+      "sku": "8622930082",
+      "sha256": "cdb32a2d45b82beaab46a6b052f2c752192e711c7e336afd25ab6460d0078c43"
+    },
+    {
+      "sku": "8622930083",
+      "sha256": "399abdc11ad841ea1b369f9d7ce9215e4da88bac73867d10b4a20cfa51eca95f"
+    }
+  ],
+  "privatePixelsExported": false
+}
