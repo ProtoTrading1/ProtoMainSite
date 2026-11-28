@@ -1,5 +1,5 @@
 {
-  "scope": "Positive same-count PC/PCS comparison spelling only; raw labels never rewritten",
+  "scope": "Positive PC/PCS equivalence only; preserve baseline noncanonical literal keys; customer baseline PC/PCS maps to EACH",
   "vectors": [
     {
       "value": "5PC",
@@ -39,11 +39,11 @@
     },
     {
       "value": "0PC",
-      "expected": null
+      "expected": "0PC"
     },
     {
       "value": "0PCS",
-      "expected": null
+      "expected": "0PCS"
     },
     {
       "value": "-5PC",
@@ -55,23 +55,23 @@
     },
     {
       "value": "+5PC",
-      "expected": null
+      "expected": "+5PC"
     },
     {
       "value": "0.5PC",
-      "expected": null
+      "expected": "0.5PC"
     },
     {
       "value": "5.0PC",
-      "expected": null
+      "expected": "5.0PC"
     },
     {
       "value": "05PC",
-      "expected": null
+      "expected": "05PC"
     },
     {
       "value": "05PCS",
-      "expected": null
+      "expected": "05PCS"
     },
     {
       "value": "5-PC",
@@ -83,27 +83,29 @@
     },
     {
       "value": "5PC/5PCS",
-      "expected": null
+      "expected": "5PC/5PCS"
     },
     {
       "value": "5PC+1",
-      "expected": null
+      "expected": "5PC+1"
     },
     {
       "value": "5PC.",
-      "expected": null
+      "expected": "5PC."
     },
     {
       "value": "PC",
-      "expected": null
+      "expected": "PC",
+      "expectedCustomer": "EACH"
     },
     {
       "value": "PCS",
-      "expected": null
+      "expected": "PCS",
+      "expectedCustomer": "EACH"
     },
     {
       "value": "5PCX",
-      "expected": null
+      "expected": "5PCX"
     },
     {
       "value": "5PC\n",
@@ -115,7 +117,7 @@
     },
     {
       "value": "100000PCS",
-      "expected": null
+      "expected": "100000PCS"
     },
     {
       "value": "5                                                                PCS",
@@ -123,6 +125,38 @@
     },
     {
       "value": null,
+      "expected": null
+    },
+    {
+      "value": "PCK100",
+      "expected": "PCK100"
+    },
+    {
+      "value": "PCK,100",
+      "expected": "PCK 100"
+    },
+    {
+      "value": "+-20pc",
+      "expected": "+ 20PC"
+    },
+    {
+      "value": "+-50pc",
+      "expected": "+ 50PC"
+    },
+    {
+      "value": "±800PCS",
+      "expected": "±800PCS"
+    },
+    {
+      "value": "5PC 5PCS",
+      "expected": "5PC 5PCS"
+    },
+    {
+      "value": "5PCS/5PCS",
+      "expected": "5PCS/5PCS"
+    },
+    {
+      "value": "5--PC",
       "expected": null
     }
   ]
