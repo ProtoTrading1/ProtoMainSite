@@ -1,0 +1,129 @@
+{
+  "scope": "Positive same-count PC/PCS comparison spelling only; raw labels never rewritten",
+  "vectors": [
+    {
+      "value": "5PC",
+      "expected": "5PC"
+    },
+    {
+      "value": "5PCS",
+      "expected": "5PC"
+    },
+    {
+      "value": "5pcs",
+      "expected": "5PC"
+    },
+    {
+      "value": " 5 PCS ",
+      "expected": "5PC"
+    },
+    {
+      "value": "5\tPC",
+      "expected": "5PC"
+    },
+    {
+      "value": " 5 PCS ",
+      "expected": "5PC"
+    },
+    {
+      "value": "1PCS",
+      "expected": "1PC"
+    },
+    {
+      "value": "99999PCS",
+      "expected": "99999PC"
+    },
+    {
+      "value": "5 PCS",
+      "expected": "5PC"
+    },
+    {
+      "value": "0PC",
+      "expected": null
+    },
+    {
+      "value": "0PCS",
+      "expected": null
+    },
+    {
+      "value": "-5PC",
+      "expected": null
+    },
+    {
+      "value": "-5PCS",
+      "expected": null
+    },
+    {
+      "value": "+5PC",
+      "expected": null
+    },
+    {
+      "value": "0.5PC",
+      "expected": null
+    },
+    {
+      "value": "5.0PC",
+      "expected": null
+    },
+    {
+      "value": "05PC",
+      "expected": null
+    },
+    {
+      "value": "05PCS",
+      "expected": null
+    },
+    {
+      "value": "5-PC",
+      "expected": null
+    },
+    {
+      "value": "5_PC",
+      "expected": null
+    },
+    {
+      "value": "5PC/5PCS",
+      "expected": null
+    },
+    {
+      "value": "5PC+1",
+      "expected": null
+    },
+    {
+      "value": "5PC.",
+      "expected": null
+    },
+    {
+      "value": "PC",
+      "expected": null
+    },
+    {
+      "value": "PCS",
+      "expected": null
+    },
+    {
+      "value": "5PCX",
+      "expected": null
+    },
+    {
+      "value": "5PC\n",
+      "expected": null
+    },
+    {
+      "value": "5\rPCS",
+      "expected": null
+    },
+    {
+      "value": "100000PCS",
+      "expected": null
+    },
+    {
+      "value": "5                                                                PCS",
+      "expected": null
+    },
+    {
+      "value": null,
+      "expected": null
+    }
+  ]
+}
