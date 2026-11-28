@@ -20,6 +20,7 @@ test('both5PCS aliases verify22 through actual stock handler;50PC mismatch stays
  await page.goto(origin+'/e2e/fixtures/piece-unit-stock.html');const cards=page.locator('.product-card');await expect(cards).toHaveCount(2);
  for(const card of await cards.all()){await expect(card).toContainText('22');await expect(card).toContainText('119');await expect(card).toContainText(/5pcs/i);await card.hover();await expect(card.getByRole('button',{name:'Add to Cart',exact:true})).toBeEnabled();}
  await page.getByRole('button',{name:'Switch to mismatched50PC'}).click();
- for(const card of await cards.all()){await expect(card).toContainText('Stock unavailable');await card.hover();await expect(card.getByRole('button',{name:'Add to Cart',exact:true})).toBeDisabled();}
+ await expect(cards).toHaveCount(2);
+ for(const card of await cards.all()){await card.getByRole('button',{name:'Check live stock',exact:true}).click();await expect(card).toContainText('Stock unavailable');await card.hover();await expect(card.getByRole('button',{name:'Add to Cart',exact:true})).toBeDisabled();}
  await expect(page.getByRole('status').filter({hasText:'Memory-only'})).toHaveText('Memory-only Add callbacks: 0');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

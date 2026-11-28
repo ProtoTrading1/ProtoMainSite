@@ -72,3 +72,9 @@ test('synthetic no-space PCK100 stays distinct; actual approximate800 versus PKT
   const p=products([{...rows[0],sku,barcode:sku,units_of_issue:website}]),observation=validateShowroomStockObservation(sku,{CODE:sku,ONHAND:95,BOOKED:0,UNITS:source});assert.equal(overlayShowroomLiveStock(p,new Map([[sku,observation]]))[0].stockOnHand,null);
  }
 });
+test('checkout mixed5PC and5PCS aliases share22 while different counts and distinct invalid originals reject',async()=>{
+ const checkout=async units=>{const values=rows.map((row,index)=>({...row,units_of_issue:units[index]}));return resolveStandardPrices(values.map((row,index)=>({qty:index?9:13,product:{sku:row.sku,code,checkoutSnapshot:{unitPrice:119,stockQty:22}}})),{index:db(values),readStock:async()=>new Map([[code,proof()]])});};
+ const lines=await checkout(['5PC','5PCS']);assert.deepEqual(lines.map(line=>line.qty),[13,9]);assert.deepEqual(lines.map(line=>line.product.unitsOfIssue),['5PC','5PCS']);
+ for(let i=0;i<lines.length;i++){assert.equal(lines[i].product.stockOnHand,22);assert.equal(lines[i].product.price,119);assert.equal(lines[i].product.image,rows[i].image_url_one);assert.equal(lines[i].product.stockRequest?.shortfallQty||0,0);}
+ for(const units of [['5PC','50PCS'],['-5PCS','5-PC'],['5_PC','-5PCS']])await assert.rejects(checkout(units),error=>error.code==='SHARED_STOCK_UNIT_MISMATCH',JSON.stringify(units));
+});

@@ -14,6 +14,7 @@ import {resolveCat07OrderPreview} from '../lib/cat07-order-preview.mjs';
 import {isCat07HistoricalAlias} from '../lib/cat07-customer-gallery.mjs';
 import sharp from 'sharp';
 import { normalizeUnitsOfIssue, sellingUnitDetails } from '../lib/selling-unit.mjs';
+import {stockUnitComparisonKey} from '../lib/stock-unit-comparison.mjs';
 import { customerFacingCataloguePrice, websitePriceFromExVat } from '../lib/catalogue-price.mjs';
 import path from 'node:path';
 import { createStockClient, resolveStockCredentials } from '../lib/stock-supabase.mjs';
@@ -493,7 +494,8 @@ export async function resolveStandardPrices(items, { index = null, fetchBridge =
       group.qty+=qty;group.hasUnknown||=stock===null;
       if(stock!==null)group.stockQty=group.stockQty===null?stock:Math.min(group.stockQty,stock);
       group.variants.set(aggregateKey,{row,snapshot:product.checkoutSnapshot||{}});
-      group.units.add(normalizeUnitsOfIssue(row.units_of_issue||'EACH'));
+      const rawUnit=row.units_of_issue||'EACH';
+      group.units.add(stockUnitComparisonKey(rawUnit)??JSON.stringify(['invalid-unit',rawUnit]));
       requestedByBarcode.set(sharedBarcode,group);
     }
     const review = evaluateCheckoutSnapshot({

@@ -48,7 +48,7 @@ for (const [file, hash] of [
   ['lib/selling-unit.mjs', 'd6d8d6ba8030d7ee7bccf53f79cce18d1c9e44f407d6b47af084b7157ec554ff'],
   ['lib/product-availability.mjs', '1dda4ddcada1c4191c6483cba69a463df7138c467e836d98aeba7d840d82f6e1'],
   ['api/account-cart.js', '87b0e3fb6816895c52ccc47317fada9295cb9c92fd696123cc211d969ff4c285'],
-  ['api/send-order.js', '48ab31be6f80febda360af82e525d10b24d6b40bca8330c5507c81c5ce668d7a'],
+  ['api/send-order.js', 'f01f76eddf91a316af2f7ee26c796e4dc3208e4ecc2e899427dbe9bd06b956db'],
   ['lib/reviewed-colour-options.mjs', '4a30306e2ad9208f560232b6bf77a818b40a80bba123f2234ee42b6664b376ce'],
   ['api/_instore-catalogue.js', 'c86cf0c8a6ff0b73086bebfbef4e787c740c3dbfa6b59799c71a1a46679793c9'],
   ['lib/instore-website-content.mjs', '515741692cf6df4b711eacd2284569bb12f768665415b9a87029f6864a33bf9b'],
