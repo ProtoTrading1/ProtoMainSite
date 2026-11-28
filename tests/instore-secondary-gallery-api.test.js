@@ -16,11 +16,19 @@ function database({generation='42',galleryGeneration=generation,available=true}=
 test('actual authenticated full-collection route overlays fresh secondary gallery on both stored result and catalogue',async()=>{
  const db=database(),res=response();await createExtendedRangeHandler({authorize:async()=>true,getClient:()=>db})({method:'GET',headers:{host:'www.proto.co.za'},query:{catalogue:'1'}},res);
  assert.equal(res.code,200);for(const rows of [res.body.products,res.body.catalogue])assert.deepEqual(rows,[{...product,images:[main,extra]}]);
- assert.equal(res.body.contentGeneration,'42');assert.equal(db.calls.filter(call=>call.name==='instore_secondary_gallery_read_v1').length,2);
+ assert.equal(res.body.contentGeneration,'42');assert.equal(db.calls.filter(call=>call.name==='instore_secondary_gallery_read_v1').length,1);
 });
 test('reader failure or generation race preserves the listing and main without authorizing stale secondary photos',async()=>{
  for(const options of [{available:false},{galleryGeneration:'43'}]){const db=database(options),res=response();await createExtendedRangeHandler({authorize:async()=>true,getClient:()=>db})({method:'GET',headers:{host:'www.proto.co.za'},query:{catalogue:'1'}},res);assert.equal(res.code,200);assert.deepEqual(res.body.products,[product]);}
 });
 test('denied customer makes zero catalogue, secondary-gallery or source requests',async()=>{
  let reads=0;await createExtendedRangeHandler({authorize:async()=>false,getClient:()=>{reads++;throw Error('Unexpected client');}})({method:'GET',headers:{host:'www.proto.co.za'},query:{}},response());assert.equal(reads,0);
+});
+
+test('one shared lookup keeps products and catalogue coherent when a second independent read would fail',async()=>{
+ const db=database(),rpc=db.rpc;let galleryReads=0;
+ db.rpc=(name,body)=>{if(name==='instore_secondary_gallery_read_v1'&&++galleryReads>1)return {abortSignal:async()=>({error:{message:'second read unavailable'}})};return rpc(name,body);};
+ const res=response();await createExtendedRangeHandler({authorize:async()=>true,getClient:()=>db})({method:'GET',headers:{host:'www.proto.co.za'},query:{catalogue:'1'}},res);
+ assert.equal(res.code,200);assert.deepEqual(res.body.products,res.body.catalogue);
+ assert.deepEqual(res.body.products,[{...product,images:[main,extra]}]);assert.equal(galleryReads,1);
 });

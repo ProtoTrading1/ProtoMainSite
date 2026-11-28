@@ -508,8 +508,12 @@ return async function handler(req, res) {
     const stored = (useArrivals||websiteOnlyProvider)?{body:null,staleBeforeMs:0}:await serveStoredCatalogue(client, { query, category, page, from, includeCatalogue,contentSnapshot });
     if (stored.body) {
       const galleries = await readPrivateReviewGalleries(client);
-      const body = {...stored.body, products: await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.products, galleries),client,'instore'),client,{generation:contentSnapshot.generation})};
-      if (Array.isArray(stored.body.catalogue)) body.catalogue = await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(stored.body.catalogue, galleries),client,'instore'),client,{generation:contentSnapshot.generation});
+      const productCount=stored.body.products.length,hasCatalogue=Array.isArray(stored.body.catalogue);
+      const combined=[...stored.body.products,...(hasCatalogue?stored.body.catalogue:[])];
+      // One authoritative gallery observation supplies both response arrays.
+      const enriched=await attachInstoreSecondaryGalleries(await attachArchivePublicationGalleries(attachPrivateReviewGalleries(combined,galleries),client,'instore'),client,{generation:contentSnapshot.generation});
+      const body={...stored.body,products:enriched.slice(0,productCount)};
+      if(hasCatalogue)body.catalogue=enriched.slice(productCount);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Vary', 'Authorization');
       return res.status(200).json({ source: SOURCE_LABEL,contentGeneration:contentSnapshot.generation, ...body });
